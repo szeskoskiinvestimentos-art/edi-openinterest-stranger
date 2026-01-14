@@ -1333,7 +1333,7 @@ class StrangerThingsCharts {
             copyBtn.parentNode.replaceChild(newBtn, copyBtn);
             
             newBtn.addEventListener('click', () => {
-                const textToCopy = ntslArea.innerText;
+                const textToCopy = ntslArea.innerText.replace(/\n/g, '\r\n');
                 
                 navigator.clipboard.writeText(textToCopy).then(() => {
                     newBtn.innerText = 'CÓDIGO COPIADO!';
