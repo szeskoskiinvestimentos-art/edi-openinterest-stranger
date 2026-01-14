@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDI - Trading Station</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --bg-hover: #334155;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --border: #334155;
+        }
+        body { background-color: var(--bg-dark); color: var(--text-main); font-family: 'Inter', sans-serif; margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Sidebar */
+        .sidebar { width: 260px; background: #0b1120; border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+        .brand { padding: 24px; border-bottom: 1px solid var(--border); }
+        .brand h1 { margin: 0; font-size: 1.25rem; color: var(--accent); letter-spacing: -0.5px; }
+        .brand span { font-size: 0.75rem; color: var(--text-muted); font-weight: normal; display: block; margin-top: 4px; }
+        
+        .nav { flex: 1; padding: 20px 0; overflow-y: auto; }
+        .nav-item { display: block; padding: 12px 24px; color: var(--text-muted); text-decoration: none; font-size: 0.9rem; transition: all 0.2s; border-left: 3px solid transparent; }
+        .nav-item:hover, .nav-item.active { background: rgba(59, 130, 246, 0.1); color: var(--text-main); border-left-color: var(--accent); }
+        .nav-header { padding: 20px 24px 8px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #475569; font-weight: 700; }
+        
+        .footer { padding: 20px; font-size: 0.75rem; color: #475569; border-top: 1px solid var(--border); text-align: center; }
+
+        /* Main Content */
+        .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        
+        /* Top Bar Metrics */
+        .topbar { height: 60px; background: #0b1120; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; gap: 24px; flex-shrink: 0; overflow-x: auto; white-space: nowrap; }
+        .metric { display: flex; flex-direction: column; }
+        .metric-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; }
+        .metric-value { font-size: 1rem; font-weight: 600; color: var(--text-main); font-feature-settings: "tnum"; }
+        .metric-value.up { color: var(--success); }
+        .metric-value.down { color: var(--danger); }
+        .divider { width: 1px; height: 30px; background: var(--border); }
+
+        /* Content Area */
+        .content { flex: 1; overflow-y: auto; padding: 30px; scroll-behavior: smooth; }
+        .section-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 20px; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
+        .section-title::before { content: ''; width: 6px; height: 24px; background: var(--accent); border-radius: 2px; display: inline-block; }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; margin-bottom: 40px; }
+        
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; display: flex; flex-direction: column; }
+        .card:hover { transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,0,0,0.3); border-color: var(--accent); }
+        
+        .card-body { padding: 20px; flex: 1; }
+        .card-tag { font-size: 0.7rem; font-weight: 700; color: var(--accent); text-transform: uppercase; margin-bottom: 8px; display: inline-block; background: rgba(59, 130, 246, 0.1); padding: 4px 8px; border-radius: 4px; }
+        .card h3 { margin: 0 0 8px 0; font-size: 1.1rem; font-weight: 600; color: #fff; }
+        .card p { margin: 0; font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; }
+        
+        .card-footer { padding: 15px 20px; background: rgba(0,0,0,0.2); border-top: 1px solid var(--border); display: flex; gap: 10px; }
+        .btn { flex: 1; text-align: center; padding: 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; text-decoration: none; transition: all 0.2s; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+        .btn-outline:hover { border-color: var(--text-muted); color: var(--text-main); }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0b1120; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        @media print {
+            @page { 
+                size: A4 landscape; 
+                margin: 5mm; 
+            }
+            body { 
+                background-color: #0f172a !important; 
+                -webkit-print-color-adjust: exact; 
+                print-color-adjust: exact; 
+                color: #f1f5f9 !important; 
+                overflow: visible !important;
+                height: auto !important;
+            }
+            .sidebar, .topbar, .no-print { 
+                display: none !important; 
+            }
+            .main {
+                display: block !important;
+            }
+            .content { 
+                margin: 0 !important; 
+                padding: 0 !important;
+                width: 100% !important; 
+                height: auto !important;
+                overflow: visible !important;
+            }
+            .grid {
+                display: block !important;
+            }
+            .card { 
+                break-inside: avoid; 
+                page-break-inside: avoid; 
+                background-color: #1e293b !important; 
+                border: 1px solid #334155 !important; 
+                margin-bottom: 20px !important;
+                box-shadow: none !important;
+                width: 100% !important;
+            }
+            .card h3 {
+                color: #3b82f6 !important;
+            }
+            .card p {
+                color: #94a3b8 !important;
+            }
+            iframe {
+                height: 600px !important; 
+                width: 100% !important;
+                page-break-inside: avoid;
+            }
+            ::-webkit-scrollbar { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="brand">
+            <h1>EDI System</h1>
+            <span>Intelligence Station</span>
+        </div>
+        <div class="nav">
+            <div class="nav-header">Navegação</div>
+<a href="#PRINCIPAL" class="nav-item">Principal</a><a href="#EXPOSIÇÃO" class="nav-item">Exposição</a><a href="#DETALHAMENTO FIG3" class="nav-item">Detalhamento Fig3</a><a href="#FLUXO" class="nav-item">Fluxo</a><a href="#ESTRUTURAL" class="nav-item">Estrutural</a><a href="#OVERLAYS" class="nav-item">Overlays</a><a href="#RISCO" class="nav-item">Risco</a><a href="#DADOS" class="nav-item">Dados</a>
+        </div>
+        <div style="padding: 0 24px 20px;">
+            <button onclick="window.print()" style="width: 100%; background: #3b82f6; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2-2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 14h12v8H6z"></path></svg>
+                Salvar PDF
+            </button>
+        </div>
+        <div class="footer">
+            &copy; 2025 EDI Analytics<br>v2.1 Updated
+        </div>
+    </nav>
+
+    <!-- Main Area -->
+    <main class="main">
+        <!-- Top Bar -->
+        <div class="topbar">
+            <div class="metric">
+                <span class="metric-label">Spot Price</span>
+                <span class="metric-value">5409.50</span>
+            </div>
+            <div class="divider"></div>
+            <div class="metric">
+                <span class="metric-label">Regime</span>
+                <span class="metric-value" style="color: #10b981">Gamma Positivo</span>
+            </div>
+            <div class="divider"></div>
+             <div class="metric">
+                <span class="metric-label">Clima</span>
+                <span class="metric-value">Normal</span>
+            </div>
+            <div class="divider"></div>
+            <div class="metric">
+                <span class="metric-label">Gamma Flip</span>
+                <span class="metric-value" style="color: #f59e0b">5250.00</span>
+            </div>
+            <div class="divider"></div>
+            <div class="metric">
+                <span class="metric-label">Delta Flip</span>
+                <span class="metric-value" style="color: #a855f7">5436.51</span>
+            </div>
+            <div style="flex:1"></div>
+            <button id="copyNtsl" class="btn btn-outline" style="min-width:140px">Copiar NTSL</button>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+
+            <div id="PRINCIPAL" style="padding-top: 20px;">
+                <h2 class="section-title">PRINCIPAL</h2>
+                <div class="grid">
+        
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">PRINCIPAL</span>
+                            <h3>dashboard</h3>
+                            <p>Relatório sequencial completo com guia explicativo.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="dashboard.html" target="_blank" class="btn-primary">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">PRINCIPAL</span>
+                            <h3>Figura3</h3>
+                            <p>Painel Mestre: Delta, Gamma e OI combinados.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Figura3.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">PRINCIPAL</span>
+                            <h3>Figura4</h3>
+                            <p>Estrutura de Gamma e análise de Flips.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Figura4.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                </div>
+            </div>
+        
+            <div id="EXPOSIÇÃO" style="padding-top: 20px;">
+                <h2 class="section-title">EXPOSIÇÃO</h2>
+                <div class="grid">
+        
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">EXPOSIÇÃO</span>
+                            <h3>Delta Agregado</h3>
+                            <p>Exposição líquida de Delta por strike.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Delta_Agregado.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">EXPOSIÇÃO</span>
+                            <h3>Delta Acumulado</h3>
+                            <p>Soma cumulativa de delta ao longo dos strikes.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Delta_Acumulado.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">EXPOSIÇÃO</span>
+                            <h3>GEX</h3>
+                            <p>Exposição Gamma (GEX) isolada (Nova Visualização).</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="GEX.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">EXPOSIÇÃO</span>
+                            <h3>Gamma Exposure</h3>
+                            <p>Exposição de Gamma (GEX) dos Market Makers.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Gamma_Exposure.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">EXPOSIÇÃO</span>
+                            <h3>Gamma Exposure Curve</h3>
+                            <p>Análise detalhada do mercado de opções.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Gamma_Exposure_Curve.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                </div>
+            </div>
+        
+            <div id="DETALHAMENTO FIG3" style="padding-top: 20px;">
+                <h2 class="section-title">DETALHAMENTO FIG3</h2>
+                <div class="grid">
+        
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">DETALHAMENTO FIG3</span>
+                            <h3>GEX OI</h3>
+                            <p>Relação GEX vs Open Interest.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="GEX_OI.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">DETALHAMENTO FIG3</span>
+                            <h3>GEX IV</h3>
+                            <p>Superfície de Volatilidade Implícita no GEX.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="GEX_IV.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">DETALHAMENTO FIG3</span>
+                            <h3>R Gamma PVOP</h3>
+                            <p>Perfil de Volume e Gamma relativo.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="R_Gamma_PVOP.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">DETALHAMENTO FIG3</span>
+                            <h3>Visao Completa</h3>
+                            <p>Visão integrada de todos os componentes da Figura 3.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Visao_Completa.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                </div>
+            </div>
+        
+            <div id="FLUXO" style="padding-top: 20px;">
+                <h2 class="section-title">FLUXO</h2>
+                <div class="grid">
+        
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">FLUXO</span>
+                            <h3>Flow Sentiment</h3>
+                            <p>Fluxo de agressão e sentimento de mercado.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Flow_Sentiment.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">FLUXO</span>
+                            <h3>Fluxo Hedge</h3>
+                            <p>Necessidade estimada de hedge dinâmico.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Fluxo_Hedge.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">FLUXO</span>
+                            <h3>Charm Flow</h3>
+                            <p>Análise detalhada do mercado de opções.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Charm_Flow.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">FLUXO</span>
+                            <h3>Dealer Pressure</h3>
+                            <p>Índice de pressão dos Dealers nos strikes.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Dealer_Pressure.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                </div>
+            </div>
+        
+            <div id="ESTRUTURAL" style="padding-top: 20px;">
+                <h2 class="section-title">ESTRUTURAL</h2>
+                <div class="grid">
+        
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">ESTRUTURAL</span>
+                            <h3>OI Strike</h3>
+                            <p>Distribuição de contratos em aberto (Call/Put).</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="OI_Strike.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">ESTRUTURAL</span>
+                            <h3>Vanna Sensitivity</h3>
+                            <p>Análise detalhada do mercado de opções.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Vanna_Sensitivity.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">ESTRUTURAL</span>
+                            <h3>Vanna Exposure</h3>
+                            <p>Impacto da mudança de Volatilidade no Delta.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Vanna_Exposure.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">ESTRUTURAL</span>
+                            <h3>Theta Exposure</h3>
+                            <p>Decaimento temporal da carteira (Theta).</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Theta_Exposure.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">ESTRUTURAL</span>
+                            <h3>Charm Exposure</h3>
+                            <p>Impacto da passagem do Tempo no Delta.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Charm_Exposure.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                </div>
+            </div>
+        
+            <div id="OVERLAYS" style="padding-top: 20px;">
+                <h2 class="section-title">OVERLAYS</h2>
+                <div class="grid">
+        
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">OVERLAYS</span>
+                            <h3>Overlay Fibo</h3>
+                            <p>Níveis de Fibonacci sobrepostos.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Overlay_Fibo.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">OVERLAYS</span>
+                            <h3>Overlay Range Walls</h3>
+                            <p>Range do dia e Walls de liquidez.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Overlay_Range_Walls.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">OVERLAYS</span>
+                            <h3>Overlay Range</h3>
+                            <p>Foco no Range de negociação estimado.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Overlay_Range.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">OVERLAYS</span>
+                            <h3>Overlay Walls</h3>
+                            <p>Foco nas barreiras de liquidez (Walls).</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Overlay_Walls.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">OVERLAYS</span>
+                            <h3>Overlay Clean</h3>
+                            <p>Gráfico limpo para análise de preço.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Overlay_Clean.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                </div>
+            </div>
+        
+            <div id="RISCO" style="padding-top: 20px;">
+                <h2 class="section-title">RISCO</h2>
+                <div class="grid">
+        
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">RISCO</span>
+                            <h3>Gamma Flip Cone</h3>
+                            <p>Projeção de volatilidade e níveis de flip.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Gamma_Flip_Cone.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">RISCO</span>
+                            <h3>Delta Flip Profile</h3>
+                            <p>Análise detalhada do mercado de opções.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Delta_Flip_Profile.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">RISCO</span>
+                            <h3>Gamma Flip Analysis</h3>
+                            <p>Comparativo de múltiplos modelos de Flip.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Gamma_Flip_Analysis.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">RISCO</span>
+                            <h3>Pin Risk</h3>
+                            <p>Análise detalhada do mercado de opções.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Pin_Risk.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">RISCO</span>
+                            <h3>Rails Bounce</h3>
+                            <p>Análise detalhada do mercado de opções.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Rails_Bounce.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">RISCO</span>
+                            <h3>Expiry Pressure</h3>
+                            <p>Análise detalhada do mercado de opções.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Expiry_Pressure.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                </div>
+            </div>
+        
+            <div id="DADOS" style="padding-top: 20px;">
+                <h2 class="section-title">DADOS</h2>
+                <div class="grid">
+        
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">DADOS</span>
+                            <h3>Figura3 Tabela</h3>
+                            <p>Dados brutos do Painel Mestre.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Figura3_Tabela.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                    <div class="card">
+                        <div class="card-body">
+                            <span class="card-tag">DADOS</span>
+                            <h3>Figura4 Tabela</h3>
+                            <p>Dados brutos do Painel GEX.</p>
+                        </div>
+                        <div class="card-footer">
+                            <a href="Figura4_Tabela.html" target="_blank" class="btn-outline">Abrir Painel &#8599;</a>
+                        </div>
+                    </div>
+                
+                </div>
+            </div>
+        
+        </div>
+    </main>
+
+    <script>
+        // Simples script para marcar link ativo na sidebar
+        const links = document.querySelectorAll('.nav-item');
+        const content = document.querySelector('.content');
+        
+        // Ativar no scroll
+        content.addEventListener('scroll', () => {
+            let current = '';
+            document.querySelectorAll('[id]').forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (content.scrollTop >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+            links.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href').includes(current)) {
+                    link.classList.add('active');
+                }
+            });
+        });
+        const btn = document.getElementById('copyNtsl');
+        if (btn) {
+            btn.addEventListener('click', async () => {
+                try {
+                    const resp = await fetch('Profit_NTSL.txt');
+                    const txt = await resp.text();
+                    await navigator.clipboard.writeText(txt);
+                    btn.textContent = 'Copiado ✔';
+                    setTimeout(()=>btn.textContent='Copiar NTSL',1500);
+                } catch(e) {
+                    window.open('Profit_NTSL.txt','_blank');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

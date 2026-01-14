@@ -1,0 +1,123 @@
+MANUAL TÉCNICO DO DESENVOLVEDOR - SISTEMA NTSL & QUANT ANALYTICS
+==================================================================
+Versão: 2.0
+Objetivo: Documentação profunda das variáveis, cálculos matemáticos e interpretação dos gráficos do sistema.
+
+--------------------------------------------------------------------------------
+SEÇÃO 1: VARIÁVEIS DO INDICADOR NTSL (PROFIT CHART)
+--------------------------------------------------------------------------------
+O script NTSL é gerado dinamicamente pelo notebook Python (`generate_profit_script`). Abaixo, a lógica de cada variável.
+
+1. EDI_WALL (Midwalls e Fibo)
+   - Cálculo: Identificação de picos locais de Gamma Exposure (GEX) e Open Interest (OI) que não são os maiores absolutos.
+   - Lógica: `scipy.signal.find_peaks` sobre o array de GEX Absoluto.
+   - Função: `HorizontalLineCustom(..., clCream/clGray)`
+
+2. CALL WALL & PUT WALL
+   - Cálculo: 
+     * Call Wall: Strike com maior GEX Positivo (ou maior OI de Call, configurável).
+     * Put Wall: Strike com maior GEX Negativo (ou maior OI de Put).
+   - Importância: Definem os limites de hedgers (Dealers). Acima da Call Wall, Dealers ficam "Short Gamma" (aceleram o mercado). Entre as Walls, "Long Gamma" (amortecem o mercado).
+
+3. GAMMA FLIP (Multi-Modelos)
+   - Conceito: O preço onde o GEX Líquido total do mercado inverte de sinal (de positivo para negativo ou vice-versa).
+   - Modelos Implementados:
+     a) Clássico: Interpolação linear onde `CumSum(GEX) = 0`.
+     b) HVL (High Volatility Logic): Considera o peso da Volatilidade Histórica na probabilidade de ITM.
+     c) Sigma Kernel: Suavização gaussiana para reduzir ruído de strikes isolados.
+     d) TopN: Calcula o Flip considerando apenas os N maiores contratos (remove ruído de varejo).
+   - Visualização: Linha Fúcsia (`clFuchsia`). Se múltiplos modelos convergirem, plotamos uma única linha rotulada.
+
+4. DELTA FLIP
+   - Cálculo: Ponto onde o Delta Líquido Agregado dos Dealers é zero.
+   - Fórmula: Soma(Delta_Dealer * OI) para todos os strikes. Encontrar o Strike/Preço onde a soma cruza zero.
+   - Importância: Ponto de neutralidade direcional. Acima, Dealers precisam vender ativo objeto para hedgear (freio). Abaixo, precisam comprar (freio), dependendo do sinal do Gamma.
+   - Visualização: Linha Amarela (`clYellow`). Tem prioridade visual sobre o Gamma Flip.
+
+--------------------------------------------------------------------------------
+SEÇÃO 2: SISTEMA GRÁFICO (NOTEBOOK & WEB EXPORTS)
+--------------------------------------------------------------------------------
+
+A. FIGURA 3 - O PAINEL ESTRUTURAL (Dashboard Principal)
+   Este gráfico compõe 4 sub-gráficos fundamentais para entender a estrutura de mercado.
+   
+   1. Subfigura 1: Open Interest (OI) por Strike
+      - Eixo X: Strikes | Eixo Y: Contratos em Aberto.
+      - Barras Verdes (Calls) vs Vermelhas (Puts).
+      - Leitura: Onde estão as apostas? Barras grandes indicam onde o "dinheiro grande" está posicionado.
+   
+   2. Subfigura 2: Gamma Exposure (GEX) por Strike
+      - Fórmula: $GEX = Spot \times Gamma \times OpenInterest \times 100$
+      - Leitura: 
+        * Barras para cima (Positivas): Dealers Long Gamma. Mercado tende a ser travado (Mean Reversion).
+        * Barras para baixo (Negativas): Dealers Short Gamma. Mercado tende a ser volátil/direcional.
+   
+   3. Subfigura 3: Vega Exposure
+      - Conceito: Sensibilidade da carteira dos Dealers a mudanças na Volatilidade Implícita (IV).
+      - Leitura: Se Vega é alto positivo, Dealers ganham com aumento da volatilidade. Se negativo, sofrem com aumento da vol.
+   
+   4. Subfigura 4: Skew de Volatilidade (IV Local)
+      - Gráfico de Linha: Mostra a Volatilidade Implícita de cada Strike.
+      - Leitura "Smile/Smirk": Se a curva sobe muito nas Puts (esquerda), o mercado paga caro por proteção de queda (medo). Se sobe nas Calls (direita), paga por euforia de alta.
+
+B. FIGURA 4 - ANÁLISE DE FLIPS E CONES
+   
+   1. Gamma Flip Profile (Perfil de Flip)
+      - O que é: Uma simulação de estresse. "Se o preço cair 1%, onde estará o Gamma Flip?".
+      - Eixo X: Preço do Ativo (Simulado) | Eixo Y: Valor do Gamma Flip Resultante.
+      - Leitura: Se a linha é plana, o Flip é estável (confiável). Se a linha é vertical/instável, o Flip mudará rapidamente com o movimento do preço.
+   
+   2. Cone de Volatilidade
+      - Projeção estatística baseada na IV atual. Mostra até onde é "normal" o preço ir em 1 dia, 1 semana, etc.
+
+C. GRÁFICOS DE GREGAS DE SEGUNDA ORDEM (VANNA & CHARM)
+   
+   1. Vanna Exposure ($d\Delta / d\sigma$)
+      - O que mede: Como o Delta dos Dealers muda quando a Volatilidade muda.
+      - Uso Prático: Importante em dias de eventos (Payroll, FOMC). Se a Vol cai após o evento, Vanna mostra para onde os Dealers vão empurrar o preço.
+   
+   2. Charm Exposure ($d\Delta / dt$)
+      - O que mede: "Decaimento do Delta". Como a passagem do tempo (fim de semana, feriado) altera o hedge dos Dealers.
+      - Uso Prático: Prever movimentos de abertura de segunda-feira ou fechamento de sexta-feira.
+
+D. FLOW SENTIMENT (Análise de Agressão Estimada)
+   
+   1. Conceito
+      - Objetivo: Inferir a direção da agressão (Buy/Sell) sem dados de nível 1 de agressão (Tick-by-Tick), usando variação de preço do prêmio.
+   
+   2. Lógica de Classificação
+      * Bullish Flow (Verde): 
+        - Call com Preço > Preço Anterior (Valorização ~ Compra de Call).
+        - Put com Preço < Preço Anterior (Desvalorização ~ Venda de Put).
+      * Bearish Flow (Vermelho):
+        - Put com Preço > Preço Anterior (Valorização ~ Compra de Put).
+        - Call com Preço < Preço Anterior (Desvalorização ~ Venda de Call).
+   
+   3. Visualização
+      - Gráfico de Barras Empilhado Relativo (Positive/Negative Y-Axis).
+      - Eixo Y Positivo: Volume "Bullish" (Call Up + Put Down).
+      - Eixo Y Negativo: Volume "Bearish" (Put Up + Call Down).
+
+--------------------------------------------------------------------------------
+SEÇÃO 3: LÓGICA DE CÁLCULO (BLACK-SCHOLES & GREEKS)
+--------------------------------------------------------------------------------
+O sistema utiliza o modelo Black-Scholes-Merton para precificar cada opção da cadeia.
+
+- Inputs:
+  * Spot (Preço atual do Dólar Futuro)
+  * Strike (Preço de exercício)
+  * Time to Expiry (Tempo até vencimento em anos)
+  * Risk-Free Rate (Taxa de juros local - DI)
+  * Volatility (IV extraída do mercado ou calculada)
+
+- Processo:
+  1. Para cada opção, calcula-se Delta, Gamma, Vega, Theta.
+  2. Multiplica-se pela quantidade de OI (Open Interest).
+  3. Agrega-se por Strike para ver a exposição líquida.
+  4. Identifica-se os "Zero Crossings" para achar os Flips.
+
+--------------------------------------------------------------------------------
+NOTAS PARA MANUTENÇÃO
+--------------------------------------------------------------------------------
+- O arquivo `metrics.json` armazena os valores calculados para uso posterior.
+- A função `update_profit_logic.py` (incorporada) é responsável por traduzir essa matemática complexa em linhas simples (`HorizontalLineCustom`) para o Profit Chart.

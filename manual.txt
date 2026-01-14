@@ -1,0 +1,132 @@
+# MANUAL OPERACIONAL - DASHBOARD EDI OPEN INTEREST v3.0
+
+Bem-vindo ao manual completo do **Dashboard Edi Open Interest**. Este documento serve como guia definitivo para entender, interpretar e operar utilizando as ferramentas avançadas de análise de fluxo, posicionamento de opções e simulação de preço disponíveis na nossa plataforma.
+
+Este manual foi atualizado para contemplar a **Versão 3.0**, que inclui suporte a múltiplos vencimentos, simulação de valor justo (Black-Scholes) e integração avançada com ProfitChart (NTSL).
+
+---
+
+## 1. CONCEITOS FUNDAMENTAIS (O Básico)
+
+Antes de analisar os gráficos, é essencial dominar o vocabulário do mercado de opções e como o sistema processa os dados.
+
+### Processamento de Dados (Novidade v3.0)
+O sistema agora é capaz de ler **múltiplos arquivos de vencimento** simultaneamente.
+- Basta colocar os arquivos CSV na pasta do projeto.
+- O sistema agrega automaticamente a exposição (Gamma, Delta) de todos os vencimentos.
+- Isso oferece uma visão real da pressão total sobre o preço, não apenas do vencimento curto.
+
+### Termos Chave do Dashboard
+- **Strike (Preço de Exercício):** O preço alvo da opção. Ex: DOLFUT a 5500.
+- **Spot:** O preço atual do ativo objeto (ex: Dólar Futuro agora).
+- **Vencimento (Expiry):** Data limite do contrato. Quanto mais próximo, mais explosivos são os movimentos (Gamma Risk).
+- **Open Interest (OI):** Total de contratos em aberto que não foram liquidados. Indica onde os grandes players estão posicionados.
+- **Volume:** Quantidade negociada no dia. OI é o estoque; Volume é o fluxo.
+
+---
+
+## 2. DICIONÁRIO DE MÉTRICAS (O que você vê na tela)
+
+Explicando cada variável apresentada nos gráficos e tabelas.
+
+### As Gregas (Sensores de Risco)
+- **Delta:** A velocidade. Quanto o preço da opção muda para cada 1 ponto de mudança no ativo.
+- **Gamma:** A aceleração. Quanto o Delta muda quando o preço se move.
+  - *Importância:* Gamma alto significa risco de movimentos violentos.
+- **Vega:** Sensibilidade à Volatilidade. Quanto a opção ganha/perde se a "insegurança" (Vol) do mercado mudar.
+- **Theta:** O tempo. Quanto a opção perde de valor por dia que passa (Decaimento Temporal).
+- **Vanna:** Como o Delta muda com a Volatilidade. Importante para identificar fluxos em dias de alta volatilidade.
+- **Charm:** Como o Delta muda com o Tempo. Afeta o mercado perto do fechamento do dia ou vencimento.
+
+### Indicadores Proprietários EDI
+- **GEX (Gamma Exposure):** A exposição total de Gamma dos Market Makers (agregada de todos os vencimentos).
+  - *Leitura:* Barras grandes indicam onde o preço tende a "travar" ou "acelerar".
+- **Call Wall (Parede de Call):** O strike com maior Gamma/OI de Calls. Funciona como **Resistência Máxima**. O preço tem muita dificuldade de passar daqui.
+- **Put Wall (Parede de Put):** O strike com maior Gamma/OI de Puts. Funciona como **Suporte Máximo**. O preço tende a bater e voltar.
+- **Gamma Flip (Zero Gamma):** O nível de preço onde o mercado muda de regime.
+  - *Abaixo do Flip:* Gamma Negativo (Alta Volatilidade, movimentos rápidos).
+  - *Acima do Flip:* Gamma Positivo (Baixa Volatilidade, mercado lateral/lento).
+- **Max Pain (Painel de Dor):** O preço onde a maioria das opções vira pó. Funciona como um ímã no vencimento.
+- **Edi_Wall (Midwall):** Pontos médios estruturais entre strikes importantes, servindo como suporte/resistência intradiário (Visualizável no ProfitChart).
+
+---
+
+## 3. MAPA OPERACIONAL E ESTRATÉGIAS
+
+Como usar os gráficos e a nova Tabela de Simulação para ganhar dinheiro.
+
+### Estratégia 1: Reversão nas Walls (Call Wall / Put Wall)
+**Cenário:** O preço se aproxima da Call Wall (Resistência) ou Put Wall (Suporte).
+**Ação:**
+- Se tocar na **Call Wall**: Procurar venda (Short). Market Makers vão vender para defender a posição.
+- Se tocar na **Put Wall**: Procurar compra (Long). Market Makers vão comprar para defender.
+**Alvo:** Retorno à média ou ao Gamma Flip.
+
+### Estratégia 2: Aceleração no Gamma Flip
+**Cenário:** O preço cruza o nível do Gamma Flip.
+**Ação:**
+- Se cruzar de Cima para Baixo (entrando em Gamma Negativo): O mercado fica perigoso e rápido. Favorável para rompimentos (Breakouts).
+- Se cruzar de Baixo para Cima (entrando em Gamma Positivo): O mercado acalma. Favorável para operações de Range (comprar fundo, vender topo).
+
+### Estratégia 3: O Ímã do Max Pain
+**Cenário:** Semana de vencimento de opções.
+**Ação:** Operar visando o preço ir em direção à linha roxa do **Max Pain**. Os grandes players tendem a empurrar o mercado para lá para maximizar lucro na sexta-feira.
+
+### Estratégia 4: Arbitragem de Valor Justo (Fair Value) - NOVO v3.0
+**Ferramenta:** Seção "1.1 Simulação de Valor Justo" no Dashboard HTML.
+**Conceito:** O sistema calcula, usando Black-Scholes, quanto cada opção valerá se o mercado for até a Call Wall (ou outro alvo definido) **HOJE**.
+**Como Operar:**
+1.  Identifique no gráfico que o preço tem espaço para subir até a Call Wall.
+2.  Olhe na tabela de Simulação a linha correspondente ao strike dessa Call Wall.
+3.  Veja a coluna **"Var% Call"**. Se ela disser, por exemplo, "+150%", significa que se o movimento acontecer hoje, essa opção mais que dobra de valor.
+4.  **Decisão:** Isso te dá o Risco/Retorno matemático da operação antes mesmo de entrar. Use como validador de entrada e alvo de saída.
+
+---
+
+## 4. GUIA DE LEITURA DOS GRÁFICOS
+
+### 1. Painel Principal (Dashboard)
+- **Barras Verdes/Vermelhas:** Delta Agregado. Mostra quem está ganhando a batalha em cada strike.
+- **Linha Amarela (Delta Acumulado):** Tendência macro. Se inclina para cima, viés de alta.
+- **Linha Tracejada Vermelha (Gamma Flip):** O divisor de águas da volatilidade.
+
+### 2. Tabela de Simulação de Valor Justo (NOVO)
+- **Strike:** A opção analisada.
+- **Call/Put (Agora):** Preço teórico atual.
+- **Call/Put (Simul):** Preço projetado no cenário de alvo atingido.
+- **Var%:** Potencial de lucro/prejuízo percentual. Use para filtrar as melhores oportunidades (maior assimetria).
+
+### 3. Edi - Gamma Exposure & Curvatura
+- Mostra onde estão as "armadilhas" de liquidez.
+- **Curvatura (Linha Laranja):** Se estiver muito alta, indica tensão extrema e possibilidade de movimento forte iminente.
+
+### 4. Edi - Market Maker Profit Simulation
+- Simula o lucro do "Dono do Mercado". Se as barras ficarem vermelhas no preço atual, eles vão mover o mercado para uma zona verde (lucro). Siga o dinheiro inteligente.
+
+---
+
+## 5. INTEGRAÇÃO COM PROFITCHART (NTSL)
+
+O arquivo `Script_ProfitChart_NTSL.txt` contém o código atualizado para plotar estes níveis direto na sua tela de operação.
+
+### Funcionalidades do Indicador NTSL v3.0:
+1.  **Cópia Rápida:** No Dashboard HTML, use o botão **"Copiar Código"** no Item 5 para pegar o script atualizado sem esforço.
+2.  **Indicadores Visuais:**
+    - **Azul:** Call Wall (Resistência Forte)
+    - **Vermelho:** Put Wall (Suporte Forte)
+    - **Fúcsia (Tracejado):** Gamma Flip (Mudança de Regime)
+    - **Roxo:** Max Pain (Ímã)
+    - **Branco (Pontilhado):** Expected Moves (Limites do Dia)
+3.  **Grades Avançadas (Toggles):**
+    - Nas propriedades do indicador no ProfitChart, você encontrará opções:
+        - `MostrarPLUS`: Liga/Desliga as **Edi_Walls** (linhas médias ciano/laranja entre os níveis principais).
+        - `MostrarPLUS2`: Liga/Desliga as linhas de **Fibonacci** (retrações de 38.2%, 50%, 61.8% dentro dos canais).
+    - Isso permite limpar o gráfico ou ver a grade completa ("Matrix") conforme sua necessidade.
+
+---
+
+**Resumo Final:**
+Não opere no escuro.
+1.  Use o **Dashboard** para planejar o dia e ver o potencial de lucro (Fair Value).
+2.  Use o **Indicador NTSL** no gráfico para executar as entradas precisas nas Walls e Midwalls.
+3.  Siga o fluxo de liquidez (GEX) e evite brigar contra os Market Makers.

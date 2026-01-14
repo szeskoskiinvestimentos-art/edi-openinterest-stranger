@@ -1,0 +1,453 @@
+/* ===== STRANGER THINGS THEME CSS ===== */
+
+/* CSS Variables - Neon Colors */
+:root {
+    --primary-neon: #ff073a;
+    --secondary-neon: #00f3ff;
+    --accent-neon: #ff00ff;
+    --warning-neon: #ffff00;
+    --success-neon: #00ff00;
+    
+    --dark-bg: #0a0a0a;
+    --dark-secondary: #1a1a1a;
+    --dark-tertiary: #2a2a2a;
+    
+    --text-primary: #ffffff;
+    --text-secondary: #b3b3b3;
+    --text-muted: #666666;
+    
+    --glow-red: 0 0 20px rgba(255, 7, 58, 0.8);
+    --glow-blue: 0 0 20px rgba(0, 243, 255, 0.8);
+    --glow-purple: 0 0 20px rgba(255, 0, 255, 0.8);
+    --glow-yellow: 0 0 20px rgba(255, 255, 0, 0.8);
+    --glow-green: 0 0 20px rgba(0, 255, 0, 0.8);
+}
+
+/* Global Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Share Tech Mono', monospace;
+    background: var(--dark-bg);
+    color: var(--text-primary);
+    overflow-x: hidden;
+    position: relative;
+}
+
+/* Particle Background */
+#particles-js {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    background: linear-gradient(45deg, #0a0a0a, #1a1a1a, #0a0a0a);
+}
+
+/* Header */
+.header {
+    padding: 20px 0;
+    background: rgba(10, 10, 10, 0.9);
+    border-bottom: 2px solid var(--primary-neon);
+    box-shadow: var(--glow-red);
+    position: relative;
+    z-index: 100;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.logo {
+    text-align: center;
+}
+
+.logo-text {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: var(--primary-neon);
+    text-shadow: 0 0 10px var(--primary-neon);
+    letter-spacing: 2px;
+}
+
+.logo-subtitle {
+    font-size: 1rem;
+    color: var(--secondary-neon);
+    letter-spacing: 5px;
+    margin-top: 5px;
+    text-shadow: 0 0 5px var(--secondary-neon);
+}
+
+/* Navigation */
+.nav {
+    background: var(--dark-secondary);
+    padding: 15px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 99;
+}
+
+.nav-list {
+    display: flex;
+    justify-content: center;
+    list-style: none;
+    gap: 30px;
+}
+
+.nav-link {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+    letter-spacing: 1px;
+}
+
+.nav-link:hover, .nav-link.active {
+    color: var(--secondary-neon);
+    text-shadow: 0 0 8px var(--secondary-neon);
+}
+
+/* Main Content */
+.main {
+    padding: 40px 0;
+}
+
+.section {
+    margin-bottom: 80px;
+}
+
+.section-header {
+    text-align: center;
+    margin-bottom: 40px;
+    position: relative;
+}
+
+.section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2rem;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin-bottom: 10px;
+}
+
+.section-glow {
+    height: 2px;
+    width: 100px;
+    background: var(--secondary-neon);
+    margin: 0 auto;
+    box-shadow: var(--glow-blue);
+}
+
+/* Metrics Grid */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.metric-card {
+    background: rgba(26, 26, 26, 0.8);
+    border: 1px solid var(--primary-neon);
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--glow-red);
+}
+
+.metric-icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.metric-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2rem;
+    color: var(--secondary-neon);
+    text-shadow: 0 0 10px var(--secondary-neon);
+    margin-bottom: 5px;
+}
+
+.metric-label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+}
+
+.metric-change {
+    font-size: 0.8rem;
+    margin-top: 5px;
+}
+
+.metric-change.positive { color: var(--success-neon); }
+.metric-change.negative { color: var(--primary-neon); }
+.metric-change.neutral { color: var(--text-muted); }
+
+/* Charts & Split Layout */
+.split-layout {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 30px;
+    align-items: center;
+}
+
+@media (max-width: 900px) {
+    .split-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.context-box {
+    background: rgba(20, 20, 20, 0.8);
+    padding: 30px;
+    border-left: 3px solid var(--accent-neon);
+    height: 100%;
+}
+
+.context-box h3 {
+    font-family: 'Orbitron', sans-serif;
+    color: var(--accent-neon);
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+}
+
+.context-box p {
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+.chart-container {
+    background: rgba(10, 10, 10, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 20px;
+    height: 400px;
+    position: relative;
+}
+
+/* Code Area Styles (NTSL) */
+.code-container {
+    width: 100%;
+    height: 300px;
+    background: rgba(10, 10, 10, 0.9);
+    border: 1px solid var(--secondary-neon);
+    box-shadow: var(--glow-blue);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+#ntslCodeArea {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    color: var(--secondary-neon);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    padding: 15px;
+    border: none;
+    resize: none;
+    outline: none;
+}
+
+.action-btn {
+    background: rgba(255, 7, 58, 0.1);
+    border: 1px solid var(--primary-neon);
+    color: var(--primary-neon);
+    padding: 10px 20px;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    margin-top: 15px;
+    box-shadow: 0 0 10px rgba(255, 7, 58, 0.3);
+}
+
+.action-btn:hover {
+    background: var(--primary-neon);
+    color: #fff;
+    box-shadow: var(--glow-red);
+}
+
+.feedback-msg {
+    margin-left: 15px;
+    color: var(--success-neon);
+    font-weight: bold;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+/* Table Container */
+.table-container {
+    background: linear-gradient(135deg, rgba(20, 20, 30, 0.95), rgba(10, 10, 20, 0.98));
+    border: 1px solid var(--primary-neon);
+    border-radius: 8px;
+    padding: 2px;
+    box-shadow: 0 0 20px rgba(255, 7, 58, 0.15);
+    overflow-x: auto;
+    overflow-y: auto;
+    margin-top: 20px;
+    max-height: 500px; /* Limite de altura para scroll vertical se necessário */
+}
+
+/* Custom Scrollbar for Webkit */
+.table-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.table-container::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.table-container::-webkit-scrollbar-thumb {
+    background: var(--primary-neon);
+    border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+    background: var(--secondary-neon);
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.95rem;
+    font-family: 'Share Tech Mono', monospace;
+    min-width: 600px; /* Garante largura mínima para evitar esmagamento */
+}
+
+.data-table th {
+    background: rgba(255, 7, 58, 0.1);
+    color: var(--primary-neon);
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 15px;
+    border-bottom: 2px solid var(--primary-neon);
+    text-align: center;
+    white-space: nowrap; /* Evita quebra de linha no header */
+}
+
+.data-table td {
+    color: #e0e0e0;
+    padding: 12px 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+    white-space: nowrap; /* Evita quebra de linha nos dados */
+}
+
+/* Zebra Striping */
+.data-table tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Hover Effect */
+.data-table tr:hover td {
+    background: rgba(0, 243, 255, 0.05);
+    color: var(--secondary-neon);
+    text-shadow: 0 0 8px rgba(0, 243, 255, 0.5);
+    border-bottom: 1px solid var(--secondary-neon);
+}
+
+/* Column Alignment Helpers */
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.font-bold { font-weight: bold; }
+
+/* Sticky Header */
+.data-table thead tr {
+    position: sticky;
+    top: 0;
+    background: #0a0a0a; /* Fundo sólido para evitar transparência sobreposta */
+    z-index: 10;
+}
+
+/* Neon Table (For Fair Value) */
+.neon-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.9rem;
+    margin-top: 15px;
+}
+
+.neon-table th {
+    color: var(--secondary-neon);
+    text-transform: uppercase;
+    text-align: right; /* Alinhado à direita para números */
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--secondary-neon);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    background: #0a0a0a;
+    z-index: 5;
+}
+
+.neon-table th:first-child {
+    text-align: left;
+}
+
+.neon-table td {
+    color: var(--text-secondary);
+    padding: 10px 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    white-space: nowrap;
+    text-align: right;
+}
+
+.neon-table td:first-child {
+    text-align: left;
+}
+
+.neon-table tr:hover td {
+    background: rgba(0, 243, 255, 0.05);
+    color: #fff;
+}
+
+.positive-val {
+    color: var(--success-neon) !important;
+}
+
+.negative-val {
+    color: var(--primary-neon) !important;
+}
+
+/* Footer */
+.footer {
+    text-align: center;
+    padding: 40px 0;
+    background: var(--dark-secondary);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 80px;
+}
+
+.footer p {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
