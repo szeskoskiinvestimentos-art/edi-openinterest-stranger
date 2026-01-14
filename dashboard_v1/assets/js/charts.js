@@ -107,6 +107,7 @@ class StrangerThingsCharts {
             this.updateNtslCode(data);
             this.populateTable(data);
             this.createFairValueTable(data); // Added
+            this.updateLastUpdate(data);
         } catch (error) {
             console.error('Error initializing charts:', error);
         }
@@ -189,6 +190,29 @@ class StrangerThingsCharts {
                 { strike: 5.6, delta: -0.85, gamma: 0.045, volume: 1200, oi: 8500, iv: 18.5 }
             ]
         };
+    }
+
+    updateLastUpdate(data) {
+        const label = document.getElementById('last-update-label');
+        if (!label) return;
+
+        let raw = data.last_updated;
+        if (!raw && data.overview && data.overview.last_update) {
+            raw = data.overview.last_update;
+        }
+        if (!raw) return;
+
+        try {
+            const date = new Date(raw);
+            if (!isNaN(date.getTime())) {
+                const formatted = date.toLocaleString('pt-BR');
+                label.textContent = `• Último update: ${formatted}`;
+            } else {
+                label.textContent = `• Último update: ${raw}`;
+            }
+        } catch {
+            label.textContent = `• Último update: ${raw}`;
+        }
     }
 
     createDeltaChart(data) {
