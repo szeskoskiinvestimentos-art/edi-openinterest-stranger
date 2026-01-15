@@ -26,6 +26,10 @@ input
   ModeloFlip(1); // Selecione o modelo de Gamma Flip abaixo
   // 1 = Classic
   // 2 = Spline
+
+  refFechamento(5418.00);  // Fechamento spot
+  Taxa_Selic(15.0); // Taxa Selic anual
+  Taxa_Fed(3.5);   // Juros EUA ou Diferencial
   // 1 = Classic (5350.00)
   // 2 = Spline (5350.00)
   // 3 = HVL (5350.00)
@@ -35,6 +39,9 @@ input
 
 var
   GammaVal: Float;
+  vBase, vRisco : Float;
+  Res1, Res2, Res3, Res4 : Float;
+  Sup1, Sup2, Sup3, Sup4 : Float;
 
 begin
   // Inicializa GammaVal com o primeiro disponivel por seguranca
@@ -98,5 +105,37 @@ begin
     HorizontalLineCustom(5413.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     HorizontalLineCustom(5478.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     HorizontalLineCustom(5596.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+  end;
+
+  // --- Estratégia Borboleta (Resistências e Suportes) ---
+  if (refFechamento > 0) then
+  begin
+    // Cálculo das Variações conforme Engenharia Reversa
+    vBase := refFechamento * (Taxa_Selic / 10000);
+    vRisco := vBase / (Taxa_Fed / 10);
+
+    // --- HIERARQUIA DE RESISTÊNCIAS (ALTA) ---
+    Res1 := refFechamento + vBase;    // Vértice Principal 1
+    Res2 := Res1 + vBase;             // Vértice Principal 2 (Quebra de Constante)
+    Res3 := Res1 + vRisco;            // Vértice Secundária (Paredão F25)
+    Res4 := Res3 + vBase;             // Vértice Avançada (Exaustão)
+
+    // --- HIERARQUIA DE SUPORTES (BAIXA) ---
+    Sup1 := refFechamento - vBase;    // Vértice Principal 1
+    Sup2 := Sup1 - vBase;             // Vértice Principal 2
+    Sup3 := Sup1 - vRisco;            // Vértice Secundária (Paredão F25)
+    Sup4 := Sup3 - vBase;             // Vértice Avançada (Exaustão)
+
+    if LastBarOnChart then
+    begin
+      HorizontalLineCustom(Res1, clRed, 1, psDash, "Edi_Wall_Venda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.1);
+      HorizontalLineCustom(Sup1, clLime, 1, psDash, "Edi_Wall_Compra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.1);
+      HorizontalLineCustom(Res2, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.3);
+      HorizontalLineCustom(Sup2, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.3);
+      HorizontalLineCustom(Res3, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.5);
+      HorizontalLineCustom(Sup3, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.5);
+      HorizontalLineCustom(Res4, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.7);
+      HorizontalLineCustom(Sup4, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.7);
+    end;
   end;
 end;
