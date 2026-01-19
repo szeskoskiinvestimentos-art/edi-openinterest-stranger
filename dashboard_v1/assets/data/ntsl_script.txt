@@ -23,6 +23,7 @@ input
   ExibirEdiWall(true);
   MostrarPLUS(true);
   MostrarPLUS2(true);
+  ExibirMelhoresPontos(false);
   ModeloFlip(1);
   spot(0);
   // 1 = Classic (5650.00)
@@ -106,7 +107,7 @@ begin
     HorizontalLineCustom(5596.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
   end;
 
-  if LastBarOnChart then
+  if (ExibirMelhoresPontos and LastBarOnChart) then
   begin
     HorizontalLineCustom(5394.58, clRed, 1, psDash, "Edi_Wall_Venda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.1);
     HorizontalLineCustom(5378.42, clLime, 1, psDash, "Edi_Wall_Compra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.1);
