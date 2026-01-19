@@ -11,6 +11,7 @@ const
   clMaxPain = clPurple;
   clExpMove = clWhite;
   clEdiWall = clSilver;
+  clEffectiveWall = clAqua;
   clFib = clYellow;
   TamanhoFonte = 8;
 
@@ -21,10 +22,11 @@ input
   ExibirMaxPain(true);
   ExibirExpMoves(true);
   ExibirEdiWall(true);
+  ExibirEffectiveWalls(true);
   MostrarPLUS(true);
   MostrarPLUS2(true);
   ExibirMelhoresPontos(false);
-  ModeloFlip(1);
+  ModeloFlip(7);
   spot(0);
   // 1 = Classic (5650.00)
   // 2 = Spline (5650.00)
@@ -32,6 +34,7 @@ input
   // 4 = HVL Log (5650.00)
   // 5 = Sigma Kernel (5650.00)
   // 6 = PVOP (5650.00)
+  // 7 = HVL Gaussian (5350.00)
 
 var
   GammaVal: Float;
@@ -46,6 +49,7 @@ begin
   if (ModeloFlip = 4) then GammaVal := 5650.00;
   if (ModeloFlip = 5) then GammaVal := 5650.00;
   if (ModeloFlip = 6) then GammaVal := 5650.00;
+  if (ModeloFlip = 7) then GammaVal := 5350.00;
 
   // --- Linhas Principais (Com Intercalação de Texto) ---
   if (ExibirRange) then
@@ -54,6 +58,8 @@ begin
     HorizontalLineCustom(5347.24, clExpMove, 1, psDot, "Edi_ExpMove", TamanhoFonte, tpBottomRight, CurrentDate, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(5350.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+  if (ExibirEffectiveWalls) then
+    HorizontalLineCustom(5350.00, clEffectiveWall, 2, psDashDot, "Edi Effective Put", TamanhoFonte, tpBottomRight, 0, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(5375.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
@@ -68,6 +74,8 @@ begin
     HorizontalLineCustom(5425.76, clExpMove, 1, psDot, "Edi_ExpMove", TamanhoFonte, tpTopRight, CurrentDate, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(5650.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+  if (ExibirEffectiveWalls) then
+    HorizontalLineCustom(5650.00, clEffectiveWall, 2, psDashDot, "Edi Effective Call", TamanhoFonte, tpTopRight, 0, 0);
 
   // Flips (Dinâmicos)
   if (ExibirFlips) then begin

@@ -1315,6 +1315,8 @@ class StrangerThingsCharts {
         setText('gamma-flip', data.key_levels.gamma_flip);
         setText('call-wall', data.key_levels.call_wall);
         setText('put-wall', data.key_levels.put_wall);
+        setText('edi-effective-call', data.key_levels.effective_call_wall);
+        setText('edi-effective-put', data.key_levels.effective_put_wall);
         setText('max-pain', data.key_levels.max_pain);
     }
 
