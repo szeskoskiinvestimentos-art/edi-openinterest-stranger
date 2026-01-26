@@ -1,4 +1,4 @@
-// NTSL Indicator - Edi OpenInterest Levels - 23/01/2026 07:55
+// NTSL Indicator - Edi OpenInterest Levels - 26/01/2026 08:06
 // Gerado Automaticamente
 
 const
@@ -28,132 +28,111 @@ input
   ExibirMelhoresPontos(false);
   ModeloFlip(7);
   spot(0);
-  // 1 = Classic (5348.33)
-  // 2 = Spline (5348.39)
-  // 3 = HVL (5347.65)
-  // 4 = HVL Log (5336.31)
-  // 5 = Sigma Kernel (5314.79)
-  // 6 = PVOP (5348.33)
-  // 7 = HVL Gaussian (5407.45)
+  // 1 = Classic (5306.16)
+  // 2 = Spline (5293.04)
+  // 3 = HVL (5305.68)
+  // 4 = HVL Log (5295.48)
+  // 5 = Sigma Kernel (5290.65)
+  // 6 = PVOP (5306.16)
+  // 7 = HVL Gaussian (5250.00)
 
 var
   GammaVal: Float;
 
 begin
   // Inicializa GammaVal com o primeiro disponivel por seguranca
-  GammaVal := 5348.33;
+  GammaVal := 5306.16;
 
-  if (ModeloFlip = 1) then GammaVal := 5348.33;
-  if (ModeloFlip = 2) then GammaVal := 5348.39;
-  if (ModeloFlip = 3) then GammaVal := 5347.65;
-  if (ModeloFlip = 4) then GammaVal := 5336.31;
-  if (ModeloFlip = 5) then GammaVal := 5314.79;
-  if (ModeloFlip = 6) then GammaVal := 5348.33;
-  if (ModeloFlip = 7) then GammaVal := 5407.45;
+  if (ModeloFlip = 1) then GammaVal := 5306.16;
+  if (ModeloFlip = 2) then GammaVal := 5293.04;
+  if (ModeloFlip = 3) then GammaVal := 5305.68;
+  if (ModeloFlip = 4) then GammaVal := 5295.48;
+  if (ModeloFlip = 5) then GammaVal := 5290.65;
+  if (ModeloFlip = 6) then GammaVal := 5306.16;
+  if (ModeloFlip = 7) then GammaVal := 5250.00;
 
   // --- Linhas Principais (Com Intercalação de Texto) ---
   if (ExibirWalls) then
     HorizontalLineCustom(5250.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirRange) then
-    HorizontalLineCustom(5250.00, clRangeLow, 1, psDot, "Edi_Range", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirExpMoves) then
-    HorizontalLineCustom(5263.64, clExpMove, 1, psDot, "Edi_ExpMove", TamanhoFonte, tpTopRight, CurrentDate, 0);
-  if (ExibirWalls) then
-    HorizontalLineCustom(5275.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5270.59, clExpMove, 1, psDot, "Edi_ExpMove", TamanhoFonte, tpTopRight, CurrentDate, 0);
   if (ExibirEffectiveWalls) then
-    HorizontalLineCustom(5297.11, clEffectiveWall, 2, psDashDot, "Edi Effective Put", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls) then
-    HorizontalLineCustom(5300.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls) then
-    HorizontalLineCustom(5325.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5314.65, clEffectiveWall, 2, psDashDot, "Edi Effective Put", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirExpMoves) then
-    HorizontalLineCustom(5329.36, clExpMove, 1, psDot, "Edi_ExpMove", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(5336.41, clExpMove, 1, psDot, "Edi_ExpMove", TamanhoFonte, tpTopRight, CurrentDate, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(5350.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(5350.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirMaxPain) then
     HorizontalLineCustom(5350.00, clMaxPain, 2, psSolid, "Edi_MaxPain", TamanhoFonte, tpBottomRight, CurrentDate, 0);
-  if (ExibirWalls) then
-    HorizontalLineCustom(5450.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirRange) then
-    HorizontalLineCustom(5450.00, clRangeHigh, 1, psDot, "Edi_Range", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls) then
-    HorizontalLineCustom(5600.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5350.00, clRangeLow, 1, psDot, "Edi_Range", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirEffectiveWalls) then
-    HorizontalLineCustom(5659.81, clEffectiveWall, 2, psDashDot, "Edi Effective Call", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5388.46, clEffectiveWall, 2, psDashDot, "Edi Effective Call", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
-    HorizontalLineCustom(5700.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5400.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+  if (ExibirRange) then
+    HorizontalLineCustom(5400.00, clRangeHigh, 1, psDot, "Edi_Range", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls) then
-    HorizontalLineCustom(5900.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5650.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+  if (ExibirWalls) then
+    HorizontalLineCustom(5750.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
+  if (ExibirWalls) then
+    HorizontalLineCustom(6800.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
 
   // Flips (Dinâmicos)
   if (ExibirFlips) then begin
     if (GammaVal > 0) then
       HorizontalLineCustom(GammaVal, clGammaFlip, 2, psDash, "Edi_GammaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    if (5403.61 > 0) then
-      HorizontalLineCustom(5403.61, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    if (5416.30 > 0) then
+      HorizontalLineCustom(5416.30, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
   end;
 
   // Edi_Wall (Midpoints) - Grid Completo
   if (ExibirEdiWall) then begin
-    HorizontalLineCustom(5262.50, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5287.50, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5312.50, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5337.50, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5400.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5300.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5375.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     HorizontalLineCustom(5525.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5650.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5800.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5700.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(6275.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
   end;
 
   if (MostrarPLUS) then begin
-    HorizontalLineCustom(5259.55, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5265.45, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5284.55, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5290.45, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5309.55, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5315.45, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5334.55, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5340.45, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5388.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5411.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5507.30, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5542.70, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5638.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5661.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5776.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5823.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5288.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5311.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5369.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5380.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5495.50, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5554.50, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5688.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5711.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(6151.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(6398.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
   end;
 
   if (MostrarPLUS2) then begin
-    HorizontalLineCustom(5255.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5269.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5280.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5294.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5305.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5319.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5330.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5344.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5373.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5426.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5485.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5564.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5623.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5676.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5747.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    HorizontalLineCustom(5852.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5273.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5326.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5361.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5388.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5459.00, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5591.00, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5673.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5726.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5997.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(6552.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
   end;
 
   if (ExibirMelhoresPontos and LastBarOnChart) then
   begin
-    HorizontalLineCustom(5304.44, clRed, 1, psDash, "Edi_Wall_Venda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.1);
-    HorizontalLineCustom(5288.56, clLime, 1, psDash, "Edi_Wall_Compra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.1);
-    HorizontalLineCustom(5312.39, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.3);
-    HorizontalLineCustom(5280.61, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.3);
-    HorizontalLineCustom(5327.14, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.5);
-    HorizontalLineCustom(5265.86, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.5);
-    HorizontalLineCustom(5335.09, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.7);
-    HorizontalLineCustom(5257.91, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.7);
+    HorizontalLineCustom(5311.46, clRed, 1, psDash, "Edi_Wall_Venda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.1);
+    HorizontalLineCustom(5295.54, clLime, 1, psDash, "Edi_Wall_Compra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.1);
+    HorizontalLineCustom(5319.41, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.3);
+    HorizontalLineCustom(5287.59, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.3);
+    HorizontalLineCustom(5334.18, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.5);
+    HorizontalLineCustom(5272.82, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.5);
+    HorizontalLineCustom(5342.14, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.7);
+    HorizontalLineCustom(5264.86, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.7);
   end;
 end;
