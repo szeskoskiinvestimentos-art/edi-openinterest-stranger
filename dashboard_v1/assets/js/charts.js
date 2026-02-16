@@ -62,8 +62,21 @@ class StrangerThingsCharts {
                         borderColor: 'rgba(255, 255, 255, 0.2)'
                     }
                 }
+            },
+        };
+
+        this.chartOptions.plugins.tooltip.callbacks = {
+            label: (context) => {
+                const dataset = context.dataset || {};
+                const label = dataset.label ? dataset.label : '';
+                const raw = context.raw;
+                const isNumber = typeof raw === 'number' && !isNaN(raw);
+                const value = isNumber ? this.formatNumberBr(raw, 2) : raw;
+                return label ? label + ': ' + value : value;
             }
         };
+
+        this.chartOptions.scales.y.ticks.callback = (value) => this.formatNumberBr(value, 2);
         
         this.init();
     }
@@ -222,7 +235,7 @@ class StrangerThingsCharts {
         this.charts.delta = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.delta_data.strikes,
+                labels: data.delta_data.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [{
                     label: 'Delta Acumulado',
                     data: data.delta_data.delta_cumulative,
@@ -264,7 +277,7 @@ class StrangerThingsCharts {
         this.charts.gamma = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.gamma_data.strikes,
+                labels: data.gamma_data.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [{
                     label: 'Gamma Exposure',
                     data: data.gamma_data.gamma_exposure,
@@ -334,7 +347,7 @@ class StrangerThingsCharts {
         this.charts.volatility = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.volatility_data.strikes,
+                labels: data.volatility_data.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: datasets
             },
             options: {
@@ -394,6 +407,13 @@ class StrangerThingsCharts {
 
     // NOVOS GRÁFICOS
 
+    formatNumberBr(value, decimals = 2) {
+        if (value === null || value === undefined || isNaN(value)) return '-';
+        const factor = Math.pow(10, decimals);
+        const rounded = Math.round(value * factor) / factor;
+        return rounded.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    }
+
     createOIStrikeChart(data) {
         const ctx = document.getElementById('oiStrikeChart');
         if (!ctx) return;
@@ -402,7 +422,7 @@ class StrangerThingsCharts {
         this.charts.oiStrike = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.volume_data.strikes,
+                labels: data.volume_data.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [
                     {
                         label: 'Call OI',
@@ -442,7 +462,12 @@ class StrangerThingsCharts {
                                 tooltipItems.forEach((item) => {
                                     total += item.raw;
                                 });
-                                return 'Total: ' + total;
+                                return 'Total: ' + this.formatNumberBr(total, 0);
+                            },
+                            label: (context) => {
+                                const label = context.dataset.label || '';
+                                const value = this.formatNumberBr(context.raw, 0);
+                                return `${label}: ${value}`;
                             }
                         }
                     }
@@ -455,7 +480,11 @@ class StrangerThingsCharts {
                     },
                     y: {
                         ...this.chartOptions.scales.y,
-                        stacked: true
+                        stacked: true,
+                        ticks: {
+                            ...this.chartOptions.scales.y.ticks,
+                            callback: (value) => this.formatNumberBr(value, 0)
+                        }
                     }
                 }
             }
@@ -469,7 +498,7 @@ class StrangerThingsCharts {
         this.charts.gexSplit = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.gamma_data.strikes,
+                labels: data.gamma_data.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [
                     {
                         label: 'Gamma Call',
@@ -524,7 +553,7 @@ class StrangerThingsCharts {
         this.charts.vanna = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.greeks_2nd_order.strikes,
+                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [{
                     label: 'Vanna',
                     data: data.greeks_2nd_order.vanna,
@@ -561,7 +590,7 @@ class StrangerThingsCharts {
         this.charts.charm = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.greeks_2nd_order.strikes,
+                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [{
                     label: 'Charm',
                     data: data.greeks_2nd_order.charm,
@@ -598,7 +627,7 @@ class StrangerThingsCharts {
         this.charts.theta = new Chart(ctx, {
             type: 'bar', // Theta geralmente é melhor visualizado como barra negativa
             data: {
-                labels: data.greeks_2nd_order.strikes,
+                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [{
                     label: 'Theta',
                     data: data.greeks_2nd_order.theta,
@@ -629,7 +658,6 @@ class StrangerThingsCharts {
 
 
     updateMetrics(data) {
-        // Animate numbers
         this.animateValue('total-trades', 0, data.overview.total_trades, 2000);
         this.animateValue('volume-total', 0, data.overview.total_volume, 2000);
         this.animateValue('gamma-exposure', 0, data.overview.gamma_exposure, 2000);
@@ -649,7 +677,8 @@ class StrangerThingsCharts {
             const progress = Math.min(elapsed / duration, 1);
             
             const current = Math.floor(start + (absEnd - start) * this.easeOutQuart(progress));
-            element.textContent = (isNegative ? '-' : '') + current.toLocaleString();
+            const signed = isNegative ? -current : current;
+            element.textContent = this.formatNumberBr(signed, 0);
             
             if (progress < 1) {
                 requestAnimationFrame(animate);
@@ -670,7 +699,7 @@ class StrangerThingsCharts {
         this.charts.vega = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.greeks_2nd_order.strikes,
+                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [{
                     label: 'Vega Exposure',
                     data: data.greeks_2nd_order.vex,
@@ -705,7 +734,7 @@ class StrangerThingsCharts {
         this.charts.pinRisk = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.volume_data.strikes,
+                labels: data.volume_data.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [{
                     label: 'Pin Risk Potential (Total OI)',
                     data: totalOI,
@@ -737,7 +766,7 @@ class StrangerThingsCharts {
         this.charts.charmCum = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.greeks_2nd_order.strikes,
+                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [{
                     label: 'Charm Acumulado',
                     data: data.greeks_2nd_order.charm_cum,
@@ -771,7 +800,7 @@ class StrangerThingsCharts {
         this.charts.vannaCum = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.greeks_2nd_order.strikes,
+                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [{
                     label: 'Vanna Acumulado',
                     data: data.greeks_2nd_order.vanna_cum,
@@ -805,7 +834,7 @@ class StrangerThingsCharts {
         this.charts.rGamma = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.greeks_2nd_order.strikes,
+                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [{
                     label: 'R-Gamma (PVOP)',
                     data: data.greeks_2nd_order.r_gamma,
@@ -842,7 +871,7 @@ class StrangerThingsCharts {
         this.charts.rGammaCum = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.greeks_2nd_order.strikes,
+                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [{
                     label: 'R-Gamma Acumulado',
                     data: data.greeks_2nd_order.r_gamma_cum,
@@ -880,7 +909,7 @@ class StrangerThingsCharts {
         this.charts.thetaCum = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.greeks_2nd_order.strikes,
+                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [{
                     label: 'Theta Acumulado',
                     data: data.greeks_2nd_order.theta_cum,
@@ -916,7 +945,7 @@ class StrangerThingsCharts {
         this.charts.maxPain = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: profile.strikes,
+                labels: profile.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [{
                     label: 'Perda dos Compradores (Valor Intrínseco)',
                     data: profile.loss,
@@ -944,9 +973,8 @@ class StrangerThingsCharts {
                     y: {
                         ...this.chartOptions.scales.y,
                         ticks: {
-                            callback: function(value) {
-                                return '$' + (value / 1000000).toFixed(1) + 'M';
-                            }
+                            ...this.chartOptions.scales.y.ticks,
+                            callback: (value) => 'R$ ' + this.formatNumberBr(value / 1000000, 1) + 'M'
                         }
                     }
                 }
@@ -1000,7 +1028,7 @@ class StrangerThingsCharts {
         this.charts.deltaFlipProfile = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: profileData.spots.map(s => s.toFixed(2)),
+                labels: profileData.spots.map(s => this.formatNumberBr(s, 2)),
                 datasets: [{
                     label: 'Net Delta',
                     data: profileData.deltas,
@@ -1036,12 +1064,12 @@ class StrangerThingsCharts {
         if (!ctx || !data.v3_data || !data.v3_data.flow_sentiment) return;
 
         const flowData = data.v3_data.flow_sentiment;
-        const labels = data.delta_data.strikes; // Assuming alignment
+        const labels = data.delta_data.strikes;
 
         this.charts.flowSentiment = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: labels,
+                labels: labels.map(s => this.formatNumberBr(s, 0)),
                 datasets: [
                     {
                         label: 'Bullish Flow',
@@ -1186,7 +1214,7 @@ class StrangerThingsCharts {
         this.charts.mmPnl = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: pnlData.spots.map(s => s.toFixed(2)),
+                labels: pnlData.spots.map(s => this.formatNumberBr(s, 2)),
                 datasets: [{
                     label: 'MM PnL Simulation',
                     data: pnlData.pnl,
@@ -1222,12 +1250,12 @@ class StrangerThingsCharts {
         if (!ctx || !data.v3_data || !data.v3_data.dealer_pressure_profile) return;
 
         const profile = data.v3_data.dealer_pressure_profile;
-        const strikes = data.delta_data.strikes; // Assumindo alinhamento com strikes
+        const strikes = data.delta_data.strikes;
 
         this.charts.dealerPressure = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: strikes,
+                labels: strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [{
                     label: 'Dealer Pressure Index (DPI)',
                     data: profile,
@@ -1273,7 +1301,7 @@ class StrangerThingsCharts {
         this.charts.deltaAgregado = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.delta_data.strikes,
+                labels: data.delta_data.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [{
                     label: 'Delta Exposure Net',
                     data: data.delta_data.delta_values,
@@ -1309,7 +1337,7 @@ class StrangerThingsCharts {
         
         const setText = (id, value) => {
             const el = document.getElementById(id);
-            if (el) el.innerText = value !== null ? value.toLocaleString() : 'N/A';
+            if (el) el.innerText = value !== null ? this.formatNumberBr(value, 2) : 'N/A';
         };
 
         setText('gamma-flip', data.key_levels.gamma_flip);
@@ -1373,14 +1401,14 @@ class StrangerThingsCharts {
                 html += `
                     <tr>
                         <td class="font-bold">${sim.scenario}</td>
-                        <td>${sim.target_spot.toFixed(2)}</td>
-                        <td class="font-bold text-center" style="color: var(--secondary-neon);">${opt.Strike.toFixed(2)}</td>
-                        <td>${opt.Call_Now.toFixed(2)}</td>
-                        <td>${opt.Call_Sim.toFixed(2)}</td>
-                        <td class="${callClass}">${opt.Call_Chg.toFixed(1)}%</td>
-                        <td>${opt.Put_Now.toFixed(2)}</td>
-                        <td>${opt.Put_Sim.toFixed(2)}</td>
-                        <td class="${putClass}">${opt.Put_Chg.toFixed(1)}%</td>
+                        <td>${this.formatNumberBr(sim.target_spot, 2)}</td>
+                        <td class="font-bold text-center" style="color: var(--secondary-neon);">${this.formatNumberBr(opt.Strike, 2)}</td>
+                        <td>${this.formatNumberBr(opt.Call_Now, 2)}</td>
+                        <td>${this.formatNumberBr(opt.Call_Sim, 2)}</td>
+                        <td class="${callClass}">${this.formatNumberBr(opt.Call_Chg, 1)}%</td>
+                        <td>${this.formatNumberBr(opt.Put_Now, 2)}</td>
+                        <td>${this.formatNumberBr(opt.Put_Sim, 2)}</td>
+                        <td class="${putClass}">${this.formatNumberBr(opt.Put_Chg, 1)}%</td>
                     </tr>
                 `;
             });
