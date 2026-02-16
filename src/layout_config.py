@@ -5,6 +5,11 @@ def get_common_layout(metrics, spot, min_k, max_k):
     Retorna um dicionário com o layout padrão do Plotly e elementos gráficos (shapes, annotations)
     padronizados para todos os gráficos do relatório.
     """
+    try:
+        from src import config as settings
+        sf = getattr(settings, 'DISPLAY_SCALE_FACTOR', 1.0)
+    except Exception:
+        sf = 1.0
     regime_color = 'lime' if 'Positivo' in metrics['regime'] else 'red'
     
     # Texto do InfoBox
@@ -18,20 +23,20 @@ def get_common_layout(metrics, spot, min_k, max_k):
                  f"<b>Dealer Pressure:</b> {metrics['dealer_pressure']:+.2f}<br>")
 
     # Shapes
-    spot_line = dict(type='line', x0=spot, x1=spot, y0=0, y1=1, xref='x', yref='paper', 
+    spot_line = dict(type='line', x0=spot*sf, x1=spot*sf, y0=0, y1=1, xref='x', yref='paper', 
                      line=dict(color='lime', dash='dot', width=2))
-    hline0 = dict(type='line', x0=min_k, x1=max_k, y0=0, y1=0, 
+    hline0 = dict(type='line', x0=min_k*sf, x1=max_k*sf, y0=0, y1=0, 
                   line=dict(color='white', dash='dot', width=1))
     
     flip_line = None
     flip_label = None
     if metrics['gamma_flip']:
-        flip_line = dict(type='line', x0=metrics['gamma_flip'], x1=metrics['gamma_flip'], y0=0, y1=1, xref='x', yref='paper', 
+        flip_line = dict(type='line', x0=metrics['gamma_flip']*sf, x1=metrics['gamma_flip']*sf, y0=0, y1=1, xref='x', yref='paper', 
                          line=dict(color='red', dash='dash', width=2))
-        flip_label = dict(x=metrics['gamma_flip'], y=0.05, xref='x', yref='paper', text='Gamma Flip', showarrow=False, 
+        flip_label = dict(x=metrics['gamma_flip']*sf, y=0.05, xref='x', yref='paper', text='Gamma Flip', showarrow=False, 
                           font=dict(color='red', size=12), bgcolor='black', bordercolor='red')
     
-    spot_label = dict(x=float(spot), y=0.92, xref='x', yref='paper', text=f'SPOT {spot:.0f}', showarrow=False, 
+    spot_label = dict(x=float(spot*sf), y=0.92, xref='x', yref='paper', text=f'SPOT {spot*sf:.0f}', showarrow=False, 
                       font=dict(color='lime', size=12), bgcolor='black', bordercolor='lime')
     
     # Infobox removido conforme solicitação (movido para tabelas dedicadas)
@@ -47,7 +52,7 @@ def get_common_layout(metrics, spot, min_k, max_k):
         barmode='overlay', 
         xaxis_title='Strike', 
         yaxis_title='Exposição / OI', 
-        xaxis=dict(range=[spot-300, spot+300], tickmode='auto'), 
+        xaxis=dict(autorange=True, tickmode='auto'), 
         legend=dict(orientation='h', yanchor='top', y=-0.15, xanchor='center', x=0.5), 
         margin=dict(t=80, l=50, r=50, b=50),
         shapes=base_shapes,

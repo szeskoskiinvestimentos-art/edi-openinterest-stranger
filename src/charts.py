@@ -2,23 +2,34 @@ import plotly.graph_objects as go
 import numpy as np
 from src import config as settings
 from src.layout_config import get_common_layout
+from src.utils_fmt import format_number_br, parse_and_scale_walls
 
 def create_dashboard_figure(calc, metrics):
     """Gera a figura principal do dashboard com todos os traces do notebook original (CELL 9)."""
-    strikes = calc.strikes_ref
-    spot = metrics['spot']
+    sf = getattr(settings, 'DISPLAY_SCALE_FACTOR', 1.0)
+    strikes_raw = calc.strikes_ref
+    spot_raw = metrics['spot']
+    # Aplica escala apenas para exibição
+    strikes = strikes_raw * sf
+    spot = float(spot_raw) * sf
     min_k, max_k = strikes.min(), strikes.max()
     
     # Cores de Regime
     regime_color = 'lime' if 'Positivo' in metrics['regime'] else 'red'
     
     # Texto do InfoBox
-    info_text = (f"<b>USD/BRL Spot:</b> <span style='color:lime'>{spot:.0f}</span><br>"
-                 f"<b>Delta Agregado:</b> {metrics['delta_agregado']:,.0f}<br>"
-                 f"<b>Zero Gamma (Flip):</b> {(f'{metrics['zero_gamma_level']:.0f}' if metrics['zero_gamma_level'] else 'N/A')}<br>"
-                 f"<b>Max Pain:</b> <span style='color:orange'>{metrics['max_pain']:.0f}</span><br>"
-                 f"<b>Call Wall (Resist.):</b> <span style='color:red'>{metrics['call_wall']:.0f}</span><br>"
-                 f"<b>Put Wall (Sup.):</b> <span style='color:green'>{metrics['put_wall']:.0f}</span><br>"
+    zero_gamma_disp = (metrics['zero_gamma_level'] * sf) if metrics['zero_gamma_level'] else None
+    max_pain_disp = metrics['max_pain'] * sf if metrics['max_pain'] else None
+    call_wall_disp = metrics['call_wall'] * sf if metrics['call_wall'] else None
+    put_wall_disp = metrics['put_wall'] * sf if metrics['put_wall'] else None
+
+    # Formatação BRL para InfoBox
+    info_text = (f"<b>Spot (Escala Índice):</b> <span style='color:lime'>{format_number_br(spot, 0)}</span><br>"
+                 f"<b>Delta Agregado:</b> {format_number_br(metrics['delta_agregado'], 0)}<br>"
+                 f"<b>Zero Gamma (Flip):</b> {(format_number_br(zero_gamma_disp, 0) if zero_gamma_disp else 'N/A')}<br>"
+                 f"<b>Max Pain:</b> <span style='color:orange'>{format_number_br(max_pain_disp, 0)}</span><br>"
+                 f"<b>Call Wall (Resist.):</b> <span style='color:red'>{format_number_br(call_wall_disp, 0)}</span><br>"
+                 f"<b>Put Wall (Sup.):</b> <span style='color:green'>{format_number_br(put_wall_disp, 0)}</span><br>"
                  f"<b>Regime:</b> <span style='color:{regime_color}'>{metrics['regime']}</span><br>"
                  f"<b>Dealer Pressure:</b> {metrics['dealer_pressure']:+.2f}<br>")
 
@@ -48,11 +59,11 @@ def create_dashboard_figure(calc, metrics):
     fig.add_trace(go.Bar(x=strikes, y=-calc.oi_put_ref, name='PUT OI', marker_color='red', visible=False))
 
     # 6. Midwalls Call (Sombra)
-    fig.add_trace(go.Bar(x=calc.midwalls_strikes, y=calc.midwalls_call, marker_color='#2c2c2c', opacity=0.8, 
+    fig.add_trace(go.Bar(x=calc.midwalls_strikes * sf, y=calc.midwalls_call, marker_color='#2c2c2c', opacity=0.8, 
                          visible=False, showlegend=False))
 
     # 7. Midwalls Put (Sombra)
-    fig.add_trace(go.Bar(x=calc.midwalls_strikes, y=-calc.midwalls_put, marker_color='#2c2c2c', opacity=0.8, 
+    fig.add_trace(go.Bar(x=calc.midwalls_strikes * sf, y=-calc.midwalls_put, marker_color='#2c2c2c', opacity=0.8, 
                          visible=False, showlegend=False))
     
     # 8. Charm Exposure
@@ -83,7 +94,7 @@ def create_dashboard_figure(calc, metrics):
     # Layout Base
     fig.update_layout(template='plotly_dark', barmode='overlay', 
                       xaxis_title='Strike', yaxis_title='Exposição / OI', 
-                      xaxis=dict(range=[spot-300, spot+300], tickmode='auto'), 
+                      xaxis=dict(tickmode='auto'), 
                       legend=dict(orientation='h', yanchor='top', y=-0.15, xanchor='center', x=0.5), 
                       margin=dict(t=100))
                       
@@ -96,18 +107,23 @@ def create_dashboard_figure(calc, metrics):
     flip_line = None
     flip_label = None
     if metrics['gamma_flip']:
-        flip_line = dict(type='line', x0=metrics['gamma_flip'], x1=metrics['gamma_flip'], y0=0, y1=1, xref='x', yref='paper', 
+        flip_x = metrics['gamma_flip'] * sf
+        flip_line = dict(type='line', x0=flip_x, x1=flip_x, y0=0, y1=1, xref='x', yref='paper', 
                          line=dict(color='red', dash='dash', width=2))
-        flip_label = dict(x=metrics['gamma_flip'], y=0.05, xref='x', yref='paper', text='Gamma Flip', showarrow=False, 
+        flip_label = dict(x=flip_x, y=0.05, xref='x', yref='paper', text='Gamma Flip', showarrow=False, 
                           font=dict(color='red', size=12), bgcolor='black', bordercolor='red')
 
-    spot_label = dict(x=float(spot), y=0.92, xref='x', yref='paper', text=f'SPOT {spot:.0f}', showarrow=False, 
+    spot_label = dict(x=float(spot), y=0.92, xref='x', yref='paper', text=f'SPOT {format_number_br(spot, 0)}', showarrow=False, 
                       font=dict(color='lime', size=12), bgcolor='black', bordercolor='lime')
                       
     def infobox():
         return dict(xref='paper', yref='paper', x=0.99, y=0.95, xanchor='right', showarrow=False, align='left', 
                     text=info_text, font=dict(size=14, color='white'), bordercolor=regime_color, borderwidth=2, 
                     borderpad=6, bgcolor='rgba(20,20,20,0.85)', opacity=0.95)
+
+    # Configura separadores de milhar/decimal para formato BR (ponto milhar, virgula decimal)
+    # Plotly syntax: separators='decimal_char+thousands_char'
+    fig.update_layout(separators=',.')
 
     # Calculate smart range for Vanna
     v_indices = np.where(np.abs(calc.vanna_tot) > np.max(np.abs(calc.vanna_tot)) * 0.01)[0]
@@ -117,7 +133,7 @@ def create_dashboard_figure(calc, metrics):
         v_pad = (v_max_k - v_min_k) * 0.1
         vanna_range = [v_min_k - v_pad, v_max_k + v_pad]
     else:
-        vanna_range = [min_k, max_k]
+        vanna_range = [strikes[0], strikes[-1]]
 
     base_shapes = [spot_line, hline0]
     if flip_line: base_shapes.append(flip_line)
@@ -178,19 +194,26 @@ def create_dashboard_figure(calc, metrics):
 
 def create_analysis_figure(calc, metrics):
     """Gera a Figura 2 (Análise Detalhada) do notebook original (CELL 10)."""
-    strikes = calc.strikes_ref
-    spot = metrics['spot']
+    sf = getattr(settings, 'DISPLAY_SCALE_FACTOR', 1.0)
+    strikes = calc.strikes_ref * sf
+    spot = float(metrics['spot']) * sf
     min_k, max_k = strikes.min(), strikes.max()
     
     regime_color = 'lime' if 'Positivo' in metrics['regime'] else 'red'
     
-    info_text = (f"<b>DOLFUT:</b> <span style='color:lime'>{spot:.0f}</span><br>"
-                 f"<b>Delta Agregado:</b> {metrics['delta_agregado']:,.0f}<br>"
-                 f"<b>Gamma Flip:</b> {(f'{metrics['gamma_flip']:.0f}' if metrics['gamma_flip'] else 'N/A')}<br>"
+    gamma_flip_disp = (metrics['gamma_flip'] * sf) if metrics['gamma_flip'] else None
+    
+    # Scale Walls text
+    _, c_walls_txt = parse_and_scale_walls(metrics['walls_call_txt'], sf)
+    _, p_walls_txt = parse_and_scale_walls(metrics['walls_put_txt'], sf)
+    
+    info_text = (f"<b>DOLFUT (Escala Índice):</b> <span style='color:lime'>{format_number_br(spot, 0)}</span><br>"
+                 f"<b>Delta Agregado:</b> {format_number_br(metrics['delta_agregado'], 0)}<br>"
+                 f"<b>Gamma Flip:</b> {(format_number_br(gamma_flip_disp, 0) if gamma_flip_disp else 'N/A')}<br>"
                  f"<b>Regime:</b> <span style='color:{regime_color}'>{metrics['regime']}</span><br>"
                  f"<b>Vol Diária:</b> <span style='color:yellow'>{metrics['iv_daily']*100:.2f}%</span><br>"
-                 f"<b>CALL walls:</b> {metrics['walls_call_txt']}<br>"
-                 f"<b>PUT walls:</b> {metrics['walls_put_txt']}")
+                 f"<b>CALL walls:</b> {c_walls_txt}<br>"
+                 f"<b>PUT walls:</b> {p_walls_txt}")
 
     fig = go.Figure()
     
@@ -217,19 +240,20 @@ def create_analysis_figure(calc, metrics):
     fig.add_trace(go.Bar(x=strikes, y=-calc.oi_put_ref, name='PUT OI', marker_color='red', visible=False))
 
     # 6. Midwalls Call
-    fig.add_trace(go.Bar(x=calc.midwalls_strikes, y=calc.midwalls_call, marker_color='#2c2c2c', opacity=0.8, 
+    fig.add_trace(go.Bar(x=calc.midwalls_strikes * sf, y=calc.midwalls_call, marker_color='#2c2c2c', opacity=0.8, 
                          visible=False, showlegend=False))
 
     # 7. Midwalls Put
-    fig.add_trace(go.Bar(x=calc.midwalls_strikes, y=-calc.midwalls_put, marker_color='#2c2c2c', opacity=0.8, 
+    fig.add_trace(go.Bar(x=calc.midwalls_strikes * sf, y=-calc.midwalls_put, marker_color='#2c2c2c', opacity=0.8, 
                          visible=False, showlegend=False))
 
     fig.update_layout(template='plotly_dark', barmode='overlay', 
                       xaxis_title='Strike', yaxis_title='Contratos Abertos', 
-                      xaxis=dict(range=[spot-300, spot+300], tickmode='auto'), 
+                      xaxis=dict(tickmode='auto'), 
                       legend=dict(orientation='h', yanchor='top', y=-0.15, xanchor='center', x=0.5), 
                       margin=dict(t=100),
                       title=dict(text='EDI — Open Interest — Painel Delta & GEX', font=dict(color='white', size=18), x=0.5))
+    fig.update_layout(separators=',.')
 
     spot_line = dict(type='line', x0=spot, x1=spot, y0=0, y1=1, xref='x', yref='paper', 
                      line=dict(color='lime', dash='dot', width=2))
@@ -239,18 +263,19 @@ def create_analysis_figure(calc, metrics):
     flip_line = None
     flip_label = None
     if metrics['gamma_flip']:
-        flip_line = dict(type='line', x0=metrics['gamma_flip'], x1=metrics['gamma_flip'], y0=0, y1=1, xref='x', yref='paper', 
+        flip_x = metrics['gamma_flip'] * sf
+        flip_line = dict(type='line', x0=flip_x, x1=flip_x, y0=0, y1=1, xref='x', yref='paper', 
                          line=dict(color='red', dash='dash', width=2))
-        flip_label = dict(x=metrics['gamma_flip'], y=0.05, xref='x', yref='paper', text='Gamma Flip', showarrow=False, 
+        flip_label = dict(x=flip_x, y=0.05, xref='x', yref='paper', text='Gamma Flip', showarrow=False, 
                           font=dict(color='red', size=12), bgcolor='black', bordercolor='red')
 
-    spot_label = dict(x=float(spot), y=0.92, xref='x', yref='paper', text=f'SPOT {spot:.0f}', showarrow=False, 
+    spot_label = dict(x=float(spot), y=0.92, xref='x', yref='paper', text=f'SPOT {format_number_br(spot, 0)}', showarrow=False, 
                       font=dict(color='lime', size=12), bgcolor='black', bordercolor='lime')
     
     range_lines = [
-        dict(type='line', x0=metrics['range_low'], x1=metrics['range_low'], y0=0, y1=1, xref='x', yref='paper', 
+        dict(type='line', x0=metrics['range_low'] * sf, x1=metrics['range_low'] * sf, y0=0, y1=1, xref='x', yref='paper', 
              line=dict(color='yellow', dash='dot', width=1)),
-        dict(type='line', x0=metrics['range_high'], x1=metrics['range_high'], y0=0, y1=1, xref='x', yref='paper', 
+        dict(type='line', x0=metrics['range_high'] * sf, x1=metrics['range_high'] * sf, y0=0, y1=1, xref='x', yref='paper', 
              line=dict(color='yellow', dash='dot', width=1))
     ]
 
@@ -280,15 +305,25 @@ def create_analysis_figure(calc, metrics):
 
 def create_summary_table(metrics):
     """Gera a tabela de resumo (fig_vals) do notebook original (CELL 10)."""
-    items = ['Spot','Range baixo','Range alto','Gamma Flip','Regime','CALL walls top','PUT walls top']
+    sf = getattr(settings, 'DISPLAY_SCALE_FACTOR', 1.0)
+    spot_disp = metrics['spot'] * sf
+    range_low_disp = metrics['range_low'] * sf
+    range_high_disp = metrics['range_high'] * sf
+    gamma_flip_disp = metrics['gamma_flip'] * sf if metrics['gamma_flip'] else None
+
+    # Scale Walls text
+    _, c_walls_txt = parse_and_scale_walls(metrics['walls_call_txt'], sf)
+    _, p_walls_txt = parse_and_scale_walls(metrics['walls_put_txt'], sf)
+
+    items = ['Spot (escala índice)','Range baixo','Range alto','Gamma Flip','Regime','CALL walls top','PUT walls top']
     values = [
-        f"{metrics['spot']:.0f}", 
-        f"{metrics['range_low']:.0f}", 
-        f"{metrics['range_high']:.0f}", 
-        (f"{metrics['gamma_flip']:.0f}" if metrics['gamma_flip'] else 'N/A'), 
+        format_number_br(spot_disp, 0), 
+        format_number_br(range_low_disp, 0), 
+        format_number_br(range_high_disp, 0), 
+        (format_number_br(gamma_flip_disp, 0) if gamma_flip_disp else 'N/A'), 
         metrics['regime'], 
-        metrics['walls_call_txt'], 
-        metrics['walls_put_txt']
+        c_walls_txt, 
+        p_walls_txt
     ]
     descs  = [
         'Preço à vista (pontos)', 
@@ -299,6 +334,23 @@ def create_summary_table(metrics):
         'Top-3 paredes de OI em CALL', 
         'Top-3 paredes de OI em PUT'
     ]
+
+    if getattr(settings, 'EWZ_EXPIRATION_LABEL', None):
+        items.append('EWZ Expiration')
+        values.append(str(settings.EWZ_EXPIRATION_LABEL))
+        descs.append('Vencimento de referência do EWZ')
+    if getattr(settings, 'EWZ_ATM_IV_PCT', None) is not None:
+        items.append('EWZ IV ATM')
+        values.append(f"{settings.EWZ_ATM_IV_PCT:.2f}%")
+        descs.append('Volatilidade Implícita ATM do EWZ')
+    if getattr(settings, 'EWZ_HV_PCT', None) is not None:
+        items.append('EWZ HV')
+        values.append(f"{settings.EWZ_HV_PCT:.2f}%")
+        descs.append('Volatilidade Histórica do EWZ')
+    if getattr(settings, 'EWZ_IV_RANK_PCT', None) is not None:
+        items.append('EWZ IV Rank')
+        values.append(f"{settings.EWZ_IV_RANK_PCT:.2f}%")
+        descs.append('IV Rank do EWZ')
     
     fig = go.Figure(data=[go.Table(
         header=dict(values=['Item','Valor','Descrição'], fill_color='grey', align='left', font=dict(color='white', size=12)),
@@ -308,17 +360,67 @@ def create_summary_table(metrics):
     fig.update_layout(template='plotly_dark', margin=dict(t=30, l=10, r=10, b=10), height=400)
     return fig
 
+def create_volatility_panel(metrics):
+    """Painel de Análise de Volatilidade (VRP, IV Rank, Regime)."""
+    sf = getattr(settings, 'DISPLAY_SCALE_FACTOR', 1.0)
+    vol = metrics.get('vol_analysis', {}) or {}
+    iv = vol.get('iv_current', None)
+    hv = vol.get('hv_current', None)
+    vrp = vol.get('vrp', None)
+    iv_rank = vol.get('iv_rank', None)
+    regime = vol.get('regime', 'N/A')
+    rank_desc = vol.get('rank_desc', 'N/A')
+    spot_disp = metrics['spot'] * sf
+    gamma_flip_disp = metrics['gamma_flip'] * sf if metrics['gamma_flip'] else None
+    range_low_disp = metrics['range_low'] * sf
+    range_high_disp = metrics['range_high'] * sf
+    
+    items = ['Spot (escala índice)', 'IV ATM (%)', 'HV (%)', 'VRP (IV/HV)', 'IV Rank (%)', 'Regime Vol', 'Range baixo', 'Range alto', 'Gamma Flip']
+    values = [
+        format_number_br(spot_disp, 0),
+        (format_number_br(iv*100, 2) if iv is not None else 'N/A'),
+        (format_number_br(hv*100, 2) if hv is not None else 'N/A'),
+        (format_number_br(vrp, 2) if vrp is not None else 'N/A'),
+        (format_number_br(iv_rank, 2) if iv_rank is not None else 'N/A'),
+        regime,
+        format_number_br(range_low_disp, 0),
+        format_number_br(range_high_disp, 0),
+        (format_number_br(gamma_flip_disp, 0) if gamma_flip_disp else 'N/A'),
+    ]
+    descs = [
+        'Preço à vista (pontos)',
+        'Volatilidade Implícita ATM do EWZ',
+        'Volatilidade Histórica (EWZ)',
+        'Volatility Risk Premium (IV/HV)',
+        'Percentil de IV atual',
+        'Sugestão de regime para operações de vol',
+        'Limite inferior esperado intradiário',
+        'Limite superior esperado intradiário',
+        'Zero Gamma interpolado',
+    ]
+    
+    fig = go.Figure(data=[go.Table(
+        header=dict(values=['Métrica','Valor','Descrição'], fill_color='#374151', align='left', font=dict(color='white', size=12)),
+        cells=dict(values=[items, values, descs], fill_color='black', align='left', font=dict(color='white', size=12), height=25),
+        columnwidth=[180, 120, 420]
+    )])
+    fig.update_layout(template='plotly_dark', margin=dict(t=40, l=10, r=10, b=10), height=420)
+    fig.update_layout(separators=',.')
+    return fig
+
 def create_exploded_charts(calc, metrics):
     """
     Gera uma lista de figuras individuais para cada métrica, 
     permitindo que cada uma seja impressa em uma página separada no PDF.
     """
-    strikes = calc.strikes_ref
-    spot = metrics['spot']
-    min_k, max_k = strikes.min(), strikes.max()
+    sf = getattr(settings, 'DISPLAY_SCALE_FACTOR', 1.0)
+    strikes = calc.strikes_ref * sf
+    spot = metrics['spot'] * sf
+    # Valores brutos para layout comum (ele aplica a escala internamente)
+    min_k_raw, max_k_raw = calc.strikes_ref.min(), calc.strikes_ref.max()
     
     # Obtém layout padronizado centralizado
-    common_layout = get_common_layout(metrics, spot, min_k, max_k)
+    common_layout = get_common_layout(metrics, metrics['spot'], min_k_raw, max_k_raw)
 
     charts = []
 
@@ -354,7 +456,7 @@ def create_exploded_charts(calc, metrics):
     fig5 = go.Figure()
     fig5.add_trace(go.Bar(x=strikes, y=calc.oi_call_ref, name='CALL OI', marker_color='green'))
     # Sombra Midwalls Call
-    fig5.add_trace(go.Bar(x=calc.midwalls_strikes, y=calc.midwalls_call, marker_color='#2c2c2c', opacity=0.8, showlegend=False))
+    fig5.add_trace(go.Bar(x=calc.midwalls_strikes * sf, y=calc.midwalls_call, marker_color='#2c2c2c', opacity=0.8, showlegend=False))
     fig5.update_layout(common_layout, title='Edi - Call Open Interest')
     charts.append(('Call OI', fig5))
 
@@ -363,7 +465,7 @@ def create_exploded_charts(calc, metrics):
     # Usando valor positivo para gráfico individual para facilitar leitura de magnitude
     fig6.add_trace(go.Bar(x=strikes, y=calc.oi_put_ref, name='PUT OI', marker_color='red'))
     # Sombra Midwalls Put (positivo)
-    fig6.add_trace(go.Bar(x=calc.midwalls_strikes, y=calc.midwalls_put, marker_color='#2c2c2c', opacity=0.8, showlegend=False))
+    fig6.add_trace(go.Bar(x=calc.midwalls_strikes * sf, y=calc.midwalls_put, marker_color='#2c2c2c', opacity=0.8, showlegend=False))
     fig6.update_layout(common_layout, title='Edi - Put Open Interest')
     charts.append(('Put OI', fig6))
 
@@ -382,12 +484,12 @@ def create_exploded_charts(calc, metrics):
         v_pad = (v_max_k - v_min_k) * 0.1
         vanna_range = [v_min_k - v_pad, v_max_k + v_pad]
     else:
-        vanna_range = [min_k, max_k]
+        vanna_range = [strikes[0], strikes[-1]]
 
     fig8 = go.Figure()
     fig8.add_trace(go.Bar(x=strikes, y=calc.vanna_tot, name='Vanna Exposure', marker_color='purple', opacity=0.6))
     layout_vanna = common_layout.copy()
-    layout_vanna['xaxis'] = dict(range=vanna_range, tickmode='auto') # Override range
+    # layout_vanna['xaxis'] = dict(range=vanna_range, tickmode='auto') # Removed fixed range for auto-scale
     fig8.update_layout(layout_vanna, title='Edi - Vanna Exposure (Sensibilidade à Volatilidade)')
     charts.append(('Vanna Exposure', fig8))
 
@@ -460,13 +562,14 @@ def create_exploded_charts(calc, metrics):
     # OI Puts (negativo para espelhar)
     fig18.add_trace(go.Bar(x=strikes, y=-calc.oi_put_ref, name='PUT OI', marker_color='red', opacity=0.6))
     # Midwalls Shadows
-    fig18.add_trace(go.Bar(x=calc.midwalls_strikes, y=calc.midwalls_call, marker_color='#2c2c2c', opacity=0.3, showlegend=False))
-    fig18.add_trace(go.Bar(x=calc.midwalls_strikes, y=-calc.midwalls_put, marker_color='#2c2c2c', opacity=0.3, showlegend=False))
+    fig18.add_trace(go.Bar(x=calc.midwalls_strikes * sf, y=calc.midwalls_call, marker_color='#2c2c2c', opacity=0.3, showlegend=False))
+    fig18.add_trace(go.Bar(x=calc.midwalls_strikes * sf, y=-calc.midwalls_put, marker_color='#2c2c2c', opacity=0.3, showlegend=False))
     
     # Fibonacci Lines
     fib_shapes = []
     for fib_level in calc.fib_levels:
-        fib_shapes.append(dict(type='line', x0=fib_level, x1=fib_level, y0=0, y1=1, xref='x', yref='paper',
+        fib_val = fib_level * sf
+        fib_shapes.append(dict(type='line', x0=fib_val, x1=fib_val, y0=0, y1=1, xref='x', yref='paper',
                                line=dict(color='#374151', dash='dot', width=1)))
     
     layout_fibo = common_layout.copy()
@@ -474,7 +577,10 @@ def create_exploded_charts(calc, metrics):
     if current_shapes_fibo is None: current_shapes_fibo = []
     if not isinstance(current_shapes_fibo, list): current_shapes_fibo = [current_shapes_fibo]
     
-    layout_fibo['shapes'] = list(current_shapes_fibo) + fib_shapes
+    # Combine shapes safely (ensure list of dicts)
+    safe_current_shapes = [s for s in current_shapes_fibo if isinstance(s, dict)]
+    combined_shapes_fibo = safe_current_shapes + fib_shapes
+    layout_fibo['shapes'] = list(combined_shapes_fibo) # type: ignore
     
     fig18.update_layout(layout_fibo, title='Edi - Strikes + Midwalls + Fibonacci')
     charts.append(('Strikes + Midwalls + Fibo', fig18))
@@ -486,13 +592,13 @@ def create_exploded_charts(calc, metrics):
     
     # Range Lines & Walls
     range_shapes = [
-        dict(type='line', x0=metrics['range_low'], x1=metrics['range_low'], y0=0, y1=1, xref='x', yref='paper',
+        dict(type='line', x0=metrics['range_low'] * sf, x1=metrics['range_low'] * sf, y0=0, y1=1, xref='x', yref='paper',
              line=dict(color='yellow', dash='dash', width=2)),
-        dict(type='line', x0=metrics['range_high'], x1=metrics['range_high'], y0=0, y1=1, xref='x', yref='paper',
+        dict(type='line', x0=metrics['range_high'] * sf, x1=metrics['range_high'] * sf, y0=0, y1=1, xref='x', yref='paper',
              line=dict(color='yellow', dash='dash', width=2)),
-        dict(type='line', x0=metrics['call_wall'], x1=metrics['call_wall'], y0=0, y1=1, xref='x', yref='paper',
+        dict(type='line', x0=metrics['call_wall'] * sf, x1=metrics['call_wall'] * sf, y0=0, y1=1, xref='x', yref='paper',
              line=dict(color='red', dash='dot', width=2)),
-        dict(type='line', x0=metrics['put_wall'], x1=metrics['put_wall'], y0=0, y1=1, xref='x', yref='paper',
+        dict(type='line', x0=metrics['put_wall'] * sf, x1=metrics['put_wall'] * sf, y0=0, y1=1, xref='x', yref='paper',
              line=dict(color='green', dash='dot', width=2))
     ]
     
@@ -501,7 +607,10 @@ def create_exploded_charts(calc, metrics):
     if current_shapes_rw is None: current_shapes_rw = []
     if not isinstance(current_shapes_rw, list): current_shapes_rw = [current_shapes_rw]
     
-    layout_rw['shapes'] = list(current_shapes_rw) + range_shapes
+    # Combine shapes safely (ensure list of dicts)
+    safe_current_shapes = [s for s in current_shapes_rw if isinstance(s, dict)]
+    combined_shapes_rw = safe_current_shapes + range_shapes
+    layout_rw['shapes'] = list(combined_shapes_rw) # type: ignore
     
     fig19.update_layout(layout_rw, title='Edi - Range + Walls')
     charts.append(('Range + Walls', fig19))
@@ -517,7 +626,7 @@ def create_exploded_charts(calc, metrics):
 
     # 21. Delta Flip Profile
     fig21 = go.Figure()
-    spots_sim = calc.delta_flip_profile.get('spots', [])
+    spots_sim = [s * sf for s in calc.delta_flip_profile.get('spots', [])]
     deltas_sim = calc.delta_flip_profile.get('deltas', [])
     flip_val = calc.delta_flip_profile.get('flip_value', None)
     
@@ -525,7 +634,8 @@ def create_exploded_charts(calc, metrics):
         fig21.add_trace(go.Scatter(x=spots_sim, y=deltas_sim, mode='lines', name='Delta Profile', 
                                    line=dict(color='white')))
         if flip_val:
-            fig21.add_vline(x=flip_val, line_dash='dash', line_color='yellow', annotation_text='Flip')
+            flip_val_scaled = flip_val * sf
+            fig21.add_vline(x=flip_val_scaled, line_dash='dash', line_color='yellow', annotation_text='Flip')
         fig21.add_vline(x=spot, line_dash='dot', line_color='lime', annotation_text='Spot')
         
         layout_dp = common_layout.copy()
@@ -548,9 +658,10 @@ def create_exploded_charts(calc, metrics):
     i = 0
     for name, val in flips.items():
         if val:
+            val_scaled = val * sf
             color = colors.get(name, 'white')
-            fig22.add_vline(x=val, line_dash='dash', line_color=color, 
-                            annotation_text=f'{name}: {val:.0f}', 
+            fig22.add_vline(x=val_scaled, line_dash='dash', line_color=color, 
+                            annotation_text=f'{name}: {val_scaled:.0f}', 
                             annotation_position="top left",
                             annotation=dict(font_color=color, y=y_positions[i]))
             i += 1
@@ -580,7 +691,7 @@ def create_exploded_charts(calc, metrics):
     if hasattr(calc, 'max_pain_profile') and calc.max_pain_profile:
         fig24 = go.Figure()
         loss = calc.max_pain_profile['loss']
-        strikes_mp = calc.max_pain_profile['strikes']
+        strikes_mp = calc.max_pain_profile['strikes'] * sf
         
         # Normalize for better visualization
         loss_norm = (loss - np.min(loss)) / (np.max(loss) - np.min(loss))
@@ -590,7 +701,8 @@ def create_exploded_charts(calc, metrics):
         # Highlight Max Pain Strike
         mp_strike = calc.max_pain
         if mp_strike:
-            fig24.add_vline(x=mp_strike, line_dash='dash', line_color='lime', annotation_text=f'Max Pain: {mp_strike:.0f}')
+            mp_strike_scaled = mp_strike * sf
+            fig24.add_vline(x=mp_strike_scaled, line_dash='dash', line_color='lime', annotation_text=f'Max Pain: {mp_strike_scaled:.0f}')
             
         fig24.update_layout(common_layout, title='Edi - Max Pain Curve (Painel de Dor)')
         charts.append(('Max Pain Curve', fig24))
@@ -598,7 +710,7 @@ def create_exploded_charts(calc, metrics):
     # 25. Market Maker PnL Simulation
     if hasattr(calc, 'mm_pnl_simulation') and calc.mm_pnl_simulation:
         fig25 = go.Figure()
-        s_sim = calc.mm_pnl_simulation['spots']
+        s_sim = calc.mm_pnl_simulation['spots'] * sf
         pnl = calc.mm_pnl_simulation['pnl']
         
         # Color based on PnL
@@ -619,28 +731,94 @@ def create_exploded_charts(calc, metrics):
         fig26 = go.Figure()
         moves = calc.expected_moves
         
-        # X axis: Time (Days), Y axis: Price Levels
-        # We can plot this as a "Cone" looking sideways or just levels
-        # Let's do a simple visualization of ranges
-        
         times = [m['label'] for m in moves]
-        s1_up = [m['sigma_1_up'] for m in moves]
-        s1_down = [m['sigma_1_down'] for m in moves]
-        s2_up = [m['sigma_2_up'] for m in moves]
-        s2_down = [m['sigma_2_down'] for m in moves]
+        # 1 Sigma
+        upper = [m['upper'] * sf for m in moves]
+        lower = [m['lower'] * sf for m in moves]
         
-        fig26.add_trace(go.Scatter(x=times, y=s1_up, mode='lines+markers', name='+1 Sigma', line=dict(color='yellow')))
-        fig26.add_trace(go.Scatter(x=times, y=s1_down, mode='lines+markers', name='-1 Sigma', line=dict(color='yellow'), fill='tonexty'))
+        # 2 Sigma (Aprox)
+        move_val = [m['move'] * sf for m in moves]
+        upper2 = [u + m for u, m in zip(upper, move_val)]
+        lower2 = [l - m for l, m in zip(lower, move_val)]
         
-        fig26.add_trace(go.Scatter(x=times, y=s2_up, mode='lines+markers', name='+2 Sigma', line=dict(color='orange', dash='dash')))
-        fig26.add_trace(go.Scatter(x=times, y=s2_down, mode='lines+markers', name='-2 Sigma', line=dict(color='orange', dash='dash')))
+        fig26.add_trace(go.Scatter(x=times, y=upper, mode='lines+markers', name='+1 Sigma', line=dict(color='yellow')))
+        fig26.add_trace(go.Scatter(x=times, y=lower, mode='lines+markers', name='-1 Sigma', line=dict(color='yellow'), fill='tonexty'))
         
-        fig26.add_hline(y=spot, line_dash='dot', line_color='lime', annotation_text='Spot')
+        fig26.add_trace(go.Scatter(x=times, y=upper2, mode='lines+markers', name='+2 Sigma', line=dict(color='orange', dash='dash')))
+        fig26.add_trace(go.Scatter(x=times, y=lower2, mode='lines+markers', name='-2 Sigma', line=dict(color='orange', dash='dash')))
         
-        layout_cone = dict(template='plotly_dark', title='Edi - Cone de Movimento Esperado (Volatilidade)',
-                           xaxis_title='Horizonte Temporal', yaxis_title='Preço Esperado')
+        # Spot Line
+        fig26.add_hline(y=spot, line_dash='dot', line_color='white', annotation_text='Spot')
         
-        fig26.update_layout(layout_cone)
+        layout_em = common_layout.copy()
+        if 'xaxis' in layout_em: del layout_em['xaxis'] # Usa categorico
+        layout_em['title'] = 'Edi - Expected Move Cone'
+        fig26.update_layout(layout_em)
         charts.append(('Expected Move Cone', fig26))
+
+    # 27. Volatility & Pinning Dashboard
+    if hasattr(calc, 'vol_analysis') and calc.vol_analysis:
+        from plotly.subplots import make_subplots
+        
+        fig27 = make_subplots(
+            rows=2, cols=2,
+            specs=[[{'type': 'indicator'}, {'type': 'indicator'}],
+                   [{'colspan': 2, 'type': 'indicator'}, None]],
+            vertical_spacing=0.15
+        )
+        
+        va = calc.vol_analysis
+        
+        # IV Rank Gauge
+        fig27.add_trace(go.Indicator(
+            mode="gauge+number",
+            value=va['iv_rank'],
+            title={'text': "IV Rank (%)"},
+            gauge={'axis': {'range': [0, 100]},
+                   'bar': {'color': "cyan"},
+                   'steps': [
+                       {'range': [0, 20], 'color': "green"},
+                       {'range': [20, 50], 'color': "yellow"},
+                       {'range': [50, 80], 'color': "orange"},
+                       {'range': [80, 100], 'color': "red"}],
+                   'threshold': {'line': {'color': "white", 'width': 4}, 'thickness': 0.75, 'value': va['iv_rank']}}
+        ), row=1, col=1)
+        
+        # VRP Gauge (IV/HV)
+        vrp_val = va['vrp']
+        fig27.add_trace(go.Indicator(
+            mode="number+delta",
+            value=vrp_val,
+            title={'text': f"VRP (IV/HV)<br><span style='font-size:0.6em'>{va['regime']}</span>"},
+            delta={'reference': 1.0, 'relative': False, 'valueformat': '.2f'},
+            number={'valueformat': '.2f'}
+        ), row=1, col=2)
+        
+        # Pinning Risk Indicator
+        pr = getattr(calc, 'pinning_risk', None)
+        if pr and pr.get('is_active'):
+            strike = pr['strike']
+            # Aplica fator de escala se necessário para exibição
+            try:
+                sf = getattr(settings, 'DISPLAY_SCALE_FACTOR', 1.0)
+            except:
+                sf = 1.0
+            
+            fig27.add_trace(go.Indicator(
+                mode="number",
+                value=strike * sf,
+                title={'text': "⚠️ 0DTE PINNING RISK ⚠️<br><span style='font-size:0.6em'>Target Strike (Magnet)</span>"},
+                number={'prefix': "Pts ", 'valueformat': ",.0f", 'font': {'color': 'yellow'}}
+            ), row=2, col=1)
+        else:
+             fig27.add_trace(go.Indicator(
+                mode="number",
+                value=0,
+                title={'text': "Pinning Risk"},
+                number={'suffix': " Inativo", 'font': {'size': 20}}
+            ), row=2, col=1)
+
+        fig27.update_layout(template='plotly_dark', title='Edi - Volatility & Risk Analysis')
+        charts.append(('Vol & Risk Analysis', fig27))
 
     return charts

@@ -4,13 +4,17 @@ from datetime import datetime
 import plotly.io as pio
 from src.data_loader import load_data
 from src.calculator import OptionsCalculator
-from src.charts import create_dashboard_figure, create_analysis_figure, create_summary_table, create_exploded_charts
+from src.charts import create_dashboard_figure, create_analysis_figure, create_summary_table, create_exploded_charts, create_volatility_panel
 from src.tables import create_detailed_table, create_model_comparison_table
 from src.ntsl import generate_ntsl_script
 from src import config as settings
+from src.utils_fmt import format_number_br
 
 
 def auto_push_dashboard_v1():
+    if not settings.ENABLE_AUTO_GIT_PUSH:
+        print("Envio automático para Git desabilitado (ENABLE_AUTO_GIT_PUSH=False).")
+        return
     try:
         print("\n=== Enviando dashboard V1 para o Git ===")
         subprocess.run(["git", "add", "dashboard_v1"], check=True)
@@ -59,6 +63,17 @@ def main():
     
         options_df, spot, expiry = load_data(directory=target_dir, use_csv_spot=settings.USE_CSV_SPOT, spot_override=settings.SPOT)
         
+        # Override Expiry se fornecido manualmente no config
+        manual_exp_date_str = getattr(settings, 'MANUAL_EXPIRATION_DATE', None)
+        if manual_exp_date_str:
+            try:
+                # Tenta converter string para data
+                manual_expiry = datetime.strptime(manual_exp_date_str, "%Y-%m-%d").date()
+                print(f"  > Substituindo vencimento detectado ({expiry}) pelo manual: {manual_expiry}")
+                expiry = manual_expiry
+            except ValueError:
+                print(f"  > AVISO: Data manual inválida no config ({manual_exp_date_str}). Usando detectada: {expiry}")
+
         if options_df.empty:
             print("ERRO CRÍTICO: Nenhum dado de opções encontrado nos arquivos CSV.")
             print("Verifique se há arquivos CSV no diretório atual.")
@@ -77,6 +92,8 @@ def main():
             calc.calculate_flips_and_walls()
             calc.calculate_max_pain()
             calc.calculate_expected_moves()
+            calc.calculate_volatility_analysis()
+            calc.calculate_pinning_risk()
             calc.calculate_mm_pnl_simulation()
             metrics = calc.get_summary_metrics()
             print("Cálculos concluídos.")
@@ -95,6 +112,8 @@ def main():
         try:
             # Tabela de Resumo
             fig_table = create_summary_table(metrics)
+            # Painel de Volatilidade
+            fig_vol = create_volatility_panel(metrics)
     
             # Tabelas Adicionais (Detalhada e Comparativo)
             fig_detailed = create_detailed_table(calc, metrics)
@@ -120,7 +139,8 @@ def main():
         
         # 4. Salvar HTML Combinado
         output_file = "dashboard_v3.html"
-        print(f"Salvando arquivo final: {output_file}...")
+        if settings.ENABLE_V3_HTML_EXPORT:
+            print(f"Salvando arquivo final: {output_file}...")
         try:
             # Calcular Simulação de Valor Justo
             fair_value_sim = calc.calculate_fair_value_scenario(target_spot=calc.call_wall, target_days_from_now=0) # Exemplo inicial: Call Wall
@@ -130,6 +150,10 @@ def main():
             html_detailed = pio.to_html(fig_detailed, include_plotlyjs=False, full_html=False)
             html_models = pio.to_html(fig_models, include_plotlyjs=False, full_html=False)
             html_analysis = pio.to_html(fig_analysis, include_plotlyjs=False, full_html=False)
+            html_vol = pio.to_html(fig_vol, include_plotlyjs=False, full_html=False)
+            
+            # Fator de Escala
+            sf = getattr(settings, 'DISPLAY_SCALE_FACTOR', 1.0)
             
             # Gerar Tabela HTML de Simulação (Simples)
             html_sim_table = """
@@ -150,15 +174,23 @@ def main():
             for row in fair_value_sim:
                 color_call = "#4caf50" if row['Call_Chg'] > 0 else "#f44336"
                 color_put = "#4caf50" if row['Put_Chg'] > 0 else "#f44336"
+                
+                # Aplicar Escala
+                strike_disp = row['Strike'] * sf
+                call_now_disp = row['Call_Now'] * sf
+                call_sim_disp = row['Call_Sim'] * sf
+                put_now_disp = row['Put_Now'] * sf
+                put_sim_disp = row['Put_Sim'] * sf
+                
                 html_sim_table += f"""
                     <tr style="border-bottom: 1px solid #444;">
-                        <td style="padding: 8px;">{row['Strike']:.2f}</td>
-                        <td style="padding: 8px;">{row['Call_Now']:.2f}</td>
-                        <td style="padding: 8px;">{row['Call_Sim']:.2f}</td>
-                        <td style="padding: 8px; color: {color_call};">{row['Call_Chg']:.1f}%</td>
-                        <td style="padding: 8px;">{row['Put_Now']:.2f}</td>
-                        <td style="padding: 8px;">{row['Put_Sim']:.2f}</td>
-                        <td style="padding: 8px; color: {color_put};">{row['Put_Chg']:.1f}%</td>
+                        <td style="padding: 8px;">{format_number_br(strike_disp, 0)}</td>
+                        <td style="padding: 8px;">{format_number_br(call_now_disp, 2)}</td>
+                        <td style="padding: 8px;">{format_number_br(call_sim_disp, 2)}</td>
+                        <td style="padding: 8px; color: {color_call};">{format_number_br(row['Call_Chg'], 1)}%</td>
+                        <td style="padding: 8px;">{format_number_br(put_now_disp, 2)}</td>
+                        <td style="padding: 8px;">{format_number_br(put_sim_disp, 2)}</td>
+                        <td style="padding: 8px; color: {color_put};">{format_number_br(row['Put_Chg'], 1)}%</td>
                     </tr>
                 """
             html_sim_table += "</tbody></table>"
@@ -168,6 +200,7 @@ def main():
             toc_items = [
                 '<li><a href="#section_1">1. Resumo Executivo</a></li>',
                 '<li><a href="#section_sim">1.1 Simulação de Valor Justo (Fair Value)</a></li>',
+                '<li><a href="#section_vol">1.2 Análise de Volatilidade (VRP, IV Rank)</a></li>',
                 '<li><a href="#section_2">2. Tabela Detalhada (Fig 3)</a></li>',
                 '<li><a href="#section_3">3. Comparativo de Modelos Flip/Delta</a></li>',
                 '<li><a href="#section_4">4. Análise Detalhada de Estrutura</a></li>',
@@ -216,6 +249,7 @@ def main():
                     font-weight: bold;
                     margin-bottom: 10px;
                     font-family: inherit;
+                    class: copy-btn;
                 }
                 .copy-btn:hover {
                     background-color: #3399cc;
@@ -268,6 +302,12 @@ def main():
                         {html_sim_table}
                     </div>
                     
+                    <div id="section_vol" class="section">
+                        <h2>1.2 Análise de Volatilidade (VRP, IV Rank)</h2>
+                        <p>Métricas de volatilidade consolidadas para decisão: IV ATM, HV, VRP, IV Rank e regime sugerido.</p>
+                        {html_vol}
+                    </div>
+                    
                     <div id="section_2" class="section page-break">
                         <h2>2. Tabela Detalhada (Fig 3)</h2>
                         {html_detailed}
@@ -303,16 +343,19 @@ def main():
                 
             html_content += f"""
                     <div class="footer">
-                        Gerado automaticamente por Gamma Dashboard V3.0 | Spot: {spot:.2f} | Exp: {expiry}
+                        Gerado automaticamente por Gamma Dashboard V3.0 | Spot: {format_number_br(spot * sf, 0)} | Exp: {expiry}
                     </div>
                 </div>
             </body>
             </html>
             """
             
-            with open(output_file, "w", encoding="utf-8") as f:
-                f.write(html_content)
-            print(f"SUCESSO! Dashboard salvo em {os.path.abspath(output_file)}")
+            if settings.ENABLE_V3_HTML_EXPORT:
+                with open(output_file, "w", encoding="utf-8") as f:
+                    f.write(html_content)
+                print(f"SUCESSO! Dashboard salvo em {os.path.abspath(output_file)}")
+            else:
+                print("Geração de HTML v3 suprimida (ENABLE_V3_HTML_EXPORT=False)")
         except Exception as e:
             print(f"ERRO ao salvar arquivo: {e}")
             import traceback
@@ -321,34 +364,40 @@ def main():
             
         # 5. Atualizar Dashboard V1 (Stranger Things) - PRIORIDADE ALTA
         # Executa antes do PDF para garantir que o dashboard principal esteja atualizado
-        print("\n=== Atualização Automática Dashboard V1 ===")
-        print("Executando export_v1_data.py para recalcular gregas e atualizar NTSL...")
-        try:
-            import export_v1_data
-            # Recarrega o módulo caso já tenha sido importado
-            import importlib
-            importlib.reload(export_v1_data)
-            export_v1_data.main()
-            print(">> Dashboard V1 e código NTSL atualizados com sucesso!")
-        except ImportError:
-            print("ERRO: Módulo export_v1_data.py não encontrado.")
-        except Exception as e:
-            print(f"ERRO CRÍTICO ao atualizar Dashboard V1: {e}")
-            import traceback
-            traceback.print_exc()
+        if settings.ENABLE_V1_EXPORTS:
+            print("\n=== Atualização Automática Dashboard V1 ===")
+            print("Executando export_v1_data.py para recalcular gregas e atualizar NTSL...")
+            try:
+                import export_v1_data
+                # Recarrega o módulo caso já tenha sido importado
+                import importlib
+                importlib.reload(export_v1_data)
+                export_v1_data.main()
+                print(">> Dashboard V1 e código NTSL atualizados com sucesso!")
+            except ImportError:
+                print("ERRO: Módulo export_v1_data.py não encontrado.")
+            except Exception as e:
+                print(f"ERRO CRÍTICO ao atualizar Dashboard V1: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print("Atualização do Dashboard V1 suprimida (ENABLE_V1_EXPORTS=False)")
     
         # 6. Gerar PDF (Playwright) - Passo Final (Pode demorar)
-        print("\nGerando PDF (Playwright)...")
-        try:
-            from src.pdf_generator import export_to_pdf
-            pdf_file = "dashboard_v3.pdf"
-            export_to_pdf(output_file, pdf_file)
-        except ImportError:
-            print("AVISO: Playwright não instalado. Pulando etapa de PDF.")
-        except Exception as e:
-            print(f"ERRO ao gerar PDF: {e}")
+        if settings.ENABLE_PDF_EXPORT:
+            print("\nGerando PDF (Playwright)...")
+            try:
+                from src.pdf_generator import export_to_pdf
+                pdf_file = "dashboard_v3.pdf"
+                export_to_pdf(output_file, pdf_file)
+            except ImportError:
+                print("AVISO: Playwright não instalado. Pulando etapa de PDF.")
+            except Exception as e:
+                print(f"ERRO ao gerar PDF: {e}")
+        else:
+            print("Exportação para PDF suprimida (ENABLE_PDF_EXPORT=False)")
 
-        print("\nRotina concluída. Iniciando envio automático para o Git...")
+        print("\nRotina concluída. Verificando envio automático para o Git...")
         auto_push_dashboard_v1()
             
     except KeyboardInterrupt:

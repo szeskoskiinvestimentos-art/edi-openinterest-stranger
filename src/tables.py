@@ -1,26 +1,21 @@
 import plotly.graph_objects as go
 import numpy as np
+from src import config as settings
+from src.utils_fmt import format_number_br, parse_and_scale_walls
 
 def create_detailed_table(calc, metrics):
     """
     Recria a Tabela Detalhada (Figura 3) com métricas de GEX, Walls, Range e Midwalls.
     """
-    spot = metrics['spot']
+    sf = getattr(settings, 'DISPLAY_SCALE_FACTOR', 1.0)
+    spot = metrics['spot'] * sf
     
-    # Midwalls
-    mid_above = [k for k in calc.midwalls_strikes if k >= spot][:3]
-    mid_below = [k for k in calc.midwalls_strikes if k < spot][-3:]
-    # Ordenar mid_below decrescente (mais próximo do spot primeiro) se necessário, mas a lista original já está ordenada?
-    # calc.midwalls_strikes é ordenado crescente.
-    # Então mid_below (menores que spot) pega os últimos 3 (mais próximos do spot, mas em ordem crescente).
-    # Ex: spot 5400. Mids: ..., 5350, 5375. mid_below[-3:] -> 5325, 5350, 5375.
-    # A imagem mostra "5350" para Midwalls abaixo (3). Talvez mostre só o mais próximo ou lista.
-    # A imagem mostra: "5438" (acima) e "5350" (abaixo). Parecem ser valores únicos, não listas.
-    # Descrição diz "3 midpoints...". Talvez seja a lista.
-    # A imagem mostra apenas um valor. Talvez seja a média ou o mais próximo.
-    # Vou exibir lista separada por pipe.
-    mid_above_txt = ' | '.join([f"{k:.0f}" for k in mid_above]) if mid_above else 'N/A'
-    mid_below_txt = ' | '.join([f"{k:.0f}" for k in mid_below]) if mid_below else 'N/A'
+    # Midwalls (Escalar strikes)
+    mid_above = [k * sf for k in calc.midwalls_strikes if k >= metrics['spot']][:3]
+    mid_below = [k * sf for k in calc.midwalls_strikes if k < metrics['spot']][-3:]
+    
+    mid_above_txt = ' | '.join([format_number_br(k, 0) for k in mid_above]) if mid_above else 'N/A'
+    mid_below_txt = ' | '.join([format_number_br(k, 0) for k in mid_below]) if mid_below else 'N/A'
     
     # Net GEX
     # Net GEX (OI) = Soma de gex_tot
@@ -35,7 +30,7 @@ def create_detailed_table(calc, metrics):
     def fmt_gex(val):
         # Heurística para formatação baseada na magnitude
         if abs(val) < 100: return f"{val:.4f}"
-        return f"{val:,.2f}"
+        return format_number_br(val, 2)
 
     # PCR
     oi_call_sum = np.sum(calc.oi_call_ref)
@@ -44,21 +39,14 @@ def create_detailed_table(calc, metrics):
     
     # Walls Próximas
     # Extrair walls de metrics['walls_call_txt'] (formato "5700(1,200) | ...")
-    def parse_walls(txt):
-        if not txt: return []
-        try:
-            return [float(x.split('(')[0]) for x in txt.split('|')]
-        except:
-            return []
-            
-    c_walls = parse_walls(metrics['walls_call_txt'])
-    p_walls = parse_walls(metrics['walls_put_txt'])
+    c_walls_vals, c_walls_txt = parse_and_scale_walls(metrics['walls_call_txt'], sf)
+    p_walls_vals, p_walls_txt = parse_and_scale_walls(metrics['walls_put_txt'], sf)
     
-    cw_next = min(c_walls, key=lambda x: abs(x-spot)) if c_walls else None
-    pw_next = min(p_walls, key=lambda x: abs(x-spot)) if p_walls else None
+    cw_next = min(c_walls_vals, key=lambda x: abs(x-spot)) if c_walls_vals else None
+    pw_next = min(p_walls_vals, key=lambda x: abs(x-spot)) if p_walls_vals else None
     
-    cw_next_txt = f"{cw_next:.0f} (dist {abs(cw_next-spot):.0f})" if cw_next else 'N/A'
-    pw_next_txt = f"{pw_next:.0f} (dist {abs(pw_next-spot):.0f})" if pw_next else 'N/A'
+    cw_next_txt = f"{format_number_br(cw_next, 0)} (dist {format_number_br(abs(cw_next-spot), 0)})" if cw_next else 'N/A'
+    pw_next_txt = f"{format_number_br(pw_next, 0)} (dist {format_number_br(abs(pw_next-spot), 0)})" if pw_next else 'N/A'
     
     # IV Daily
     iv_daily = calc.iv_annual / np.sqrt(252)
@@ -74,18 +62,22 @@ def create_detailed_table(calc, metrics):
         'Net GEX (OI)', 'Net GEX (VOL)'
     ]
     
+    range_low = metrics['range_low'] * sf
+    range_high = metrics['range_high'] * sf
+    gamma_flip = metrics['gamma_flip'] * sf if metrics['gamma_flip'] else None
+    
     values = [
-        f"{spot:.0f}",
-        f"{metrics['delta_agregado']:,.0f}",
-        f"{iv_daily*100:.2f}",
-        f"{metrics['range_low']:.0f}–{metrics['range_high']:.0f}",
-        f"{metrics['range_low']:.0f}",
-        f"{metrics['range_high']:.0f}",
-        (f"{metrics['gamma_flip']:.0f}" if metrics['gamma_flip'] else 'N/A'),
+        format_number_br(spot, 0),
+        format_number_br(metrics['delta_agregado'], 0),
+        f"{format_number_br(iv_daily*100, 2)}%",
+        f"{format_number_br(range_low, 0)}–{format_number_br(range_high, 0)}",
+        format_number_br(range_low, 0),
+        format_number_br(range_high, 0),
+        (format_number_br(gamma_flip, 0) if gamma_flip else 'N/A'),
         metrics['regime'],
-        (f"{pcr:.2f}" if not np.isnan(pcr) else 'N/A'),
-        metrics['walls_call_txt'],
-        metrics['walls_put_txt'],
+        (format_number_br(pcr, 2) if not np.isnan(pcr) else 'N/A'),
+        c_walls_txt,
+        p_walls_txt,
         cw_next_txt,
         pw_next_txt,
         mid_above_txt,
@@ -117,8 +109,9 @@ def create_model_comparison_table(calc):
     """
     Cria tabela comparativa entre os modelos de Gamma Flip e Delta Flip.
     """
+    sf = getattr(settings, 'DISPLAY_SCALE_FACTOR', 1.0)
     flips = calc.flip_variations
-    spot = calc.spot
+    spot = calc.spot * sf
     
     models = []
     values = []
@@ -142,20 +135,24 @@ def create_model_comparison_table(calc):
     
     for name in keys:
         if name in flips:
-            val = flips[name]
-            models.append(name)
-            values.append(f"{val:.0f}" if val else "N/A")
-            dists.append(f"{val - spot:+.0f}" if val else "N/A")
-            descs.append(descriptions_map.get(name, ''))
+            val_raw = flips[name]
+            if val_raw:
+                val = val_raw * sf
+                models.append(name)
+                values.append(format_number_br(val, 0))
+                dists.append(format_number_br(val - spot, 0, prefix="+" if val >= spot else ""))
+                descs.append(descriptions_map.get(name, ''))
             
     # Adicionar Delta Flip
     df_profile = calc.delta_flip_profile
     if df_profile and df_profile.get('flip_value'):
-        d_val = df_profile['flip_value']
+        d_val_raw = df_profile['flip_value']
+        d_val = d_val_raw * sf
         models.append('Delta Flip')
-        values.append(f"{d_val:.0f}")
-        dists.append(f"{d_val - spot:+.0f}")
+        values.append(format_number_br(d_val, 0))
+        dists.append(format_number_br(d_val - spot, 0, prefix="+" if d_val >= spot else ""))
         descs.append(descriptions_map.get('Delta Flip', ''))
+
         
     fig = go.Figure(data=[go.Table(
         header=dict(values=['Modelo', 'Valor (Flip)', 'Distância do Spot', 'Descrição'], fill_color='#8e44ad', align='left', font=dict(color='white', size=12)),

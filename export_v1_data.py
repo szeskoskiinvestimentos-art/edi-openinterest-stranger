@@ -47,6 +47,13 @@ def safe_list(value: Any) -> List[Any]:
         return value
     return []
 
+def safe_scale(value: Any, scale_factor: float) -> Optional[float]:
+    """Aplica fator de escala de forma segura, retornando None se o valor for inválido."""
+    val = safe_float(value)
+    if val is not None:
+        return val * scale_factor
+    return None
+
 def main():
     print("=== Exportador de Dados para Dashboard V1 (Stranger Things) ===")
     
@@ -76,6 +83,8 @@ def main():
     # Cálculos Avançados V3
     print("Calculando métricas avançadas V3...")
     calc.calculate_expected_moves()
+    calc.calculate_volatility_analysis() # Novo
+    calc.calculate_pinning_risk()      # Novo
     calc.calculate_gamma_flip_cone()
     calc.calculate_delta_flip_profile()
     calc.calculate_flow_sentiment()
@@ -83,6 +92,9 @@ def main():
     
     # Obter Métricas Resumidas (Necessário para Overview e Key Levels)
     summary_metrics = calc.get_summary_metrics()
+
+    # Prepara dados vetoriais (Definido antes para uso nas simulações)
+    sf = getattr(settings, 'DISPLAY_SCALE_FACTOR', 1.0)
 
     # Fair Value Simulation (Novo)
     print("Calculando Simulação de Valor Justo...")
@@ -103,10 +115,23 @@ def main():
                 if hasattr(calc, 'calculate_fair_value_scenario'):
                     res = calc.calculate_fair_value_scenario(scen['spot'], target_days_from_now=0)
                     if res: # Garante que retornou algo válido
+                        # Escalar os resultados da simulação
+                        scaled_res = []
+                        for item in res:
+                            scaled_res.append({
+                                'Strike': safe_scale(item.get('Strike'), sf),
+                                'Call_Now': safe_scale(item.get('Call_Now'), sf),
+                                'Call_Sim': safe_scale(item.get('Call_Sim'), sf),
+                                'Call_Chg': item.get('Call_Chg'), # Porcentagem
+                                'Put_Now': safe_scale(item.get('Put_Now'), sf),
+                                'Put_Sim': safe_scale(item.get('Put_Sim'), sf),
+                                'Put_Chg': item.get('Put_Chg') # Porcentagem
+                            })
+
                         fair_value_sims.append({
                             'scenario': scen['label'],
-                            'target_spot': scen['spot'],
-                            'options': res
+                            'target_spot': safe_scale(scen['spot'], sf),
+                            'options': scaled_res
                         })
             except Exception as e:
                 print(f"Erro ao simular cenário {scen['label']}: {e}")
@@ -114,8 +139,7 @@ def main():
     # 3. Montar Estrutura JSON para V1
     # Baseado em dashboard_v1/assets/data/market_data.json
     
-    # Prepara dados vetoriais
-    strikes = calc.strikes_ref
+    strikes = calc.strikes_ref * sf
     
     # Delta Data
     delta_values = calc.dexp_tot # Delta Exposure por Strike
@@ -197,35 +221,54 @@ def main():
         "gamma_exposure": float(np.sum(gamma_values)),
         "delta_position": float(np.sum(delta_values)),
         "last_update": datetime.now().isoformat(),
-        "spot_price": float(spot),
+        "spot_price": float(spot * sf),
         "dealer_pressure": safe_float(summary_metrics.get('dealer_pressure')),
         "regime": summary_metrics.get('regime')
     }
 
     # Key Levels (Novos)
+    expected_moves_scaled = []
+    if calc.expected_moves:
+        for move in calc.expected_moves:
+            expected_moves_scaled.append({
+                "label": move.get("label"),
+                "days": move.get("days"),
+                "move": move.get("move"), # Porcentagem mantem
+                "upper": safe_scale(move.get("upper"), sf),
+                "lower": safe_scale(move.get("lower"), sf)
+            })
+
     key_levels = {
-        "gamma_flip": safe_float(calc.gamma_flip),
-        "gamma_flip_hvl": safe_float(calc.gamma_flip_hvl),
-        "call_wall": safe_float(calc.call_wall),
-        "put_wall": safe_float(calc.put_wall),
-        "max_pain": safe_float(calc.max_pain),
-        "zero_gamma": safe_float(calc.zero_gamma_level),
-        "range_low": safe_float(summary_metrics.get('range_low')),
-        "range_high": safe_float(summary_metrics.get('range_high')),
-        "expected_moves": calc.expected_moves if calc.expected_moves else []
+        "gamma_flip": safe_scale(calc.gamma_flip, sf),
+        "gamma_flip_hvl": safe_scale(calc.gamma_flip_hvl, sf),
+        "gamma_flip_hvl_gaussian": safe_scale(calc.flip_variations.get('HVL Gaussian'), sf) if hasattr(calc, 'flip_variations') and calc.flip_variations else None,
+        "call_wall": safe_scale(calc.call_wall, sf),
+        "put_wall": safe_scale(calc.put_wall, sf),
+        "effective_call_wall": safe_scale(calc.effective_call_wall, sf),
+        "effective_put_wall": safe_scale(calc.effective_put_wall, sf),
+        "max_pain": safe_scale(calc.max_pain, sf),
+        "zero_gamma": safe_scale(calc.zero_gamma_level, sf),
+        "range_low": safe_scale(summary_metrics.get('range_low'), sf),
+        "range_high": safe_scale(summary_metrics.get('range_high'), sf),
+        "expected_moves": expected_moves_scaled,
+        "pinning_risk": {
+            "strike": safe_scale(calc.pinning_risk.get('strike'), sf) if getattr(calc, 'pinning_risk', None) else None,
+            "score": calc.pinning_risk.get('strength') if getattr(calc, 'pinning_risk', None) else None
+        },
+        "volatility_analysis": getattr(calc, 'vol_analysis', None)
     }
 
     # Advanced V3 Data Structures
     v3_data = {
         "gamma_flip_cone": {
             "alphas": safe_list(calc.gamma_flip_cone.get('alphas')),
-            "flips": safe_list(calc.gamma_flip_cone.get('flips'))
+            "flips": [f*sf for f in safe_list(calc.gamma_flip_cone.get('flips'))]
         } if calc.gamma_flip_cone else None,
         
         "delta_flip_profile": {
-            "spots": safe_list(calc.delta_flip_profile.get('spots')),
+            "spots": [s*sf for s in safe_list(calc.delta_flip_profile.get('spots'))],
             "deltas": safe_list(calc.delta_flip_profile.get('deltas')),
-            "flip_value": safe_float(calc.delta_flip_profile.get('flip_value'))
+            "flip_value": safe_scale(calc.delta_flip_profile.get('flip_value'), sf) if calc.delta_flip_profile else None
         } if calc.delta_flip_profile else None,
         
         "flow_sentiment": {
@@ -234,12 +277,12 @@ def main():
         } if calc.flow_sentiment else None,
         
         "mm_pnl": {
-            "spots": safe_list(calc.mm_pnl_simulation.get('spots')),
+            "spots": [s*sf for s in safe_list(calc.mm_pnl_simulation.get('spots'))],
             "pnl": safe_list(calc.mm_pnl_simulation.get('pnl'))
         } if calc.mm_pnl_simulation else None,
         
         "max_pain_profile": {
-            "strikes": safe_list(calc.max_pain_profile.get('strikes')),
+            "strikes": [k*sf for k in safe_list(calc.max_pain_profile.get('strikes'))],
             "loss": safe_list(calc.max_pain_profile.get('loss'))
         } if hasattr(calc, 'max_pain_profile') and calc.max_pain_profile else None,
 
@@ -248,13 +291,16 @@ def main():
     }
 
     # Gerar Script NTSL (ProfitChart)
+    # IMPORTANTE: Passamos valores ORIGINAIS (não escalados), pois o ntsl.py agora aplica o scale factor internamente.
     metrics_ntsl = {
         'spot': spot,
-        'call_wall': key_levels['call_wall'],
-        'put_wall': key_levels['put_wall'],
-        'range_high': key_levels['call_wall'], # Fallback simples,
-        'range_low': key_levels['put_wall'],   # Fallback simples,
-        'max_pain': key_levels['max_pain']
+        'call_wall': calc.call_wall,
+        'put_wall': calc.put_wall,
+        'effective_call_wall': calc.effective_call_wall,
+        'effective_put_wall': calc.effective_put_wall,
+        'range_high': calc.call_wall, # Fallback simples
+        'range_low': calc.put_wall,   # Fallback simples
+        'max_pain': calc.max_pain
     }
     
     # Tenta calcular range baseado em vol se possível, ou usa walls
@@ -311,12 +357,21 @@ def main():
             "r_gamma": safe_list(r_gamma_exposure),
             "r_gamma_cum": safe_list(r_gamma_cum)
         },
+        "ewz_meta": {
+            "expiration": getattr(settings, 'EWZ_EXPIRATION_LABEL', None),
+            "atm_iv_pct": getattr(settings, 'EWZ_ATM_IV_PCT', None),
+            "hv_pct": getattr(settings, 'EWZ_HV_PCT', None),
+            "iv_rank_pct": getattr(settings, 'EWZ_IV_RANK_PCT', None)
+        },
         "detailed_data": detailed_data
     }
     
     # 4. Salvar Dados
     output_path_json = os.path.join('dashboard_v1', 'assets', 'data', 'market_data.json')
 
+    if not settings.ENABLE_V1_EXPORTS:
+        print("Exportação V1 desabilitada (ENABLE_V1_EXPORTS=False). Dados montados apenas em memória.")
+        return
     try:
         # Garantir diretório
         os.makedirs(os.path.dirname(output_path_json), exist_ok=True)

@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 from scipy.interpolate import UnivariateSpline
+from scipy.ndimage import gaussian_filter1d
 from src import config as settings
 import datetime as dt
 import logging
@@ -38,10 +39,14 @@ class OptionsCalculator:
         # Preparação de Dados Básicos
         self.strikes_ref = np.sort(self.options_df['StrikeK'].unique())
         
-        # Cálculo do Tempo (T) - Referência (vencimento mais próximo ou o passado)
-        # Útil para métricas que exigem um T único, mas as gregas usarão T por vencimento
+        # Cálculo do Tempo (T) - Referência
+        # Se for vencimento hoje (0DTE), usa fração do dia (0.1 dia = ~2h de risco final) para capturar Gamma explosivo
         bdays = int(np.busday_count(self.dataref, self.expiry_date)) if self.expiry_date else 1
-        self.T = max(bdays, 1) / 252.0
+        is_0dte_friday = bool(self.expiry_date) and (self.dataref == self.expiry_date) and (self.expiry_date.weekday() == 4)
+        if is_0dte_friday:
+            self.T = settings.MIN_T_EXPIRY
+        else:
+            self.T = (1.0/252.0) if bdays <= 0 else (bdays/252.0)
         
         # OIs Agregados por Strike (Soma de todos os vencimentos para visualização geral)
         self.oi_call = self.options_df.loc[self.options_df['OptionType']=='CALL'].groupby('StrikeK')['Open Int'].sum()
@@ -133,7 +138,8 @@ class OptionsCalculator:
                 # Usa dataref (data base do cálculo)
                 dataref_dt = pd.to_datetime(self.dataref)
                 bdays = int(np.busday_count(dataref_dt.date(), expiry_dt.date()))
-                T_exp = max(bdays, 1) / 252.0
+                is_0dte_friday = (dataref_dt.date() == expiry_dt.date()) and (expiry_dt.weekday() == 4)
+                T_exp = settings.MIN_T_EXPIRY if is_0dte_friday else ((1.0/252.0) if bdays <= 0 else (bdays/252.0))
                 
                 # Filtra e processa dados deste vencimento
                 df_exp = self.options_df[self.options_df['Expiry'] == expiry]
@@ -296,11 +302,11 @@ class OptionsCalculator:
 
     def calculate_flips_and_walls(self):
         """Calcula Gamma Flip, Zero Gamma, Max Pain e Walls."""
-        # Gamma Flip
+        # Gamma Flip (Usando lógica robusta do _find_zero_cross)
         try:
-            idx = np.where(self.gex_cum_signed >= 0)[0]
-            self.gamma_flip = self.strikes_ref[idx[0]] if len(idx) > 0 else None
-        except:
+            self.gamma_flip = self._find_zero_cross(self.strikes_ref, self.gex_cum_signed, self.spot)
+        except Exception as e:
+            print(f"Erro ao calcular Gamma Flip: {e}")
             self.gamma_flip = None
             
         # Gamma Flip HVL
@@ -329,9 +335,14 @@ class OptionsCalculator:
             # Use aggregated GEX per strike calculated in calculate_greeks_exposure
             self.call_wall = self.strikes_ref[np.argmax(np.array(self.gex_call_tot))]
             self.put_wall = self.strikes_ref[np.argmax(np.array(self.gex_put_tot))]
+            
+            # Calculate Effective Walls (Weighted Average of Top Strikes)
+            self.calculate_effective_walls()
         except:
             self.call_wall = self.spot
             self.put_wall = self.spot
+            self.effective_call_wall = self.spot
+            self.effective_put_wall = self.spot
 
         # Midwalls (Interpolação de OI para visualização)
         try:
@@ -399,6 +410,40 @@ class OptionsCalculator:
             print(f"Error calculating MM PnL: {e}")
 
 
+    def calculate_effective_walls(self):
+        """Calcula Effective Walls (Média Ponderada dos Top Strikes)."""
+        try:
+            # Effective Put Wall: Weighted Avg of Top 2 OI Puts
+            # Note: We use OI for stability, as GEX fluctuates more.
+            # But the user mentioned "Put Wall" context which is usually OI or GEX. 
+            # Standard Put Wall is OI based usually, but here we used GEX for 'put_wall' attribute above.
+            # Let's align with the "discovery" logic which used OI for the weighted average that matched the target.
+            
+            # Get Top 2 OI Puts
+            top_puts_idx = np.argsort(self.oi_put_ref)[-2:] # Top 2
+            top_puts_oi = self.oi_put_ref[top_puts_idx]
+            top_puts_k = self.strikes_ref[top_puts_idx]
+            
+            if np.sum(top_puts_oi) > 0:
+                self.effective_put_wall = np.average(top_puts_k, weights=top_puts_oi)
+            else:
+                self.effective_put_wall = self.put_wall
+                
+            # Effective Call Wall: Weighted Avg of Top 2 OI Calls
+            top_calls_idx = np.argsort(self.oi_call_ref)[-2:] # Top 2
+            top_calls_oi = self.oi_call_ref[top_calls_idx]
+            top_calls_k = self.strikes_ref[top_calls_idx]
+            
+            if np.sum(top_calls_oi) > 0:
+                self.effective_call_wall = np.average(top_calls_k, weights=top_calls_oi)
+            else:
+                self.effective_call_wall = self.call_wall
+                
+        except Exception as e:
+            # logger.warning(f"Error calculating effective walls: {e}")
+            self.effective_call_wall = self.call_wall
+            self.effective_put_wall = self.put_wall
+
     def _find_zero_cross(self, x_arr, y_arr, target_x=None):
         """Helper to find zero crossing x-value."""
         x_arr = np.array(x_arr, dtype=float)
@@ -408,20 +453,58 @@ class OptionsCalculator:
         sg = np.sign(y_arr)
         idx = np.where(np.diff(sg) != 0)[0]
         
+        # DEBUG
+        print(f"DEBUG: Spot={target_x}, Crossings={len(idx)}")
+        
+        # 1. Tenta encontrar um cruzamento real de zero (Zero Gamma)
         if len(idx) > 0:
             if target_x is not None:
-                # Find crossing closest to target_x (spot)
-                j = int(np.argmin(np.abs(x_arr[idx] - float(target_x))))
+                # Encontra o cruzamento mais próximo do Spot
+                distances = np.abs(x_arr[idx] - float(target_x))
+                j = int(np.argmin(distances))
                 i = idx[j]
+                
+                # Validação de Distância: Se o cruzamento estiver muito longe (>40%), ignora
+                # O usuário reclamou de valores irrelevantes (ex: 7).
+                closest_x = x_arr[i] # Aproximação
+                
+                # DEBUG
+                print(f"DEBUG: Closest Crossing={closest_x}, Dist={abs(closest_x - target_x)}, Limit={target_x * 0.40}")
+
+                if abs(closest_x - target_x) > (target_x * 0.40):
+                    pass # Cai para o fallback local
+                else:
+                    # Interpolação Linear para precisão
+                    y1, y2 = y_arr[i], y_arr[i+1]
+                    x1, x2 = x_arr[i], x_arr[i+1]
+                    if y2 == y1: return x1
+                    return float(x1 - y1 * (x2 - x1) / (y2 - y1))
             else:
                 i = idx[0] # First crossing
-                
-            y1, y2 = y_arr[i], y_arr[i+1]
-            x1, x2 = x_arr[i], x_arr[i+1]
-            if y2 == y1: return x1
-            return float(x1 - y1 * (x2 - x1) / (y2 - y1))
+                y1, y2 = y_arr[i], y_arr[i+1]
+                x1, x2 = x_arr[i], x_arr[i+1]
+                if y2 == y1: return x1
+                return float(x1 - y1 * (x2 - x1) / (y2 - y1))
         
-        # No crossing, return argmin abs
+        # 2. Fallback: Se não houver cruzamento ou for muito longe
+        # Procura o ponto de menor Gamma Absoluto DENTRO de uma janela operacional (+/- 30% do Spot)
+        if target_x is not None:
+            lower_bound = target_x * 0.70
+            upper_bound = target_x * 1.30
+            mask = (x_arr >= lower_bound) & (x_arr <= upper_bound)
+            
+            # DEBUG
+            print(f"DEBUG: Fallback Range [{lower_bound}, {upper_bound}], Strikes in range: {np.sum(mask)}")
+
+            if np.any(mask):
+                local_x = x_arr[mask]
+                local_y = y_arr[mask]
+                # Retorna o strike com menor gamma absoluto na região (o "mais próximo de zero" localmente)
+                best_local = float(local_x[np.argmin(np.abs(local_y))])
+                print(f"DEBUG: Best Local={best_local}")
+                return best_local
+
+        # 3. Último caso: Retorna o mínimo global (pode ser o 7 indesejado, mas é o matemático)
         return float(x_arr[np.argmin(np.abs(y_arr))])
 
     def calculate_gamma_flip_variations(self):
@@ -484,6 +567,17 @@ class OptionsCalculator:
         # Already calculated in r_gamma_cum
         flips['PVOP'] = self._find_zero_cross(strikes, self.r_gamma_cum, spot)
         
+        # 7. HVL Gaussian Smoothed
+        try:
+            # Sigma otimizado via discovery_levels.py
+            sigma_gauss = 1.17 
+            gex_smooth = gaussian_filter1d(self.gex_flip_base, sigma=sigma_gauss)
+            gex_cum_gauss = np.cumsum(gex_smooth)
+            flips['HVL Gaussian'] = self._find_zero_cross(strikes, gex_cum_gauss, spot)
+        except Exception as e:
+            # logger.error(f"Error calculating HVL Gaussian flip: {e}")
+            flips['HVL Gaussian'] = flips['Classic'] # Fallback
+
         self.flip_variations = flips
         
     def calculate_delta_flip_profile(self):
@@ -505,7 +599,8 @@ class OptionsCalculator:
                 expiry_dt = pd.to_datetime(expiry)
                 dataref_dt = pd.to_datetime(self.dataref)
                 bdays = int(np.busday_count(dataref_dt.date(), expiry_dt.date()))
-                T_exp = max(bdays, 1) / 252.0
+                is_0dte_friday = (dataref_dt.date() == expiry_dt.date()) and (expiry_dt.weekday() == 4)
+                T_exp = settings.MIN_T_EXPIRY if is_0dte_friday else ((1.0/252.0) if bdays <= 0 else (bdays/252.0))
                 
                 df_exp = self.options_df[self.options_df['Expiry'] == expiry]
                 oi_call = df_exp[df_exp['OptionType'] == 'CALL'].groupby('StrikeK')['Open Int'].sum().reindex(self.strikes_ref, fill_value=0.0).values
@@ -627,34 +722,117 @@ class OptionsCalculator:
     def calculate_expected_moves(self):
         """Calcula movimentos esperados baseados na IV ATM."""
         try:
-            if self.iv_strike_ref is None or len(self.iv_strike_ref) == 0:
-                 self.expected_moves = []
-                 return
-
-            # Encontrar IV ATM
-            idx_atm = int(np.argmin(np.abs(self.strikes_ref - self.spot)))
-            iv_atm = self.iv_strike_ref[idx_atm]
+            # Tenta usar IV ATM do ambiente primeiro (mais preciso para 0DTE se fornecido manualmente)
+            iv_atm = None
+            try:
+                env_iv = getattr(settings, 'EWZ_ATM_IV_PCT', None)
+                if env_iv is not None:
+                    iv_atm = float(env_iv) / 100.0
+            except (ValueError, TypeError):
+                pass
             
-            # Movimentos para hoje (1 dia), 1 semana, e Expiração
+            # Se não tiver manual, tenta extrair dos dados
+            if iv_atm is None:
+                if self.iv_strike_ref is not None and len(self.iv_strike_ref) > 0:
+                    idx_atm = int(np.argmin(np.abs(self.strikes_ref - self.spot)))
+                    iv_atm = self.iv_strike_ref[idx_atm]
+                else:
+                    iv_atm = self.iv_annual
+
+            # Movimentos para hoje (1 dia/0DTE), 1 semana, e Expiração
+            # Se for 0DTE, o movimento "1 Dia" é na verdade "Intraday Restante"
+            is_0dte = bool(self.expiry_date) and (self.dataref == self.expiry_date) and (self.expiry_date.weekday() == 4)
+            
             t_days = [1, 5, self.T * 252]
-            labels = ['1 Dia', '1 Semana', 'Expiração']
+            labels = ['1 Dia' if not is_0dte else 'Intraday (0DTE)', '1 Semana', 'Expiração']
             
             moves = []
             for t, lbl in zip(t_days, labels):
-                t_year = t / 252.0
+                t_year = max(t, 0.5) / 252.0 # Garante mínimo de meio dia de vol para não zerar
                 sigma_move = self.spot * iv_atm * np.sqrt(t_year)
                 moves.append({
                     'label': lbl,
                     'days': t,
-                    'sigma_1_up': self.spot + sigma_move,
-                    'sigma_1_down': self.spot - sigma_move,
-                    'sigma_2_up': self.spot + 2*sigma_move,
-                    'sigma_2_down': self.spot - 2*sigma_move
+                    'move': sigma_move,
+                    'upper': self.spot + sigma_move,
+                    'lower': self.spot - sigma_move
                 })
+                
             self.expected_moves = moves
+            self.iv_atm_used = iv_atm # Guarda para uso em outras funções
+            
         except Exception as e:
-            print(f"Error calculating expected moves: {e}")
+            logger.error(f"Erro em calculate_expected_moves: {e}")
             self.expected_moves = []
+
+    def calculate_volatility_analysis(self):
+        """Calcula métricas avançadas de volatilidade (VRP, Cone, Regime)."""
+        try:
+            # Recupera dados do settings ou usa defaults calculados
+            iv = self.iv_atm_used if hasattr(self, 'iv_atm_used') and self.iv_atm_used else self.iv_annual
+            
+            try:
+                env_hv = getattr(settings, 'EWZ_HV_PCT', None)
+                hv = (float(env_hv) / 100.0) if env_hv is not None else settings.HVL_ANNUAL
+            except (ValueError, TypeError):
+                hv = settings.HVL_ANNUAL
+
+            try:
+                env_rank = getattr(settings, 'EWZ_IV_RANK_PCT', None)
+                iv_rank = float(env_rank) if env_rank is not None else 50.0
+            except (ValueError, TypeError):
+                iv_rank = 50.0
+            
+            vrp = iv / hv if hv > 0 else 1.0
+            
+            # Classificação de Regime
+            if vrp > 1.15: regime_vol = "Cara (Venda de Vol)"
+            elif vrp < 0.85: regime_vol = "Barata (Compra de Vol)"
+            else: regime_vol = "Justa (Neutro)"
+            
+            # Classificação IV Rank
+            if iv_rank > 80: rank_desc = "Extrema Alta"
+            elif iv_rank > 50: rank_desc = "Alta"
+            elif iv_rank > 20: rank_desc = "Média"
+            else: rank_desc = "Baixa"
+            
+            self.vol_analysis = {
+                'iv_current': iv,
+                'hv_current': hv,
+                'vrp': vrp,
+                'iv_rank': iv_rank,
+                'regime': regime_vol,
+                'rank_desc': rank_desc
+            }
+        except Exception as e:
+            logger.error(f"Erro em calculate_volatility_analysis: {e}")
+            self.vol_analysis = {}
+
+    def calculate_pinning_risk(self):
+        """Identifica riscos de Pinning (preço travado) para 0DTE."""
+        try:
+            if (self.T * 252) > 1.5: # Só calcula se for próximo do vencimento (< 1.5 dias)
+                self.pinning_risk = None
+                return
+
+            # Strike com maior Gamma Total (Absoluto) é o maior ímã
+            # Gamma Total = Gamma Call + Gamma Put (ambos positivos para Long, negativos para Short dealer)
+            # Assumindo Dealer Short Gamma perto do vencimento em strikes vendidos
+            
+            # Usando GEX Total Absoluto como proxy de interesse
+            gex_total_abs = np.abs(self.gex_call_tot) + np.abs(self.gex_put_tot)
+            idx_max = np.argmax(gex_total_abs)
+            magnet_strike = self.strikes_ref[idx_max]
+            magnet_strength = gex_total_abs[idx_max]
+            
+            self.pinning_risk = {
+                'strike': magnet_strike,
+                'strength': magnet_strength,
+                'is_active': True
+            }
+        except Exception as e:
+            logger.error(f"Erro em calculate_pinning_risk: {e}")
+            self.pinning_risk = None
 
     def calculate_mm_pnl_simulation(self):
         """Simula o PnL do Market Maker em função do movimento do Spot."""
@@ -808,11 +986,11 @@ class OptionsCalculator:
         range_low = self.spot * (1 - iv_daily)
         range_high = self.spot * (1 + iv_daily)
         
-        # Top Walls OI
+        # Top Walls OI (mantém strikes no espaço original; escala aplicada apenas na exibição)
         idx_call = np.argsort(self.oi_call_ref)[-3:]
         idx_put  = np.argsort(self.oi_put_ref)[-3:]
-        walls_call_txt = ' | '.join([f"{self.strikes_ref[i]:.0f}({self.oi_call_ref[i]:,.0f})" for i in reversed(idx_call)])
-        walls_put_txt  = ' | '.join([f"{self.strikes_ref[i]:.0f}({self.oi_put_ref[i]:,.0f})" for i in reversed(idx_put)])
+        walls_call_txt = ' | '.join([f"{float(self.strikes_ref[i]):.4f}({self.oi_call_ref[i]:,.0f})" for i in reversed(idx_call)])
+        walls_put_txt  = ' | '.join([f"{float(self.strikes_ref[i]):.4f}({self.oi_put_ref[i]:,.0f})" for i in reversed(idx_put)])
 
         return {
             'spot': self.spot,
@@ -831,5 +1009,8 @@ class OptionsCalculator:
             'walls_call_txt': walls_call_txt,
             'walls_put_txt': walls_put_txt,
             'iv_daily': iv_daily,
-            'dataref': self.dataref
+            'dataref': self.dataref,
+            'vol_analysis': getattr(self, 'vol_analysis', {}),
+            'pinning_risk': getattr(self, 'pinning_risk', None),
+            'expected_moves': getattr(self, 'expected_moves', [])
         }

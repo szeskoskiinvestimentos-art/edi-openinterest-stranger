@@ -37,7 +37,36 @@ def read_options_table(path: Path):
                         break
             except Exception:
                 pass
+
+    # Tentativa 2: Extração implícita via Moneyness (se disponível)
+    # Fórmula: Spot = Strike / (1 - MoneynessPct/100) para Calls ITM
+    if spot_val is None and 'Moneyness' in df.columns and 'Strike' in df.columns:
+        try:
+            # Cria cópia temporária para cálculo
+            tmp = df[['Strike', 'Moneyness']].copy()
+            tmp['Strike'] = pd.to_numeric(tmp['Strike'], errors='coerce')
+            tmp['MoneynessPct'] = _num(tmp['Moneyness'])
+            
+            # Filtra apenas dados válidos (evita divisão por zero e NaNs)
+            tmp = tmp.dropna()
+            
+            if not tmp.empty:
+                # Calcula spot implícito para cada linha
+                # Assumindo definição de moneyness: M% = (Spot - Strike) / Spot -> Spot = Strike / (1 - M%)
+                # Nota: Essa definição é comum em dados como Barchart para Calls
+                # Para maior precisão, pegamos a mediana para eliminar outliers
+                tmp['ImpliedSpot'] = tmp['Strike'] / (1 - tmp['MoneynessPct'] / 100.0)
                 
+                # Filtra valores absurdos (ex: negativos ou infinitos)
+                valid_spots = tmp['ImpliedSpot'][tmp['ImpliedSpot'] > 0]
+                
+                if not valid_spots.empty:
+                    # Usa a mediana para robustez
+                    spot_val = float(valid_spots.median())
+                    # print(f"DEBUG: Spot recuperado via Moneyness: {spot_val}")
+        except Exception:
+            pass
+
     rename_map = {
         'Open Int':'Open Int', 'Open Interest':'Open Int', 'OI':'Open Int',
         'Qtde. Contratos em Aberto':'Open Int',
@@ -51,7 +80,7 @@ def read_options_table(path: Path):
     df['OptionType'] = (df['OptionType'].astype(str).str.strip().str.upper()
                         .replace({'C':'CALL','CALLS':'CALL','P':'PUT','PUTS':'PUT'}))
                         
-    for col in ['Strike','Last','Volume','Open Int','Premium','Change']:
+    for col in ['Strike','Last','Volume','Open Int','Premium','Change','IV','Implied Volatility','Delta']:
         if col in df.columns:
             df[col] = _num(df[col])
             
@@ -156,8 +185,8 @@ def load_data(directory='.', use_csv_spot=False, spot_override=None):
     if use_csv_spot and spot_auto:
         final_spot = spot_auto
         
-    # Ajuste de escala do Spot se necessário (menor que 100 -> multiplica por 1000)
-    if final_spot and final_spot < 100:
-        final_spot *= 1000
+    # Ajuste de escala do Spot removido para suportar EWZ (valores < 100)
+    # if final_spot and final_spot < 100:
+    #     final_spot *= 1000
         
     return options, final_spot, expiry
