@@ -30,8 +30,8 @@
 
     <!-- Navigation -->
     <nav class="nav">
-        <div class="container">
-            <ul class="nav-list">
+        <div class="container" style="display:flex;align-items:center;justify-content:space-between;">
+            <ul class="nav-list" style="margin:0">
                 <li><a href="#overview" class="nav-link active">Visão Geral</a></li>
                 <li><a href="#delta" class="nav-link">Essenciais</a></li>
                 <li><a href="#structure" class="nav-link">Estrutura</a></li>
@@ -41,6 +41,12 @@
                 <li><a href="#consolidated" class="nav-link">Consolidado</a></li>
                 <li><a href="#youtube" class="nav-link">YouTube</a></li>
             </ul>
+            <div class="nav-actions">
+                <select id="assetSelect" aria-label="Selecionar ativo" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;">
+                    <option value="WDO">WDO</option>
+                    <option value="WIN" selected>WIN</option>
+                </select>
+            </div>
         </div>
     </nav>
 
@@ -561,5 +567,26 @@
     <!-- Gráficos e Lógica Principal -->
     <script src="assets/js/charts.js"></script>
     <script src="assets/js/main.js"></script>
+    <script>
+        (function(){
+            const sel = document.getElementById('assetSelect');
+            function targetFor(val){
+                const href = location.href;
+                const isUnified = href.indexOf('dashboard_unificado') !== -1;
+                if(val === 'WDO'){
+                    return isUnified
+                        ? href.replace('/WIN/', '/WDO/').replace('dashboard_unificado/WIN', 'dashboard_unificado/WDO')
+                        : '../../Edi_OpenInterest - PY - Stranger - WDO/dashboard_v1/index.html';
+                } else {
+                    return isUnified
+                        ? href.replace('/WDO/', '/WIN/').replace('dashboard_unificado/WDO', 'dashboard_unificado/WIN')
+                        : '../../Edi_OpenInterest - PY - Stranger - Indice/dashboard_v1/index.html';
+                }
+            }
+            sel.addEventListener('change', function(e){
+                location.href = targetFor(e.target.value);
+            });
+        })();
+    </script>
 </body>
 </html>
