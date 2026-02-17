@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Edi OpenInterest - Dashboards</title>
+  <style>
+    @keyframes glow {
+      0% { text-shadow: 0 0 6px rgba(255,0,51,0.6), 0 0 20px rgba(255,0,51,0.4) }
+      100% { text-shadow: 0 0 12px rgba(255,0,51,0.9), 0 0 30px rgba(255,0,51,0.6) }
+    }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(1200px 600px at 30% 20%, #0a0a12 20%, #0d0d17 60%, #0a0a12 100%);
+      color: #e5e7eb;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 18px;
+      background: linear-gradient(90deg, #0b0b13, #121229);
+      border-bottom: 1px solid #1f2937;
+    }
+    .brand {
+      font-weight: 800;
+      font-size: 18px;
+      color: #ff0033;
+      letter-spacing: 1px;
+      animation: glow 2s ease-in-out infinite alternate;
+    }
+    .tabs {
+      display: flex;
+      gap: 10px;
+    }
+    .tab {
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 1px solid #3b82f6;
+      background: rgba(23,23,35,0.8);
+      color: #93c5fd;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all .2s ease;
+    }
+    .tab:hover { transform: translateY(-1px); }
+    .tab.active {
+      background: #ff0033;
+      border-color: #ff0033;
+      color: #fff;
+      box-shadow: 0 0 8px rgba(255,0,51,0.6);
+    }
+    .frame-wrapper {
+      width: 100%;
+      height: calc(100vh - 70px);
+      background: #000;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+    .warning {
+      padding: 10px 18px;
+      font-size: 12px;
+      background: rgba(23,23,35,0.7);
+      border-bottom: 1px solid #1f2937;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">EDI MARKET GUARDIN</div>
+    <div class="tabs">
+      <button class="tab active" id="tab-win" onclick="selectDashboard('win')">Índice (WIN)</button>
+      <button class="tab" id="tab-wdo" onclick="selectDashboard('wdo')">Dólar (WDO)</button>
+    </div>
+  </header>
+  <div class="warning">
+    Se alguma aba aparecer em branco ou 404, verifique se os arquivos
+    <code>docs/win/index.html</code> e <code>docs/wdo/index.html</code> foram gerados
+    e enviados para o GitHub.
+  </div>
+  <div class="frame-wrapper">
+    <iframe id="dashboard-frame" src="win/index.html" loading="lazy"></iframe>
+  </div>
+
+  <script>
+    function selectDashboard(kind) {
+      const frame = document.getElementById('dashboard-frame');
+      const tabWin = document.getElementById('tab-win');
+      const tabWdo = document.getElementById('tab-wdo');
+
+      if (kind === 'win') {
+        frame.src = 'win/index.html';
+        tabWin.classList.add('active');
+        tabWdo.classList.remove('active');
+      } else {
+        frame.src = 'wdo/index.html';
+        tabWdo.classList.add('active');
+        tabWin.classList.remove('active');
+      }
+    }
+  </script>
+</body>
+</html>
+
