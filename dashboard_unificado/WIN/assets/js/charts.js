@@ -406,12 +406,37 @@ class StrangerThingsCharts {
     }
 
     // NOVOS GRÁFICOS
-
+    
     formatNumberBr(value, decimals = 2) {
         if (value === null || value === undefined || isNaN(value)) return '-';
         const factor = Math.pow(10, decimals);
         const rounded = Math.round(value * factor) / factor;
         return rounded.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    }
+
+    formatCompactBr(value) {
+        if (value === null || value === undefined || isNaN(value)) return '-';
+        const abs = Math.abs(value);
+        let divisor = 1;
+        let suffix = '';
+        if (abs >= 1e12) {
+            divisor = 1e12;
+            suffix = 'T';
+        } else if (abs >= 1e9) {
+            divisor = 1e9;
+            suffix = 'B';
+        } else if (abs >= 1e6) {
+            divisor = 1e6;
+            suffix = 'M';
+        } else if (abs >= 1e3) {
+            divisor = 1e3;
+            suffix = 'K';
+        } else {
+            return this.formatNumberBr(value, 0);
+        }
+        const scaled = value / divisor;
+        const formatted = scaled.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+        return `${formatted}${suffix}`;
     }
 
     createOIStrikeChart(data) {
@@ -678,7 +703,7 @@ class StrangerThingsCharts {
             
             const current = Math.floor(start + (absEnd - start) * this.easeOutQuart(progress));
             const signed = isNegative ? -current : current;
-            element.textContent = this.formatNumberBr(signed, 0);
+            element.textContent = this.formatCompactBr(signed);
             
             if (progress < 1) {
                 requestAnimationFrame(animate);
