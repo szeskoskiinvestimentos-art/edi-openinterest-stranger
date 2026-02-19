@@ -572,18 +572,23 @@
     <script>
         (function(){
             const sel = document.getElementById('assetSelect');
+            const prodBase = 'https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/dashboard_unificado/';
             function targetFor(val){
+                const host = location.hostname;
                 const href = location.href;
+                const isProd = host.indexOf('github.io') !== -1 || host.indexOf('sites.google.com') !== -1;
+                if(isProd){
+                    return prodBase + (val === 'WDO' ? 'WDO/' : 'WIN/');
+                }
                 const isUnified = href.indexOf('dashboard_unificado') !== -1;
                 if(val === 'WDO'){
                     return isUnified
                         ? href.replace('/WIN/', '/WDO/').replace('dashboard_unificado/WIN', 'dashboard_unificado/WDO')
                         : '../../Edi_OpenInterest - PY - Stranger - WDO/dashboard_v1/index.html';
-                } else {
-                    return isUnified
-                        ? href.replace('/WDO/', '/WIN/').replace('dashboard_unificado/WDO', 'dashboard_unificado/WIN')
-                        : '../../Edi_OpenInterest - PY - Stranger - Indice/dashboard_v1/index.html';
                 }
+                return isUnified
+                    ? href.replace('/WDO/', '/WIN/').replace('dashboard_unificado/WDO', 'dashboard_unificado/WIN')
+                    : '../../Edi_OpenInterest - PY - Stranger - Indice/dashboard_v1/index.html';
             }
             sel.addEventListener('change', function(e){
                 location.href = targetFor(e.target.value);
