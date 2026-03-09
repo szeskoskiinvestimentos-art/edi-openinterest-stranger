@@ -1,5 +1,5 @@
 window.marketData = {
-    "last_updated": "2026-03-09 16:03:11",
+    "last_updated": "2026-03-09 16:03:51",
     "spot_price": 5289.5,
     "fed_watch_rates": {
         "source": "Simulated/Manual",
@@ -7,7 +7,7 @@ window.marketData = {
         "meetings": [
             {
                 "date": "2026-03-18",
-                "days_remaining": 9,
+                "days_remaining": 8,
                 "current_rate": "525-550",
                 "probs": {
                     "Corte 0.25%": 65.5,
@@ -17,7 +17,7 @@ window.marketData = {
             },
             {
                 "date": "2026-05-01",
-                "days_remaining": 53,
+                "days_remaining": 52,
                 "current_rate": "500-525",
                 "probs": {
                     "Corte 0.25%": 45.0,
@@ -38,7 +38,7 @@ window.marketData = {
         "total_volume": 4800,
         "gamma_exposure": 49491281.575206675,
         "delta_position": -1355.6128641459059,
-        "last_update": "2026-03-09T16:03:11.172730",
+        "last_update": "2026-03-09T16:03:51.331495",
         "spot_price": 5289.5,
         "dealer_pressure": 0.11485686468491121,
         "regime": "Gamma Positivo"
