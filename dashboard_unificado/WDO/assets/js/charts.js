@@ -102,6 +102,11 @@ class StrangerThingsCharts {
             this.createDealerPressureChart(data); // Added
             this.createDeltaAgregadoChart(data); // Added
 
+            // Ferramentas de Mercado
+            this.createFedWatchTable(data);
+            this.createMostActivesTable(data);
+            this.createVolumeVolatilityChart(data);
+
             this.updateMetrics(data);
             this.updateKeyLevels(data);
             this.updateNtslCode(data);
@@ -190,6 +195,120 @@ class StrangerThingsCharts {
                 { strike: 5.6, delta: -0.85, gamma: 0.045, volume: 1200, oi: 8500, iv: 18.5 }
             ]
         };
+    }
+
+    createVolumeVolatilityChart(data) {
+        const ctx = document.getElementById('volumeVolatilityChart');
+        if (!ctx) return;
+
+        // Combine call and put volume for this chart
+        const strikes = data.volume_data.strikes;
+        const totalVol = data.volume_data.call_volume.map((v, i) => v + data.volume_data.put_volume[i]);
+        const ivs = data.volatility_data.iv_values;
+
+        this.charts.volVol = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: strikes,
+                datasets: [
+                    {
+                        label: 'Volume Total',
+                        data: totalVol,
+                        backgroundColor: 'rgba(0, 243, 255, 0.3)',
+                        borderColor: '#00f3ff',
+                        borderWidth: 1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Volatilidade (IV)',
+                        data: ivs,
+                        type: 'line',
+                        borderColor: '#ff00ff',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                ...this.chartOptions,
+                plugins: {
+                    ...this.chartOptions.plugins,
+                    title: {
+                        display: true,
+                        text: 'Volume vs Volatilidade',
+                        color: '#ff00ff',
+                        font: { family: 'Orbitron', size: 16 }
+                    }
+                },
+                scales: {
+                    ...this.chartOptions.scales,
+                    y: {
+                        ...this.chartOptions.scales.y,
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: { display: true, text: 'Volume', color: '#00f3ff' }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        grid: { drawOnChartArea: false },
+                        ticks: { color: '#ff00ff' },
+                        title: { display: true, text: 'IV %', color: '#ff00ff' }
+                    }
+                }
+            }
+        });
+    }
+
+    createFedWatchTable(data) {
+        const container = document.getElementById('fedwatch-container');
+        if (!container || !data.fed_watch) {
+            if(container) container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            return;
+        }
+
+        let html = '<table class="data-table"><thead><tr><th>Vencimento</th><th>Dias</th><th>Prob. Alta</th><th>Prob. Baixa</th><th>Neutro</th></tr></thead><tbody>';
+        
+        data.fed_watch.forEach(item => {
+            html += `<tr>
+                <td>${item.expiry}</td>
+                <td>${item.days_to_expiry}</td>
+                <td class="positive">${item.prob_hike}%</td>
+                <td class="negative">${item.prob_cut}%</td>
+                <td class="neutral">${item.prob_neutral}%</td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    createMostActivesTable(data) {
+        const container = document.getElementById('most-actives-container');
+        if (!container || !data.most_actives) {
+            if(container) container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            return;
+        }
+
+        let html = '<table class="data-table"><thead><tr><th>Strike</th><th>Tipo</th><th>OI</th><th>Volume</th><th>IV%</th></tr></thead><tbody>';
+        
+        data.most_actives.forEach(item => {
+            const typeClass = item.type === 'CALL' ? 'positive' : 'negative';
+            html += `<tr>
+                <td>${item.strike}</td>
+                <td class="${typeClass}">${item.type}</td>
+                <td>${this.formatCompactBr(item.oi)}</td>
+                <td>${this.formatCompactBr(item.volume)}</td>
+                <td>${item.iv.toFixed(1)}%</td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
     }
 
     updateLastUpdate(data) {

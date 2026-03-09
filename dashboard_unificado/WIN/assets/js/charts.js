@@ -86,8 +86,12 @@ class StrangerThingsCharts {
             const data = await this.loadMarketData();
             this.createDeltaChart(data);
             this.createGammaChart(data);
-            // this.createVolumeChart(data); // Removido por redundância (Volume Chart era na verdade OI)
             this.createVolatilityChart(data);
+            
+            // Market Tools
+            this.createFedWatchTable(data);
+            this.createMostActivesTable(data);
+            this.createVolumeVolatilityChart(data);
             
             // Novos Gráficos
             this.createOIStrikeChart(data);
@@ -1371,6 +1375,187 @@ class StrangerThingsCharts {
         setText('edi-effective-call', data.key_levels.effective_call_wall);
         setText('edi-effective-put', data.key_levels.effective_put_wall);
         setText('max-pain', data.key_levels.max_pain);
+    }
+
+    createFedWatchTable(data) {
+        const container = document.getElementById('fedwatch-container');
+        if (!container || !data.fed_watch) return;
+
+        if (data.fed_watch.length === 0) {
+            container.innerHTML = '<p>Nenhum dado de FedWatch disponível.</p>';
+            return;
+        }
+
+        let html = '<div class="table-responsive"><table class="neon-table"><thead><tr><th>Vencimento</th><th>Dias Úteis</th><th>IV ATM</th><th>1 SD (68%)</th><th>2 SD (95%)</th><th>3 SD (99%)</th></tr></thead><tbody>';
+
+        data.fed_watch.forEach(fw => {
+            const range1 = fw.ranges.find(r => r.sd === 1);
+            const range2 = fw.ranges.find(r => r.sd === 2);
+            const range3 = fw.ranges.find(r => r.sd === 3);
+
+            const fmtRange = (r) => r ? `${this.formatNumberBr(r.lower, 2)} - ${this.formatNumberBr(r.upper, 2)}` : '-';
+
+            html += `
+                <tr>
+                    <td class="font-bold">${fw.expiry}</td>
+                    <td>${fw.days_to_exp}</td>
+                    <td style="color: var(--secondary-neon);">${this.formatNumberBr(fw.iv_atm * 100, 2)}%</td>
+                    <td>${fmtRange(range1)}</td>
+                    <td>${fmtRange(range2)}</td>
+                    <td>${fmtRange(range3)}</td>
+                </tr>
+            `;
+        });
+
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+    }
+
+    createMostActivesTable(data) {
+        const container = document.getElementById('most-actives-container');
+        if (!container || !data.most_actives) return;
+
+        const { top_oi, top_vol } = data.most_actives;
+
+        if ((!top_oi || top_oi.length === 0) && (!top_vol || top_vol.length === 0)) {
+            container.innerHTML = '<p>Nenhum dado de contratos ativos disponível.</p>';
+            return;
+        }
+
+        // Helper to create sub-table
+        const createSubTable = (title, items, valueKey, valueLabel) => {
+            let subHtml = `
+                <div class="actives-panel" style="margin-bottom: 20px;">
+                    <h4 style="color: var(--primary-neon); border-bottom: 1px solid var(--primary-neon); padding-bottom: 5px; margin-bottom: 10px;">${title}</h4>
+                    <table class="neon-table small-table">
+                        <thead>
+                            <tr>
+                                <th>Strike</th>
+                                <th>Tipo</th>
+                                <th>${valueLabel}</th>
+                                <th>IV</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            items.slice(0, 10).forEach(item => { // Top 10
+                const typeClass = item.type === 'CALL' ? 'positive-val' : 'negative-val';
+                const typeLabel = item.type === 'CALL' ? 'C' : 'P';
+                subHtml += `
+                    <tr>
+                        <td class="font-bold">${this.formatNumberBr(item.strike, 2)}</td>
+                        <td class="${typeClass}">${typeLabel}</td>
+                        <td>${this.formatNumberBr(item[valueKey], 0)}</td>
+                        <td>${this.formatNumberBr(item.iv, 1)}%</td>
+                    </tr>
+                `;
+            });
+            
+            subHtml += '</tbody></table></div>';
+            return subHtml;
+        };
+
+        let html = '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">';
+        html += createSubTable('🔥 Top Open Interest', top_oi, 'oi', 'Open Int');
+        html += createSubTable('🌊 Top Volume', top_vol, 'volume', 'Volume');
+        html += '</div>';
+
+        container.innerHTML = html;
+    }
+
+    createVolumeVolatilityChart(data) {
+        const ctx = document.getElementById('volumeVolatilityChart');
+        if (!ctx) return;
+        
+        // Se tivermos dados de Term Structure, usamos. Se não, fallback para Volume Profile vs IV
+        if (data.term_structure && data.term_structure.expiries && data.term_structure.expiries.length > 0) {
+            // Term Structure Chart
+            this.charts.volumeVolatility = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.term_structure.expiries,
+                    datasets: [{
+                        label: 'Term Structure (IV x Vencimento)',
+                        data: data.term_structure.iv_atm,
+                        borderColor: '#ffff00',
+                        backgroundColor: 'rgba(255, 255, 0, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        pointBackgroundColor: '#ffff00',
+                        pointRadius: 5
+                    }]
+                },
+                options: {
+                    ...this.chartOptions,
+                    plugins: {
+                        ...this.chartOptions.plugins,
+                        title: {
+                            display: true,
+                            text: 'Estrutura a Termo da Volatilidade (Term Structure)',
+                            color: '#ff00ff',
+                            font: { family: 'Orbitron', size: 16, weight: 'bold' }
+                        }
+                    }
+                }
+            });
+        } else {
+            // Fallback: Volume vs IV (por strike)
+             this.charts.volumeVolatility = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.volume_data.strikes.map(s => this.formatNumberBr(s, 0)),
+                    datasets: [
+                        {
+                            label: 'Total Volume',
+                            data: data.volume_data.total_volume,
+                            backgroundColor: 'rgba(0, 243, 255, 0.3)',
+                            borderColor: '#00f3ff',
+                            borderWidth: 1,
+                            yAxisID: 'y'
+                        },
+                        {
+                            type: 'line',
+                            label: 'IV (%)',
+                            data: data.volatility_data.iv_values,
+                            borderColor: '#ffff00',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    ...this.chartOptions,
+                    plugins: {
+                        ...this.chartOptions.plugins,
+                        title: {
+                            display: true,
+                            text: 'Volume vs Volatilidade',
+                            color: '#ff00ff',
+                            font: { family: 'Orbitron', size: 16, weight: 'bold' }
+                        }
+                    },
+                    scales: {
+                        ...this.chartOptions.scales,
+                        y: {
+                            ...this.chartOptions.scales.y,
+                            position: 'left',
+                            title: { display: true, text: 'Volume', color: '#00f3ff' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#ffff00', font: { family: 'Share Tech Mono' } },
+                            title: { display: true, text: 'IV (%)', color: '#ffff00' }
+                        }
+                    }
+                }
+            });
+        }
     }
 
     updateNtslCode(data) {
