@@ -1,4 +1,4 @@
-// NTSL Indicator - Edi OpenInterest Levels - 10/03/2026 06:53
+// NTSL Indicator - Edi OpenInterest Levels - 10/03/2026 08:13
 // Gerado Automaticamente
 
 const
@@ -27,8 +27,8 @@ input
   MostrarPLUS2(true);
   ExibirMelhoresPontos(false);
   MostrarTodosPontos(false); // Se falso, limita a +/- 10k pts do Spot
-  ModeloFlip(2);
-  spot(5289.50);
+  ModeloFlip(3);
+  spot(5199.00);
 
 var
   GammaVal: Float;
@@ -37,7 +37,7 @@ var
 
 begin
   // Inicializa GammaVal com o primeiro disponivel por seguranca
-  GammaVal := 4500.00;
+  GammaVal := 5239.42;
 
   // Define Limites de Exibicao (Otimizacao)
   if (MostrarTodosPontos) then begin
@@ -48,49 +48,49 @@ begin
     LimitLower := spot - 10000;
   end;
 
-  // 1 = Classic (4500.00)
-  // 2 = Spline (5193.28)
-  // 3 = HVL (4500.00)
-  // 4 = HVL Log (4500.00)
-  // 5 = Sigma Kernel (4500.00)
-  // 6 = PVOP (4500.00)
-  // 7 = HVL Gaussian (4500.00)
+  // 1 = Classic (5239.42)
+  // 2 = Spline (5236.33)
+  // 3 = HVL (5219.43)
+  // 4 = HVL Log (5174.93)
+  // 5 = Sigma Kernel (5172.48)
+  // 6 = PVOP (5239.42)
+  // 7 = HVL Gaussian (5306.05)
 
   // --- Linhas Principais (Com Intercalação de Texto) ---
-  if (ModeloFlip = 1) then GammaVal := 4500.00;
-  if (ModeloFlip = 2) then GammaVal := 5193.28;
-  if (ModeloFlip = 3) then GammaVal := 4500.00;
-  if (ModeloFlip = 4) then GammaVal := 4500.00;
-  if (ModeloFlip = 5) then GammaVal := 4500.00;
-  if (ModeloFlip = 6) then GammaVal := 4500.00;
-  if (ModeloFlip = 7) then GammaVal := 4500.00;
-  ShowLine := (ExibirWalls) and (4500.00 <= LimitUpper) and (4500.00 >= LimitLower);
+  if (ModeloFlip = 1) then GammaVal := 5239.42;
+  if (ModeloFlip = 2) then GammaVal := 5236.33;
+  if (ModeloFlip = 3) then GammaVal := 5219.43;
+  if (ModeloFlip = 4) then GammaVal := 5174.93;
+  if (ModeloFlip = 5) then GammaVal := 5172.48;
+  if (ModeloFlip = 6) then GammaVal := 5239.42;
+  if (ModeloFlip = 7) then GammaVal := 5306.05;
+  ShowLine := (ExibirWalls) and (5100.00 <= LimitUpper) and (5100.00 >= LimitLower);
   if (ShowLine) then
-    HorizontalLineCustom(4500.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
-  ShowLine := (ExibirEffectiveWalls) and (5104.27 <= LimitUpper) and (5104.27 >= LimitLower);
-  if (ShowLine) then
-    HorizontalLineCustom(5104.27, clEffectiveWall, 2, psDashDot, "Edi Effective Put", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5100.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
   ShowLine := (ExibirWalls) and (5150.00 <= LimitUpper) and (5150.00 >= LimitLower);
   if (ShowLine) then
     HorizontalLineCustom(5150.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
+  ShowLine := (ExibirExpMoves) and (5160.29 <= LimitUpper) and (5160.29 >= LimitLower);
+  if (ShowLine) then
+    HorizontalLineCustom(5160.29, clExpMove, 1, psDot, "Edi_ExpMove", TamanhoFonte, tpTopRight, CurrentDate, 0);
+  ShowLine := (ExibirEffectiveWalls) and (5185.99 <= LimitUpper) and (5185.99 >= LimitLower);
+  if (ShowLine) then
+    HorizontalLineCustom(5185.99, clEffectiveWall, 2, psDashDot, "Edi Effective Put", TamanhoFonte, tpTopLeft, 0, 0);
   ShowLine := (ExibirWalls) and (5200.00 <= LimitUpper) and (5200.00 >= LimitLower);
   if (ShowLine) then
     HorizontalLineCustom(5200.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
+  ShowLine := (ExibirRange) and (5200.00 <= LimitUpper) and (5200.00 >= LimitLower);
+  if (ShowLine) then
+    HorizontalLineCustom(5200.00, clRangeLow, 1, psDot, "Edi_Range", TamanhoFonte, tpTopRight, 0, 0);
+  ShowLine := (ExibirExpMoves) and (5237.71 <= LimitUpper) and (5237.71 >= LimitLower);
+  if (ShowLine) then
+    HorizontalLineCustom(5237.71, clExpMove, 1, psDot, "Edi_ExpMove", TamanhoFonte, tpTopRight, CurrentDate, 0);
   ShowLine := (ExibirWalls) and (5250.00 <= LimitUpper) and (5250.00 >= LimitLower);
   if (ShowLine) then
     HorizontalLineCustom(5250.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
   ShowLine := (ExibirMaxPain) and (5250.00 <= LimitUpper) and (5250.00 >= LimitLower);
   if (ShowLine) then
     HorizontalLineCustom(5250.00, clMaxPain, 2, psSolid, "Edi_MaxPain", TamanhoFonte, tpTopRight, CurrentDate, 0);
-  ShowLine := (ExibirRange) and (5250.00 <= LimitUpper) and (5250.00 >= LimitLower);
-  if (ShowLine) then
-    HorizontalLineCustom(5250.00, clRangeLow, 1, psDot, "Edi_Range", TamanhoFonte, tpBottomRight, 0, 0);
-  ShowLine := (ExibirExpMoves) and (5250.11 <= LimitUpper) and (5250.11 >= LimitLower);
-  if (ShowLine) then
-    HorizontalLineCustom(5250.11, clExpMove, 1, psDot, "Edi_ExpMove", TamanhoFonte, tpTopRight, CurrentDate, 0);
-  ShowLine := (ExibirExpMoves) and (5328.89 <= LimitUpper) and (5328.89 >= LimitLower);
-  if (ShowLine) then
-    HorizontalLineCustom(5328.89, clExpMove, 1, psDot, "Edi_ExpMove", TamanhoFonte, tpTopRight, CurrentDate, 0);
   ShowLine := (ExibirWalls) and (5400.00 <= LimitUpper) and (5400.00 >= LimitLower);
   if (ShowLine) then
     HorizontalLineCustom(5400.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
@@ -100,31 +100,34 @@ begin
   ShowLine := (ExibirWalls) and (5550.00 <= LimitUpper) and (5550.00 >= LimitLower);
   if (ShowLine) then
     HorizontalLineCustom(5550.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  ShowLine := (ExibirEffectiveWalls) and (5567.65 <= LimitUpper) and (5567.65 >= LimitLower);
-  if (ShowLine) then
-    HorizontalLineCustom(5567.65, clEffectiveWall, 2, psDashDot, "Edi Effective Call", TamanhoFonte, tpTopLeft, 0, 0);
   ShowLine := (ExibirWalls) and (5600.00 <= LimitUpper) and (5600.00 >= LimitLower);
   if (ShowLine) then
     HorizontalLineCustom(5600.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   ShowLine := (ExibirRange) and (5600.00 <= LimitUpper) and (5600.00 >= LimitLower);
   if (ShowLine) then
     HorizontalLineCustom(5600.00, clRangeHigh, 1, psDot, "Edi_Range", TamanhoFonte, tpTopRight, 0, 0);
+  ShowLine := (ExibirEffectiveWalls) and (5798.90 <= LimitUpper) and (5798.90 >= LimitLower);
+  if (ShowLine) then
+    HorizontalLineCustom(5798.90, clEffectiveWall, 2, psDashDot, "Edi Effective Call", TamanhoFonte, tpTopLeft, 0, 0);
   ShowLine := (ExibirWalls) and (5900.00 <= LimitUpper) and (5900.00 >= LimitLower);
   if (ShowLine) then
     HorizontalLineCustom(5900.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+  ShowLine := (ExibirWalls) and (6000.00 <= LimitUpper) and (6000.00 >= LimitLower);
+  if (ShowLine) then
+    HorizontalLineCustom(6000.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
 
   // Flips (Dinâmicos)
   if (ExibirFlips) then begin
     if (GammaVal > 0) then
       HorizontalLineCustom(GammaVal, clGammaFlip, 2, psDash, "Edi_GammaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    if (5361.09 > 0) then
-      HorizontalLineCustom(5361.09, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    if (5391.06 > 0) then
+      HorizontalLineCustom(5391.06, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
   end;
 
   // Edi_Wall (Midpoints) - Grid Completo
   if (ExibirEdiWall) then begin
-    if (4825.00 <= LimitUpper) and (4825.00 >= LimitLower) then
-      HorizontalLineCustom(4825.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (5125.00 <= LimitUpper) and (5125.00 >= LimitLower) then
+      HorizontalLineCustom(5125.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     if (5175.00 <= LimitUpper) and (5175.00 >= LimitLower) then
       HorizontalLineCustom(5175.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     if (5225.00 <= LimitUpper) and (5225.00 >= LimitLower) then
@@ -139,13 +142,15 @@ begin
       HorizontalLineCustom(5575.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     if (5750.00 <= LimitUpper) and (5750.00 >= LimitLower) then
       HorizontalLineCustom(5750.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (5950.00 <= LimitUpper) and (5950.00 >= LimitLower) then
+      HorizontalLineCustom(5950.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
   end;
 
   if (MostrarPLUS) then begin
-    if (4748.30 <= LimitUpper) and (4748.30 >= LimitLower) then
-      HorizontalLineCustom(4748.30, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (4901.70 <= LimitUpper) and (4901.70 >= LimitLower) then
-      HorizontalLineCustom(4901.70, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (5119.10 <= LimitUpper) and (5119.10 >= LimitLower) then
+      HorizontalLineCustom(5119.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (5130.90 <= LimitUpper) and (5130.90 >= LimitLower) then
+      HorizontalLineCustom(5130.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     if (5169.10 <= LimitUpper) and (5169.10 >= LimitLower) then
       HorizontalLineCustom(5169.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     if (5180.90 <= LimitUpper) and (5180.90 >= LimitLower) then
@@ -174,13 +179,17 @@ begin
       HorizontalLineCustom(5714.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     if (5785.40 <= LimitUpper) and (5785.40 >= LimitLower) then
       HorizontalLineCustom(5785.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (5938.20 <= LimitUpper) and (5938.20 >= LimitLower) then
+      HorizontalLineCustom(5938.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (5961.80 <= LimitUpper) and (5961.80 >= LimitLower) then
+      HorizontalLineCustom(5961.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
   end;
 
   if (MostrarPLUS2) then begin
-    if (4653.40 <= LimitUpper) and (4653.40 >= LimitLower) then
-      HorizontalLineCustom(4653.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (4996.60 <= LimitUpper) and (4996.60 >= LimitLower) then
-      HorizontalLineCustom(4996.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (5111.80 <= LimitUpper) and (5111.80 >= LimitLower) then
+      HorizontalLineCustom(5111.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (5138.20 <= LimitUpper) and (5138.20 >= LimitLower) then
+      HorizontalLineCustom(5138.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     if (5161.80 <= LimitUpper) and (5161.80 >= LimitLower) then
       HorizontalLineCustom(5161.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     if (5188.20 <= LimitUpper) and (5188.20 >= LimitLower) then
@@ -209,17 +218,21 @@ begin
       HorizontalLineCustom(5670.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     if (5829.20 <= LimitUpper) and (5829.20 >= LimitLower) then
       HorizontalLineCustom(5829.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (5923.60 <= LimitUpper) and (5923.60 >= LimitLower) then
+      HorizontalLineCustom(5923.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (5976.40 <= LimitUpper) and (5976.40 >= LimitLower) then
+      HorizontalLineCustom(5976.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
   end;
 
   if (ExibirMelhoresPontos and LastBarOnChart) then
   begin
-    HorizontalLineCustom(5297.43, clRed, 1, psDash, "Edi_Wall_Venda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.1);
-    HorizontalLineCustom(5281.57, clLime, 1, psDash, "Edi_Wall_Compra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.1);
-    HorizontalLineCustom(5305.37, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.3);
-    HorizontalLineCustom(5273.63, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.3);
-    HorizontalLineCustom(5320.10, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.5);
-    HorizontalLineCustom(5258.90, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.5);
-    HorizontalLineCustom(5328.04, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.7);
-    HorizontalLineCustom(5250.96, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.7);
+    HorizontalLineCustom(5206.80, clRed, 1, psDash, "Edi_Wall_Venda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.1);
+    HorizontalLineCustom(5191.20, clLime, 1, psDash, "Edi_Wall_Compra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.1);
+    HorizontalLineCustom(5214.60, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.3);
+    HorizontalLineCustom(5183.40, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.3);
+    HorizontalLineCustom(5229.08, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.5);
+    HorizontalLineCustom(5168.92, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.5);
+    HorizontalLineCustom(5236.88, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.7);
+    HorizontalLineCustom(5161.12, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.7);
   end;
 end;
