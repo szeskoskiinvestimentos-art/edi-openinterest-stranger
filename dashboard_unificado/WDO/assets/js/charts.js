@@ -266,49 +266,141 @@ class StrangerThingsCharts {
 
     createFedWatchTable(data) {
         const container = document.getElementById('fedwatch-container');
-        if (!container || !data.fed_watch) {
-            if(container) container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+        if (!container) return;
+
+        const rates = data && data.fed_watch_rates;
+        if (rates && Array.isArray(rates.meetings) && rates.meetings.length > 0) {
+            let html = '<div class="table-wrapper"><table class="neon-table"><thead><tr><th>Reunião</th><th>Dias</th><th>Faixa Atual</th><th>Probabilidades</th></tr></thead><tbody>';
+
+            rates.meetings.forEach((m) => {
+                const probs = (m && m.probs) ? m.probs : {};
+                const probsText = Object.keys(probs).length > 0
+                    ? Object.entries(probs).map(([k, v]) => `${k}: ${this.formatNumberBr(v, 1)}%`).join(' | ')
+                    : '-';
+
+                html += `
+                    <tr>
+                        <td class="font-bold">${m.date || '-'}</td>
+                        <td>${m.days_remaining ?? '-'}</td>
+                        <td style="color: var(--secondary-neon);">${m.current_rate || '-'}</td>
+                        <td>${probsText}</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+            return;
+        }
+
+        const legacy = data && data.fed_watch;
+        if (!Array.isArray(legacy) || legacy.length === 0) {
+            container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
             return;
         }
 
         let html = '<table class="data-table"><thead><tr><th>Vencimento</th><th>Dias</th><th>Prob. Alta</th><th>Prob. Baixa</th><th>Neutro</th></tr></thead><tbody>';
-        
-        data.fed_watch.forEach(item => {
+
+        legacy.forEach((item) => {
+            const days = item.days_to_exp ?? item.days_to_expiry ?? item.days_remaining ?? '-';
+            const hike = item.prob_hike ?? '-';
+            const cut = item.prob_cut ?? '-';
+            const neutral = item.prob_neutral ?? '-';
+
             html += `<tr>
-                <td>${item.expiry}</td>
-                <td>${item.days_to_expiry}</td>
-                <td class="positive">${item.prob_hike}%</td>
-                <td class="negative">${item.prob_cut}%</td>
-                <td class="neutral">${item.prob_neutral}%</td>
+                <td>${item.expiry || item.date || '-'}</td>
+                <td>${days}</td>
+                <td class="positive">${hike}${typeof hike === 'number' ? '%' : ''}</td>
+                <td class="negative">${cut}${typeof cut === 'number' ? '%' : ''}</td>
+                <td class="neutral">${neutral}${typeof neutral === 'number' ? '%' : ''}</td>
             </tr>`;
         });
-        
+
         html += '</tbody></table>';
         container.innerHTML = html;
     }
 
     createMostActivesTable(data) {
         const container = document.getElementById('most-actives-container');
-        if (!container || !data.most_actives) {
-            if(container) container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+        if (!container) return;
+        if (!data || !data.most_actives) {
+            container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
             return;
         }
 
-        let html = '<table class="data-table"><thead><tr><th>Strike</th><th>Tipo</th><th>OI</th><th>Volume</th><th>IV%</th></tr></thead><tbody>';
-        
-        data.most_actives.forEach(item => {
-            const typeClass = item.type === 'CALL' ? 'positive' : 'negative';
-            html += `<tr>
-                <td>${item.strike}</td>
-                <td class="${typeClass}">${item.type}</td>
-                <td>${this.formatCompactBr(item.oi)}</td>
-                <td>${this.formatCompactBr(item.volume)}</td>
-                <td>${item.iv.toFixed(1)}%</td>
-            </tr>`;
-        });
-        
-        html += '</tbody></table>';
-        container.innerHTML = html;
+        const most = data.most_actives;
+        const topOi = most && Array.isArray(most.top_oi) ? most.top_oi : null;
+        const topVol = most && Array.isArray(most.top_vol) ? most.top_vol : null;
+
+        if ((topOi && topOi.length > 0) || (topVol && topVol.length > 0)) {
+            const createSubTable = (title, items, valueKey, valueLabel) => {
+                if (!items || items.length === 0) return '';
+
+                let subHtml = `
+                    <div class="actives-panel" style="margin-bottom: 20px;">
+                        <h4 style="color: var(--primary-neon); border-bottom: 1px solid var(--primary-neon); padding-bottom: 5px; margin-bottom: 10px;">${title}</h4>
+                        <table class="neon-table small-table">
+                            <thead>
+                                <tr>
+                                    <th>Strike</th>
+                                    <th>Tipo</th>
+                                    <th>${valueLabel}</th>
+                                    <th>IV</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                items.slice(0, 10).forEach((item) => {
+                    const typeClass = item.type === 'CALL' ? 'positive-val' : 'negative-val';
+                    const typeLabel = item.type === 'CALL' ? 'C' : 'P';
+                    const strike = item.strike ?? item.Strike;
+                    const value = item[valueKey];
+                    const iv = item.iv ?? item.IV;
+
+                    subHtml += `
+                        <tr>
+                            <td class="font-bold">${this.formatNumberBr(strike, 2)}</td>
+                            <td class="${typeClass}">${typeLabel}</td>
+                            <td>${this.formatNumberBr(value, 0)}</td>
+                            <td>${this.formatNumberBr(iv, 1)}%</td>
+                        </tr>
+                    `;
+                });
+
+                subHtml += '</tbody></table></div>';
+                return subHtml;
+            };
+
+            let html = '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">';
+            html += createSubTable('🔥 Top Open Interest', topOi, 'oi', 'Open Int');
+            html += createSubTable('🌊 Top Volume', topVol, 'volume', 'Volume');
+            html += '</div>';
+            container.innerHTML = html;
+            return;
+        }
+
+        if (Array.isArray(most) && most.length > 0) {
+            let html = '<table class="data-table"><thead><tr><th>Strike</th><th>Tipo</th><th>OI</th><th>Volume</th><th>IV%</th></tr></thead><tbody>';
+
+            most.forEach((item) => {
+                const typeClass = item.type === 'CALL' ? 'positive' : 'negative';
+                const iv = typeof item.iv === 'number' ? item.iv.toFixed(1) : '-';
+                html += `<tr>
+                    <td>${item.strike}</td>
+                    <td class="${typeClass}">${item.type}</td>
+                    <td>${this.formatCompactBr(item.oi)}</td>
+                    <td>${this.formatCompactBr(item.volume)}</td>
+                    <td>${iv}${iv !== '-' ? '%' : ''}</td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+            return;
+        }
+
+        container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
     }
 
     updateLastUpdate(data) {
