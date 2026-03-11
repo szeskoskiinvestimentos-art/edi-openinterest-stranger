@@ -91,6 +91,7 @@ class StrangerThingsCharts {
             // Market Tools
             this.createFedWatchTable(data);
             this.createMostActivesTable(data);
+            this.createOIByExpiryChart(data);
             this.createVolumeVolatilityChart(data);
             
             // Novos Gráficos
@@ -443,6 +444,88 @@ class StrangerThingsCharts {
         return `${formatted}${suffix}`;
     }
 
+    estimateMostActivesScaleFactor(data) {
+        const scaledStrikesRaw = data?.gamma_data?.strikes || data?.volume_data?.strikes || [];
+        const most = data?.most_actives;
+        const rawStrikes = [
+            ...(most?.top_oi || []).map(x => x?.strike),
+            ...(most?.top_vol || []).map(x => x?.strike)
+        ].filter(x => Number.isFinite(x) && x > 0);
+
+        if (rawStrikes.some(x => x > 1000)) return 1;
+        const spot = data?.overview?.spot_price;
+        if (!Number.isFinite(spot) || spot <= 5000) return 1;
+
+        const scaledStrikes = (Array.isArray(scaledStrikesRaw) ? scaledStrikesRaw : [])
+            .filter(x => Number.isFinite(x))
+            .slice()
+            .sort((a, b) => a - b);
+
+        if (scaledStrikes.length < 2) return 1;
+        if (rawStrikes.length === 0) return 1;
+
+        const diffs = [];
+        const diffCount = Math.min(200, scaledStrikes.length - 1);
+        for (let i = 1; i <= diffCount; i++) {
+            const d = scaledStrikes[i] - scaledStrikes[i - 1];
+            if (Number.isFinite(d) && d > 0) diffs.push(d);
+        }
+
+        if (diffs.length === 0) return 1;
+        diffs.sort((a, b) => a - b);
+        const diffMedian = diffs[Math.floor(diffs.length / 2)];
+        if (!Number.isFinite(diffMedian) || diffMedian <= 0) return 1;
+
+        const tol = diffMedian * 0.25;
+        const hasNear = (value) => {
+            let lo = 0;
+            let hi = scaledStrikes.length - 1;
+            while (lo <= hi) {
+                const mid = (lo + hi) >> 1;
+                const v = scaledStrikes[mid];
+                if (Math.abs(v - value) <= tol) return true;
+                if (v < value) lo = mid + 1;
+                else hi = mid - 1;
+            }
+            const v1 = scaledStrikes[Math.max(0, Math.min(scaledStrikes.length - 1, lo))];
+            const v2 = scaledStrikes[Math.max(0, Math.min(scaledStrikes.length - 1, lo - 1))];
+            return Math.abs(v1 - value) <= tol || Math.abs(v2 - value) <= tol;
+        };
+
+        const sample = rawStrikes.slice(0, 12);
+        const scoreFor = (sf) => {
+            if (!Number.isFinite(sf) || sf <= 0) return -1;
+            let score = 0;
+            for (const raw of sample) {
+                const target = raw * sf;
+                if (hasNear(target)) score += 1;
+            }
+            const spotRaw = spot / sf;
+            const minRaw = Math.min(...rawStrikes);
+            const maxRaw = Math.max(...rawStrikes);
+            if (Number.isFinite(spotRaw) && spotRaw >= (minRaw - 2) && spotRaw <= (maxRaw + 2)) score += 2;
+            return score;
+        };
+
+        const candidate1 = diffMedian;
+        const candidate2 = diffMedian * 2;
+        const score1 = scoreFor(candidate1);
+        const score2 = scoreFor(candidate2);
+        const best = score2 > score1 ? candidate2 : candidate1;
+
+        if (!Number.isFinite(best) || best < 100 || best > 100000) return 1;
+        return best;
+    }
+
+    normalizeMostActiveStrike(strike, data, scaleFactor) {
+        if (!Number.isFinite(strike) || strike <= 0) return 0;
+        const spot = data?.overview?.spot_price;
+        if (Number.isFinite(spot) && spot > 5000 && strike < 1000 && Number.isFinite(scaleFactor) && scaleFactor > 1.2) {
+            return strike * scaleFactor;
+        }
+        return strike;
+    }
+
     createOIStrikeChart(data) {
         const ctx = document.getElementById('oiStrikeChart');
         if (!ctx) return;
@@ -687,8 +770,11 @@ class StrangerThingsCharts {
 
 
     updateMetrics(data) {
-        this.animateValue('total-trades', 0, data.overview.total_trades, 2000);
-        this.animateValue('volume-total', 0, data.overview.total_volume, 2000);
+        const volumeTotal = data?.overview?.volume_total ?? data?.overview?.total_volume ?? 0;
+        const openInterestTotal = data?.overview?.open_interest_total ?? data?.overview?.total_trades ?? 0;
+
+        this.animateValue('total-trades', 0, volumeTotal, 2000);
+        this.animateValue('volume-total', 0, openInterestTotal, 2000);
         this.animateValue('gamma-exposure', 0, data.overview.gamma_exposure, 2000);
         this.animateValue('delta-position', 0, data.overview.delta_position, 2000);
     }
@@ -1144,26 +1230,75 @@ class StrangerThingsCharts {
 
     createExpectedMoveChart(data) {
         const ctx = document.getElementById('expectedMoveChart');
-        if (!ctx || !data.key_levels || !data.key_levels.expected_moves) return;
+        const moves = data?.key_levels?.expected_moves;
+        if (!ctx || !Array.isArray(moves) || moves.length === 0) return;
 
-        const moves = data.key_levels.expected_moves;
-        
-        const labels = moves.map(m => m.label);
-        
-        const days = moves.map(m => m.days);
-        const upper1 = moves.map(m => m.sigma_1_up);
-        const lower1 = moves.map(m => m.sigma_1_down);
-        const upper2 = moves.map(m => m.sigma_2_up);
-        const lower2 = moves.map(m => m.sigma_2_down);
-        
-        // Add current spot as point 0
-        const spot = data.overview.spot_price;
-        const allDays = [0, ...days];
+        const spot = data?.overview?.spot_price;
+        if (!Number.isFinite(spot)) return;
+
+        const normalized = moves.map((m) => {
+            const label = m?.label ?? '-';
+            const days = Number(m?.days);
+
+            const sigma1Up = Number(m?.sigma_1_up);
+            const sigma1Down = Number(m?.sigma_1_down);
+            const sigma2Up = Number(m?.sigma_2_up);
+            const sigma2Down = Number(m?.sigma_2_down);
+
+            if ([sigma1Up, sigma1Down, sigma2Up, sigma2Down].every(Number.isFinite)) {
+                return { label, days, sigma1Up, sigma1Down, sigma2Up, sigma2Down };
+            }
+
+            const upper = Number(m?.upper);
+            const lower = Number(m?.lower);
+            if (Number.isFinite(upper) && Number.isFinite(lower)) {
+                const distUp = upper - spot;
+                const distDown = spot - lower;
+                if (Number.isFinite(distUp) && Number.isFinite(distDown)) {
+                    return {
+                        label,
+                        days,
+                        sigma1Up: upper,
+                        sigma1Down: lower,
+                        sigma2Up: spot + distUp * 2,
+                        sigma2Down: spot - distDown * 2
+                    };
+                }
+            }
+
+            const movePct = Number(m?.move);
+            if (Number.isFinite(movePct) && movePct > 0) {
+                const dist = spot * (movePct / 100);
+                if (Number.isFinite(dist)) {
+                    return {
+                        label,
+                        days,
+                        sigma1Up: spot + dist,
+                        sigma1Down: spot - dist,
+                        sigma2Up: spot + dist * 2,
+                        sigma2Down: spot - dist * 2
+                    };
+                }
+            }
+
+            return null;
+        }).filter(Boolean);
+
+        if (normalized.length === 0) return;
+
+        const labels = normalized.map(m => m.label);
+        const upper1 = normalized.map(m => m.sigma1Up);
+        const lower1 = normalized.map(m => m.sigma1Down);
+        const upper2 = normalized.map(m => m.sigma2Up);
+        const lower2 = normalized.map(m => m.sigma2Down);
+
         const allUpper1 = [spot, ...upper1];
         const allLower1 = [spot, ...lower1];
         const allUpper2 = [spot, ...upper2];
         const allLower2 = [spot, ...lower2];
         const allLabels = ['Hoje', ...labels];
+
+        if (this.charts.expectedMove) this.charts.expectedMove.destroy();
 
         this.charts.expectedMove = new Chart(ctx, {
             type: 'line',
@@ -1188,7 +1323,7 @@ class StrangerThingsCharts {
                     },
                     {
                         label: 'Spot',
-                        data: Array(allDays.length).fill(spot),
+                        data: Array(allLabels.length).fill(spot),
                         borderColor: '#ffffff',
                         borderDash: [2, 2],
                         pointRadius: 0,
@@ -1438,13 +1573,22 @@ class StrangerThingsCharts {
     }
 
     createMostActivesTable(data) {
-        const container = document.getElementById('most-actives-container');
-        if (!container || !data.most_actives) return;
+        const containers = document.querySelectorAll('#most-actives-container, #most-actives-container-tools');
+        if (!containers || containers.length === 0) return;
+        if (!data || !data.most_actives) {
+            containers.forEach((c) => {
+                c.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            });
+            return;
+        }
 
         const { top_oi, top_vol } = data.most_actives;
+        const scaleFactor = this.estimateMostActivesScaleFactor(data);
 
         if ((!top_oi || top_oi.length === 0) && (!top_vol || top_vol.length === 0)) {
-            container.innerHTML = '<p>Nenhum dado de contratos ativos disponível.</p>';
+            containers.forEach((c) => {
+                c.innerHTML = '<p>Nenhum dado de contratos ativos disponível.</p>';
+            });
             return;
         }
 
@@ -1468,9 +1612,10 @@ class StrangerThingsCharts {
             items.slice(0, 10).forEach(item => { // Top 10
                 const typeClass = item.type === 'CALL' ? 'positive-val' : 'negative-val';
                 const typeLabel = item.type === 'CALL' ? 'C' : 'P';
+                const strikeDisplay = this.normalizeMostActiveStrike(item.strike, data, scaleFactor);
                 subHtml += `
                     <tr>
-                        <td class="font-bold">${this.formatNumberBr(item.strike, 2)}</td>
+                        <td class="font-bold">${this.formatNumberBr(strikeDisplay, 0)}</td>
                         <td class="${typeClass}">${typeLabel}</td>
                         <td>${this.formatNumberBr(item[valueKey], 0)}</td>
                         <td>${this.formatNumberBr(item.iv, 1)}%</td>
@@ -1487,54 +1632,136 @@ class StrangerThingsCharts {
         html += createSubTable('🌊 Top Volume', top_vol, 'volume', 'Volume');
         html += '</div>';
 
-        container.innerHTML = html;
+        containers.forEach((c) => {
+            c.innerHTML = html;
+        });
+    }
+
+    createOIByExpiryChart(data) {
+        const canvas = document.getElementById('oiByExpiryChart');
+        if (!canvas) return;
+
+        const rows = data && Array.isArray(data.oi_by_expiry) ? data.oi_by_expiry : [];
+        if (rows.length === 0) {
+            if (canvas.parentElement) canvas.parentElement.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            return;
+        }
+
+        const labels = rows.map((r) => r.expiry);
+        const callOI = rows.map((r) => Number(r.call_oi) || 0);
+        const putOI = rows.map((r) => Number(r.put_oi) || 0);
+
+        const config = {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'OI Call',
+                        data: callOI,
+                        backgroundColor: 'rgba(0, 255, 0, 0.25)',
+                        borderColor: '#00ff00',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'OI Put',
+                        data: putOI,
+                        backgroundColor: 'rgba(255, 0, 0, 0.25)',
+                        borderColor: '#ff0000',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                ...this.chartOptions,
+                plugins: {
+                    ...this.chartOptions.plugins,
+                    title: {
+                        display: true,
+                        text: 'Open Interest por Vencimento (Call vs Put)',
+                        color: '#ff00ff',
+                        font: { family: 'Orbitron', size: 16, weight: 'bold' }
+                    }
+                },
+                scales: {
+                    ...this.chartOptions.scales,
+                    x: { ...this.chartOptions.scales.x, stacked: true },
+                    y: {
+                        ...this.chartOptions.scales.y,
+                        stacked: true,
+                        ticks: { ...this.chartOptions.scales.y.ticks, callback: (v) => this.formatCompactBr(v) }
+                    }
+                }
+            }
+        };
+
+        if (this.charts.oiByExpiry) this.charts.oiByExpiry.destroy();
+        this.charts.oiByExpiry = new Chart(canvas, config);
     }
 
     createVolumeVolatilityChart(data) {
-        const ctx = document.getElementById('volumeVolatilityChart');
-        if (!ctx) return;
-        
-        // Se tivermos dados de Term Structure, usamos. Se não, fallback para Volume Profile vs IV
-        if (data.term_structure && data.term_structure.expiries && data.term_structure.expiries.length > 0) {
-            // Term Structure Chart
-            this.charts.volumeVolatility = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.term_structure.expiries,
-                    datasets: [{
-                        label: 'Term Structure (IV x Vencimento)',
-                        data: data.term_structure.iv_atm,
-                        borderColor: '#ffff00',
-                        backgroundColor: 'rgba(255, 255, 0, 0.1)',
-                        borderWidth: 2,
-                        tension: 0.4,
-                        pointBackgroundColor: '#ffff00',
-                        pointRadius: 5
-                    }]
-                },
-                options: {
-                    ...this.chartOptions,
-                    plugins: {
-                        ...this.chartOptions.plugins,
-                        title: {
-                            display: true,
-                            text: 'Estrutura a Termo da Volatilidade (Term Structure)',
-                            color: '#ff00ff',
-                            font: { family: 'Orbitron', size: 16, weight: 'bold' }
+        const canvases = document.querySelectorAll('#volumeVolatilityChart, #volumeVolatilityChartTools');
+        if (!canvases || canvases.length === 0) return;
+
+        const buildConfig = () => {
+            const ts = data && data.term_structure;
+            const expiries = ts && Array.isArray(ts.expiries) ? ts.expiries : [];
+            const ivRaw = ts && (Array.isArray(ts.iv_atm_pct) ? ts.iv_atm_pct : (Array.isArray(ts.iv_atm) ? ts.iv_atm : []));
+            const hasTerm = expiries.length > 0 && Array.isArray(ivRaw) && ivRaw.length === expiries.length;
+
+            if (hasTerm) {
+                const iv = ivRaw.map((v) => (Number.isFinite(v) && v <= 2 ? v * 100 : v));
+                return {
+                    type: 'line',
+                    data: {
+                        labels: expiries,
+                        datasets: [{
+                            label: 'Term Structure (IV x Vencimento)',
+                            data: iv,
+                            borderColor: '#ffff00',
+                            backgroundColor: 'rgba(255, 255, 0, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            pointBackgroundColor: '#ffff00',
+                            pointRadius: 5
+                        }]
+                    },
+                    options: {
+                        ...this.chartOptions,
+                        plugins: {
+                            ...this.chartOptions.plugins,
+                            title: {
+                                display: true,
+                                text: 'Estrutura a Termo da Volatilidade (Term Structure)',
+                                color: '#ff00ff',
+                                font: { family: 'Orbitron', size: 16, weight: 'bold' }
+                            }
+                        },
+                        scales: {
+                            ...this.chartOptions.scales,
+                            y: {
+                                ...this.chartOptions.scales.y,
+                                ticks: { ...this.chartOptions.scales.y.ticks, callback: (v) => this.formatNumberBr(v, 2) + '%' }
+                            }
                         }
                     }
-                }
-            });
-        } else {
-            // Fallback: Volume vs IV (por strike)
-             this.charts.volumeVolatility = new Chart(ctx, {
+                };
+            }
+
+            const strikes = data && data.volume_data && Array.isArray(data.volume_data.strikes) ? data.volume_data.strikes : [];
+            const totalVolume = data && data.volume_data && Array.isArray(data.volume_data.total_volume) ? data.volume_data.total_volume : [];
+            const ivValues = data && data.volatility_data && Array.isArray(data.volatility_data.iv_values) ? data.volatility_data.iv_values : [];
+
+            if (strikes.length === 0 || totalVolume.length !== strikes.length || ivValues.length !== strikes.length) return null;
+
+            return {
                 type: 'bar',
                 data: {
-                    labels: data.volume_data.strikes.map(s => this.formatNumberBr(s, 0)),
+                    labels: strikes.map(s => this.formatNumberBr(s, 0)),
                     datasets: [
                         {
                             label: 'Total Volume',
-                            data: data.volume_data.total_volume,
+                            data: totalVolume,
                             backgroundColor: 'rgba(0, 243, 255, 0.3)',
                             borderColor: '#00f3ff',
                             borderWidth: 1,
@@ -1543,7 +1770,7 @@ class StrangerThingsCharts {
                         {
                             type: 'line',
                             label: 'IV (%)',
-                            data: data.volatility_data.iv_values,
+                            data: ivValues,
                             borderColor: '#ffff00',
                             borderWidth: 2,
                             tension: 0.4,
@@ -1580,8 +1807,20 @@ class StrangerThingsCharts {
                         }
                     }
                 }
-            });
-        }
+            };
+        };
+
+        const keys = ['volumeVolatility', 'volumeVolatilityTools'];
+        canvases.forEach((canvas, index) => {
+            const key = keys[index] || `volumeVolatility_${index}`;
+            const config = buildConfig();
+            if (!config) {
+                if (canvas.parentElement) canvas.parentElement.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+                return;
+            }
+            if (this.charts[key]) this.charts[key].destroy();
+            this.charts[key] = new Chart(canvas, config);
+        });
     }
 
     updateNtslCode(data) {
@@ -1618,12 +1857,21 @@ class StrangerThingsCharts {
     }
 
     createFairValueTable(data) {
-        const container = document.getElementById('fair-value-container');
-        if (!container || !data.v3_data || !data.v3_data.fair_value_sims) return;
+        const containers = document.querySelectorAll('#fair-value-container-overview, #fair-value-container-v3, #fair-value-container');
+        if (!containers || containers.length === 0) return;
 
-        const sims = data.v3_data.fair_value_sims;
+        const sims = data?.v3_data?.fair_value_sims;
+        if (!Array.isArray(sims)) {
+            containers.forEach((c) => {
+                c.innerHTML = '<p>Dados indisponíveis.</p>';
+            });
+            return;
+        }
+
         if (sims.length === 0) {
-            container.innerHTML = '<p>Nenhuma simulação disponível.</p>';
+            containers.forEach((c) => {
+                c.innerHTML = '<p>Nenhuma simulação disponível.</p>';
+            });
             return;
         }
 
@@ -1651,7 +1899,9 @@ class StrangerThingsCharts {
         });
 
         html += '</tbody></table>';
-        container.innerHTML = html;
+        containers.forEach((c) => {
+            c.innerHTML = html;
+        });
     }
 
     populateTable(data) {

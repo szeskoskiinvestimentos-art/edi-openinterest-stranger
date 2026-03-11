@@ -129,7 +129,7 @@ class EDIApp {
                     break;
                 case '2':
                     e.preventDefault();
-                    this.navigateToSection('delta');
+                    this.navigateToSection('advanced');
                     break;
                 case '3':
                     e.preventDefault();
@@ -137,11 +137,11 @@ class EDIApp {
                     break;
                 case '4':
                     e.preventDefault();
-                    this.navigateToSection('volume');
+                    this.navigateToSection('structure');
                     break;
                 case '5':
                     e.preventDefault();
-                    this.navigateToSection('volatility');
+                    this.navigateToSection('delta');
                     break;
                 case 'h':
                 case 'H':
@@ -162,10 +162,10 @@ class EDIApp {
 🎮 EDI Market Guardin V1 - Atalhos de Teclado
 
 1 - Visão Geral
-2 - Delta
-3 - Gamma  
-4 - Volume
-5 - Volatilidade
+2 - Níveis
+3 - Gamma
+4 - Estrutura
+5 - Delta
 H - Ajuda
 R - Atualizar Dados
 

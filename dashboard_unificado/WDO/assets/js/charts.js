@@ -105,6 +105,7 @@ class StrangerThingsCharts {
             // Ferramentas de Mercado
             this.createFedWatchTable(data);
             this.createMostActivesTable(data);
+            this.createOIByExpiryChart(data);
             this.createVolumeVolatilityChart(data);
 
             this.updateMetrics(data);
@@ -511,6 +512,68 @@ class StrangerThingsCharts {
         }
 
         container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+    }
+
+    createOIByExpiryChart(data) {
+        const canvas = document.getElementById('oiByExpiryChart');
+        if (!canvas) return;
+
+        const rows = data && Array.isArray(data.oi_by_expiry) ? data.oi_by_expiry : [];
+        if (rows.length === 0) {
+            if (canvas.parentElement) canvas.parentElement.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            return;
+        }
+
+        const labels = rows.map((r) => r.expiry);
+        const callOI = rows.map((r) => Number(r.call_oi) || 0);
+        const putOI = rows.map((r) => Number(r.put_oi) || 0);
+
+        const config = {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'OI Call',
+                        data: callOI,
+                        backgroundColor: 'rgba(0, 255, 0, 0.25)',
+                        borderColor: '#00ff00',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'OI Put',
+                        data: putOI,
+                        backgroundColor: 'rgba(255, 0, 0, 0.25)',
+                        borderColor: '#ff0000',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                ...this.chartOptions,
+                plugins: {
+                    ...this.chartOptions.plugins,
+                    title: {
+                        display: true,
+                        text: 'Open Interest por Vencimento (Call vs Put)',
+                        color: '#ff00ff',
+                        font: { family: 'Orbitron', size: 16, weight: 'bold' }
+                    }
+                },
+                scales: {
+                    ...this.chartOptions.scales,
+                    x: { ...this.chartOptions.scales.x, stacked: true },
+                    y: {
+                        ...this.chartOptions.scales.y,
+                        stacked: true,
+                        ticks: { ...this.chartOptions.scales.y.ticks, callback: (v) => this.formatCompactBr(v) }
+                    }
+                }
+            }
+        };
+
+        if (this.charts.oiByExpiry) this.charts.oiByExpiry.destroy();
+        this.charts.oiByExpiry = new Chart(canvas, config);
     }
 
     updateLastUpdate(data) {
