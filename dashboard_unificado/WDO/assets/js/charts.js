@@ -1316,7 +1316,7 @@ class StrangerThingsCharts {
         this.charts.gammaFlipCone = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: coneData.alphas.map(a => (a * 100).toFixed(0) + '% Vol'),
+                labels: coneData.alphas.map(a => `${Number(a).toFixed(2)}σ`),
                 datasets: [{
                     label: 'Gamma Flip Level',
                     data: coneData.flips,
@@ -1442,33 +1442,42 @@ class StrangerThingsCharts {
         const ctx = document.getElementById('expectedMoveChart');
         if (!ctx || !data.key_levels || !data.key_levels.expected_moves) return;
 
-        const moves = data.key_levels.expected_moves;
-        
-        const labels = moves.map(m => m.label);
-        
-        const days = moves.map(m => m.days);
-        const upper1 = moves.map(m => m.sigma_1_up);
-        const lower1 = moves.map(m => m.sigma_1_down);
-        const upper2 = moves.map(m => m.sigma_2_up);
-        const lower2 = moves.map(m => m.sigma_2_down);
-        
-        // Add current spot as point 0
         const spot = data.overview.spot_price;
-        const allDays = [0, ...days];
-        const allUpper1 = [spot, ...upper1];
-        const allLower1 = [spot, ...lower1];
-        const allUpper2 = [spot, ...upper2];
-        const allLower2 = [spot, ...lower2];
-        const allLabels = ['Hoje', ...labels];
+        const toFiniteNumber = (v) => {
+            const x = Number(v);
+            return Number.isFinite(x) ? x : null;
+        };
+
+        const movesRaw = Array.isArray(data.key_levels.expected_moves) ? data.key_levels.expected_moves : [];
+        const normalized = movesRaw.map(m => {
+            const days = toFiniteNumber(m.days);
+            const upper1 = toFiniteNumber(m.sigma_1_up ?? m.upper);
+            const lower1 = toFiniteNumber(m.sigma_1_down ?? m.lower);
+            const move1 = toFiniteNumber(m.move ?? (upper1 != null ? (upper1 - spot) : null));
+            const upper2 = toFiniteNumber(m.sigma_2_up ?? (move1 != null ? (spot + 2 * move1) : null));
+            const lower2 = toFiniteNumber(m.sigma_2_down ?? (move1 != null ? (spot - 2 * move1) : null));
+            return { days, label: String(m.label ?? ''), upper1, lower1, upper2, lower2 };
+        }).filter(m => m.days != null && m.upper1 != null && m.lower1 != null && m.upper2 != null && m.lower2 != null);
+
+        const byDay = new Map();
+        for (const m of normalized) byDay.set(m.days, m);
+        const daysSorted = Array.from(byDay.keys()).sort((a, b) => a - b);
+        const horizons = [0, ...daysSorted];
+        const expiryDays = Math.max(...horizons);
+
+        const upper2Points = horizons.map(d => ({ x: d, y: d === 0 ? spot : byDay.get(d).upper2 }));
+        const upper1Points = horizons.map(d => ({ x: d, y: d === 0 ? spot : byDay.get(d).upper1 }));
+        const spotPoints = horizons.map(d => ({ x: d, y: spot }));
+        const lower1Points = horizons.map(d => ({ x: d, y: d === 0 ? spot : byDay.get(d).lower1 }));
+        const lower2Points = horizons.map(d => ({ x: d, y: d === 0 ? spot : byDay.get(d).lower2 }));
 
         this.charts.expectedMove = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: allLabels,
                 datasets: [
                     {
                         label: '+2σ',
-                        data: allUpper2,
+                        data: upper2Points,
                         borderColor: 'rgba(255, 0, 0, 0.5)',
                         borderDash: [5, 5],
                         fill: false,
@@ -1476,7 +1485,7 @@ class StrangerThingsCharts {
                     },
                     {
                         label: '+1σ',
-                        data: allUpper1,
+                        data: upper1Points,
                         borderColor: '#00ff00',
                         backgroundColor: 'rgba(0, 255, 0, 0.1)',
                         fill: 3, // Fill to dataset index 3 (-1σ)
@@ -1484,7 +1493,7 @@ class StrangerThingsCharts {
                     },
                     {
                         label: 'Spot',
-                        data: Array(allDays.length).fill(spot),
+                        data: spotPoints,
                         borderColor: '#ffffff',
                         borderDash: [2, 2],
                         pointRadius: 0,
@@ -1492,7 +1501,7 @@ class StrangerThingsCharts {
                     },
                     {
                         label: '-1σ',
-                        data: allLower1,
+                        data: lower1Points,
                         borderColor: '#00ff00',
                         backgroundColor: 'rgba(0, 255, 0, 0.1)',
                         fill: false, // Already filled from +1σ
@@ -1500,7 +1509,7 @@ class StrangerThingsCharts {
                     },
                     {
                         label: '-2σ',
-                        data: allLower2,
+                        data: lower2Points,
                         borderColor: 'rgba(255, 0, 0, 0.5)',
                         borderDash: [5, 5],
                         fill: false,
@@ -1517,10 +1526,44 @@ class StrangerThingsCharts {
                         text: 'Expected Move Cone (Volatilidade Implícita)',
                         color: '#ff00ff',
                         font: { family: 'Orbitron', size: 16, weight: 'bold' }
+                    },
+                    tooltip: {
+                        ...this.chartOptions.plugins.tooltip,
+                        callbacks: {
+                            title: (items) => {
+                                const d = Number(items?.[0]?.parsed?.x);
+                                if (!Number.isFinite(d)) return '';
+                                if (d === 0) return 'Hoje';
+                                if (d === expiryDays) return `Expiração (${d}d)`;
+                                if (d === 1) return '1 Dia';
+                                if (d === 5) return '1 Semana';
+                                return `${d} dias`;
+                            }
+                        }
                     }
                 },
                 scales: {
                     ...this.chartOptions.scales,
+                    x: {
+                        ...this.chartOptions.scales.x,
+                        type: 'linear',
+                        title: { display: true, text: 'Horizonte (dias úteis)' },
+                        ticks: {
+                            autoSkip: false,
+                            callback: (value) => {
+                                const v = Number(value);
+                                if (!Number.isFinite(v)) return value;
+                                if (v === 0) return 'Hoje';
+                                if (v === expiryDays) return 'Exp';
+                                if (v === 1) return '1D';
+                                if (v === 5) return '1S';
+                                return `${v}d`;
+                            }
+                        },
+                        afterBuildTicks: (axis) => {
+                            axis.ticks = axis.ticks.filter(t => horizons.includes(Number(t.value)));
+                        }
+                    },
                     y: {
                         ...this.chartOptions.scales.y,
                         title: { display: true, text: 'Preço' }
@@ -1707,40 +1750,55 @@ class StrangerThingsCharts {
     }
 
     createFairValueTable(data) {
-        const container = document.getElementById('fair-value-container');
-        if (!container || !data.v3_data || !data.v3_data.fair_value_sims) return;
+        const containers = document.querySelectorAll('#fair-value-container');
+        if (!containers || containers.length === 0) return;
 
-        const sims = data.v3_data.fair_value_sims;
+        const sims = data && data.v3_data && Array.isArray(data.v3_data.fair_value_sims)
+            ? data.v3_data.fair_value_sims
+            : null;
+
+        if (!sims) {
+            containers.forEach((c) => { c.innerHTML = '<p>Dados indisponíveis.</p>'; });
+            return;
+        }
         if (sims.length === 0) {
-            container.innerHTML = '<p>Nenhuma simulação disponível.</p>';
+            containers.forEach((c) => { c.innerHTML = '<p>Nenhuma simulação disponível.</p>'; });
             return;
         }
 
+        const fmt = (v, decimals = 2) => {
+            if (typeof v !== 'number' || !isFinite(v)) return '-';
+            return v.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+        };
+
         let html = '<table class="neon-table"><thead><tr><th>Cenário</th><th>Alvo (Spot)</th><th>Strike</th><th>Call (Hoje)</th><th>Call (Sim)</th><th>Var %</th><th>Put (Hoje)</th><th>Put (Sim)</th><th>Var %</th></tr></thead><tbody>';
 
-        sims.forEach(sim => {
-            sim.options.forEach(opt => {
-                const callClass = opt.Call_Chg >= 0 ? 'positive-val' : 'negative-val';
-                const putClass = opt.Put_Chg >= 0 ? 'positive-val' : 'negative-val';
-                
+        sims.forEach((sim) => {
+            const opts = sim && Array.isArray(sim.options) ? sim.options : [];
+            opts.forEach((opt) => {
+                const callChg = typeof opt.Call_Chg === 'number' ? opt.Call_Chg : 0;
+                const putChg = typeof opt.Put_Chg === 'number' ? opt.Put_Chg : 0;
+                const callClass = callChg >= 0 ? 'positive-val' : 'negative-val';
+                const putClass = putChg >= 0 ? 'positive-val' : 'negative-val';
+
                 html += `
                     <tr>
-                        <td class="font-bold">${sim.scenario}</td>
-                        <td>${sim.target_spot.toFixed(2)}</td>
-                        <td class="font-bold text-center" style="color: var(--secondary-neon);">${opt.Strike.toFixed(2)}</td>
-                        <td>${opt.Call_Now.toFixed(2)}</td>
-                        <td>${opt.Call_Sim.toFixed(2)}</td>
-                        <td class="${callClass}">${opt.Call_Chg.toFixed(1)}%</td>
-                        <td>${opt.Put_Now.toFixed(2)}</td>
-                        <td>${opt.Put_Sim.toFixed(2)}</td>
-                        <td class="${putClass}">${opt.Put_Chg.toFixed(1)}%</td>
+                        <td class="font-bold">${sim.scenario ?? '-'}</td>
+                        <td>${fmt(sim.target_spot, 2)}</td>
+                        <td class="font-bold text-center" style="color: var(--secondary-neon);">${fmt(opt.Strike, 2)}</td>
+                        <td>${fmt(opt.Call_Now, 2)}</td>
+                        <td>${fmt(opt.Call_Sim, 2)}</td>
+                        <td class="${callClass}">${fmt(callChg, 1)}%</td>
+                        <td>${fmt(opt.Put_Now, 2)}</td>
+                        <td>${fmt(opt.Put_Sim, 2)}</td>
+                        <td class="${putClass}">${fmt(putChg, 1)}%</td>
                     </tr>
                 `;
             });
         });
 
         html += '</tbody></table>';
-        container.innerHTML = html;
+        containers.forEach((c) => { c.innerHTML = html; });
     }
 
     populateTable(data) {
