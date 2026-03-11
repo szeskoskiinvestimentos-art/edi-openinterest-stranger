@@ -1379,16 +1379,42 @@ class StrangerThingsCharts {
 
     createFedWatchTable(data) {
         const container = document.getElementById('fedwatch-container');
-        if (!container || !data.fed_watch) return;
+        if (!container) return;
 
-        if (data.fed_watch.length === 0) {
-            container.innerHTML = '<p>Nenhum dado de FedWatch disponível.</p>';
+        const rates = data && data.fed_watch_rates;
+        if (rates && Array.isArray(rates.meetings) && rates.meetings.length > 0) {
+            let html = '<div class="table-responsive"><table class="neon-table"><thead><tr><th>Reunião</th><th>Dias</th><th>Faixa Atual</th><th>Probabilidades</th></tr></thead><tbody>';
+
+            rates.meetings.forEach((m) => {
+                const probs = (m && m.probs) ? m.probs : {};
+                const probsText = Object.keys(probs).length > 0
+                    ? Object.entries(probs).map(([k, v]) => `${k}: ${this.formatNumberBr(v, 1)}%`).join(' | ')
+                    : '-';
+
+                html += `
+                    <tr>
+                        <td class="font-bold">${m.date || '-'}</td>
+                        <td>${m.days_remaining ?? '-'}</td>
+                        <td style="color: var(--secondary-neon);">${m.current_rate || '-'}</td>
+                        <td>${probsText}</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+            return;
+        }
+
+        const legacy = data && data.fed_watch;
+        if (!Array.isArray(legacy) || legacy.length === 0) {
+            container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
             return;
         }
 
         let html = '<div class="table-responsive"><table class="neon-table"><thead><tr><th>Vencimento</th><th>Dias Úteis</th><th>IV ATM</th><th>1 SD (68%)</th><th>2 SD (95%)</th><th>3 SD (99%)</th></tr></thead><tbody>';
 
-        data.fed_watch.forEach(fw => {
+        legacy.forEach((fw) => {
             const range1 = fw.ranges.find(r => r.sd === 1);
             const range2 = fw.ranges.find(r => r.sd === 2);
             const range3 = fw.ranges.find(r => r.sd === 3);

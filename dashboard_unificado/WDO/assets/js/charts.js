@@ -267,15 +267,29 @@ class StrangerThingsCharts {
     createFedWatchTable(data) {
         const container = document.getElementById('fedwatch-container');
         if (!container) return;
+        const insightEl = document.getElementById('fedwatch-insight');
 
         const rates = data && data.fed_watch_rates;
-        if (rates && Array.isArray(rates.meetings) && rates.meetings.length > 0) {
-            let html = '<div class="table-wrapper"><table class="neon-table"><thead><tr><th>Reunião</th><th>Dias</th><th>Faixa Atual</th><th>Probabilidades</th></tr></thead><tbody>';
+        if (rates) {
+            if (!Array.isArray(rates.meetings) || rates.meetings.length === 0) {
+                container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+                if (insightEl) insightEl.textContent = '';
+                return;
+            }
+            let html = '<div class="table-wrapper"><table class="neon-table"><thead><tr><th>Reunião</th><th>Dias</th><th>Faixa Atual</th><th style="text-align:left">Probabilidades</th></tr></thead><tbody>';
 
             rates.meetings.forEach((m) => {
                 const probs = (m && m.probs) ? m.probs : {};
+                const toNum = (v) => {
+                    if (typeof v === 'number') return v;
+                    const n = parseFloat(String(v).replace(',', '.'));
+                    return Number.isFinite(n) ? n : 0;
+                };
                 const probsText = Object.keys(probs).length > 0
-                    ? Object.entries(probs).map(([k, v]) => `${k}: ${this.formatNumberBr(v, 1)}%`).join(' | ')
+                    ? Object.entries(probs)
+                        .sort((a, b) => toNum(b[1]) - toNum(a[1]))
+                        .map(([k, v]) => `${k}: ${this.formatNumberBr(toNum(v), 1)}%`)
+                        .join(' | ')
                     : '-';
 
                 html += `
@@ -283,19 +297,115 @@ class StrangerThingsCharts {
                         <td class="font-bold">${m.date || '-'}</td>
                         <td>${m.days_remaining ?? '-'}</td>
                         <td style="color: var(--secondary-neon);">${m.current_rate || '-'}</td>
-                        <td>${probsText}</td>
+                        <td style="text-align: left;">${probsText}</td>
                     </tr>
                 `;
             });
 
             html += '</tbody></table></div>';
+            html += '<div style="height: 260px; margin-top: 12px;"><canvas id="fedwatchProbChart"></canvas></div>';
             container.innerHTML = html;
+
+            if (insightEl) {
+                const first = rates.meetings[0];
+                const probs = (first && first.probs) ? first.probs : {};
+                const entries = Object.entries(probs)
+                    .map(([k, v]) => [k, (typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.')))])
+                    .filter(([, v]) => Number.isFinite(v))
+                    .sort((a, b) => b[1] - a[1]);
+                if (entries.length > 0) {
+                    const [topRange, topProb] = entries[0];
+                    const days = first.days_remaining ?? '-';
+                    const date = first.date || '-';
+                    const parseRange = (s) => {
+                        if (!s) return null;
+                        const m = String(s).trim().match(/^(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)$/);
+                        if (!m) return null;
+                        const low = parseFloat(m[1].replace(',', '.'));
+                        const high = parseFloat(m[2].replace(',', '.'));
+                        if (!Number.isFinite(low) || !Number.isFinite(high)) return null;
+                        return { low, high, mid: (low + high) / 2 };
+                    };
+
+                    const currentRange = parseRange(first.current_rate);
+                    const topParsed = parseRange(topRange);
+                    const topText = `Leitura atual: para a reunião de ${date} (em ${days} dias), a faixa mais provável é ${topRange} (${this.formatNumberBr(topProb, 1)}%).`;
+                    const isConcentrated = topProb >= 60;
+
+                    let directionText = '';
+                    if (currentRange && topParsed) {
+                        const eps = 1e-9;
+                        if (topParsed.mid < currentRange.mid - eps) {
+                            directionText = ` Isso sugere corte vs a faixa atual (${first.current_rate}).`;
+                        } else if (topParsed.mid > currentRange.mid + eps) {
+                            directionText = ` Isso sugere alta vs a faixa atual (${first.current_rate}).`;
+                        } else {
+                            directionText = ` Isso sugere manutenção da faixa atual (${first.current_rate}).`;
+                        }
+                    }
+
+                    const confidenceText = isConcentrated ? '' : ' Cenário ainda dividido; acompanhe as próximas leituras.';
+                    insightEl.textContent = `${topText}${directionText}${confidenceText}`;
+                } else {
+                    insightEl.textContent = '';
+                }
+            }
+
+            const first = rates.meetings[0];
+            const probs = (first && first.probs) ? first.probs : {};
+            const labels = Object.entries(probs)
+                .map(([k, v]) => [k, (typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.')))])
+                .filter(([, v]) => Number.isFinite(v))
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 8);
+
+            const canvas = document.getElementById('fedwatchProbChart');
+            if (canvas && labels.length > 0 && typeof Chart !== 'undefined') {
+                if (this.charts.fedwatchProb) this.charts.fedwatchProb.destroy();
+                this.charts.fedwatchProb = new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels: labels.map(([k]) => k),
+                        datasets: [{
+                            label: 'Probabilidade (%)',
+                            data: labels.map(([, v]) => v),
+                            backgroundColor: 'rgba(0, 243, 255, 0.25)',
+                            borderColor: '#00f3ff',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        ...this.chartOptions,
+                        indexAxis: 'y',
+                        plugins: {
+                            ...this.chartOptions.plugins,
+                            title: {
+                                display: true,
+                                text: 'Distribuição de Probabilidades (Próxima Reunião)',
+                                color: '#ff00ff',
+                                font: { family: 'Orbitron', size: 14, weight: 'bold' }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ...this.chartOptions.scales.x,
+                                title: { display: true, text: 'Probabilidade (%)', color: '#00f3ff' }
+                            },
+                            y: {
+                                ...this.chartOptions.scales.y,
+                                title: { display: true, text: 'Faixa-alvo', color: '#00f3ff' }
+                            }
+                        }
+                    }
+                });
+            }
             return;
         }
 
         const legacy = data && data.fed_watch;
         if (!Array.isArray(legacy) || legacy.length === 0) {
             container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            if (insightEl) insightEl.textContent = '';
             return;
         }
 
