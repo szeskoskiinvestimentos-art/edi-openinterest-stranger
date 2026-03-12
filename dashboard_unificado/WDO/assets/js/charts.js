@@ -71,6 +71,18 @@ class StrangerThingsCharts {
     async init() {
         try {
             const data = await this.loadMarketData();
+            const utils = window.ChartDataUtils;
+            if (utils?.registerSpotLinePlugin) utils.registerSpotLinePlugin();
+            const spot = utils?.getSpot ? utils.getSpot(data) : null;
+            if (spot !== null) {
+                this.chartOptions.plugins.spotLine = {
+                    value: spot,
+                    color: 'lime',
+                    dash: [4, 4],
+                    width: 2,
+                    labelText: `SPOT ${spot.toFixed(2)}`
+                };
+            }
             this.createDeltaChart(data);
             this.createGammaChart(data);
             // this.createVolumeChart(data); // Removido por redundância (Volume Chart era na verdade OI)
@@ -518,7 +530,23 @@ class StrangerThingsCharts {
         const canvas = document.getElementById('oiByExpiryChart');
         if (!canvas) return;
 
-        const rows = data && Array.isArray(data.oi_by_expiry) ? data.oi_by_expiry : [];
+        const rowsRaw = data?.oi_by_expiry ?? data?.v3_data?.oi_by_expiry;
+        const rowsInput = Array.isArray(rowsRaw) ? rowsRaw : [];
+        const formatExpiryLabel = (v) => {
+            const s = String(v ?? '').trim();
+            return s.length >= 10 ? s.slice(0, 10) : s;
+        };
+        const withDays = rowsInput.map((r) => ({
+            ...r,
+            expiry: formatExpiryLabel(r?.expiry),
+            days_to_exp: Number.isFinite(Number(r?.days_to_exp)) ? Number(r.days_to_exp) : null
+        }));
+        const rows = withDays.slice().sort((a, b) => {
+            if (a.days_to_exp != null && b.days_to_exp != null) return a.days_to_exp - b.days_to_exp;
+            if (a.days_to_exp != null) return -1;
+            if (b.days_to_exp != null) return 1;
+            return String(a.expiry).localeCompare(String(b.expiry));
+        });
         if (rows.length === 0) {
             if (canvas.parentElement) canvas.parentElement.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
             return;
@@ -603,13 +631,21 @@ class StrangerThingsCharts {
         const ctx = document.getElementById('deltaChart');
         if (!ctx) return;
 
+        const deltaData = data?.delta_data ?? data?.v3_data?.delta_data;
+        if (!deltaData || !Array.isArray(deltaData.strikes) || !Array.isArray(deltaData.delta_cumulative) || deltaData.strikes.length === 0) return;
+
+        const length = Math.min(deltaData.strikes.length, deltaData.delta_cumulative.length);
+        if (length === 0) return;
+        const strikes = deltaData.strikes.slice(0, length);
+        const deltaCum = deltaData.delta_cumulative.slice(0, length);
+
         this.charts.delta = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.delta_data.strikes,
+                labels: strikes,
                 datasets: [{
                     label: 'Delta Acumulado',
-                    data: data.delta_data.delta_cumulative,
+                    data: deltaCum,
                     borderColor: '#ff073a',
                     backgroundColor: 'rgba(255, 7, 58, 0.1)',
                     borderWidth: 3,
@@ -682,12 +718,46 @@ class StrangerThingsCharts {
         const ctx = document.getElementById('volatilityChart');
         if (!ctx) return;
 
-        // Check if skew data exists
-        const hasSkew = data.volatility_data.skew && data.volatility_data.skew.length > 0;
+        const utils = window.ChartDataUtils;
+        const volData = utils?.getVolatilityData ? utils.getVolatilityData(data) : (data?.v3_data?.volatility_data ?? data?.volatility_data);
+        const strikesIn = Array.isArray(volData?.strikes) ? volData.strikes : [];
+        const ivIn = Array.isArray(volData?.iv_values) ? volData.iv_values : [];
+        const skewIn = Array.isArray(volData?.skew) ? volData.skew : [];
+
+        const baseLen = Math.min(strikesIn.length, ivIn.length);
+        if (baseLen === 0) {
+            if (ctx.parentElement) ctx.parentElement.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            return;
+        }
+
+        const hasSkewRaw = skewIn.length === strikesIn.length && skewIn.length === ivIn.length && skewIn.length > 0;
+        const points = [];
+        for (let i = 0; i < baseLen; i++) {
+            const strike = Number(strikesIn[i]);
+            const iv = Number(ivIn[i]);
+            if (!Number.isFinite(strike) || !Number.isFinite(iv)) continue;
+            const skew = hasSkewRaw ? Number(skewIn[i]) : null;
+            points.push({ strike, iv, skew: Number.isFinite(skew) ? skew : null });
+        }
+        if (points.length === 0) {
+            if (ctx.parentElement) ctx.parentElement.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            return;
+        }
+        points.sort((a, b) => a.strike - b.strike);
+
+        const labels = points.map((p) => this.formatNumberBr(p.strike, 0));
+        const ivValues = points.map((p) => p.iv);
+        const hasSkew = points.some((p) => p.skew !== null);
+        const skewValues = hasSkew
+            ? points.map((p) => {
+                  const v = p.skew ?? 0;
+                  return Math.abs(v) < 1e-10 ? 0 : v;
+              })
+            : [];
 
         const datasets = [{
             label: 'Volatilidade Implícita (%)',
-            data: data.volatility_data.iv_values,
+            data: ivValues,
             borderColor: '#ffff00',
             backgroundColor: 'rgba(255, 255, 0, 0.1)',
             borderWidth: 3,
@@ -703,7 +773,7 @@ class StrangerThingsCharts {
         if (hasSkew) {
             datasets.push({
                 label: 'IV Skew (Derivada)',
-                data: data.volatility_data.skew,
+                data: skewValues,
                 borderColor: '#ff00ff',
                 backgroundColor: 'rgba(255, 0, 255, 0.1)',
                 borderWidth: 2,
@@ -718,7 +788,7 @@ class StrangerThingsCharts {
         this.charts.volatility = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.volatility_data.strikes,
+                labels,
                 datasets: datasets
             },
             options: {
@@ -763,7 +833,13 @@ class StrangerThingsCharts {
                         },
                         ticks: {
                             color: '#ff00ff',
-                            font: { family: 'Share Tech Mono' }
+                            font: { family: 'Share Tech Mono' },
+                            callback: (v) => {
+                                const n = Number(v);
+                                if (!Number.isFinite(n)) return '';
+                                if (Math.abs(n) < 1e-10) return '0';
+                                return this.formatNumberBr(n, 4);
+                            }
                         },
                         title: {
                             display: true,
@@ -814,22 +890,116 @@ class StrangerThingsCharts {
         const ctx = document.getElementById('oiStrikeChart');
         if (!ctx) return;
 
+        const storageKey = `oiStrikeScope:${location.pathname}`;
+        const oiAll = data?.oi_data;
+        const oiNearest = data?.oi_data_nearest;
+        const rowsByExpiry = data && Array.isArray(data.oi_by_expiry) ? data.oi_by_expiry : [];
+
+        const hasOiShape = (obj) =>
+            obj &&
+            Array.isArray(obj.strikes) &&
+            Array.isArray(obj.call_oi) &&
+            Array.isArray(obj.put_oi) &&
+            obj.strikes.length > 0 &&
+            obj.call_oi.length === obj.strikes.length &&
+            obj.put_oi.length === obj.strikes.length;
+        
+        const baseAll = hasOiShape(oiAll) ? oiAll : null;
+        const baseNearest = hasOiShape(oiNearest) ? oiNearest : null;
+        const canToggle = Boolean(baseAll && baseNearest);
+
+        const findNearestExpiryRow = () => {
+            const withDays = rowsByExpiry
+                .filter((r) => Number.isFinite(Number(r.days_to_exp)))
+                .map((r) => ({ ...r, days_to_exp: Number(r.days_to_exp) }));
+            const nonNeg = withDays.filter((r) => r.days_to_exp >= 0);
+            if (nonNeg.length > 0) return nonNeg.reduce((a, b) => (b.days_to_exp < a.days_to_exp ? b : a));
+            if (withDays.length > 0) return withDays.reduce((a, b) => (b.days_to_exp < a.days_to_exp ? b : a));
+            return rowsByExpiry[0] || null;
+        };
+
+        const nearestExpiryRow = findNearestExpiryRow();
+
+        const getSelectedScope = () => {
+            const saved = (localStorage.getItem(storageKey) || '').toLowerCase();
+            if (saved === 'nearest' && canToggle) return 'nearest';
+            return 'all';
+        };
+        const setSelectedScope = (scope) => localStorage.setItem(storageKey, scope);
+
+        const resolveOi = (scope) => {
+            if (scope === 'nearest' && canToggle) return baseNearest;
+            return baseAll ?? baseNearest;
+        };
+
+        const scope = getSelectedScope();
+        const selected = resolveOi(scope);
+        if (!hasOiShape(selected)) return;
+
+        if (canToggle) {
+            const host = ctx.parentElement;
+            if (host) {
+                const existing = host.querySelector('#oiStrikeScopeToggle');
+                const toggle = existing || document.createElement('div');
+                toggle.id = 'oiStrikeScopeToggle';
+                toggle.style.display = 'flex';
+                toggle.style.gap = '8px';
+                toggle.style.margin = '0 0 10px 0';
+                toggle.style.flexWrap = 'wrap';
+
+                const labelNearest = nearestExpiryRow?.expiry ? `Venc. mais próximo (${nearestExpiryRow.expiry})` : 'Venc. mais próximo';
+
+                toggle.innerHTML = `
+                    <button type="button" data-scope="all" style="padding:6px 10px;border:1px solid #00f3ff;background:transparent;color:#e0e0e0;border-radius:6px;cursor:pointer;font-family:Orbitron;">Todos vencimentos</button>
+                    <button type="button" data-scope="nearest" style="padding:6px 10px;border:1px solid #00f3ff;background:transparent;color:#e0e0e0;border-radius:6px;cursor:pointer;font-family:Orbitron;">${labelNearest}</button>
+                `;
+
+                const applyActive = (activeScope) => {
+                    toggle.querySelectorAll('button[data-scope]').forEach((btn) => {
+                        const isActive = btn.getAttribute('data-scope') === activeScope;
+                        btn.style.background = isActive ? 'rgba(0, 243, 255, 0.12)' : 'transparent';
+                        btn.style.borderColor = isActive ? '#ff00ff' : '#00f3ff';
+                        btn.style.color = isActive ? '#ffffff' : '#e0e0e0';
+                    });
+                };
+
+                if (!existing) host.insertBefore(toggle, ctx);
+                applyActive(scope);
+
+                toggle.querySelectorAll('button[data-scope]').forEach((btn) => {
+                    btn.onclick = () => {
+                        const nextScope = btn.getAttribute('data-scope') || 'all';
+                        setSelectedScope(nextScope);
+                        applyActive(nextScope);
+                        const next = resolveOi(nextScope);
+                        const chart = this.charts.oiStrike;
+                        if (chart && hasOiShape(next)) {
+                            chart.data.labels = next.strikes;
+                            chart.data.datasets[0].data = next.call_oi;
+                            chart.data.datasets[1].data = next.put_oi;
+                            chart.update();
+                        }
+                    };
+                });
+            }
+        }
+
         // Gráfico de Barras Empilhadas (Call vs Put) para Total OI
         this.charts.oiStrike = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.volume_data.strikes,
+                labels: selected.strikes,
                 datasets: [
                     {
                         label: 'Call OI',
-                        data: data.volume_data.call_volume,
+                        data: selected.call_oi,
                         backgroundColor: 'rgba(0, 255, 0, 0.6)', // Verde Neon
                         borderColor: '#00ff00',
                         borderWidth: 1
                     },
                     {
                         label: 'Put OI',
-                        data: data.volume_data.put_volume,
+                        data: selected.put_oi,
                         backgroundColor: 'rgba(255, 7, 58, 0.6)', // Vermelho Neon
                         borderColor: '#ff073a',
                         borderWidth: 1
@@ -1045,10 +1215,31 @@ class StrangerThingsCharts {
 
 
     updateMetrics(data) {
-        this.animateValue('total-trades', 0, data.overview.total_trades, 2000);
-        this.animateValue('volume-total', 0, data.overview.total_volume, 2000);
-        this.animateValue('gamma-exposure', 0, data.overview.gamma_exposure, 2000);
-        this.animateValue('delta-position', 0, data.overview.delta_position, 2000);
+        const volumeTotal = data?.overview?.volume_total ?? data?.overview?.total_volume ?? 0;
+        const sumTotalOi = (oi) => {
+            if (!oi || !Array.isArray(oi.strikes) || oi.strikes.length === 0) return null;
+            const length = oi.strikes.length;
+            const total = Array.isArray(oi.total_oi) && oi.total_oi.length === length
+                ? oi.total_oi
+                : (Array.isArray(oi.call_oi) && Array.isArray(oi.put_oi) && oi.call_oi.length === length && oi.put_oi.length === length)
+                    ? oi.call_oi.map((v, i) => (Number(v) || 0) + (Number(oi.put_oi[i]) || 0))
+                    : null;
+            if (!total) return null;
+            return total.reduce((acc, v) => acc + (Number(v) || 0), 0);
+        };
+        const openInterestTotal = data?.overview?.open_interest_total
+            ?? sumTotalOi(data?.oi_data)
+            ?? sumTotalOi(data?.oi_data_nearest)
+            ?? sumTotalOi(data?.v3_data?.oi_data)
+            ?? sumTotalOi(data?.v3_data?.oi_data_nearest)
+            ?? 0;
+        const gammaExposure = data?.overview?.gamma_exposure ?? 0;
+        const deltaPosition = data?.overview?.delta_position ?? 0;
+
+        this.animateValue('total-trades', 0, volumeTotal, 2000);
+        this.animateValue('volume-total', 0, openInterestTotal, 2000);
+        this.animateValue('gamma-exposure', 0, gammaExposure, 2000);
+        this.animateValue('delta-position', 0, deltaPosition, 2000);
     }
 
     animateValue(elementId, start, end, duration) {
@@ -1114,14 +1305,26 @@ class StrangerThingsCharts {
         const ctx = document.getElementById('pinRiskChart');
         if (!ctx) return;
 
-        // Simplificado: OI Call + OI Put próximo ao vencimento
-        // Aqui usamos Total OI como proxy
-        const totalOI = data.volume_data.call_volume.map((v, i) => v + data.volume_data.put_volume[i]);
+        const hasOiShape = (obj) =>
+            obj &&
+            Array.isArray(obj.strikes) &&
+            Array.isArray(obj.call_oi) &&
+            Array.isArray(obj.put_oi) &&
+            obj.strikes.length > 0 &&
+            obj.call_oi.length === obj.strikes.length &&
+            obj.put_oi.length === obj.strikes.length;
+
+        const oiSrc = hasOiShape(data?.oi_data_nearest) ? data.oi_data_nearest : (hasOiShape(data?.oi_data) ? data.oi_data : null);
+        if (!oiSrc) return;
+
+        const totalOI = Array.isArray(oiSrc.total_oi) && oiSrc.total_oi.length === oiSrc.strikes.length
+            ? oiSrc.total_oi
+            : oiSrc.call_oi.map((v, i) => (Number(v) || 0) + (Number(oiSrc.put_oi[i]) || 0));
 
         this.charts.pinRisk = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.volume_data.strikes,
+                labels: oiSrc.strikes,
                 datasets: [{
                     label: 'Pin Risk Potential (Total OI)',
                     data: totalOI,
@@ -1325,17 +1528,40 @@ class StrangerThingsCharts {
 
     createMaxPainChart(data) {
         const ctx = document.getElementById('maxPainChart');
-        if (!ctx || !data.v3_data || !data.v3_data.max_pain_profile) return;
+        if (!ctx) return;
 
-        const profile = data.v3_data.max_pain_profile;
+        const utils = window.ChartDataUtils;
+        const profile = utils?.getMaxPainProfile ? utils.getMaxPainProfile(data) : (data?.v3_data?.max_pain_profile ?? data?.max_pain_profile);
+        const strikesIn = Array.isArray(profile?.strikes) ? profile.strikes : [];
+        const lossIn = Array.isArray(profile?.loss) ? profile.loss : [];
+        const baseLen = Math.min(strikesIn.length, lossIn.length);
+        if (baseLen === 0) {
+            if (ctx.parentElement) ctx.parentElement.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            return;
+        }
+
+        const points = [];
+        for (let i = 0; i < baseLen; i++) {
+            const strike = Number(strikesIn[i]);
+            const loss = Number(lossIn[i]);
+            if (!Number.isFinite(strike) || !Number.isFinite(loss)) continue;
+            points.push({ strike, loss });
+        }
+        if (points.length === 0) {
+            if (ctx.parentElement) ctx.parentElement.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            return;
+        }
+        points.sort((a, b) => a.strike - b.strike);
+        const labels = points.map((p) => this.formatNumberBr(p.strike, 0));
+        const loss = points.map((p) => p.loss);
 
         this.charts.maxPain = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: profile.strikes,
+                labels,
                 datasets: [{
                     label: 'Perda dos Compradores (Valor Intrínseco)',
-                    data: profile.loss,
+                    data: loss,
                     borderColor: '#ff0000',
                     backgroundColor: 'rgba(255, 0, 0, 0.1)',
                     borderWidth: 3,
@@ -1360,9 +1586,8 @@ class StrangerThingsCharts {
                     y: {
                         ...this.chartOptions.scales.y,
                         ticks: {
-                            callback: function(value) {
-                                return '$' + (value / 1000000).toFixed(1) + 'M';
-                            }
+                            ...this.chartOptions.scales.y.ticks,
+                            callback: (value) => '$' + this.formatNumberBr(Number(value) / 1000000, 1) + 'M'
                         }
                     }
                 }
@@ -1372,12 +1597,46 @@ class StrangerThingsCharts {
 
     createGammaFlipConeChart(data) {
         const ctx = document.getElementById('gammaFlipConeChart');
-        if (!ctx || !data.v3_data || !data.v3_data.gamma_flip_cone) return;
+        if (!ctx) return;
 
         const storageKey = `gammaFlipConeScope:${location.pathname}`;
-        const coneAll = data.v3_data.gamma_flip_cone;
-        const coneNearest = data.v3_data.gamma_flip_cone_nearest;
-        const nearestExpiry = data.v3_data.gamma_flip_cone_nearest_expiry;
+        const utils = window.ChartDataUtils;
+        const payload = utils?.getGammaFlipConePayload
+            ? utils.getGammaFlipConePayload(data)
+            : {
+                coneAll: data?.v3_data?.gamma_flip_cone ?? data?.gamma_flip_cone,
+                coneNearest: data?.v3_data?.gamma_flip_cone_nearest ?? data?.gamma_flip_cone_nearest,
+                nearestExpiry: data?.v3_data?.gamma_flip_cone_nearest_expiry ?? data?.gamma_flip_cone_nearest_expiry
+            };
+
+        const normalizeCone = utils?.normalizeGammaFlipCone || ((cone) => {
+            const alphasIn = Array.isArray(cone?.alphas) ? cone.alphas : [];
+            const flipsIn = Array.isArray(cone?.flips) ? cone.flips : [];
+            const baseLen = Math.min(alphasIn.length, flipsIn.length);
+            if (baseLen === 0) return null;
+
+            const byAlpha = new Map();
+            for (let i = 0; i < baseLen; i++) {
+                const alpha = Number(alphasIn[i]);
+                if (!Number.isFinite(alpha)) continue;
+                const rawFlip = flipsIn[i];
+                const flip = rawFlip === null || rawFlip === undefined ? null : Number(rawFlip);
+                byAlpha.set(alpha, Number.isFinite(flip) ? flip : null);
+            }
+            if (byAlpha.size === 0) return null;
+
+            const alphas = Array.from(byAlpha.keys()).sort((a, b) => a - b);
+            const points = alphas.map((a) => ({ x: a, y: byAlpha.get(a) }));
+            return { alphas, points };
+        });
+
+        const nearestExpiry = payload.nearestExpiry;
+        const coneAll = normalizeCone(payload.coneAll);
+        const coneNearest = normalizeCone(payload.coneNearest);
+        if (!coneAll) {
+            if (ctx.parentElement) ctx.parentElement.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            return;
+        }
 
         const getSelectedScope = () => {
             const saved = (localStorage.getItem(storageKey) || '').toLowerCase();
@@ -1429,8 +1688,7 @@ class StrangerThingsCharts {
                         const nextCone = resolveConeData(nextScope);
                         const chart = this.charts.gammaFlipCone;
                         if (chart) {
-                            chart.data.labels = nextCone.alphas.map(a => `${Number(a).toFixed(2)}σ`);
-                            chart.data.datasets[0].data = nextCone.flips;
+                            chart.data.datasets[0].data = nextCone.points;
                             chart.update();
                         }
                     };
@@ -1438,13 +1696,14 @@ class StrangerThingsCharts {
             }
         }
         
+        if (this.charts.gammaFlipCone) this.charts.gammaFlipCone.destroy();
+
         this.charts.gammaFlipCone = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: coneData.alphas.map(a => `${Number(a).toFixed(2)}σ`),
                 datasets: [{
                     label: 'Gamma Flip Level',
-                    data: coneData.flips,
+                    data: coneData.points,
                     borderColor: '#00ff00',
                     backgroundColor: 'rgba(0, 255, 0, 0.1)',
                     borderWidth: 3,
@@ -1463,6 +1722,45 @@ class StrangerThingsCharts {
                         text: 'Gamma Flip Cone (Sensibilidade)',
                         color: '#ff00ff',
                         font: { family: 'Orbitron', size: 16, weight: 'bold' }
+                    },
+                    tooltip: {
+                        ...this.chartOptions.plugins.tooltip,
+                        callbacks: {
+                            title: (items) => {
+                                const x = Number(items?.[0]?.parsed?.x);
+                                if (!Number.isFinite(x)) return '';
+                                return `${x.toFixed(2)}σ`;
+                            },
+                            label: (item) => {
+                                const y = Number(item?.parsed?.y);
+                                if (!Number.isFinite(y)) return 'Gamma Flip: -';
+                                return `Gamma Flip: ${this.formatNumberBr(y, 0)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    ...this.chartOptions.scales,
+                    x: {
+                        ...this.chartOptions.scales.x,
+                        type: 'linear',
+                        title: { display: true, text: 'Fator σ (SIGMA_FACTOR)' },
+                        ticks: {
+                            ...this.chartOptions.scales.x.ticks,
+                            callback: (value) => {
+                                const v = Number(value);
+                                if (!Number.isFinite(v)) return value;
+                                return `${v.toFixed(2)}σ`;
+                            }
+                        }
+                    },
+                    y: {
+                        ...this.chartOptions.scales.y,
+                        title: { display: true, text: 'Gamma Flip (Strike)' },
+                        ticks: {
+                            ...this.chartOptions.scales.y.ticks,
+                            callback: (value) => this.formatNumberBr(Number(value), 0)
+                        }
                     }
                 }
             }
@@ -1471,17 +1769,39 @@ class StrangerThingsCharts {
 
     createDeltaFlipProfileChart(data) {
         const ctx = document.getElementById('deltaFlipProfileChart');
-        if (!ctx || !data.v3_data || !data.v3_data.delta_flip_profile) return;
+        if (!ctx) return;
 
-        const profileData = data.v3_data.delta_flip_profile;
+        const utils = window.ChartDataUtils;
+        const profileData = utils?.getDeltaFlipProfile ? utils.getDeltaFlipProfile(data) : (data?.v3_data?.delta_flip_profile ?? data?.delta_flip_profile);
+        const spotsIn = Array.isArray(profileData?.spots) ? profileData.spots : [];
+        const deltasIn = Array.isArray(profileData?.deltas) ? profileData.deltas : [];
+        const baseLen = Math.min(spotsIn.length, deltasIn.length);
+        if (baseLen === 0) {
+            if (ctx.parentElement) ctx.parentElement.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            return;
+        }
+
+        const spots = [];
+        const deltas = [];
+        for (let i = 0; i < baseLen; i++) {
+            const s = Number(spotsIn[i]);
+            const d = Number(deltasIn[i]);
+            if (!Number.isFinite(s) || !Number.isFinite(d)) continue;
+            spots.push(s);
+            deltas.push(d);
+        }
+        if (spots.length === 0) {
+            if (ctx.parentElement) ctx.parentElement.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            return;
+        }
         
         this.charts.deltaFlipProfile = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: profileData.spots.map(s => s.toFixed(2)),
+                labels: spots.map(s => s.toFixed(2)),
                 datasets: [{
                     label: 'Net Delta',
-                    data: profileData.deltas,
+                    data: deltas,
                     borderColor: '#00f3ff',
                     backgroundColor: 'rgba(0, 243, 255, 0.1)',
                     borderWidth: 2,
@@ -1511,10 +1831,19 @@ class StrangerThingsCharts {
 
     createFlowSentimentChart(data) {
         const ctx = document.getElementById('flowSentimentChart');
-        if (!ctx || !data.v3_data || !data.v3_data.flow_sentiment) return;
+        if (!ctx) return;
 
-        const flowData = data.v3_data.flow_sentiment;
-        const labels = data.delta_data.strikes; // Assuming alignment
+        const utils = window.ChartDataUtils;
+        const flowData = utils?.getFlowSentiment ? utils.getFlowSentiment(data) : data?.v3_data?.flow_sentiment;
+        if (!flowData) return;
+
+        const strikes = utils?.getStrikes ? utils.getStrikes(data) : (data?.delta_data?.strikes ?? data?.v3_data?.delta_data?.strikes);
+        if (!Array.isArray(strikes) || strikes.length === 0) return;
+        const bull = Array.isArray(flowData?.bull) ? flowData.bull : [];
+        const bear = Array.isArray(flowData?.bear) ? flowData.bear : [];
+        const baseLen = Math.min(strikes.length, bull.length, bear.length);
+        if (baseLen === 0) return;
+        const labels = strikes.slice(0, baseLen);
 
         this.charts.flowSentiment = new Chart(ctx, {
             type: 'bar',
@@ -1523,14 +1852,14 @@ class StrangerThingsCharts {
                 datasets: [
                     {
                         label: 'Bullish Flow',
-                        data: flowData.bull,
+                        data: bull.slice(0, baseLen),
                         backgroundColor: 'rgba(0, 255, 0, 0.6)',
                         borderColor: '#00ff00',
                         borderWidth: 1
                     },
                     {
                         label: 'Bearish Flow',
-                        data: flowData.bear,
+                        data: bear.slice(0, baseLen),
                         backgroundColor: 'rgba(255, 0, 0, 0.6)',
                         borderColor: '#ff0000',
                         borderWidth: 1
@@ -1565,16 +1894,27 @@ class StrangerThingsCharts {
 
     createExpectedMoveChart(data) {
         const ctx = document.getElementById('expectedMoveChart');
-        if (!ctx || !data.key_levels || !data.key_levels.expected_moves) return;
+        if (!ctx) return;
 
-        const spot = data.overview.spot_price;
+        const utils = window.ChartDataUtils;
+        const movesIn = utils?.getExpectedMoves ? utils.getExpectedMoves(data) : (data?.key_levels?.expected_moves ?? data?.v3_data?.expected_moves);
+        if (!Array.isArray(movesIn) || movesIn.length === 0) {
+            if (ctx.parentElement) ctx.parentElement.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            return;
+        }
+
+        const spot = utils?.getSpot ? utils.getSpot(data) : (data?.overview?.spot_price ?? data?.overview?.spot);
+        if (!Number.isFinite(spot)) {
+            if (ctx.parentElement) ctx.parentElement.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            return;
+        }
+
         const toFiniteNumber = (v) => {
             const x = Number(v);
             return Number.isFinite(x) ? x : null;
         };
 
-        const movesRaw = Array.isArray(data.key_levels.expected_moves) ? data.key_levels.expected_moves : [];
-        const normalized = movesRaw.map(m => {
+        const normalized = movesIn.map(m => {
             const days = toFiniteNumber(m.days);
             const upper1 = toFiniteNumber(m.sigma_1_up ?? m.upper);
             const lower1 = toFiniteNumber(m.sigma_1_down ?? m.lower);
@@ -1583,6 +1923,11 @@ class StrangerThingsCharts {
             const lower2 = toFiniteNumber(m.sigma_2_down ?? (move1 != null ? (spot - 2 * move1) : null));
             return { days, label: String(m.label ?? ''), upper1, lower1, upper2, lower2 };
         }).filter(m => m.days != null && m.upper1 != null && m.lower1 != null && m.upper2 != null && m.lower2 != null);
+
+        if (normalized.length === 0) {
+            if (ctx.parentElement) ctx.parentElement.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            return;
+        }
 
         const byDay = new Map();
         for (const m of normalized) byDay.set(m.days, m);
@@ -1595,6 +1940,8 @@ class StrangerThingsCharts {
         const spotPoints = horizons.map(d => ({ x: d, y: spot }));
         const lower1Points = horizons.map(d => ({ x: d, y: d === 0 ? spot : byDay.get(d).lower1 }));
         const lower2Points = horizons.map(d => ({ x: d, y: d === 0 ? spot : byDay.get(d).lower2 }));
+
+        if (this.charts.expectedMove) this.charts.expectedMove.destroy();
 
         this.charts.expectedMove = new Chart(ctx, {
             type: 'line',
@@ -1700,17 +2047,32 @@ class StrangerThingsCharts {
 
     createMMPnLChart(data) {
         const ctx = document.getElementById('mmPnlChart');
-        if (!ctx || !data.v3_data || !data.v3_data.mm_pnl) return;
+        if (!ctx) return;
 
-        const pnlData = data.v3_data.mm_pnl;
+        const utils = window.ChartDataUtils;
+        const pnlData = utils?.getMMPnl ? utils.getMMPnl(data) : data?.v3_data?.mm_pnl;
+        const spotsIn = Array.isArray(pnlData?.spots) ? pnlData.spots : [];
+        const pnlIn = Array.isArray(pnlData?.pnl) ? pnlData.pnl : [];
+        const baseLen = Math.min(spotsIn.length, pnlIn.length);
+        if (baseLen === 0) return;
+        const spots = [];
+        const pnl = [];
+        for (let i = 0; i < baseLen; i++) {
+            const s = Number(spotsIn[i]);
+            const p = Number(pnlIn[i]);
+            if (!Number.isFinite(s) || !Number.isFinite(p)) continue;
+            spots.push(s);
+            pnl.push(p);
+        }
+        if (spots.length === 0) return;
         
         this.charts.mmPnl = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: pnlData.spots.map(s => s.toFixed(2)),
+                labels: spots.map(s => s.toFixed(2)),
                 datasets: [{
                     label: 'MM PnL Simulation',
-                    data: pnlData.pnl,
+                    data: pnl,
                     borderColor: '#ffff00',
                     backgroundColor: 'rgba(255, 255, 0, 0.1)',
                     borderWidth: 2,
@@ -1740,10 +2102,15 @@ class StrangerThingsCharts {
 
     createDealerPressureChart(data) {
         const ctx = document.getElementById('dealerPressureChart');
-        if (!ctx || !data.v3_data || !data.v3_data.dealer_pressure_profile) return;
+        if (!ctx) return;
 
-        const profile = data.v3_data.dealer_pressure_profile;
-        const strikes = data.delta_data.strikes; // Assumindo alinhamento com strikes
+        const utils = window.ChartDataUtils;
+        const profileIn = utils?.getDealerPressureProfile ? utils.getDealerPressureProfile(data) : data?.v3_data?.dealer_pressure_profile;
+        const strikesIn = utils?.getStrikes ? utils.getStrikes(data) : (data?.delta_data?.strikes ?? data?.v3_data?.delta_data?.strikes);
+        if (!Array.isArray(profileIn) || !Array.isArray(strikesIn) || profileIn.length === 0 || strikesIn.length === 0) return;
+        const baseLen = Math.min(profileIn.length, strikesIn.length);
+        const profile = profileIn.slice(0, baseLen);
+        const strikes = strikesIn.slice(0, baseLen);
 
         this.charts.dealerPressure = new Chart(ctx, {
             type: 'line',
@@ -1789,15 +2156,23 @@ class StrangerThingsCharts {
         const ctx = document.getElementById('deltaAgregadoChart');
         if (!ctx) return;
 
+        const deltaData = data?.delta_data ?? data?.v3_data?.delta_data;
+        if (!deltaData || !Array.isArray(deltaData.strikes) || !Array.isArray(deltaData.delta_values) || deltaData.strikes.length === 0) return;
+
+        const length = Math.min(deltaData.strikes.length, deltaData.delta_values.length);
+        if (length === 0) return;
+        const strikes = deltaData.strikes.slice(0, length);
+        const deltaValues = deltaData.delta_values.slice(0, length);
+
         // Delta Exposure por Strike (Net)
         // Diferente do Delta Acumulado (Cumulative)
         this.charts.deltaAgregado = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.delta_data.strikes,
+                labels: strikes,
                 datasets: [{
                     label: 'Delta Exposure Net',
-                    data: data.delta_data.delta_values,
+                    data: deltaValues,
                     backgroundColor: (context) => {
                         const val = context.raw;
                         return val >= 0 ? 'rgba(0, 255, 0, 0.6)' : 'rgba(255, 0, 0, 0.6)';
@@ -1826,19 +2201,20 @@ class StrangerThingsCharts {
     }
 
     updateKeyLevels(data) {
-        if (!data.key_levels) return;
+        const keyLevels = data?.key_levels ?? data?.v3_data?.key_levels;
+        if (!keyLevels) return;
         
         const setText = (id, value) => {
             const el = document.getElementById(id);
-            if (el) el.innerText = value !== null ? value.toLocaleString() : 'N/A';
+            if (el) el.innerText = value !== null ? this.formatNumberBr(value, 2) : 'N/A';
         };
 
-        setText('gamma-flip', data.key_levels.gamma_flip);
-        setText('call-wall', data.key_levels.call_wall);
-        setText('put-wall', data.key_levels.put_wall);
-        setText('edi-effective-call', data.key_levels.effective_call_wall);
-        setText('edi-effective-put', data.key_levels.effective_put_wall);
-        setText('max-pain', data.key_levels.max_pain);
+        setText('gamma-flip', keyLevels.gamma_flip);
+        setText('call-wall', keyLevels.call_wall);
+        setText('put-wall', keyLevels.put_wall);
+        setText('edi-effective-call', keyLevels.effective_call_wall);
+        setText('edi-effective-put', keyLevels.effective_put_wall);
+        setText('max-pain', keyLevels.max_pain);
     }
 
     updateNtslCode(data) {
