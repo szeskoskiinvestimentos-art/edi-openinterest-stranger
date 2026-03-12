@@ -1374,7 +1374,69 @@ class StrangerThingsCharts {
         const ctx = document.getElementById('gammaFlipConeChart');
         if (!ctx || !data.v3_data || !data.v3_data.gamma_flip_cone) return;
 
-        const coneData = data.v3_data.gamma_flip_cone;
+        const storageKey = `gammaFlipConeScope:${location.pathname}`;
+        const coneAll = data.v3_data.gamma_flip_cone;
+        const coneNearest = data.v3_data.gamma_flip_cone_nearest;
+        const nearestExpiry = data.v3_data.gamma_flip_cone_nearest_expiry;
+
+        const getSelectedScope = () => {
+            const saved = (localStorage.getItem(storageKey) || '').toLowerCase();
+            if (saved === 'nearest' && coneNearest) return 'nearest';
+            return 'all';
+        };
+        const setSelectedScope = (scope) => localStorage.setItem(storageKey, scope);
+
+        const resolveConeData = (scope) => (scope === 'nearest' && coneNearest ? coneNearest : coneAll);
+
+        const scope = getSelectedScope();
+        const coneData = resolveConeData(scope);
+
+        if (coneNearest) {
+            const host = ctx.parentElement;
+            if (host) {
+                const existing = host.querySelector('#gammaFlipConeScopeToggle');
+                const toggle = existing || document.createElement('div');
+                toggle.id = 'gammaFlipConeScopeToggle';
+                toggle.style.display = 'flex';
+                toggle.style.gap = '8px';
+                toggle.style.margin = '0 0 10px 0';
+                toggle.style.flexWrap = 'wrap';
+
+                const labelNearest = nearestExpiry ? `Venc. mais próximo (${nearestExpiry})` : 'Venc. mais próximo';
+
+                toggle.innerHTML = `
+                    <button type="button" data-scope="all" style="padding:6px 10px;border:1px solid #00f3ff;background:transparent;color:#e0e0e0;border-radius:6px;cursor:pointer;font-family:Orbitron;">Todos vencimentos</button>
+                    <button type="button" data-scope="nearest" style="padding:6px 10px;border:1px solid #00f3ff;background:transparent;color:#e0e0e0;border-radius:6px;cursor:pointer;font-family:Orbitron;">${labelNearest}</button>
+                `;
+
+                const applyActive = (activeScope) => {
+                    toggle.querySelectorAll('button[data-scope]').forEach((btn) => {
+                        const isActive = btn.getAttribute('data-scope') === activeScope;
+                        btn.style.background = isActive ? 'rgba(0, 243, 255, 0.12)' : 'transparent';
+                        btn.style.borderColor = isActive ? '#ff00ff' : '#00f3ff';
+                        btn.style.color = isActive ? '#ffffff' : '#e0e0e0';
+                    });
+                };
+
+                if (!existing) host.insertBefore(toggle, ctx);
+                applyActive(scope);
+
+                toggle.querySelectorAll('button[data-scope]').forEach((btn) => {
+                    btn.onclick = () => {
+                        const nextScope = btn.getAttribute('data-scope') || 'all';
+                        setSelectedScope(nextScope);
+                        applyActive(nextScope);
+                        const nextCone = resolveConeData(nextScope);
+                        const chart = this.charts.gammaFlipCone;
+                        if (chart) {
+                            chart.data.labels = nextCone.alphas.map(a => `${Number(a).toFixed(2)}σ`);
+                            chart.data.datasets[0].data = nextCone.flips;
+                            chart.update();
+                        }
+                    };
+                });
+            }
+        }
         
         this.charts.gammaFlipCone = new Chart(ctx, {
             type: 'line',
