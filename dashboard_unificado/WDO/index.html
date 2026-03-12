@@ -52,6 +52,7 @@
                 <select id="assetSelect" aria-label="Selecionar ativo" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;">
                     <option value="WDO" selected>WDO</option>
                     <option value="WIN">WIN</option>
+                    <option value="MERCADO">EDI Market Guardin</option>
                 </select>
             </div>
         </div>
@@ -634,7 +635,11 @@
                 const href = location.href;
                 const isProd = host.indexOf('github.io') !== -1 || host.indexOf('sites.google.com') !== -1;
                 if(isProd){
+                    if(val === 'MERCADO') return href;
                     return prodBase + (val === 'WDO' ? 'WDO/' : 'WIN/');
+                }
+                if(val === 'MERCADO'){
+                    return '../../../Cotacoes/dashboard/index.html';
                 }
                 const isUnified = href.indexOf('dashboard_unificado') !== -1;
                 if(val === 'WIN'){
