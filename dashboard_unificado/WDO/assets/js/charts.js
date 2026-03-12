@@ -2251,7 +2251,7 @@ class StrangerThingsCharts {
     }
 
     createFairValueTable(data) {
-        const containers = document.querySelectorAll('#fair-value-container');
+        const containers = document.querySelectorAll('#fair-value-container-overview, #fair-value-container-v3, #fair-value-container');
         if (!containers || containers.length === 0) return;
 
         const sims = data && data.v3_data && Array.isArray(data.v3_data.fair_value_sims)
