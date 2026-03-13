@@ -192,62 +192,66 @@ class StrangerThingsCharts {
                     labelText: `SPOT ${spot.toFixed(2)}`
                 };
             }
-            if (!window.Chart) {
+            const safe = (label, fn) => {
+                try {
+                    fn();
+                } catch (err) {
+                    console.error(`Erro em ${label}:`, err);
+                }
+            };
+            safe('updateMetrics', () => this.updateMetrics(data));
+            safe('updateKeyLevels', () => this.updateKeyLevels(data));
+            safe('updateNtslCode', () => this.updateNtslCode(data));
+            safe('populateTable', () => this.populateTable(data));
+            safe('createFairValueTable', () => this.createFairValueTable(data));
+            safe('updateLastUpdate', () => this.updateLastUpdate(data));
+            const hasChart = await this.waitForChartJs(2500);
+            if (!hasChart) {
                 this.showChartLibraryWarning();
-                this.updateMetrics(data);
-                this.updateKeyLevels(data);
-                this.updateNtslCode(data);
-                this.populateTable(data);
-                this.createFairValueTable(data); // Added
-                this.updateLastUpdate(data);
                 return;
             }
-            this.createDeltaChart(data);
-            this.createGammaChart(data);
-            // this.createVolumeChart(data); // Removido por redundância (Volume Chart era na verdade OI)
-            this.createVolatilityChart(data);
-            
-            // Novos Gráficos
-            this.createOIStrikeChart(data);
-            this.createGexSplitChart(data);
-            this.createVannaChart(data);
-            this.createCharmChart(data);
-            this.createThetaChart(data);
-            this.createVegaChart(data);
-            this.createPinRiskChart(data);
-            
-            // Gregas Acumuladas & R-Gamma
-            this.createCharmCumChart(data);
-            this.createVannaCumChart(data);
-            this.createThetaCumChart(data); // Added
-            this.createRGammaChart(data);
-            this.createRGammaCumChart(data);
-
-            // V3 Charts
-            this.createMaxPainChart(data);
-            this.createExpectedMoveChart(data);
-            this.createGammaFlipConeChart(data);
-            this.createDeltaFlipProfileChart(data);
-            this.createFlowSentimentChart(data);
-            this.createMMPnLChart(data);
-            this.createDealerPressureChart(data); // Added
-            this.createDeltaAgregadoChart(data); // Added
-
-            // Ferramentas de Mercado
-            this.createFedWatchTable(data);
-            this.createMostActivesTable(data);
-            this.createOIByExpiryChart(data);
-            this.createVolumeVolatilityChart(data);
-
-            this.updateMetrics(data);
-            this.updateKeyLevels(data);
-            this.updateNtslCode(data);
-            this.populateTable(data);
-            this.createFairValueTable(data); // Added
-            this.updateLastUpdate(data);
+            safe('createDeltaChart', () => this.createDeltaChart(data));
+            safe('createGammaChart', () => this.createGammaChart(data));
+            safe('createVolatilityChart', () => this.createVolatilityChart(data));
+            safe('createOIStrikeChart', () => this.createOIStrikeChart(data));
+            safe('createGexSplitChart', () => this.createGexSplitChart(data));
+            safe('createVannaChart', () => this.createVannaChart(data));
+            safe('createCharmChart', () => this.createCharmChart(data));
+            safe('createThetaChart', () => this.createThetaChart(data));
+            safe('createVegaChart', () => this.createVegaChart(data));
+            safe('createPinRiskChart', () => this.createPinRiskChart(data));
+            safe('createCharmCumChart', () => this.createCharmCumChart(data));
+            safe('createVannaCumChart', () => this.createVannaCumChart(data));
+            safe('createThetaCumChart', () => this.createThetaCumChart(data));
+            safe('createRGammaChart', () => this.createRGammaChart(data));
+            safe('createRGammaCumChart', () => this.createRGammaCumChart(data));
+            safe('createMaxPainChart', () => this.createMaxPainChart(data));
+            safe('createExpectedMoveChart', () => this.createExpectedMoveChart(data));
+            safe('createGammaFlipConeChart', () => this.createGammaFlipConeChart(data));
+            safe('createDeltaFlipProfileChart', () => this.createDeltaFlipProfileChart(data));
+            safe('createFlowSentimentChart', () => this.createFlowSentimentChart(data));
+            safe('createMMPnLChart', () => this.createMMPnLChart(data));
+            safe('createDealerPressureChart', () => this.createDealerPressureChart(data));
+            safe('createDeltaAgregadoChart', () => this.createDeltaAgregadoChart(data));
+            safe('createFedWatchTable', () => this.createFedWatchTable(data));
+            safe('createMostActivesTable', () => this.createMostActivesTable(data));
+            safe('createOIByExpiryChart', () => this.createOIByExpiryChart(data));
+            safe('createVolumeVolatilityChart', () => this.createVolumeVolatilityChart(data));
         } catch (error) {
             console.error('Error initializing charts:', error);
         }
+    }
+
+    waitForChartJs(timeoutMs = 2500) {
+        const start = Date.now();
+        return new Promise((resolve) => {
+            const tick = () => {
+                if (window.Chart) return resolve(true);
+                if (Date.now() - start >= timeoutMs) return resolve(false);
+                setTimeout(tick, 50);
+            };
+            tick();
+        });
     }
 
     async loadMarketData() {
