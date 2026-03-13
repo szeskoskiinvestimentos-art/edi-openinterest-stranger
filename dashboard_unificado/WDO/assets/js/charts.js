@@ -71,9 +71,118 @@ class StrangerThingsCharts {
     async init() {
         try {
             const data = await this.loadMarketData();
+            const ensureSpotLinePlugin = () => {
+                const Chart = window?.Chart;
+                if (!Chart || typeof Chart.register !== 'function') return;
+                if (window.__ediSpotLinePluginRegistered) return;
+
+                Chart.register({
+                    id: 'spotLine',
+                    afterDatasetsDraw(chart, _args, pluginOptions) {
+                        const value = Number(pluginOptions?.value);
+                        if (!Number.isFinite(value)) return;
+
+                        const xScale = chart?.scales?.x ?? Object.values(chart?.scales ?? {}).find((s) => s?.axis === 'x');
+                        if (!xScale || typeof xScale.getPixelForValue !== 'function') return;
+
+                        let xPixel = null;
+                        if (xScale.type === 'category') {
+                            const labelsIn = chart?.data?.labels;
+                            const labels = Array.isArray(labelsIn) ? labelsIn : [];
+                            const numericLabels = labels
+                                .map((l) => {
+                                    if (typeof l === 'number') return l;
+                                    if (typeof l !== 'string') return Number(l);
+                                    const s = l.trim();
+                                    const looksLikePtBr = /^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s);
+                                    if (!looksLikePtBr) return Number(s);
+                                    const normalized = s.replace(/\./g, '').replace(',', '.');
+                                    return Number(normalized);
+                                })
+                                .map((n, i) => ({ n, i }))
+                                .filter((p) => Number.isFinite(p.n));
+                            if (numericLabels.length === 0) return;
+                            const min = Math.min(...numericLabels.map((p) => p.n));
+                            const max = Math.max(...numericLabels.map((p) => p.n));
+                            if (value < min || value > max) return;
+                            let lo = null;
+                            let hi = null;
+                            for (let i = 0; i < numericLabels.length; i++) {
+                                const p = numericLabels[i];
+                                if (p.n <= value) lo = p;
+                                if (p.n >= value) {
+                                    hi = p;
+                                    break;
+                                }
+                            }
+                            if (!lo && hi) lo = hi;
+                            if (!hi && lo) hi = lo;
+                            if (!lo || !hi) return;
+                            if (lo.i === hi.i || lo.n === hi.n) {
+                                xPixel = xScale.getPixelForValue(lo.i);
+                            } else {
+                                const x0 = xScale.getPixelForValue(lo.i);
+                                const x1 = xScale.getPixelForValue(hi.i);
+                                const t = (value - lo.n) / (hi.n - lo.n);
+                                xPixel = x0 + (x1 - x0) * t;
+                            }
+                        } else {
+                            const min = Number(xScale.min);
+                            const max = Number(xScale.max);
+                            if (Number.isFinite(min) && Number.isFinite(max) && (value < min || value > max)) return;
+                            xPixel = xScale.getPixelForValue(value);
+                        }
+
+                        if (!Number.isFinite(xPixel)) return;
+
+                        const chartArea = chart.chartArea;
+                        if (!chartArea) return;
+
+                        const ctx = chart.ctx;
+                        const color = pluginOptions?.color ?? 'lime';
+                        const width = Number(pluginOptions?.width ?? 2);
+                        const dash = Array.isArray(pluginOptions?.dash) ? pluginOptions.dash : [4, 4];
+
+                        ctx.save();
+                        ctx.lineWidth = Number.isFinite(width) ? width : 2;
+                        ctx.strokeStyle = color;
+                        if (typeof ctx.setLineDash === 'function') ctx.setLineDash(dash);
+                        ctx.beginPath();
+                        ctx.moveTo(xPixel, chartArea.top);
+                        ctx.lineTo(xPixel, chartArea.bottom);
+                        ctx.stroke();
+                        if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+
+                        const showLabel = pluginOptions?.label !== false;
+                        if (showLabel) {
+                            const labelText = typeof pluginOptions?.labelText === 'string'
+                                ? pluginOptions.labelText
+                                : `SPOT ${Number.isFinite(value) ? value.toFixed(2) : value}`;
+                            ctx.fillStyle = color;
+                            ctx.font = pluginOptions?.font ?? '12px Orbitron';
+                            ctx.textBaseline = 'top';
+                            ctx.fillText(labelText, xPixel + 6, chartArea.top + 6);
+                        }
+
+                        ctx.restore();
+                    }
+                });
+
+                window.__ediSpotLinePluginRegistered = true;
+            };
+
+            const getSpotFallback = (d) => {
+                const spot = Number(d?.overview?.spot_price ?? d?.overview?.spot ?? d?.spot_price ?? d?.spot);
+                return Number.isFinite(spot) ? spot : null;
+            };
+
             const utils = window.ChartDataUtils;
-            if (utils?.registerSpotLinePlugin) utils.registerSpotLinePlugin();
-            const spot = utils?.getSpot ? utils.getSpot(data) : null;
+            if (utils?.registerSpotLinePlugin) {
+                utils.registerSpotLinePlugin();
+            } else {
+                ensureSpotLinePlugin();
+            }
+            const spot = utils?.getSpot ? utils.getSpot(data) : getSpotFallback(data);
             if (spot !== null) {
                 this.chartOptions.plugins.spotLine = {
                     value: spot,
