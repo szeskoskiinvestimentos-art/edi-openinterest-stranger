@@ -587,12 +587,13 @@
         (function(){
             const sel = document.getElementById('assetSelect');
             const prodBase = 'https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/dashboard_unificado/';
+            const prodMarket = 'https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/Cotacoes/dashboard/index.html';
             function targetFor(val){
                 const host = location.hostname;
                 const href = location.href;
                 const isProd = host.indexOf('github.io') !== -1 || host.indexOf('sites.google.com') !== -1;
                 if(isProd){
-                    if(val === 'MERCADO') return href;
+                    if(val === 'MERCADO') return prodMarket;
                     return prodBase + (val === 'WDO' ? 'WDO/' : 'WIN/');
                 }
                 if(val === 'MERCADO'){
