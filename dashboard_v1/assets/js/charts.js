@@ -190,11 +190,6 @@ class StrangerThingsCharts {
             };
 
             const utils = window.ChartDataUtils;
-            if (utils?.registerSpotLinePlugin) {
-                utils.registerSpotLinePlugin();
-            } else {
-                ensureSpotLinePlugin();
-            }
             const spot = utils?.getSpot ? utils.getSpot(data) : getSpotFallback(data);
             if (spot !== null) {
                 this.chartOptions.plugins.spotLine = {
@@ -223,6 +218,13 @@ class StrangerThingsCharts {
                 this.showChartLibraryWarning();
                 return;
             }
+            safe('registerSpotLinePlugin', () => {
+                if (utils?.registerSpotLinePlugin) {
+                    utils.registerSpotLinePlugin();
+                } else {
+                    ensureSpotLinePlugin();
+                }
+            });
             safe('createDeltaChart', () => this.createDeltaChart(data));
             safe('createGammaChart', () => this.createGammaChart(data));
             safe('createVolatilityChart', () => this.createVolatilityChart(data));
