@@ -192,6 +192,16 @@ class StrangerThingsCharts {
                     labelText: `SPOT ${spot.toFixed(2)}`
                 };
             }
+            if (!window.Chart) {
+                this.showChartLibraryWarning();
+                this.updateMetrics(data);
+                this.updateKeyLevels(data);
+                this.updateNtslCode(data);
+                this.populateTable(data);
+                this.createFairValueTable(data); // Added
+                this.updateLastUpdate(data);
+                return;
+            }
             this.createDeltaChart(data);
             this.createGammaChart(data);
             // this.createVolumeChart(data); // Removido por redundância (Volume Chart era na verdade OI)
@@ -261,6 +271,25 @@ class StrangerThingsCharts {
             this.showFallbackWarning();
             return this.getFallbackData();
         }
+    }
+
+    showChartLibraryWarning() {
+        if (document.getElementById('edi-chart-lib-warning')) return;
+        const warning = document.createElement('div');
+        warning.id = 'edi-chart-lib-warning';
+        warning.style.position = 'fixed';
+        warning.style.top = '0';
+        warning.style.left = '0';
+        warning.style.width = '100%';
+        warning.style.backgroundColor = '#0b5cff';
+        warning.style.color = '#ffffff';
+        warning.style.textAlign = 'center';
+        warning.style.padding = '10px';
+        warning.style.zIndex = '9999';
+        warning.style.fontWeight = 'bold';
+        warning.style.fontFamily = 'Orbitron';
+        warning.innerText = '⚠️ Chart.js não carregou (rede/CDN bloqueado). Valores e níveis foram carregados, mas os gráficos foram desabilitados.';
+        document.body.prepend(warning);
     }
 
     showFallbackWarning() {
