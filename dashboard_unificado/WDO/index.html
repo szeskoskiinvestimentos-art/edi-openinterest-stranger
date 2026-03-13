@@ -623,7 +623,19 @@
     <script src="assets/js/particles.js"></script>
     
     <!-- Gráficos e Lógica Principal -->
-    <script src="../../shared/js/chart_data_utils.js?v=20260310"></script>
+    <script>
+        (function(){
+            const version = '20260310';
+            const href = location.href || '';
+            const inUnified = href.indexOf('dashboard_unificado') !== -1;
+            const primary = inUnified
+                ? `../shared/js/chart_data_utils.js?v=${version}`
+                : `../dashboard_unificado/shared/js/chart_data_utils.js?v=${version}`;
+            const fallback = `https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/dashboard_unificado/shared/js/chart_data_utils.js?v=${version}`;
+            const tag = `<script src="${primary}" onerror="this.onerror=null;this.src='${fallback}'"><\\/script>`;
+            document.write(tag);
+        })();
+    </script>
     <script src="assets/js/charts.js?v=20260310"></script>
     <script src="assets/js/main.js?v=20260310"></script>
     <script>

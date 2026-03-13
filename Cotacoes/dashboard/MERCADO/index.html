@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDI Market Guardian - Cotações de Mercado</title>
+    <link rel="stylesheet" href="../WDO/assets/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .market-ticker {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border: 1px solid rgba(0, 243, 255, .28);
+            border-radius: 12px;
+            background: rgba(0, 0, 0, .28);
+            box-shadow: 0 0 18px rgba(0, 243, 255, .08);
+            overflow: hidden;
+        }
+        .market-ticker__label {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            letter-spacing: 2px;
+            color: var(--secondary-neon);
+            text-shadow: 0 0 10px rgba(0, 243, 255, .35);
+            flex: 0 0 auto;
+        }
+        .market-ticker__viewport {
+            position: relative;
+            overflow: hidden;
+            flex: 1;
+            min-width: 0;
+        }
+        .market-ticker__viewport::before,
+        .market-ticker__viewport::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 36px;
+            pointer-events: none;
+            z-index: 2;
+        }
+        .market-ticker__viewport::before {
+            left: 0;
+            background: linear-gradient(90deg, rgba(10, 10, 10, .95), rgba(10, 10, 10, 0));
+        }
+        .market-ticker__viewport::after {
+            right: 0;
+            background: linear-gradient(270deg, rgba(10, 10, 10, .95), rgba(10, 10, 10, 0));
+        }
+        .market-ticker__track {
+            display: flex;
+            width: max-content;
+            gap: 14px;
+            animation: marketTickerScroll 70s linear infinite;
+            will-change: transform;
+        }
+        .market-ticker:hover .market-ticker__track {
+            animation-play-state: paused;
+        }
+        .market-ticker__group {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding-right: 14px;
+        }
+        .market-ticker__item {
+            display: inline-flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 8px 10px;
+            border: 1px solid rgba(255, 255, 255, .10);
+            border-radius: 999px;
+            background: rgba(26, 26, 26, .65);
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+        }
+        .market-ticker__item:hover {
+            border-color: rgba(0, 243, 255, .28);
+        }
+        .market-ticker__short {
+            font-weight: 900;
+            letter-spacing: 1px;
+        }
+        .market-ticker__price {
+            opacity: .9;
+            font-family: 'Share Tech Mono', monospace;
+        }
+        @keyframes marketTickerScroll {
+            from { transform: translateX(0); }
+            to { transform: translateX(-50%); }
+        }
+        #flow-sentinel .flow-sentinel__stack{
+            display:flex;
+            flex-direction:column;
+            gap:16px;
+        }
+        #flow-sentinel .context-box{
+            width:100%;
+            max-height:none !important;
+            height:auto !important;
+            overflow:visible !important;
+        }
+        #flow-sentinel .table-container{
+            width:100%;
+            max-height:none !important;
+            height:auto !important;
+            overflow:visible !important;
+        }
+        #flow-sentinel #fs-components,
+        #flow-sentinel #fs-components > div{
+            max-height:none !important;
+            height:auto !important;
+            overflow:visible !important;
+        }
+        .fs-dot{
+            width:14px;
+            height:14px;
+            border-radius:999px;
+            display:inline-block;
+            box-shadow:0 0 14px rgba(255,255,255,.10);
+        }
+        .fs-dot--sell-usd{background:rgba(0,255,160,.95);box-shadow:0 0 16px rgba(0,255,160,.35)}
+        .fs-dot--buy-usd{background:rgba(255,60,80,.95);box-shadow:0 0 16px rgba(255,60,80,.35)}
+        .fs-dot--neutral{background:rgba(255,210,74,.95);box-shadow:0 0 16px rgba(255,210,74,.25)}
+        @keyframes fsDotPulse{
+            0%{transform:scale(1);filter:brightness(1)}
+            50%{transform:scale(1.35);filter:brightness(1.25)}
+            100%{transform:scale(1);filter:brightness(1)}
+        }
+        .fs-dot--blink{animation:fsDotPulse .9s ease-in-out infinite}
+        #panorama .table-container{
+            width:100%;
+            max-height:none !important;
+            height:auto !important;
+            overflow:visible !important;
+        }
+        .panorama-grid{
+            column-width:360px;
+            column-gap:14px;
+        }
+        .panorama-card{
+            border:1px solid rgba(255,255,255,.12);
+            border-radius:14px;
+            padding:12px;
+            background:rgba(0,0,0,.18);
+            display:inline-block;
+            width:100%;
+            break-inside:avoid;
+            margin:0 0 14px;
+        }
+        .panorama-card--wide{
+            grid-column:1 / -1;
+        }
+        .panorama-card__header{
+            display:flex;
+            justify-content:space-between;
+            gap:10px;
+            align-items:center;
+            margin-bottom:10px;
+        }
+        .panorama-card__title{
+            font-weight:900;
+            letter-spacing:1px;
+            opacity:.95;
+        }
+        .panorama-freeze{
+            background:#1b1b1b;
+            color:#e0e0e0;
+            border:1px solid rgba(255,255,255,.18);
+            padding:6px 10px;
+            border-radius:10px;
+            font-weight:800;
+            letter-spacing:.5px;
+            cursor:pointer;
+        }
+        .panorama-freeze[aria-pressed="true"]{
+            border-color:rgba(0,255,160,.55);
+            box-shadow:0 0 16px rgba(0,255,160,.18);
+        }
+        .panorama-table{
+            width:100%;
+            border-collapse:collapse;
+            table-layout:fixed;
+        }
+        .panorama-table th{
+            text-align:left;
+            opacity:.75;
+            font-weight:900;
+            font-size:12px;
+            letter-spacing:.8px;
+            padding:6px 0;
+            border-bottom:1px solid rgba(255,255,255,.08);
+        }
+        .panorama-table th:nth-child(1), .panorama-table td:nth-child(1){width:52%}
+        .panorama-table th:nth-child(2), .panorama-table td:nth-child(2){width:16%}
+        .panorama-table th:nth-child(3), .panorama-table td:nth-child(3){width:16%}
+        .panorama-table th:nth-child(4), .panorama-table td:nth-child(4){width:16%}
+        .panorama-table td{
+            padding:8px 0;
+            border-bottom:1px solid rgba(255,255,255,.06);
+            vertical-align:middle;
+        }
+        .panorama-asset{
+            display:flex;
+            gap:10px;
+            align-items:flex-start;
+            min-width:0;
+        }
+        .panorama-asset__name{
+            font-weight:900;
+            opacity:.92;
+            white-space:normal;
+            overflow-wrap:anywhere;
+            word-break:break-word;
+            hyphens:auto;
+            line-height:1.15;
+        }
+        .panorama-mono{
+            font-family:'Share Tech Mono',monospace;
+            font-weight:900;
+            white-space:nowrap;
+        }
+        @media (max-width: 520px){
+            .panorama-grid{column-width:auto}
+            .panorama-table th{font-size:11px}
+            .panorama-table td{padding:10px 0}
+            .panorama-table th:nth-child(1), .panorama-table td:nth-child(1){width:58%}
+            .panorama-table th:nth-child(2), .panorama-table td:nth-child(2){width:14%}
+            .panorama-table th:nth-child(3), .panorama-table td:nth-child(3){width:14%}
+            .panorama-table th:nth-child(4), .panorama-table td:nth-child(4){width:14%}
+        }
+        .help-grid{
+            display:grid;
+            grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+            gap:12px;
+            margin-top:10px;
+        }
+        .help-col{
+            border:1px solid rgba(255,255,255,.10);
+            border-radius:10px;
+            padding:10px 12px;
+            background:rgba(0,0,0,.18);
+        }
+        .help-title{
+            font-family:'Orbitron',sans-serif;
+            font-weight:900;
+            letter-spacing:1px;
+            font-size:12px;
+            opacity:.92;
+            margin-bottom:6px;
+        }
+        .help-col ul{
+            margin:0 0 0 18px;
+            opacity:.92;
+            line-height:1.45;
+        }
+    </style>
+</head>
+<body>
+    <div id="particles-js"></div>
+
+    <header class="header">
+        <div class="container">
+            <div class="logo">
+                <h1 class="logo-text">EDI MARKET GUARDIAN</h1>
+                <div class="logo-subtitle">
+                    COTAÇÕES DE MERCADO
+                    <span id="last-update-label"></span>
+                </div>
+            </div>
+            <div class="header-glow"></div>
+        </div>
+    </header>
+
+    <nav class="nav">
+        <div class="container" style="display:flex;align-items:center;position:relative;">
+            <div class="nav-center" style="flex:1;display:flex;justify-content:center;">
+                <ul class="nav-list" style="margin:0;flex-wrap:nowrap;overflow-x:auto;padding-right:260px;gap:22px;">
+                    <li><a href="#overview" class="nav-link active">Visão Geral</a></li>
+                    <li><a href="#intel" class="nav-link">Intel</a></li>
+                    <li><a href="#my-assets" class="nav-link">Meus Ativos</a></li>
+                    <li><a href="#brazil-market" class="nav-link">Brasil</a></li>
+                    <li><a href="#commodities" class="nav-link">Commodities</a></li>
+                    <li><a href="#metals" class="nav-link">Metais</a></li>
+                    <li><a href="#fx-carry" class="nav-link">FX / Carry</a></li>
+                    <li><a href="#emerging" class="nav-link">Emergentes</a></li>
+                    <li><a href="#alerts" class="nav-link">Alertas</a></li>
+                    <li><a href="#all-assets" class="nav-link">Geral</a></li>
+                </ul>
+            </div>
+            <div class="nav-actions" style="position:absolute;right:0;top:50%;transform:translateY(-50%);display:flex;gap:10px;">
+                <select id="assetSelect" aria-label="Selecionar dashboard" title="Troca de dashboard: MERCADO, WDO ou WIN. Em produção abre o link publicado; no uso local aponta para a pasta do dashboard_unificado." style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;">
+                    <option value="WDO">WDO</option>
+                    <option value="WIN">WIN</option>
+                    <option value="MERCADO" selected>EDI Market Guardian</option>
+                </select>
+                <button id="reloadDataBtn" type="button" title="Atualiza os dados. Se o atualizador local estiver rodando, ele tenta capturar (Investing/InfoMoney) e salvar em assets/data. Se estiver offline, apenas recarrega o arquivo atual." style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;cursor:pointer;">
+                    ↻ Dados
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main">
+        <div class="container">
+            <section id="overview" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">VISÃO GERAL</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-icon">🧭</div>
+                        <div class="metric-value" id="metric-assets">0</div>
+                        <div class="metric-label">Ativos Monitorados</div>
+                        <div class="metric-change neutral" id="metric-retention">10 dias</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">🚀</div>
+                        <div class="metric-value" id="metric-top-up">—</div>
+                        <div class="metric-label">Maior Alta (agora)</div>
+                        <div class="metric-change positive" id="metric-top-up-pct">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">🧊</div>
+                        <div class="metric-value" id="metric-top-down">—</div>
+                        <div class="metric-label">Maior Queda (agora)</div>
+                        <div class="metric-change negative" id="metric-top-down-pct">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">🧲</div>
+                        <div class="metric-value" id="metric-flow">Neutro</div>
+                        <div class="metric-label">Sinal de Fluxo</div>
+                        <div class="metric-change neutral" id="metric-flow-score">0.00</div>
+                    </div>
+                </div>
+
+                <div class="context-box" style="margin-top:18px;">
+                    <h3>🧾 Ajuda rápida (Operação)</h3>
+                    <div class="help-grid">
+                        <div class="help-col">
+                            <div class="help-title">Como usar</div>
+                            <ul>
+                                <li><b>↻ Dados</b>: dispara o atualizador local (porta 3033). Ao terminar, a página recarrega <b>market_quotes.js</b> e <b>economic_calendar.js</b>.</li>
+                                <li><b>Carimbo</b>: o horário no topo reflete o <b>generatedAt</b> do arquivo de dados.</li>
+                            </ul>
+                        </div>
+                        <div class="help-col">
+                            <div class="help-title">Quando falha</div>
+                            <ul>
+                                <li><b>ATUALIZADOR OFFLINE</b>: o serviço não está rodando, então a página só recarrega o que já existe em disco.</li>
+                                <li><b>Bloqueio/anti-bot</b>: Investing/InfoMoney pode limitar a <b>captura</b> (captcha/timeout), mesmo com a página funcionando.</li>
+                            </ul>
+                        </div>
+                        <div class="help-col">
+                            <div class="help-title">O que fazer</div>
+                            <ul>
+                                <li>Inicie o serviço com <b>Atualizar_Dados_Mercado.bat</b> e tente novamente.</li>
+                                <li>Se houver bloqueio, mantenha o atualizador rodando e conclua login/verificação quando ele abrir o navegador.</li>
+                                <li>Use <b>Data Pack</b> para auditar o que realmente atualizou (cobertura, DI, calendário).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="market-ticker" style="margin-top:-16px;margin-bottom:28px;">
+                    <div class="market-ticker__label">MUNDO</div>
+                    <div class="market-ticker__viewport">
+                        <div id="globalTicker" class="market-ticker__track"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout split-layout--center-text" style="margin-top: 24px;">
+                    <div class="context-box">
+                        <h3>⚡ Top Movers por Grupo</h3>
+                        <p>Resumo instantâneo de rotação por classe. Clique em um item para abrir a tabela correspondente já filtrada pelo símbolo.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="topMovers"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 40px;">
+                    <div class="context-box">
+                        <h3>🧠 Leitura de Fluxo (MVP)</h3>
+                        <p>O sinal de fluxo aqui é uma heurística simples baseada em comportamento conjunto por grupos (commodities/metais/FX/emergentes). Ele é um “termômetro” de risco (risk-on/off) para orientar a leitura macro, sem pretensão de ser preditivo.</p>
+                        <p>Evolução prevista (próximos passos):</p>
+                        <ul style="margin:10px 0 0 18px;opacity:.92;line-height:1.45;">
+                            <li><b>Motor de Carry Trade</b>: medir diferencial de juros e precificação de curva (ex.: US x BR), cruzando com FX (DXY, pares EM) para identificar onde o prêmio de carrego está “entrando/saindo”.</li>
+                            <li><b>Fluxo de Capitais</b>: proxies de fluxo via ETFs/índices e spreads (ex.: equities vs bonds, EM vs DM), além de “risk gauges” (volatilidade/credito) para separar fluxo estrutural de ruído intraday.</li>
+                            <li><b>Regimes</b>: classificar o ambiente (risk-on, risk-off, inflação/deflação, stress de liquidez) e ajustar pesos por regime para evitar sinais falsos.</li>
+                            <li><b>Alertas</b>: disparos por mudança de regime e divergências entre grupos (ex.: commodities fortes com FX/EM fracos) para highlight de rotação.</li>
+                        </ul>
+                        <div id="dataStatus" style="margin-top:12px;font-weight:800;letter-spacing:1px;opacity:.9;"></div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="overviewChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section id="intel" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">INTEL (MVP)</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div class="context-box" style="width:100%;">
+                        <h3>🧭 Regime &amp; Convicção</h3>
+                        <p><b>INTEL (MVP)</b> é a camada de <b>inteligência</b> do dashboard: ela transforma as cotações e sinais disponíveis em uma <b>leitura operacional</b> (o que o mercado está “precificando” agora), com transparência do <b>por quê</b> e do quanto dá para confiar.</p>
+                        <p><b>Regime</b> é a classificação do ambiente (<b>risk-on</b> x <b>risk-off</b>) a partir da concordância entre grupos (FX, commodities, volatilidade, índices). <b>Convicção</b> não é “certeza”; é um termômetro de <b>qualidade do sinal</b> com base em <b>cobertura</b> (quantos itens têm preço) e <b>consistência</b> (se os grupos contam a mesma história).</p>
+                        <p><b>O que isso costuma significar para índice emergente</b> (ex.: Brasil/IBOV, EM ETF): <b>risk-on</b> tende a favorecer <b>entrada de fluxo</b> em emergentes (índice tende a subir) e <b>USD enfraquece</b>; <b>risk-off</b> tende a puxar <b>fuga para segurança</b> (índice emergente tende a cair) e <b>USD fortalece</b>. É uma leitura de <b>probabilidade</b>, não garantia: confirme sempre com o “Por quê” e a Convicção.</p>
+                        <p><b>Como usar</b>: leia o <b>Regime</b>, confirme a <b>Convicção</b>, e então cheque o bloco <b>Por quê</b> (quais variáveis mais puxaram o resultado). Se a convicção estiver baixa, trate como <b>neutro</b> ou sinal fraco e reduza peso na decisão.</p>
+                    </div>
+                    <div class="table-container" style="width:100%;">
+                        <div id="regimeConviction"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 28px;">
+                    <div class="context-box">
+                        <h3>🇨🇳 China Proxy + 🇧🇷 Brasil Produtor</h3>
+                        <p>Leitura Brasil via China (FXI/CSI/HSI) e commodities críticas (Minério/Soja/Petróleo), com confluências e divergências.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="chinaBrazil"></div>
+                    </div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:16px;margin-top:28px;">
+                    <div class="context-box" style="width:100%;">
+                        <h3>📉 Curva (Proxy) por Buckets</h3>
+                        <p>Leitura de juros por <b>curto/médio/longo</b> para transformar a curva em um painel simples: <b>nível</b> (juros altos/baixos) e <b>inclinação</b> (abre/fecha). Isso ajuda a contextualizar o <b>apetite ao risco</b> e o comportamento típico de <b>emergentes</b>.</p>
+                        <p><b>Fonte</b>: quando há <b>DI (B3)</b>, usamos os contratos para montar a curva do Brasil. Quando não há DI, usamos <b>yields globais</b> disponíveis como proxy (ex.: EUA/Europa) para não deixar o bloco vazio.</p>
+                        <ul style="margin:10px 0 0 18px;opacity:.92;line-height:1.45;">
+                            <li><b>Curto</b>: reflete política monetária e expectativa imediata (sensível a “Fed/Copom”).</li>
+                            <li><b>Médio</b>: transição do ciclo; costuma capturar reprecificação do “pouso” (crescimento x inflação).</li>
+                            <li><b>Longo</b>: prêmio de prazo/risco fiscal/inflacionário; “âncora” de percepção estrutural.</li>
+                            <li><b>Shape</b>: <b>STEEPEN</b> (longos ↑ vs curtos) sugere abertura de prêmio de prazo; <b>FLATTEN</b> (curtos ↑ vs longos) sugere aperto no curto e/ou desaceleração à frente.</li>
+                            <li><b>Operacional</b>: curva abrindo e dólar firme tende a piorar para emergentes; curva fechando e dólar mais fraco tende a ajudar. Confirme com <b>Regime</b> e o bloco <b>Por quê</b>.</li>
+                        </ul>
+                    </div>
+                    <div class="table-container" style="width:100%;">
+                        <div id="ratesBuckets"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 28px;">
+                    <div class="context-box">
+                        <h3>🧨 Opções &amp; Gamma (Resumo)</h3>
+                        <p>Resumo dos níveis de <b>Open Interest</b> e <b>regime de gamma</b> para <b>WDO</b> e <b>WIN</b>, reaproveitando o módulo do <b>dashboard_unificado</b> (B3_System). Use como mapa de níveis (não como “sinal de direção”).</p>
+                        <div class="help-grid">
+                            <div class="help-col">
+                                <div class="help-title">Como usar</div>
+                                <ul>
+                                    <li>Comece pelo <b>Regime</b> (gamma +/−) e pelo <b>Range</b> esperado.</li>
+                                    <li>Marque <b>CallWall</b> / <b>PutWall</b> / <b>Gamma Flip</b> como níveis de atenção.</li>
+                                </ul>
+                            </div>
+                            <div class="help-col">
+                                <div class="help-title">Quando falha</div>
+                                <ul>
+                                    <li><b>Sem dados</b>: o arquivo <b>market_data.json</b> do dashboard_unificado não está atualizado.</li>
+                                    <li><b>Serviço offline</b>: o resumo é servido via porta <b>3033</b> (mesmo serviço do botão ↻ Dados).</li>
+                                </ul>
+                            </div>
+                            <div class="help-col">
+                                <div class="help-title">O que fazer</div>
+                                <ul>
+                                    <li>Rode <b>Atualizar_Dados_Mercado.bat</b> para ativar o serviço local.</li>
+                                    <li>Se os dados estiverem antigos, atualize o dashboard_unificado (B3_System) e recarregue.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <div id="optionsGammaSummary"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 18px;">
+                    <div class="context-box">
+                        <h3>🗞️ Notícias (FinancialJuice)</h3>
+                        <p>Atalho para o feed ao vivo do <b>FinancialJuice</b>. Use este bloco para acompanhar <b>narrativa</b> e <b>eventos</b> em tempo real (macro, política, commodities e risco). Quando algo for material, registre o possível impacto na <b>Agenda &amp; Matriz</b> (WDO/WIN). Não use como fonte de preços/níveis.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="newsFinancialJuice"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 28px;">
+                    <div class="context-box">
+                        <h3>🗓️ Agenda &amp; Matriz (SE–ENTÃO)</h3>
+                        <p>Lista de eventos e reação esperada (WDO/WIN), misturando <b>itens manuais</b> e <b>eventos automáticos</b> quando disponíveis.</p>
+                        <div class="help-grid">
+                            <div class="help-col">
+                                <div class="help-title">Como usar</div>
+                                <ul>
+                                    <li>Preencha <b>HH:MM</b>, <b>Evento</b> e <b>Impacto</b> e escreva o seu “SE–ENTÃO” para <b>WDO</b> e <b>WIN</b>.</li>
+                                    <li>Clique <b>Adicionar</b> para registrar. Use <b>Remover</b> para apagar itens manuais.</li>
+                                </ul>
+                            </div>
+                            <div class="help-col">
+                                <div class="help-title">Quando falha</div>
+                                <ul>
+                                    <li><b>Sem eventos automáticos</b>: a captura do calendário pode estar bloqueada/indisponível.</li>
+                                    <li><b>Itens manuais sumiram</b>: limpeza de cache/dados do site pode apagar o storage local.</li>
+                                </ul>
+                            </div>
+                            <div class="help-col">
+                                <div class="help-title">O que fazer</div>
+                                <ul>
+                                    <li>Trate a Agenda manual como plano operacional do dia quando o feed não vier.</li>
+                                    <li>Eventos <b>AUTO •</b> vêm do arquivo <b>economic_calendar</b> e entram filtrados; se não aparecerem, priorize o registro manual.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <div id="agendaMatrix"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 18px;">
+                    <div class="context-box">
+                        <h3>📆 Calendário Econômico (Investing)</h3>
+                        <p>Widget do Investing.com para consulta visual. A captura tenta transformar o calendário em lista no módulo <b>Agenda &amp; Matriz</b>.</p>
+                        <div class="help-grid">
+                            <div class="help-col">
+                                <div class="help-title">Como usar</div>
+                                <ul>
+                                    <li>Use o iframe para checar eventos, horários e impacto.</li>
+                                    <li>Se o evento for relevante, registre sua reação esperada na <b>Agenda &amp; Matriz</b>.</li>
+                                </ul>
+                            </div>
+                            <div class="help-col">
+                                <div class="help-title">Quando falha</div>
+                                <ul>
+                                    <li>O widget pode carregar e a <b>captura</b> ainda assim falhar (bloqueio/timeout/captcha).</li>
+                                </ul>
+                            </div>
+                            <div class="help-col">
+                                <div class="help-title">O que fazer</div>
+                                <ul>
+                                    <li>Se a captura falhar, mantenha a Agenda manual como fonte primária do plano do dia.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-container calendar-widget">
+                        <div class="calendar-widget__inner">
+                            <iframe
+                                class="calendar-widget__iframe"
+                                src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&features=datepicker,timezone,timeselector,filters&countries=110,32,6,37,5,39,35,7,72&calType=day&timeZone=12&lang=12"
+                                frameborder="0"
+                                allowtransparency="true"
+                                marginwidth="0"
+                                marginheight="0"
+                            ></iframe>
+                            <div class="poweredBy calendar-widget__poweredby">
+                                <span>
+                                    Calendário Econômico fornecido por
+                                    <a href="https://br.investing.com/" rel="nofollow" target="_blank" class="underline_link">Investing.com Brasil</a>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:16px;margin-top:28px;">
+                    <div class="context-box" style="width:100%;">
+                        <h3>🧩 Setor Rotation (Heatmap)</h3>
+                        <p>Mapa de calor dos <b>ETFs setoriais</b> (SPDR) do S&amp;P 500: cada bloco mostra a <b>variação do setor</b> e ajuda a enxergar <b>rotação</b> (cíclicos x defensivos / growth x value).</p>
+                        <p style="margin-top:10px;opacity:.92;line-height:1.45;">
+                            <b>O que é cada setor</b>:
+                            <br><b>XLF</b> Financeiro (bancos/seguros) • <b>XLK</b> Tecnologia • <b>XLE</b> Energia • <b>XLV</b> Saúde
+                            <br><b>XLY</b> Consumo discricionário • <b>XLP</b> Consumo básico • <b>XLU</b> Utilities (serviços públicos)
+                            <br><b>XLI</b> Industriais • <b>XLB</b> Materiais • <b>XLC</b> Comunicação • <b>XLRE</b> Imobiliário
+                        </p>
+                        <p style="margin-top:10px;opacity:.92;line-height:1.45;">
+                            <b>Como ler</b>: verde = setor subindo, vermelho = setor caindo. Defensivos (XLU/XLP/XLV) liderando costuma indicar <b>risk-off</b>; cíclicos (XLY/XLI/XLB/XLE/XLF) liderando tende a indicar <b>risk-on</b>. Clique em um setor para abrir a série na tabela de ativos.
+                        </p>
+                    </div>
+                    <div class="table-container" style="width:100%;">
+                        <div id="sectorHeatmap"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="my-assets" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">MEUS ATIVOS</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>⭐ Watchlist</h3>
+                        <p>Marque ativos com a estrela nas tabelas para acompanhar aqui. Clique em um ativo para ver a série.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="favoritesChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="table-container" id="favoritesTable"></div>
+            </section>
+
+            <section id="flow-sentinel" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">SENTINELA DE FLUXO (FX)</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="flow-sentinel__stack">
+                    <div class="context-box">
+                        <h3>🛡️ Sentinela de Fluxo</h3>
+                        <p>Leitura de pré-mercado baseada em <b>blocos FX</b>: um bloco de <b>apetite ao risco</b> (moedas ligadas a commodities) versus um bloco de <b>proteção</b> (safe havens). O objetivo é capturar o viés provável para Brasil na abertura.</p>
+                        <ul style="margin:10px 0 0 18px;opacity:.92;line-height:1.45;">
+                            <li><b>Bloco Risco (FX Commodities)</b>: NZD, AUD, CAD (+ RUB). <b>Se o score estiver positivo</b>: <b>venda de USD</b> / <b>compra de índice</b>. <b>Se estiver negativo</b>: <b>compra de USD</b> / <b>venda de índice</b>.</li>
+                            <li><b>Bloco Proteção (Safe Havens)</b>: JPY, CHF, USD, SEK (+ DXY). <b>Se o score estiver positivo</b>: <b>compra de USD</b> / <b>venda de índice</b>. <b>Se estiver negativo</b>: <b>venda de USD</b> / <b>compra de índice</b>.</li>
+                            <li><b>Petróleo &amp; Geopolítica</b>: quando <b>Brent/WTI</b> estiver <b>subindo forte</b> e <b>USD/CAD</b> + <b>USD/RUB</b> caindo (CAD/RUB fortes), isso reforça o <b>Bloco Risco</b> e tende a <b>venda de USD</b>. Se petróleo cair ou CAD/RUB não confirmarem, o efeito tende a ficar <b>neutro</b>.</li>
+                            <li><b>Execução</b>: primeiro identifique o viés pelo <b>Regime</b> (Apetite ao Risco x Proteção) e só então execute. Use Fibo (111/112/141,4) e a “regra dos 30%” em dias de tendência forte para evitar caça de topo/fundo.</li>
+                        </ul>
+                    </div>
+                    <div class="table-container">
+                        <div class="metrics-grid" style="margin:0;">
+                            <div class="metric-card">
+                                <div class="metric-icon"><span id="fs-beta-pos-dot" class="fs-dot fs-dot--neutral"></span></div>
+                                <div class="metric-value" id="fs-beta-pos-score">—</div>
+                                <div class="metric-label">Bloco Risco (FX)</div>
+                                <div class="metric-change neutral" id="fs-beta-pos-detail">—</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon"><span id="fs-beta-neg-dot" class="fs-dot fs-dot--neutral"></span></div>
+                                <div class="metric-value" id="fs-beta-neg-score">—</div>
+                                <div class="metric-label">Bloco Proteção (FX)</div>
+                                <div class="metric-change neutral" id="fs-beta-neg-detail">—</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon">🛢️</div>
+                                <div class="metric-value" id="fs-oil-score">—</div>
+                                <div class="metric-label">Petróleo (Brent/WTI)</div>
+                                <div class="metric-change neutral" id="fs-oil-detail">—</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon">🧭</div>
+                                <div class="metric-value" id="fs-signal">—</div>
+                                <div class="metric-label">Regime</div>
+                                <div class="metric-change neutral" id="fs-signal-score">—</div>
+                            </div>
+                        </div>
+                        <div id="fs-components" style="margin-top:16px;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="commodities" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">COMMODITIES</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>🌾 Energia &amp; Agricultura</h3>
+                        <p>Acompanhe commodities com recorte por produtividade e sensibilidade a ciclo global. Clique em um ativo para ver a série dos últimos 10 dias.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="commoditiesChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="table-container" id="commoditiesTable"></div>
+            </section>
+
+            <section id="metals" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">METAIS</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>🪙 Metais Preciosos &amp; Industriais</h3>
+                        <p>Útil para leitura de demanda industrial, proteção (gold) e sensibilidade a China/ciclo. Clique em um ativo para ver a série dos últimos 10 dias.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="metalsChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="table-container" id="metalsTable"></div>
+            </section>
+
+            <section id="fx-carry" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">FX / CARRY</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>💱 FX e Proxy de Carry (MVP)</h3>
+                        <p>Separação G10 vs Emergentes para facilitar a leitura de risk-on/off. O motor de carry trade completo entra depois.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="fxChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="table-container" id="fxTable"></div>
+            </section>
+
+            <section id="emerging" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">EMERGENTES</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>🌍 ETFs / Índices Emergentes</h3>
+                        <p>Grupo para identificar rotação regional e sensibilidade a commodities. Clique em um ativo para ver a série dos últimos 10 dias.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="emergingChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="table-container" id="emergingTable"></div>
+            </section>
+
+            <section id="brazil-market" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">MERCADO BRASILEIRO</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>🇧🇷 Brasil (Índices, BRL, Juros, ADR)</h3>
+                        <p>Organiza tudo que se refere ao Brasil: Ibovespa/B3, câmbio BRL, juros (curva), risco país (CDS/spreads), ETFs e empresas brasileiras (inclui ADRs). Clique em um ativo para ver a série.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="brazilChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="table-container" id="brazilTable"></div>
+            </section>
+
+            <section id="alerts" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">ALERTAS</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>🔔 Alertas de Fluxo</h3>
+                        <p>Quando ativado, monitora variações de curto prazo e aponta para onde o dinheiro tende a estar indo por categoria. Funciona apenas com a aba aberta.</p>
+                        <div class="help-grid">
+                            <div class="help-col">
+                                <div class="help-title">Como usar</div>
+                                <ul>
+                                    <li>Ative a chave <b>Ativar alertas</b> e mantenha a aba aberta.</li>
+                                    <li>Ajuste <b>Disparo (|%|)</b> para definir a sensibilidade.</li>
+                                </ul>
+                            </div>
+                            <div class="help-col">
+                                <div class="help-title">Quando falha</div>
+                                <ul>
+                                    <li>Se a aba estiver fechada, o monitoramento para.</li>
+                                    <li>Se a permissão for negada, não há pop-up, mas a lista continua funcionando.</li>
+                                </ul>
+                            </div>
+                            <div class="help-col">
+                                <div class="help-title">O que fazer</div>
+                                <ul>
+                                    <li>Clique <b>Permitir Notificação</b> para habilitar pop-ups do navegador.</li>
+                                    <li>Em dias de alta volatilidade, aumente o disparo para reduzir ruído.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                            <label style="display:flex;gap:10px;align-items:center;">
+                                <input type="checkbox" id="alertsEnabled" />
+                                <span style="font-family:'Orbitron',monospace;letter-spacing:1px;">Ativar alertas</span>
+                            </label>
+                            <label style="display:flex;gap:10px;align-items:center;">
+                                <span style="opacity:.8;">Disparo (|%|)</span>
+                                <input id="alertsThresholdPct" type="number" min="0" step="0.05" value="1.0" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 10px;border-radius:4px;font-weight:700;width:110px;" />
+                            </label>
+                            <button id="alertsRequestPermission" class="btn" style="padding:8px 12px;">Permitir Notificação</button>
+                        </div>
+                        <div id="alertsList" style="margin-top:16px;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="all-assets" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">TODOS OS ATIVOS</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>🗂️ Monitoramento Geral</h3>
+                        <p>Tabela consolidada de todos os ativos monitorados, agrupados por classe. Inclui ícone por ativo e um mini gráfico de linha para leitura rápida de tendência.</p>
+                    </div>
+                    <div class="table-container" id="allAssetsTable"></div>
+                </div>
+            </section>
+
+            <section id="panorama" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">PANORAMA DE MERCADO (MVP)</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div class="context-box" style="width:100%;">
+                        <h3>🧩 Panorama (Visão Refinada)</h3>
+                        <p>Resumo final em formato “mesa”: organiza os principais grupos com <b>Último</b>, <b>Var%</b> e <b>Hora</b> para leitura rápida. Use <b>Congelar</b> para fixar um snapshot e comparar com a próxima atualização.</p>
+                        <div class="help-grid">
+                            <div class="help-col">
+                                <div class="help-title">Como usar</div>
+                                <ul>
+                                    <li>Clique <b>Congelar</b> no card do grupo para salvar um snapshot local.</li>
+                                    <li>Clique novamente para descongelar e voltar ao “agora”.</li>
+                                </ul>
+                            </div>
+                            <div class="help-col">
+                                <div class="help-title">Quando falha</div>
+                                <ul>
+                                    <li>Se não houver dados suficientes, alguns cards podem aparecer vazios.</li>
+                                </ul>
+                            </div>
+                            <div class="help-col">
+                                <div class="help-title">O que fazer</div>
+                                <ul>
+                                    <li>Congele antes de eventos/notícias e compare depois para medir reação.</li>
+                                    <li>Se um grupo estiver vazio, confirme no <b>Data Pack</b> se a cobertura está baixa.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="width:100%;">
+                        <div id="marketPanorama"></div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="split-layout" style="margin-top: 28px;">
+                <div class="context-box">
+                    <h3>🧾 Data Pack (Cobertura)</h3>
+                    <p>Auditoria simples: presença, atualização e itens críticos. Use como checklist para não operar “no escuro”.</p>
+                    <div class="help-grid">
+                        <div class="help-col">
+                            <div class="help-title">Como usar</div>
+                            <ul>
+                                <li>Verifique <b>presença</b> e <b>carimbo</b> antes de confiar nos sinais.</li>
+                                <li>Use como checklist para validar se o dia está “completo” (preços, DI, calendário).</li>
+                            </ul>
+                        </div>
+                        <div class="help-col">
+                            <div class="help-title">Quando falha</div>
+                            <ul>
+                                <li><b>Falha/bloqueio</b>: a captura pode ter sido interrompida (captcha/timeout).</li>
+                                <li><b>Fonte ausente</b>: algum arquivo/endpoint não atualizou e o bloco fica incompleto.</li>
+                            </ul>
+                        </div>
+                        <div class="help-col">
+                            <div class="help-title">O que fazer</div>
+                            <ul>
+                                <li>Trate blocos com falha como “desatualizados” e reduza convicção.</li>
+                                <li>Priorize o que é operacional (DI, USD/BRL, índices e calendário) e complete manualmente quando necessário.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <div id="dataAudit"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="../WDO/assets/js/particles.js"></script>
+    <script src="assets/data/market_quotes.js"></script>
+    <script src="assets/data/economic_calendar.js"></script>
+    <script src="assets/js/charts.js?v=20260311"></script>
+    <script src="assets/js/main.js?v=20260311"></script>
+    <script>
+        (function () {
+            const sel = document.getElementById('assetSelect');
+            if (!sel) return;
+            const prodBase = 'https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/dashboard_unificado/';
+            function isProdHost() {
+                const host = location.hostname || '';
+                return host.indexOf('github.io') !== -1 || host.indexOf('sites.google.com') !== -1;
+            }
+            function targetFor(val) {
+                if (val === 'MERCADO') return location.href;
+                if (isProdHost()) return prodBase + (val === 'WDO' ? 'WDO/' : 'WIN/');
+                return '../../../B3_System/dashboard_unificado/' + (val === 'WDO' ? 'WDO/index.html' : 'WIN/index.html');
+            }
+            sel.addEventListener('change', function (e) {
+                const url = targetFor(e.target.value);
+                try {
+                    window.top.location.href = url;
+                } catch (err) {
+                    location.href = url;
+                }
+            });
+        })();
+    </script>
+</body>
+</html>
