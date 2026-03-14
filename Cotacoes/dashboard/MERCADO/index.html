@@ -136,6 +136,33 @@
             100%{transform:scale(1);filter:brightness(1)}
         }
         .fs-dot--blink{animation:fsDotPulse .9s ease-in-out infinite}
+        .fs-thermo{
+            height:12px;
+            border-radius:999px;
+            border:1px solid rgba(255,255,255,.14);
+            background:rgba(255,255,255,.06);
+            overflow:hidden;
+            position:relative;
+        }
+        .fs-thermo__fill{
+            height:100%;
+            width:0%;
+            background:linear-gradient(90deg, rgba(255,60,80,.95) 0%, rgba(255,210,74,.95) 50%, rgba(0,255,160,.95) 100%);
+            border-radius:999px;
+            transition:width .25s ease;
+        }
+        .fs-thermo__pin{
+            position:absolute;
+            top:50%;
+            width:10px;
+            height:10px;
+            border-radius:999px;
+            transform:translate(-50%,-50%);
+            background:rgba(255,255,255,.92);
+            box-shadow:0 0 14px rgba(255,255,255,.22);
+            left:0%;
+            transition:left .25s ease;
+        }
         #panorama .table-container{
             width:100%;
             max-height:none !important;
@@ -409,6 +436,16 @@
                     </div>
                 </div>
 
+                <div class="split-layout" style="margin-top: 18px;">
+                    <div class="context-box">
+                        <h3>🏦 Carry Trade (estado + evidências)</h3>
+                        <p>Leitura qualitativa do carry (building/unwinding/neutro) cruzando diferencial (proxy BR vs US) com FX (DXY e pares-chave). Sem números: apenas estado e evidências.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="carryIntel"></div>
+                    </div>
+                </div>
+
                 <div style="display:flex;flex-direction:column;gap:16px;margin-top:28px;">
                     <div class="context-box" style="width:100%;">
                         <h3>📉 Curva (Proxy) por Buckets</h3>
@@ -467,6 +504,16 @@
                     </div>
                     <div class="table-container">
                         <div id="newsFinancialJuice"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 18px;">
+                    <div class="context-box">
+                        <h3>🕸️ Web News Module (Precificação)</h3>
+                        <p>Fallback de notícias quando você está sem bloco de manchetes anexadas. Saída é <b>qualitativa</b> (sem números): o que tende a estar sendo <b>precificado</b> em <b>WDO</b> e <b>WIN</b>, com <b>fontes</b> e <b>carimbo</b> quando disponível.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="newsWebModule"></div>
                     </div>
                 </div>
 
@@ -631,8 +678,16 @@
                                 <div class="metric-label">Regime</div>
                                 <div class="metric-change neutral" id="fs-signal-score">—</div>
                             </div>
+                            <div class="metric-card">
+                                <div class="metric-icon">🌡️</div>
+                                <div class="metric-value" id="fs-thermo-score">—</div>
+                                <div class="metric-label">Termômetro Pré‑Mercado</div>
+                                <div class="metric-change neutral" id="fs-thermo-detail">—</div>
+                            </div>
                         </div>
                         <div id="fs-components" style="margin-top:16px;"></div>
+                        <div id="fs-history" style="margin-top:12px;"></div>
+                        <div id="fs-alerts" style="margin-top:12px;"></div>
                     </div>
                 </div>
             </section>
@@ -684,11 +739,49 @@
                 <div class="split-layout">
                     <div class="context-box">
                         <h3>💱 FX e Proxy de Carry (MVP)</h3>
-                        <p>Separação G10 vs Emergentes para facilitar a leitura de risk-on/off. O motor de carry trade completo entra depois.</p>
+                        <p>Separação G10 vs Emergentes e um monitor simples de carry trade: diferencial de juros (proxy BR vs US) + FX (DXY e pares chave) para inferir “carrego entrando/saindo”.</p>
                     </div>
                     <div class="chart-container">
                         <canvas id="fxChart"></canvas>
                     </div>
+                </div>
+
+                <div class="table-container" style="margin-top:16px;">
+                    <div class="metrics-grid" style="margin:0;">
+                        <div class="metric-card">
+                            <div class="metric-icon">🏦</div>
+                            <div class="metric-value" id="carry-premium-level">—</div>
+                            <div class="metric-label">Prêmio BR vs US (bps)</div>
+                            <div class="metric-change neutral" id="carry-premium-detail">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon">💹</div>
+                            <div class="metric-value" id="carry-audjpy-level">—</div>
+                            <div class="metric-label">AUD/JPY (sintético)</div>
+                            <div class="metric-change neutral" id="carry-audjpy-detail">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon">💴</div>
+                            <div class="metric-value" id="carry-usdjpy-level">—</div>
+                            <div class="metric-label">USD/JPY</div>
+                            <div class="metric-change neutral" id="carry-usdjpy-detail">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon">🧭</div>
+                            <div class="metric-value" id="carry-state">—</div>
+                            <div class="metric-label">Carry (status)</div>
+                            <div class="metric-change neutral" id="carry-state-detail">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon">🎯</div>
+                            <div class="metric-value" id="carry-score">—</div>
+                            <div class="metric-label">Carrego entrando/saindo</div>
+                            <div class="metric-change neutral" id="carry-score-detail">—</div>
+                        </div>
+                    </div>
+                    <div id="carry-components" style="margin-top:16px;"></div>
+                    <div id="carry-history" style="margin-top:12px;"></div>
+                    <div id="carry-alerts" style="margin-top:12px;"></div>
                 </div>
 
                 <div class="table-container" id="fxTable"></div>
@@ -726,6 +819,16 @@
                     </div>
                     <div class="chart-container">
                         <canvas id="brazilChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 28px;">
+                    <div class="context-box">
+                        <h3>📦 Export Basket (Qualitativo)</h3>
+                        <p>Leitura rápida do “cesto exportador” e checklist de cobertura das commodities-chave (sem números explícitos).</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="exportBasket"></div>
                     </div>
                 </div>
 

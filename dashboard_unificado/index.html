@@ -2,6 +2,9 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Dashboard Unificado WDO/WIN</title>
   <style>
     body{margin:0;background:#0b0b0b;height:100vh}
@@ -9,6 +12,15 @@
   </style>
 </head>
 <body>
-  <iframe src="WDO/index.html?v=20260313"></iframe>
+  <iframe id="dash"></iframe>
+  <script>
+    (function(){
+      const iframe = document.getElementById('dash');
+      if (!iframe) return;
+      const isFile = location.protocol === 'file:';
+      const suffix = isFile ? '' : `?v=${String(Date.now())}`;
+      iframe.src = `WDO/index.html${suffix}`;
+    })();
+  </script>
 </body>
 </html>

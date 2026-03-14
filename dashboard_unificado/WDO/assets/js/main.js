@@ -383,14 +383,16 @@ Pressione ESC ou clique fora para fechar.`;
     }
 }
 
-// Initialize app when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
+const __ediBootApp = () => {
     window.ediApp = new EDIApp();
-    
-    // Add welcome message
     setTimeout(() => {
         if (window.ediApp) {
             window.ediApp.showNotification('Bem-vindo ao EDI Market Guardin V1! Pressione H para ajuda. 🚀');
         }
     }, 2000);
-});
+};
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', __ediBootApp);
+} else {
+    __ediBootApp();
+}

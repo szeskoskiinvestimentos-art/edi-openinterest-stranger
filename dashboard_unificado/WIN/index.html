@@ -11,8 +11,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" onerror="this.onerror=function(){this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'};this.src='https://unpkg.com/chart.js/dist/chart.umd.min.js'"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js" onerror="this.onerror=function(){this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'};this.src='https://unpkg.com/chart.js/dist/chart.umd.min.js'"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
     <div id="particles-js"></div>
@@ -576,28 +576,42 @@
     </footer>
 
     <!-- Scripts -->
-    <!-- Carrega dados globais (importante para evitar CORS) -->
-    <script src="assets/data/market_data.js"></script>
-    
     <!-- Sistema de Partículas Customizado (Stranger Things Theme) -->
     <script src="assets/js/particles.js"></script>
     
     <!-- Gráficos e Lógica Principal -->
     <script>
         (function(){
-            const version = '20260313';
+            const isFile = location.protocol === 'file:';
+            const version = String(Date.now());
+            const suffix = isFile ? '' : `?v=${version}`;
             const href = location.href || '';
             const inUnified = href.indexOf('dashboard_unificado') !== -1;
             const primary = inUnified
-                ? `../shared/js/chart_data_utils.js?v=${version}`
-                : `../dashboard_unificado/shared/js/chart_data_utils.js?v=${version}`;
-            const fallback = `https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/dashboard_unificado/shared/js/chart_data_utils.js?v=${version}`;
-            const tag = `<script src="${primary}" onerror="this.onerror=null;this.src='${fallback}'"><\\/script>`;
-            document.write(tag);
+                ? `../shared/js/chart_data_utils.js${suffix}`
+                : `../dashboard_unificado/shared/js/chart_data_utils.js${suffix}`;
+            const fallback = `https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/dashboard_unificado/shared/js/chart_data_utils.js${suffix}`;
+
+            window.__ediAssetVersion = version;
+
+            const addScript = (src, onerror) => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.async = false;
+                if (onerror) s.onerror = onerror;
+                document.body.appendChild(s);
+                return s;
+            };
+
+            addScript(`assets/data/market_data.js${suffix}`);
+            addScript(primary, function(){
+                this.onerror = null;
+                this.src = fallback;
+            });
+            addScript(`assets/js/charts.js${suffix}`);
+            addScript(`assets/js/main.js${suffix}`);
         })();
     </script>
-    <script src="assets/js/charts.js?v=20260313"></script>
-    <script src="assets/js/main.js?v=20260313"></script>
     <script>
         (function(){
             const sel = document.getElementById('assetSelect');

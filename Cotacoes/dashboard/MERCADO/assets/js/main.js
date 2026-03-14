@@ -750,6 +750,76 @@ function renderRegimeConviction(data) {
     const el = document.getElementById('regimeConviction');
     if (!el) return;
 
+    const downgradeConvictionLabel = (label, steps) => {
+        const s = Math.max(0, Math.floor(Number(steps) || 0));
+        let out = String(label || '');
+        for (let i = 0; i < s; i++) {
+            if (out === 'ALTA') out = 'MÉDIA';
+            else if (out === 'MÉDIA') out = 'BAIXA';
+            else out = 'BAIXA';
+        }
+        return out;
+    };
+
+    const buildReturnSeries = (symbol, maxPoints) => {
+        if (!symbol) return [];
+        const pts = (data && data.series && data.series[symbol]) ? data.series[symbol] : [];
+        const priced = Array.isArray(pts)
+            ? pts
+                .map(p => {
+                    const tMs = p && p.t ? Date.parse(p.t) : NaN;
+                    const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                    return Number.isFinite(tMs) && typeof price === 'number' ? { tMs, price } : null;
+                })
+                .filter(Boolean)
+            : [];
+        if (priced.length < 3) return [];
+        const n = Math.max(6, Math.floor(Number(maxPoints) || 72));
+        const slice = priced.slice(Math.max(0, priced.length - n));
+        const out = [];
+        for (let i = 1; i < slice.length; i++) {
+            const prev = slice[i - 1];
+            const cur = slice[i];
+            if (!prev || !cur) continue;
+            if (!(prev.price > 0) || !(cur.price > 0)) continue;
+            const r = Math.log(cur.price / prev.price);
+            if (!Number.isFinite(r)) continue;
+            out.push({ tMs: cur.tMs, r });
+        }
+        return out;
+    };
+
+    const correlationAligned = (a, b) => {
+        const mapB = new Map(b.map(x => [x.tMs, x.r]));
+        const xs = [];
+        const ys = [];
+        for (const x of a) {
+            if (!x || !Number.isFinite(x.tMs) || !Number.isFinite(x.r)) continue;
+            const y = mapB.get(x.tMs);
+            if (typeof y !== 'number' || !Number.isFinite(y)) continue;
+            xs.push(x.r);
+            ys.push(y);
+        }
+        const n = xs.length;
+        if (n < 12) return { corr: null, n };
+        const mx = xs.reduce((s, v) => s + v, 0) / n;
+        const my = ys.reduce((s, v) => s + v, 0) / n;
+        let cov = 0;
+        let vx = 0;
+        let vy = 0;
+        for (let i = 0; i < n; i++) {
+            const dx = xs[i] - mx;
+            const dy = ys[i] - my;
+            cov += dx * dy;
+            vx += dx * dx;
+            vy += dy * dy;
+        }
+        const denom = Math.sqrt(vx * vy);
+        if (!(denom > 0) || !Number.isFinite(denom)) return { corr: null, n };
+        const c = cov / denom;
+        return { corr: Number.isFinite(c) ? Math.max(-1, Math.min(1, c)) : null, n };
+    };
+
     const sentinelSymbols = {
         audusd: findAssetSymbol(data, /^AUD\/USD\b/i),
         nzdusd: findAssetSymbol(data, /^NZD\/USD\b/i),
@@ -762,6 +832,10 @@ function renderRegimeConviction(data) {
         brent: findAssetSymbol(data, /\bBrent\b/i),
         wti: findAssetSymbol(data, /\bWTI\b/i),
         usdbbrl: findAssetSymbol(data, /^USD\/BRL\b/i),
+        usdmxn: findAssetSymbol(data, /^USD\/MXN\b/i),
+        usdzar: findAssetSymbol(data, /^USD\/ZAR\b/i),
+        usdclp: findAssetSymbol(data, /^USD\/CLP\b/i),
+        usdtry: findAssetSymbol(data, /^USD\/TRY\b/i),
     };
 
     const betaPosItems = [
@@ -787,6 +861,49 @@ function renderRegimeConviction(data) {
     const wti = getChangePct(data, sentinelSymbols.wti);
     const brent = getChangePct(data, sentinelSymbols.brent);
     const oilScore = [wti, brent].filter(v => typeof v === 'number' && Number.isFinite(v)).length ? Math.max(wti || -Infinity, brent || -Infinity) : null;
+
+    const neutralThreshold = 0.12;
+    const usdmxnPct = getChangePct(data, sentinelSymbols.usdmxn);
+    const usdzarPct = getChangePct(data, sentinelSymbols.usdzar);
+    const emCoreState =
+        typeof usdmxnPct === 'number' && typeof usdzarPct === 'number'
+            ? usdmxnPct > neutralThreshold && usdzarPct > neutralThreshold
+                ? 'Stress EM (USD/EM ↑)'
+                : usdmxnPct < -neutralThreshold && usdzarPct < -neutralThreshold
+                    ? 'Bid EM (USD/EM ↓)'
+                    : 'EM misto'
+            : 'EM N/A';
+
+    const usdclpPct = getChangePct(data, sentinelSymbols.usdclp);
+    const usdtryPct = getChangePct(data, sentinelSymbols.usdtry);
+
+    const emBasketComponents = [
+        { label: 'USD/MXN', v: usdmxnPct, w: 0.35 },
+        { label: 'USD/ZAR', v: usdzarPct, w: 0.35 },
+        { label: 'USD/CLP', v: usdclpPct, w: 0.15 },
+        { label: 'USD/TRY', v: usdtryPct, w: 0.15 },
+    ].filter(x => typeof x.v === 'number' && Number.isFinite(x.v) && typeof x.w === 'number' && x.w > 0);
+
+    const emBasketPct = emBasketComponents.length >= 2
+        ? (() => {
+            const wSum = emBasketComponents.reduce((s, x) => s + x.w, 0);
+            if (!(wSum > 0)) return null;
+            const v = emBasketComponents.reduce((s, x) => s + (x.v * x.w), 0) / wSum;
+            return Number.isFinite(v) ? v : null;
+        })()
+        : null;
+
+    const emBasketState =
+        typeof emBasketPct === 'number'
+            ? emBasketPct > neutralThreshold
+                ? 'Stress EM (Basket USD/EM ↑)'
+                : emBasketPct < -neutralThreshold
+                    ? 'Bid EM (Basket USD/EM ↓)'
+                    : 'EM misto'
+            : 'EM N/A';
+
+    const emGateState = emBasketState !== 'EM N/A' ? emBasketState : emCoreState;
+    const emGateLabel = emBasketState !== 'EM N/A' ? 'Basket' : 'MXN+ZAR';
 
     const flow = computeFlowScore(data);
     const regimeScore = Number(flow.score.toFixed(3));
@@ -837,9 +954,43 @@ function renderRegimeConviction(data) {
     }
     if (divergences.length) convictionScore *= 0.92;
 
+    if ((emGateState === 'Stress EM (Basket USD/EM ↑)' || emGateState === 'Stress EM (USD/EM ↑)') && regimeLabel === 'Risk-On') {
+        convictionScore *= 0.94;
+        divergences.push(`Emergentes (${emGateLabel}) sugerem stress enquanto o regime aponta risk-on`);
+    }
+    if ((emGateState === 'Bid EM (Basket USD/EM ↓)' || emGateState === 'Bid EM (USD/EM ↓)') && regimeLabel === 'Risk-Off') {
+        convictionScore *= 0.94;
+        divergences.push(`Emergentes (${emGateLabel}) sugerem bid enquanto o regime aponta risk-off`);
+    }
+
+    const hasFxi = !!findAssetSymbol(data, /^FXI$/i);
+    const hasCsi = !!findAssetSymbol(data, /^\.(CSI300)\b/i);
+    const hasChinaCore = hasFxi || hasCsi;
+    const hasIron = !!findAssetSymbol(data, /^TIOc1$|^SM58Fc1$/i);
+    const hasSoy = !!findAssetSymbol(data, /^ZS$/i);
+
+    let downgrade = 0;
+    if (!hasChinaCore) {
+        convictionScore *= 0.85;
+        downgrade += 1;
+        divergences.push('China proxies críticos ausentes (FXI/CSI300) → convicção reduzida');
+    } else if (!(hasFxi && hasCsi)) {
+        convictionScore *= 0.94;
+        divergences.push('China proxies parciais (FXI/CSI300) → leitura menos confiável');
+    }
+    if (!hasIron) {
+        convictionScore *= 0.92;
+        divergences.push('Commodities BR incompletas: Minério ausente → convicção reduzida');
+        downgrade += 1;
+    } else if (!hasSoy) {
+        convictionScore *= 0.96;
+        divergences.push('Commodities BR parciais: Soja ausente');
+    }
+
     convictionScore = Math.max(0, Math.min(1, convictionScore));
-    const convictionLabel = convictionScore >= 0.75 ? 'ALTA' : convictionScore >= 0.55 ? 'MÉDIA' : 'BAIXA';
-    const convictionTone = convictionScore >= 0.75 ? 'positive' : convictionScore >= 0.55 ? 'neutral' : 'negative';
+    const baseLabel = convictionScore >= 0.75 ? 'ALTA' : convictionScore >= 0.55 ? 'MÉDIA' : 'BAIXA';
+    const convictionLabel = downgrade ? downgradeConvictionLabel(baseLabel, downgrade) : baseLabel;
+    const convictionTone = convictionLabel === 'ALTA' ? 'positive' : convictionLabel === 'MÉDIA' ? 'neutral' : 'negative';
 
     const drivers = [];
     drivers.push({ k: 'Risco (tags)', v: regimeScore, fmt: x => formatNumber(x, 2), tone: regimeScore > 0.35 ? 'positive' : regimeScore < -0.35 ? 'negative' : 'neutral' });
@@ -853,6 +1004,70 @@ function renderRegimeConviction(data) {
         const brl = getChangePct(data, sentinelSymbols.usdbbrl);
         drivers.push({ k: 'USD/BRL', v: brl, fmt: x => formatPercent(x, 2), tone: brl === null ? 'neutral' : brl > 0 ? 'positive' : brl < 0 ? 'negative' : 'neutral' });
     }
+    if (typeof emBasketPct === 'number') {
+        drivers.push({ k: 'EM Basket (USD/EM)', v: emBasketPct, fmt: x => formatPercent(x, 2), tone: emBasketPct > 0 ? 'positive' : emBasketPct < 0 ? 'negative' : 'neutral' });
+    }
+    if (sentinelSymbols.usdmxn) {
+        drivers.push({ k: 'USD/MXN', v: usdmxnPct, fmt: x => formatPercent(x, 2), tone: usdmxnPct === null ? 'neutral' : usdmxnPct > 0 ? 'positive' : usdmxnPct < 0 ? 'negative' : 'neutral' });
+    }
+    if (sentinelSymbols.usdzar) {
+        drivers.push({ k: 'USD/ZAR', v: usdzarPct, fmt: x => formatPercent(x, 2), tone: usdzarPct === null ? 'neutral' : usdzarPct > 0 ? 'positive' : usdzarPct < 0 ? 'negative' : 'neutral' });
+    }
+    if (sentinelSymbols.usdclp) {
+        drivers.push({ k: 'USD/CLP', v: usdclpPct, fmt: x => formatPercent(x, 2), tone: usdclpPct === null ? 'neutral' : usdclpPct > 0 ? 'positive' : usdclpPct < 0 ? 'negative' : 'neutral' });
+    }
+    if (sentinelSymbols.usdtry) {
+        drivers.push({ k: 'USD/TRY', v: usdtryPct, fmt: x => formatPercent(x, 2), tone: usdtryPct === null ? 'neutral' : usdtryPct > 0 ? 'positive' : usdtryPct < 0 ? 'negative' : 'neutral' });
+    }
+
+    const corrBrlMxn = sentinelSymbols.usdbbrl && sentinelSymbols.usdmxn
+        ? correlationAligned(buildReturnSeries(sentinelSymbols.usdbbrl, 96), buildReturnSeries(sentinelSymbols.usdmxn, 96))
+        : { corr: null, n: 0 };
+    const corrBrlZar = sentinelSymbols.usdbbrl && sentinelSymbols.usdzar
+        ? correlationAligned(buildReturnSeries(sentinelSymbols.usdbbrl, 96), buildReturnSeries(sentinelSymbols.usdzar, 96))
+        : { corr: null, n: 0 };
+    const corrBrlEmBasket = (() => {
+        if (!sentinelSymbols.usdbbrl) return { corr: null, n: 0 };
+        const basketSymbols = [
+            { symbol: sentinelSymbols.usdmxn, w: 0.35 },
+            { symbol: sentinelSymbols.usdzar, w: 0.35 },
+            { symbol: sentinelSymbols.usdclp, w: 0.15 },
+            { symbol: sentinelSymbols.usdtry, w: 0.15 },
+        ].filter(x => !!x.symbol && typeof x.w === 'number' && x.w > 0);
+        if (basketSymbols.length < 2) return { corr: null, n: 0 };
+
+        const seriesByT = basketSymbols.map(x => ({
+            w: x.w,
+            map: new Map(buildReturnSeries(x.symbol, 96).map(p => [p.tMs, p.r])),
+        }));
+        const wSum = seriesByT.reduce((s, x) => s + x.w, 0);
+        if (!(wSum > 0)) return { corr: null, n: 0 };
+
+        const ref = buildReturnSeries(sentinelSymbols.usdbbrl, 96);
+        const basket = [];
+        for (const p of ref) {
+            if (!p || !Number.isFinite(p.tMs)) continue;
+            let sum = 0;
+            let w = 0;
+            let n = 0;
+            for (const s of seriesByT) {
+                const r = s.map.get(p.tMs);
+                if (typeof r !== 'number' || !Number.isFinite(r)) continue;
+                sum += r * s.w;
+                w += s.w;
+                n += 1;
+            }
+            if (n < 2 || !(w > 0)) continue;
+            const v = sum / w;
+            if (!Number.isFinite(v)) continue;
+            basket.push({ tMs: p.tMs, r: v });
+        }
+        return correlationAligned(ref, basket);
+    })();
+    const corrTone = c => (typeof c === 'number' && Number.isFinite(c) ? (c > 0.4 ? 'positive' : c < -0.4 ? 'negative' : 'neutral') : 'neutral');
+    const corrBadge = (c, n) => (typeof c === 'number' && Number.isFinite(c))
+        ? toneBadgeHtmlFromTone(corrTone(c), c, `${formatNumber(c, 2)} (n=${n})`, { maxAbs: 1 })
+        : toneBadgeHtmlFromTone('neutral', 0, '—', { maxAbs: 1 });
 
     const listHtml = `
         <div style="margin-top:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
@@ -875,6 +1090,28 @@ function renderRegimeConviction(data) {
                     ${divergences.map(t => `<div style="opacity:.9;line-height:1.35;">• ${escapeHtml(t)}</div>`).join('')}
                 </div>`
                 : ''}
+        </div>
+        <div style="margin-top:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Emergentes (Fluxo)</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(emGateState)}</div>
+            </div>
+            <div style="margin-top:6px;opacity:.80;font-size:12px;line-height:1.35;">Core: ${escapeHtml(emCoreState)} • Basket: ${escapeHtml(emBasketState)}${typeof emBasketPct === 'number' ? ` (${escapeHtml(formatPercent(emBasketPct, 2))})` : ''}</div>
+            <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;">
+                <div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">
+                    <div style="opacity:.9;font-weight:800;">Corr USD/BRL × EM Basket</div>
+                    <div style="font-family:'Share Tech Mono',monospace;">${corrBadge(corrBrlEmBasket.corr, corrBrlEmBasket.n)}</div>
+                </div>
+                <div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">
+                    <div style="opacity:.9;font-weight:800;">Corr USD/BRL × USD/MXN</div>
+                    <div style="font-family:'Share Tech Mono',monospace;">${corrBadge(corrBrlMxn.corr, corrBrlMxn.n)}</div>
+                </div>
+                <div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">
+                    <div style="opacity:.9;font-weight:800;">Corr USD/BRL × USD/ZAR</div>
+                    <div style="font-family:'Share Tech Mono',monospace;">${corrBadge(corrBrlZar.corr, corrBrlZar.n)}</div>
+                </div>
+            </div>
+            <div style="margin-top:10px;opacity:.82;font-size:12px;">Correlação calculada em retornos log (últimos pontos com timestamp coincidente). Basket pondera MXN/ZAR (núcleo) + CLP/TRY (redução de ruído).</div>
         </div>
     `;
 
@@ -919,6 +1156,9 @@ function renderChinaBrazil(data) {
         fxi: findAssetSymbol(data, /^FXI$/i),
         csi: findAssetSymbol(data, /^\.(CSI300)\b/i),
         hsi: findAssetSymbol(data, /\bHSI\b|Hang Seng|^\.HSI/i),
+        mchi: findAssetSymbol(data, /^MCHI$/i),
+        ashr: findAssetSymbol(data, /^ASHR$/i),
+        kweb: findAssetSymbol(data, /^KWEB$/i),
         iron: findAssetSymbol(data, /^TIOc1$|^SM58Fc1$/i),
         soy: findAssetSymbol(data, /^ZS$/i),
         corn: findAssetSymbol(data, /^ZC$/i),
@@ -939,7 +1179,9 @@ function renderChinaBrazil(data) {
         return { label, symbol, pct, cls, name: name || '' };
     };
 
-    const china = [pick('FXI', sym.fxi), pick('CSI300', sym.csi), pick('HSI', sym.hsi)];
+    const chinaCore = [pick('FXI', sym.fxi), pick('CSI300', sym.csi), pick('HSI', sym.hsi)];
+    const chinaExtra = [pick('MCHI', sym.mchi), pick('ASHR', sym.ashr), pick('KWEB', sym.kweb)].filter(x => x.symbol);
+    const china = chinaExtra.length ? [...chinaCore, ...chinaExtra] : chinaCore;
     const comm = [
         pick('Minério (TIO/SM58F)', sym.iron),
         pick('Soja (ZS)', sym.soy),
@@ -951,26 +1193,170 @@ function renderChinaBrazil(data) {
     ];
     const br = [pick('USD/BRL', sym.usdbbrl), pick('EWZ', sym.ewz), pick('BOVA11', sym.bova11), pick('IBOV', sym.ibov)];
 
-    const w = [
-        { key: 'iron', symbol: sym.iron, w: 0.4 },
-        { key: 'soy', symbol: sym.soy, w: 0.25 },
-        { key: 'oil', symbol: sym.brent || sym.wti, w: 0.35 },
-    ];
-    const parts = w
-        .map(x => ({ ...x, pct: getChangePct(data, x.symbol) }))
-        .filter(x => typeof x.pct === 'number' && Number.isFinite(x.pct));
-    const wSum = parts.reduce((a, b) => a + b.w, 0);
-    const score = wSum ? parts.reduce((a, b) => a + b.w * b.pct, 0) / wSum : 0;
-    const scoreLbl = score > 0.35 ? 'Suporte (Produtor)' : score < -0.35 ? 'Pressão (Produtor)' : 'Neutro';
-    const scoreCls = score > 0.35 ? 'positive' : score < -0.35 ? 'negative' : 'neutral';
+    const avg = xs => {
+        const list = (xs || []).filter(v => typeof v === 'number' && Number.isFinite(v));
+        if (!list.length) return null;
+        return list.reduce((a, b) => a + b, 0) / list.length;
+    };
+
+    const wAvg = (items) => {
+        const parts = (items || [])
+            .map(x => ({ ...x, pct: getChangePct(data, x.symbol) }))
+            .filter(x => typeof x.pct === 'number' && Number.isFinite(x.pct));
+        const wSum = parts.reduce((a, b) => a + b.w, 0);
+        return wSum ? parts.reduce((a, b) => a + b.w * b.pct, 0) / wSum : null;
+    };
+
+    const oilPct = getChangePct(data, sym.brent) ?? getChangePct(data, sym.wti);
+    const chinaAvg = avg([getChangePct(data, sym.fxi), getChangePct(data, sym.csi), getChangePct(data, sym.hsi)]);
+    const usdbbrl = getChangePct(data, sym.usdbbrl);
+
+    const brlImpulse = wAvg([
+        { symbol: sym.iron, w: 0.28 },
+        { symbol: sym.soy, w: 0.20 },
+        { symbol: sym.corn, w: 0.09 },
+        { symbol: sym.coffee, w: 0.05 },
+        { symbol: sym.sugar, w: 0.05 },
+        { symbol: sym.brent || sym.wti, w: 0.33 },
+    ]);
+
+    const ibovImpulse = wAvg([
+        { symbol: sym.iron, w: 0.45 },
+        { symbol: sym.brent || sym.wti, w: 0.55 },
+    ]);
+
+    const brlPressure = (typeof oilPct === 'number' && oilPct > 0 ? 0.65 * oilPct : 0)
+        + (typeof chinaAvg === 'number' && chinaAvg < 0 ? 0.55 * (-chinaAvg) : 0)
+        + (typeof usdbbrl === 'number' && usdbbrl > 0 ? 0.35 * usdbbrl : 0);
+
+    const ibovPressure = (typeof oilPct === 'number' && oilPct > 0 ? 0.75 * oilPct : 0)
+        + (typeof chinaAvg === 'number' && chinaAvg < 0 ? 0.60 * (-chinaAvg) : 0);
+
+    const netBrl = (typeof brlImpulse === 'number' ? brlImpulse : 0) - brlPressure;
+    const netIbov = (typeof ibovImpulse === 'number' ? ibovImpulse : 0) - ibovPressure;
+
+    const classifyNet = (v) => {
+        if (typeof v !== 'number' || !Number.isFinite(v)) return { tone: 'neutral', txt: 'Inconclusivo' };
+        if (v >= 0.35) return { tone: 'positive', txt: 'Impulso > Pressão' };
+        if (v <= -0.35) return { tone: 'negative', txt: 'Pressão > Impulso' };
+        return { tone: 'neutral', txt: 'Misto / Neutro' };
+    };
+
+    const classifyImpulse = (v) => {
+        if (typeof v !== 'number' || !Number.isFinite(v)) return { tone: 'neutral', txt: 'Inconclusivo' };
+        if (v >= 0.6) return { tone: 'positive', txt: 'Impulso forte' };
+        if (v >= 0.25) return { tone: 'positive', txt: 'Impulso' };
+        if (v <= -0.6) return { tone: 'negative', txt: 'Pressão forte' };
+        if (v <= -0.25) return { tone: 'negative', txt: 'Pressão' };
+        return { tone: 'neutral', txt: 'Neutro' };
+    };
+
+    const classifyPressure = (v) => {
+        if (typeof v !== 'number' || !Number.isFinite(v)) return { tone: 'neutral', txt: 'Inconclusivo' };
+        if (v >= 0.8) return { tone: 'negative', txt: 'Pressão forte' };
+        if (v >= 0.35) return { tone: 'negative', txt: 'Pressão' };
+        return { tone: 'neutral', txt: 'Baixa' };
+    };
+
+    const mk = (tone, txt) => toneBadgeHtmlFromTone(tone, 0, txt, { maxAbs: 1 });
+
+    const classifyChinaScenario = ({ avgPct, pos, neg, cov }) => {
+        if (cov < 2 || typeof avgPct !== 'number' || !Number.isFinite(avgPct)) {
+            return { tone: 'neutral', label: 'Inconclusivo', hint: 'Poucos proxies com variação disponível.' };
+        }
+        if (avgPct >= 0.35 && pos >= 2 && neg <= 1) {
+            return { tone: 'positive', label: 'China Forte', hint: 'Equities/proxies em alta de forma consistente.' };
+        }
+        if (avgPct <= -0.35 && neg >= 2 && pos <= 1) {
+            return { tone: 'negative', label: 'China Fraca', hint: 'Equities/proxies em queda de forma consistente.' };
+        }
+        return { tone: 'neutral', label: 'China Mista', hint: 'Sinais divergentes entre proxies.' };
+    };
+
+    const chinaPcts = [getChangePct(data, sym.fxi), getChangePct(data, sym.csi), getChangePct(data, sym.hsi), getChangePct(data, sym.mchi), getChangePct(data, sym.ashr), getChangePct(data, sym.kweb)]
+        .filter(v => typeof v === 'number' && Number.isFinite(v));
+    const chinaPos = chinaPcts.filter(v => v > 0.15).length;
+    const chinaNeg = chinaPcts.filter(v => v < -0.15).length;
+    const chinaCov = chinaPcts.length;
+    const chinaScenario = classifyChinaScenario({ avgPct: chinaAvg, pos: chinaPos, neg: chinaNeg, cov: chinaCov });
+
+    const coverageChecks = (() => {
+        const hasFxi = !!sym.fxi;
+        const hasCsi = !!sym.csi;
+        const hasHsi = !!sym.hsi;
+        const hasChinaCore = hasFxi || hasCsi;
+        const hasIron = !!sym.iron;
+        const hasSoy = !!sym.soy;
+        const hasOil = !!(sym.brent || sym.wti);
+        const missing = [];
+        if (!hasChinaCore) missing.push('FXI/CSI300');
+        if (!hasIron) missing.push('Minério');
+
+        const status = missing.length === 0 ? { tone: 'positive', label: 'OK' } : missing.length === 1 ? { tone: 'neutral', label: 'Parcial' } : { tone: 'negative', label: 'Crítico' };
+        const conviction = missing.length === 0 ? { tone: 'positive', label: 'Sem redução' } : { tone: 'negative', label: 'Convicção reduzida' };
+        const why = missing.length ? `Faltando: ${missing.join(', ')}` : 'Cobertura adequada para o módulo China↔Brasil.';
+
+        return {
+            status,
+            conviction,
+            why,
+            lines: [
+                { label: 'FXI ou CSI300 (≥1)', ok: hasChinaCore },
+                { label: 'HSI (fallback)', ok: hasHsi },
+                { label: 'Minério (TIO/SM58F)', ok: hasIron },
+                { label: 'Soja (ZS)', ok: hasSoy },
+                { label: 'Petróleo (Brent/WTI)', ok: hasOil },
+            ],
+        };
+    })();
+
+    const chinaImpact = (() => {
+        if (chinaScenario.label === 'China Forte') {
+            return {
+                brl: { tone: 'positive', txt: 'Tende a favorecer BRL' },
+                ibov: { tone: 'positive', txt: 'Tende a favorecer IBOV (cíclicos)' },
+                com: { tone: 'positive', txt: 'Apoio a minério/soja' },
+            };
+        }
+        if (chinaScenario.label === 'China Fraca') {
+            return {
+                brl: { tone: 'negative', txt: 'Tende a pressionar BRL' },
+                ibov: { tone: 'negative', txt: 'Tende a pressionar IBOV (Vale)' },
+                com: { tone: 'negative', txt: 'Pressão em minério/soja' },
+            };
+        }
+        if (chinaScenario.label === 'China Mista') {
+            return {
+                brl: { tone: 'neutral', txt: 'BRL depende mais do risco local' },
+                ibov: { tone: 'neutral', txt: 'Setorial/seleção' },
+                com: { tone: 'neutral', txt: 'Commodities podem divergir' },
+            };
+        }
+        return {
+            brl: { tone: 'neutral', txt: 'Inconclusivo' },
+            ibov: { tone: 'neutral', txt: 'Inconclusivo' },
+            com: { tone: 'neutral', txt: 'Inconclusivo' },
+        };
+    })();
+
+    const brlNet = classifyNet(netBrl);
+    const ibovNet = classifyNet(netIbov);
+    const brlImp = classifyImpulse(brlImpulse);
+    const ibovImp = classifyImpulse(ibovImpulse);
+    const brlPres = classifyPressure(brlPressure);
+    const ibovPres = classifyPressure(ibovPressure);
+
+    const oilExport = classifyImpulse(oilPct);
+    const oilInfl = typeof oilPct === 'number' && Number.isFinite(oilPct)
+        ? (oilPct >= 0.6 ? { tone: 'negative', txt: 'Pressão forte' } : oilPct >= 0.25 ? { tone: 'negative', txt: 'Pressão' } : oilPct <= -0.6 ? { tone: 'positive', txt: 'Alívio forte' } : oilPct <= -0.25 ? { tone: 'positive', txt: 'Alívio' } : { tone: 'neutral', txt: 'Neutro' })
+        : { tone: 'neutral', txt: 'Inconclusivo' };
 
     const divergences = [];
     const fxi = getChangePct(data, sym.fxi);
     const csi = getChangePct(data, sym.csi);
     const iron = getChangePct(data, sym.iron);
     const soy = getChangePct(data, sym.soy);
-    const oil = getChangePct(data, sym.brent) ?? getChangePct(data, sym.wti);
-    const usdbbrl = getChangePct(data, sym.usdbbrl);
+    const oil = oilPct;
 
     if (typeof fxi === 'number' && typeof iron === 'number' && fxi > 0.4 && iron < -0.4) divergences.push('China forte sem confirmação em Minério');
     if (typeof csi === 'number' && typeof soy === 'number' && csi < -0.4 && soy > 0.4) divergences.push('Soja forte com China fraca (ver oferta/clima)');
@@ -996,22 +1382,108 @@ function renderChinaBrazil(data) {
     `;
 
     const html = `
+        <div style="margin-bottom:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Cenário China (Proxy)</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(chinaScenario.tone, chinaScenario.label)}</div>
+            </div>
+            <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;">
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(0,0,0,.12);display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                    <div style="opacity:.9;font-weight:900;">Impacto esperado (BRL)</div>
+                    <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(chinaImpact.brl.tone, chinaImpact.brl.txt)}</div>
+                </div>
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(0,0,0,.12);display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                    <div style="opacity:.9;font-weight:900;">Impacto esperado (IBOV)</div>
+                    <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(chinaImpact.ibov.tone, chinaImpact.ibov.txt)}</div>
+                </div>
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(0,0,0,.12);display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                    <div style="opacity:.9;font-weight:900;">Impacto esperado (Commodities)</div>
+                    <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(chinaImpact.com.tone, chinaImpact.com.txt)}</div>
+                </div>
+            </div>
+            <div style="margin-top:10px;opacity:.82;font-size:12px;">${escapeHtml(chinaScenario.hint)}</div>
+            <div style="margin-top:12px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px;">
+                <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+                    <div style="font-weight:900;letter-spacing:1px;opacity:.92;">Auditoria de cobertura</div>
+                    <div style="display:flex;gap:8px;align-items:center;font-family:'Share Tech Mono',monospace;font-weight:900;">
+                        <span>${mk(coverageChecks.status.tone, coverageChecks.status.label)}</span>
+                        <span>${mk(coverageChecks.conviction.tone, coverageChecks.conviction.label)}</span>
+                    </div>
+                </div>
+                <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;">
+                    ${coverageChecks.lines
+                        .map(x => `
+                            <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(0,0,0,.12);display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                                <div style="opacity:.9;font-weight:900;">${escapeHtml(x.label)}</div>
+                                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(x.ok ? 'positive' : 'negative', x.ok ? '✅' : '❌')}</div>
+                            </div>
+                        `)
+                        .join('')}
+                </div>
+                <div style="margin-top:10px;opacity:.82;font-size:12px;">${escapeHtml(coverageChecks.why)}</div>
+            </div>
+        </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
             ${renderList('China (Proxies)', china)}
             ${renderList('Commodities BR (críticas)', comm)}
             ${renderList('Brasil (Proxies)', br)}
         </div>
         <div style="margin-top:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
-            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Score Produtor BR</div>
-                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${toneBadgeHtmlFromTone(scoreCls, score, `${scoreLbl} • ${formatNumber(score, 2)}`, { maxAbs: 1 })}</div>
+            <div style="font-weight:900;letter-spacing:1px;opacity:.95;margin-bottom:10px;">Impulso vs Pressão (Brasil Produtor)</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:12px;background:rgba(0,0,0,.12);">
+                    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                        <div style="font-weight:900;letter-spacing:.8px;opacity:.92;">BRL (USD/BRL)</div>
+                        <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(brlNet.tone, brlNet.txt)}</div>
+                    </div>
+                    <div style="margin-top:10px;display:grid;grid-template-columns:1fr;gap:8px;">
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                            <div style="opacity:.9;font-weight:800;">Impulso (balança)</div>
+                            <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(brlImp.tone, brlImp.txt)}</div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                            <div style="opacity:.9;font-weight:800;">Pressão (óleo/China/stress)</div>
+                            <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(brlPres.tone, brlPres.txt)}</div>
+                        </div>
+                    </div>
+                </div>
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:12px;background:rgba(0,0,0,.12);">
+                    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                        <div style="font-weight:900;letter-spacing:.8px;opacity:.92;">Índice (IBOV)</div>
+                        <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(ibovNet.tone, ibovNet.txt)}</div>
+                    </div>
+                    <div style="margin-top:10px;display:grid;grid-template-columns:1fr;gap:8px;">
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                            <div style="opacity:.9;font-weight:800;">Impulso (Vale/Petro)</div>
+                            <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(ibovImp.tone, ibovImp.txt)}</div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                            <div style="opacity:.9;font-weight:800;">Pressão (óleo infla/China)</div>
+                            <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(ibovPres.tone, ibovPres.txt)}</div>
+                        </div>
+                    </div>
+                </div>
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:12px;background:rgba(0,0,0,.12);">
+                    <div style="font-weight:900;letter-spacing:.8px;opacity:.92;">Petróleo (duplo efeito)</div>
+                    <div style="margin-top:10px;display:grid;grid-template-columns:1fr;gap:8px;">
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                            <div style="opacity:.9;font-weight:800;">Export (impulso)</div>
+                            <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(oilExport.tone, oilExport.txt)}</div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                            <div style="opacity:.9;font-weight:800;">Inflação doméstica (pressão)</div>
+                            <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(oilInfl.tone, oilInfl.txt)}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:10px;opacity:.80;font-size:12px;">Leitura: petróleo pode dar suporte via balança/Petrobras e, ao mesmo tempo, pressionar via inflação/juros.</div>
+                </div>
             </div>
             ${divergences.length
-                ? `<div style="margin-top:10px;opacity:.92;border-top:1px solid rgba(255,255,255,.08);padding-top:10px;">
+                ? `<div style="margin-top:12px;opacity:.92;border-top:1px solid rgba(255,255,255,.08);padding-top:10px;">
                     <div style="font-weight:900;letter-spacing:1px;margin-bottom:6px;">Divergências</div>
                     ${divergences.map(t => `<div style="opacity:.9;line-height:1.35;">• ${escapeHtml(t)}</div>`).join('')}
                 </div>`
-                : `<div style="margin-top:10px;opacity:.85;">Sem divergências relevantes detectadas.</div>`}
+                : `<div style="margin-top:12px;opacity:.85;">Sem divergências relevantes detectadas.</div>`}
         </div>
     `;
 
@@ -1640,6 +2112,7 @@ function renderSectorHeatmap(data) {
 function renderIntel(data) {
     renderRegimeConviction(data);
     renderChinaBrazil(data);
+    renderCarryIntel(data);
     renderRatesBuckets(data);
     renderAgendaMatrix();
     renderDataAudit(data);
@@ -1911,19 +2384,15 @@ function renderFinancialJuice(payload) {
 
     const rows = (items || []).map(x => {
         const createdAt = x && x.createdAt ? formatDateTime(String(x.createdAt)) : '';
-        const pt = x && x.ptBR ? String(x.ptBR) : '';
         const original = x && x.original ? String(x.original) : '';
-        const headline = pt || original;
         const link = x && x.url ? String(x.url) : url;
-        const originalLine = pt && original ? `<div style="opacity:.70;font-size:12px;line-height:1.25;margin-top:4px;">${escapeHtml(original)}</div>` : '';
 
         return `
             <div style="padding:10px 12px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(0,0,0,.14);">
                 <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                    <div style="font-weight:900;line-height:1.25;">${escapeHtml(headline || '—')}</div>
+                    <div style="font-weight:900;line-height:1.25;">${escapeHtml(original || '—')}</div>
                     <div style="opacity:.80;font-size:12px;white-space:nowrap;">${escapeHtml(createdAt || '')}</div>
                 </div>
-                ${originalLine}
                 <div style="margin-top:6px;">
                     <a href="${escapeHtml(link)}" target="_blank" class="underline_link" style="font-size:12px;opacity:.95;">ver fonte</a>
                 </div>
@@ -1941,84 +2410,164 @@ function renderFinancialJuice(payload) {
             <div style="padding:0 12px 10px;opacity:.90;">
                 ${escapeHtml(message || (mode ? `Sem manchetes disponíveis (${mode}).` : 'Sem manchetes disponíveis.'))}
             </div>
-            <div style="padding:0 12px 12px;">
-                <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(0,0,0,.14);padding:10px 12px;">
-                    <div style="font-weight:900;margin-bottom:6px;">Colar manchetes para traduzir (pt-BR)</div>
-                    <div style="opacity:.85;font-size:12px;line-height:1.35;margin-bottom:10px;">
-                        Cole abaixo as linhas do FinancialJuice (ou de outra fonte) e clique em “Traduzir”.
-                    </div>
-                    <textarea id="fjPaste" rows="5" style="width:100%;resize:vertical;background:#0f0f0f;color:#e0e0e0;border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:10px;outline:none;"></textarea>
-                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;">
-                        <button id="fjPasteBtn" type="button" style="background:#141414;color:#e0e0e0;border:1px solid rgba(0,243,255,.28);padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:900;">
-                            Traduzir
-                        </button>
-                        <div id="fjPasteStatus" style="opacity:.85;font-size:12px;"></div>
-                    </div>
-                </div>
-            </div>
         `;
-
-    const translateErr = payload && payload.translate && payload.translate.error ? String(payload.translate.error) : '';
-    const translateHint = translateErr
-        ? `<span style="opacity:.90;color:#ff6b6b;">${escapeHtml(translateErr)}</span>`
-        : '';
 
     setHtml('newsFinancialJuice', `
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;">
             <a href="${escapeHtml(url)}" target="_blank" class="underline_link" style="font-weight:900;">Abrir FinancialJuice</a>
-            ${translateHint}
         </div>
         ${body}
     `);
-
-    const btn = document.getElementById('fjPasteBtn');
-    const input = document.getElementById('fjPaste');
-    const status = document.getElementById('fjPasteStatus');
-    if (btn && input && status) {
-        btn.onclick = async function () {
-            const raw = String(input.value || '').trim();
-            const lines = raw.split(/\r?\n/g).map(s => s.trim()).filter(Boolean).slice(0, 30);
-            if (!lines.length) {
-                status.textContent = 'Cole ao menos 1 linha.';
-                return;
-            }
-            status.textContent = 'Traduzindo...';
-            try {
-                const baseUrl = getMarketServiceBaseUrl();
-                const translated = await fetchJsonPostWithTimeout(`${baseUrl}/api/news/translate`, { items: lines, source: 'en', target: 'pt-BR' }, 9000);
-                if (!translated || translated.ok !== true || !Array.isArray(translated.items)) {
-                    status.textContent = (translated && translated.message) ? String(translated.message) : 'Tradução indisponível.';
-                    return;
-                }
-                const sum = translated && translated.summary ? translated.summary : null;
-                if (sum && sum.translatedCount === 0 && sum.errorCount > 0 && sum.firstError) {
-                    status.textContent = String(sum.firstError);
-                } else {
-                    status.textContent = '';
-                }
-                const items = translated.items.map((x, idx) => ({
-                    id: `manual_${Date.now()}_${idx}`,
-                    createdAt: null,
-                    original: x && x.original ? String(x.original) : '',
-                    ptBR: x && x.translated ? String(x.translated) : null,
-                    url: url,
-                }));
-                renderFinancialJuice({ ok: true, url: url, mode: 'manual', items: items });
-            } catch (e) {
-                status.textContent = 'Falha ao traduzir. Confirme o serviço local e o tradutor.';
-            }
-        };
-    }
 }
 
 async function loadFinancialJuice() {
     const baseUrl = getMarketServiceBaseUrl();
     try {
-        const payload = await fetchJsonWithTimeout(`${baseUrl}/api/news/financialjuice/headlines?limit=40&translate=1&t=${Date.now()}`, 4500);
+        const payload = await fetchJsonWithTimeout(`${baseUrl}/api/news/financialjuice/headlines?limit=40&t=${Date.now()}`, 4500);
         renderFinancialJuice(payload);
         return true;
     } catch {
         renderFinancialJuice(null);
+        return false;
+    }
+}
+
+function renderWebNewsModule(payload) {
+    const elId = 'newsWebModule';
+    const ok = payload && payload.ok === true;
+    const message = payload && payload.message ? String(payload.message) : '';
+    const items = ok && Array.isArray(payload.items) ? payload.items : null;
+    const summary = ok && payload.summary ? payload.summary : null;
+    const sources = ok && Array.isArray(payload.sources) ? payload.sources : [];
+    const windowHours = ok && typeof payload.windowHours === 'number' ? payload.windowHours : null;
+    const generatedAt = ok && payload.generatedAt ? String(payload.generatedAt) : '';
+
+    const badge = (tone, text) => {
+        const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
+        return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
+    };
+
+    if (!ok) {
+        setHtml(elId, `
+            <div style="padding:12px;opacity:.90;">
+                ${escapeHtml(message || 'Web News Module indisponível.')}
+            </div>
+        `);
+        return;
+    }
+
+    const sentiment = summary && summary.sentiment ? String(summary.sentiment) : 'Neutro';
+    const conflicts = summary && Array.isArray(summary.conflicts) ? summary.conflicts : [];
+    const thesis = summary && summary.thesis ? summary.thesis : null;
+    const globalTop = summary && Array.isArray(summary.globalTop) ? summary.globalTop : [];
+    const brasilTop = summary && Array.isArray(summary.brasilTop) ? summary.brasilTop : [];
+    const commoditiesTop = summary && Array.isArray(summary.commoditiesTop) ? summary.commoditiesTop : [];
+
+    const sentimentTone =
+        sentiment === 'Muito Otimista' || sentiment === 'Otimista' ? 'positive'
+            : sentiment === 'Muito Pessimista' || sentiment === 'Pessimista' ? 'negative'
+                : 'neutral';
+
+    const topicsLine = (label, arr) => {
+        if (!arr || !arr.length) return '';
+        return `<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);"><span style="opacity:.9;font-weight:900;">${escapeHtml(label)}:</span> <span style="opacity:.92;">${escapeHtml(arr.join(' • '))}</span></div>`;
+    };
+
+    const renderItems = () => {
+        if (!items || !items.length) return `<div style="padding:0 12px 10px;opacity:.90;">Sem manchetes no momento.</div>`;
+
+        const rows = items.map(x => {
+            const publishedAt = x && x.publishedAt ? formatDateTime(String(x.publishedAt)) : '';
+            const title = x && x.title ? String(x.title) : '';
+            const link = x && x.url ? String(x.url) : '';
+            const source = x && x.source ? String(x.source) : '';
+            const bucket = x && x.bucket ? String(x.bucket) : '';
+            const driver = x && x.driver ? String(x.driver) : '';
+            const wdo = x && x.impact && x.impact.wdo ? String(x.impact.wdo) : '≈';
+            const win = x && x.impact && x.impact.win ? String(x.impact.win) : '≈';
+            const conf = x && x.confidence ? String(x.confidence) : 'média';
+
+            const wdoTone = wdo === '↑' ? 'negative' : wdo === '↓' ? 'positive' : 'neutral';
+            const winTone = win === '↑' ? 'positive' : win === '↓' ? 'negative' : 'neutral';
+
+            return `
+                <div style="padding:10px 12px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(0,0,0,.14);">
+                    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <div style="font-weight:900;line-height:1.25;">${escapeHtml(title || '—')}</div>
+                        <div style="opacity:.80;font-size:12px;white-space:nowrap;">${escapeHtml(publishedAt || '')}</div>
+                    </div>
+                    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        ${badge('neutral', `${bucket}${driver ? ` • ${driver}` : ''}`)}
+                        ${badge(wdoTone, `WDO ${wdo}`)}
+                        ${badge(winTone, `WIN ${win}`)}
+                        ${badge('neutral', `conf: ${conf}`)}
+                    </div>
+                    <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <div style="opacity:.85;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(source || '')}</div>
+                        ${link ? `<a href="${escapeHtml(link)}" target="_blank" class="underline_link" style="font-size:12px;opacity:.95;">ver fonte</a>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        return `
+            <div style="max-height:56vh;overflow:auto;overscroll-behavior:contain;padding:0 12px 12px;">
+                <div style="display:grid;gap:10px;">${rows}</div>
+            </div>
+        `;
+    };
+
+    setHtml(elId, `
+        <div style="padding:10px 12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;">Web News Module</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    ${badge(sentimentTone, `Sentimento: ${sentiment}`)}
+                    ${badge('neutral', `Janela: ${windowHours ? `${windowHours}h` : '—'}`)}
+                    ${generatedAt ? badge('neutral', `Carimbo: ${formatDateTimeLoose(generatedAt)}`) : ''}
+                </div>
+            </div>
+            <div style="margin-top:10px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px;">
+                ${topicsLine('TOP Global', globalTop)}
+                ${topicsLine('TOP Brasil', brasilTop)}
+                ${topicsLine('TOP Commodities', commoditiesTop)}
+            </div>
+            ${thesis
+        ? `
+                <div style="margin-top:12px;border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(0,0,0,.12);">
+                    <div style="font-weight:900;letter-spacing:1px;opacity:.92;margin-bottom:8px;">O que está sendo precificado (3 frases)</div>
+                    <div style="opacity:.92;line-height:1.45;">${escapeHtml(String(thesis.global || ''))}</div>
+                    <div style="opacity:.92;line-height:1.45;margin-top:6px;">${escapeHtml(String(thesis.brasil || ''))}</div>
+                    <div style="opacity:.92;line-height:1.45;margin-top:6px;">${escapeHtml(String(thesis.commodities || ''))}</div>
+                </div>
+              `
+        : ''}
+            ${conflicts && conflicts.length
+        ? `
+                <div style="margin-top:12px;border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(0,0,0,.12);">
+                    <div style="font-weight:900;letter-spacing:1px;opacity:.92;margin-bottom:8px;">Conflitos</div>
+                    ${conflicts.map(t => `<div style="opacity:.92;line-height:1.35;">• ${escapeHtml(String(t))}</div>`).join('')}
+                </div>
+              `
+        : ''}
+            ${sources && sources.length
+        ? `
+                <div style="margin-top:12px;opacity:.80;font-size:12px;">Fontes: ${escapeHtml(sources.join(' • '))}</div>
+              `
+        : ''}
+        </div>
+        ${renderItems()}
+    `);
+}
+
+async function loadWebNewsModule() {
+    const baseUrl = getMarketServiceBaseUrl();
+    try {
+        const payload = await fetchJsonWithTimeout(`${baseUrl}/api/news/web/module?limit=40&t=${Date.now()}`, 5500);
+        renderWebNewsModule(payload);
+        return true;
+    } catch {
+        renderWebNewsModule({ ok: false, message: 'Web News Module offline. Rode "Atualizar_Dados_Mercado.bat" para subir o serviço.' });
         return false;
     }
 }
@@ -2136,6 +2685,141 @@ function renderFlowSentinel(data) {
     setMetric('fs-signal', signal);
     setMetric('fs-signal-score', `${formatNumber(delta, 3)} • ${delta > 0.25 ? 'Vender USD' : delta < -0.25 ? 'Comprar USD' : 'Neutro'}`);
 
+    const observedCount = betaPosCount + betaNegCount;
+    if (observedCount < 3) {
+        setMetric('fs-thermo-score', '—');
+        setMetric('fs-thermo-detail', '—');
+        setHtml('fs-history', '');
+        setHtml('fs-alerts', '');
+    } else {
+        let oilAdj = 0;
+        if (oilBias === 'Fluxo pró-produtor') oilAdj = +0.15;
+        else if (typeof oilScore === 'number' && oilScore >= 1.2) oilAdj = -0.15;
+        else if (typeof oilScore === 'number' && oilScore <= -1.2) oilAdj = -0.1;
+
+        const composite = delta + oilAdj;
+        const score01 = Math.max(0, Math.min(1, (composite + 0.8) / 1.6));
+        const score10 = Math.round(score01 * 10);
+        const pct = Math.round(score01 * 100);
+        const thermoLabel = score10 >= 7 ? 'Risk-On' : score10 <= 3 ? 'Risk-Off' : 'Neutro';
+
+        setMetric('fs-thermo-score', `${score10}/10`);
+        setHtml('fs-thermo-detail', `
+            <div style="display:flex;flex-direction:column;gap:6px;">
+                <div style="opacity:.90;">${escapeHtml(thermoLabel)}${oilAdj !== 0 ? ` • Ajuste petróleo ${oilAdj > 0 ? '+' : ''}${formatNumber(oilAdj, 2)}` : ''}</div>
+                <div class="fs-thermo" aria-label="Termômetro de pré-mercado">
+                    <div class="fs-thermo__fill" style="width:${pct}%;"></div>
+                    <div class="fs-thermo__pin" style="left:${pct}%;"></div>
+                </div>
+            </div>
+        `);
+
+        const historyKey = 'mercado_fs_history_v1';
+        const maxHistory = 24;
+        const nowMs = Date.now();
+
+        const readHistory = () => {
+            try {
+                const raw = localStorage.getItem(historyKey);
+                const parsed = raw ? JSON.parse(raw) : null;
+                if (!Array.isArray(parsed)) return [];
+                return parsed
+                    .filter(x => x && typeof x === 'object')
+                    .map(x => {
+                        const o = x;
+                        const tMs = typeof o.tMs === 'number' && Number.isFinite(o.tMs) ? o.tMs : null;
+                        const s10 = typeof o.s10 === 'number' && Number.isFinite(o.s10) ? o.s10 : null;
+                        const p = typeof o.pct === 'number' && Number.isFinite(o.pct) ? o.pct : null;
+                        const d = typeof o.delta === 'number' && Number.isFinite(o.delta) ? o.delta : null;
+                        const oa = typeof o.oilAdj === 'number' && Number.isFinite(o.oilAdj) ? o.oilAdj : 0;
+                        const lab = typeof o.label === 'string' ? o.label : '';
+                        if (tMs === null || s10 === null || p === null || d === null) return null;
+                        return { tMs, s10, pct: p, delta: d, oilAdj: oa, label: lab };
+                    })
+                    .filter(Boolean);
+            } catch {
+                return [];
+            }
+        };
+
+        const writeHistory = items => {
+            try {
+                localStorage.setItem(historyKey, JSON.stringify(items));
+            } catch {
+            }
+        };
+
+        const toTime = tMs => {
+            try {
+                return new Date(tMs).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            } catch {
+                return '';
+            }
+        };
+
+        const clamp10 = v => Math.max(0, Math.min(10, Math.round(v)));
+        const toneColor = s10 => {
+            const x = clamp10(s10);
+            if (x <= 3) return 'rgba(255,60,80,.95)';
+            if (x >= 7) return 'rgba(0,255,160,.95)';
+            return 'rgba(255,210,74,.95)';
+        };
+
+        const history = readHistory();
+        const nextItem = { tMs: nowMs, s10: score10, pct: pct, delta: delta, oilAdj: oilAdj, label: thermoLabel };
+        const last = history.length ? history[history.length - 1] : null;
+        if (last && nowMs - last.tMs < 20000) {
+            history[history.length - 1] = nextItem;
+        } else {
+            history.push(nextItem);
+        }
+        const trimmed = history.slice(-maxHistory);
+        writeHistory(trimmed);
+
+        const bars = trimmed
+            .slice(-12)
+            .map(h => {
+                const height = 8 + clamp10(h.s10) * 2.3;
+                const title = `${toTime(h.tMs)} • ${clamp10(h.s10)}/10 • Δ ${formatNumber(h.delta, 3)}${h.oilAdj ? ` • oil ${h.oilAdj > 0 ? '+' : ''}${formatNumber(h.oilAdj, 2)}` : ''}`;
+                return `<div title="${escapeHtml(title)}" style="width:10px;height:${height}px;background:${toneColor(h.s10)};border-radius:4px;opacity:.92;"></div>`;
+            })
+            .join('');
+
+        setHtml('fs-history', `
+            <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Histórico (últimas janelas)</div>
+                    <div style="opacity:.80;font-size:12px;">${escapeHtml(trimmed.length ? `${toTime(trimmed[trimmed.length - 1].tMs)}` : '')}</div>
+                </div>
+                <div style="display:flex;align-items:flex-end;gap:6px;margin-top:10px;min-height:38px;">
+                    ${bars || '<div style="opacity:.85;">—</div>'}
+                </div>
+            </div>
+        `);
+
+        const alerts = [];
+        const betaPosAbs = typeof betaPosScore === 'number' ? Math.abs(betaPosScore) : 0;
+        const betaNegAbs = typeof betaNegScore === 'number' ? Math.abs(betaNegScore) : 0;
+        if (betaPosCount >= 2 && betaNegCount >= 2 && betaPosAction.state !== betaNegAction.state && betaPosAbs >= 0.18 && betaNegAbs >= 0.18) {
+            alerts.push('Divergência: blocos Risco e Proteção estão puxando para lados opostos.');
+        }
+        if (Math.abs(delta) < 0.12 && betaPosAbs >= 0.18 && betaNegAbs >= 0.18) {
+            alerts.push('Sem consenso: delta neutro com blocos “fortes” (ruído/abertura).');
+        }
+        if (typeof oilScore === 'number' && oilScore >= 1.2 && oilBias !== 'Fluxo pró-produtor') {
+            alerts.push('Petróleo forte sem confirmação (CAD/RUB): possível stress/geopolítica.');
+        }
+
+        setHtml('fs-alerts', alerts.length
+            ? `
+                <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
+                    <div style="font-weight:900;letter-spacing:1px;opacity:.95;margin-bottom:8px;">Alertas (divergência)</div>
+                    ${alerts.map(t => `<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);opacity:.92;line-height:1.35;">${escapeHtml(t)}</div>`).join('')}
+                </div>
+              `
+            : '');
+    }
+
     const rows = []
         .concat([{ title: 'Bloco Risco (FX)' }])
         .concat(betaPosItems.map(x => ({ label: x.label, val: x.val })))
@@ -2163,6 +2847,445 @@ function renderFlowSentinel(data) {
         </div>
     `;
     setHtml('fs-components', html);
+}
+
+function renderCarryTradeMonitor(data) {
+    const symbols = {
+        audusd: findAssetSymbol(data, /^AUD\/USD\b/i),
+        nzdusd: findAssetSymbol(data, /^NZD\/USD\b/i),
+        usdjpy: findAssetSymbol(data, /^USD\/JPY\b/i),
+        usdbrl: findAssetSymbol(data, /^USD\/BRL\b/i),
+        dxy: findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index)/i),
+        br10y: findAssetSymbol(data, /^BR10YT=RR$/i),
+        us10y: findAssetSymbol(data, /^US10YT=RR$/i),
+        us10br10: findAssetSymbol(data, /^US10BR10=RR$/i),
+        audjpy: findAssetSymbol(data, /^AUD\/JPY\b/i),
+        nzdjpy: findAssetSymbol(data, /^NZD\/JPY\b/i),
+    };
+
+    const lastOf = symbol => {
+        if (!symbol) return null;
+        const p = getMostRecentPointWithPrice(data, symbol) || getLastPoint(data, symbol);
+        if (!p) return null;
+        const price = typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+        const changePct = typeof p.changePct === 'number' && Number.isFinite(p.changePct) ? p.changePct : null;
+        const t = p.t ? String(p.t) : '';
+        return { price, changePct, t };
+    };
+
+    const audusd = lastOf(symbols.audusd);
+    const nzdusd = lastOf(symbols.nzdusd);
+    const usdjpy = lastOf(symbols.usdjpy);
+    const usdbrl = lastOf(symbols.usdbrl);
+    const dxy = lastOf(symbols.dxy);
+    const br10y = lastOf(symbols.br10y);
+    const us10y = lastOf(symbols.us10y);
+    const us10br10 = lastOf(symbols.us10br10);
+    const audjpyDirect = lastOf(symbols.audjpy);
+    const nzdjpyDirect = lastOf(symbols.nzdjpy);
+
+    const pctOf = x => (x && typeof x.changePct === 'number' ? x.changePct : null);
+    const priceOf = x => (x && typeof x.price === 'number' ? x.price : null);
+
+    const audusdPct = pctOf(audusd);
+    const nzdusdPct = pctOf(nzdusd);
+    const usdjpyPct = pctOf(usdjpy);
+    const usdbrlPct = pctOf(usdbrl);
+    const dxyPct = pctOf(dxy);
+
+    const audjpyPct =
+        pctOf(audjpyDirect) !== null
+            ? pctOf(audjpyDirect)
+            : audusdPct !== null && usdjpyPct !== null
+                ? (Math.max(-99, Math.min(99, ((1 + audusdPct / 100) * (1 + usdjpyPct / 100) - 1) * 100)))
+                : null;
+
+    const audjpyLevel =
+        priceOf(audjpyDirect) !== null
+            ? priceOf(audjpyDirect)
+            : priceOf(audusd) !== null && priceOf(usdjpy) !== null
+                ? priceOf(audusd) * priceOf(usdjpy)
+                : null;
+
+    const nzdjpyPct =
+        pctOf(nzdjpyDirect) !== null
+            ? pctOf(nzdjpyDirect)
+            : nzdusdPct !== null && usdjpyPct !== null
+                ? (Math.max(-99, Math.min(99, ((1 + nzdusdPct / 100) * (1 + usdjpyPct / 100) - 1) * 100)))
+                : null;
+
+    let premiumBps = null;
+    let premiumPct = null;
+    let premiumSource = '';
+    if (us10br10 && typeof us10br10.price === 'number') {
+        premiumBps = us10br10.price;
+        premiumPct = pctOf(us10br10);
+        premiumSource = 'US10BR10';
+    } else if (br10y && us10y && typeof br10y.price === 'number' && typeof us10y.price === 'number') {
+        premiumBps = (br10y.price - us10y.price) * 100;
+        premiumPct = null;
+        premiumSource = 'BR10Y-US10Y';
+    } else if (br10y && typeof br10y.price === 'number') {
+        premiumBps = br10y.price * 100;
+        premiumPct = null;
+        premiumSource = 'BR10Y';
+    }
+
+    const hasCore = [audusdPct, usdjpyPct].filter(v => typeof v === 'number').length >= 2;
+    const hasPremium = typeof premiumBps === 'number' && Number.isFinite(premiumBps);
+
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+    const norm = (v, unit) => {
+        if (typeof v !== 'number' || !Number.isFinite(v) || typeof unit !== 'number' || !Number.isFinite(unit) || unit <= 0) return 0;
+        return clamp(v / unit, -2, 2);
+    };
+
+    let carryStatus = 'Neutro';
+    let carryStatusDetail = '—';
+    if (!hasCore) {
+        carryStatus = 'Dados insuficientes';
+        carryStatusDetail = 'AUD/USD e USD/JPY';
+    } else if (typeof audjpyPct === 'number') {
+        const severe = typeof usdjpyPct === 'number' && typeof audusdPct === 'number' && usdjpyPct <= -0.8 && audusdPct <= -0.6;
+        if (audjpyPct <= -1.0 && severe) {
+            carryStatus = 'Unwinding (severo)';
+        } else if (audjpyPct <= -1.0) {
+            carryStatus = 'Unwinding';
+        } else if (audjpyPct >= 1.0) {
+            carryStatus = 'Building';
+        } else {
+            carryStatus = 'Neutro';
+        }
+        const parts = [];
+        if (typeof audjpyPct === 'number') parts.push(`AUD/JPY ${formatPercent(audjpyPct, 2)}`);
+        if (typeof usdjpyPct === 'number') parts.push(`USD/JPY ${formatPercent(usdjpyPct, 2)}`);
+        if (typeof audusdPct === 'number') parts.push(`AUD/USD ${formatPercent(audusdPct, 2)}`);
+        carryStatusDetail = parts.join(' • ') || '—';
+    }
+
+    let flowLabel = 'Neutro';
+    if (typeof audjpyPct === 'number' && typeof premiumPct === 'number') {
+        const entering = premiumPct < -0.4 && audjpyPct > 0.4 && (typeof dxyPct !== 'number' || dxyPct <= 0.1);
+        const leaving = premiumPct > 0.4 && audjpyPct < -0.4 && (typeof dxyPct !== 'number' || dxyPct >= -0.1);
+        flowLabel = entering ? 'Entrando' : leaving ? 'Saindo' : 'Neutro';
+    } else if (typeof audjpyPct === 'number') {
+        if (audjpyPct > 0.6 && (typeof dxyPct !== 'number' || dxyPct < 0.1) && (typeof usdbrlPct !== 'number' || usdbrlPct < 0.1)) flowLabel = 'Entrando';
+        if (audjpyPct < -0.6 && (typeof dxyPct !== 'number' || dxyPct > -0.1) && (typeof usdbrlPct !== 'number' || usdbrlPct > -0.1)) flowLabel = 'Saindo';
+    }
+
+    let score = 5;
+    score += 1.8 * norm(audjpyPct || 0, 1.0);
+    score += 1.2 * norm(-(premiumPct || 0), 0.8);
+    score += 1.0 * norm(-(dxyPct || 0), 0.7);
+    score += 1.2 * norm(-(usdbrlPct || 0), 0.7);
+
+    if (typeof nzdusdPct === 'number' && typeof audusdPct === 'number' && Math.abs(nzdusdPct) > Math.abs(audusdPct) + 0.4) {
+        score += nzdusdPct < 0 ? -0.6 : +0.2;
+    }
+
+    const score10 = clamp(Math.round(score), 0, 10);
+    const scoreTone = score10 >= 7 ? 'positive' : score10 <= 3 ? 'negative' : 'neutral';
+
+    setMetric('carry-premium-level', hasPremium ? formatNumber(premiumBps, 1) : '—');
+    setMetric('carry-premium-detail', hasPremium ? `${premiumSource}${typeof premiumPct === 'number' ? ` • ${formatPercent(premiumPct, 2)}` : ''}` : '—');
+
+    setMetric('carry-audjpy-level', typeof audjpyLevel === 'number' ? formatNumber(audjpyLevel, 2) : '—');
+    setMetric('carry-audjpy-detail', typeof audjpyPct === 'number' ? formatPercent(audjpyPct, 2) : '—');
+
+    setMetric('carry-usdjpy-level', typeof priceOf(usdjpy) === 'number' ? formatNumber(priceOf(usdjpy), 2) : '—');
+    setMetric('carry-usdjpy-detail', typeof usdjpyPct === 'number' ? formatPercent(usdjpyPct, 2) : '—');
+
+    setMetric('carry-state', carryStatus);
+    setMetric('carry-state-detail', carryStatusDetail);
+
+    setMetric('carry-score', `${score10}/10`);
+    setHtml('carry-score-detail', toneBadgeHtmlFromTone(scoreTone, score10 - 5, `${flowLabel}`, { maxAbs: 5 }));
+
+    const rows = [
+        { label: 'DXY', v: dxyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'USD/BRL', v: usdbrlPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'AUD/USD', v: audusdPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'NZD/USD', v: nzdusdPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'USD/JPY', v: usdjpyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'AUD/JPY*', v: audjpyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'NZD/JPY*', v: nzdjpyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'Prêmio BR vs US (bps)', v: hasPremium ? premiumBps : null, fmt: x => formatNumber(x, 1), maxAbs: 1200 },
+    ];
+
+    const listHtml = `
+        <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
+            <div style="font-weight:900;letter-spacing:1px;opacity:.95;margin-bottom:8px;">Componentes</div>
+            ${rows
+                .filter(r => r.v !== null && r.v !== undefined)
+                .map(r => {
+                    const txt = r.v === null ? '—' : r.fmt(r.v);
+                    const badge = r.v === null ? '—' : toneBadgeHtml(r.v, txt, { maxAbs: r.maxAbs });
+                    const note = /\*$/.test(String(r.label)) ? `<span style="opacity:.7;font-size:12px;">(sintético)</span>` : '';
+                    return `
+                        <div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">
+                            <div style="opacity:.9;font-weight:800;">${escapeHtml(r.label)} ${note}</div>
+                            <div style="font-family:'Share Tech Mono',monospace;">${badge}</div>
+                        </div>
+                    `;
+                })
+                .join('')}
+        </div>
+    `;
+    setHtml('carry-components', listHtml);
+
+    const historyKey = 'mercado_carry_history_v1';
+    const maxHistory = 24;
+    const nowMs = Date.now();
+
+    const readHistory = () => {
+        try {
+            const raw = localStorage.getItem(historyKey);
+            const parsed = raw ? JSON.parse(raw) : null;
+            if (!Array.isArray(parsed)) return [];
+            return parsed
+                .filter(x => x && typeof x === 'object')
+                .map(x => {
+                    const o = x;
+                    const tMs = typeof o.tMs === 'number' && Number.isFinite(o.tMs) ? o.tMs : null;
+                    const s10 = typeof o.s10 === 'number' && Number.isFinite(o.s10) ? o.s10 : null;
+                    const label = typeof o.label === 'string' ? o.label : '';
+                    const aj = typeof o.audjpyPct === 'number' && Number.isFinite(o.audjpyPct) ? o.audjpyPct : null;
+                    const prem = typeof o.premiumPct === 'number' && Number.isFinite(o.premiumPct) ? o.premiumPct : null;
+                    if (tMs === null || s10 === null) return null;
+                    return { tMs, s10, label, audjpyPct: aj, premiumPct: prem };
+                })
+                .filter(Boolean);
+        } catch {
+            return [];
+        }
+    };
+
+    const writeHistory = items => {
+        try {
+            localStorage.setItem(historyKey, JSON.stringify(items));
+        } catch {
+        }
+    };
+
+    const toTime = tMs => {
+        try {
+            return new Date(tMs).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        } catch {
+            return '';
+        }
+    };
+
+    const toneColor = s10 => {
+        const x = clamp(Math.round(s10), 0, 10);
+        if (x <= 3) return 'rgba(255,60,80,.95)';
+        if (x >= 7) return 'rgba(0,255,160,.95)';
+        return 'rgba(255,210,74,.95)';
+    };
+
+    const history = readHistory();
+    const nextItem = { tMs: nowMs, s10: score10, label: flowLabel, audjpyPct: audjpyPct, premiumPct: premiumPct };
+    const last = history.length ? history[history.length - 1] : null;
+    if (last && nowMs - last.tMs < 20000) {
+        history[history.length - 1] = nextItem;
+    } else {
+        history.push(nextItem);
+    }
+    const trimmed = history.slice(-maxHistory);
+    writeHistory(trimmed);
+
+    const bars = trimmed
+        .slice(-12)
+        .map(h => {
+            const height = 8 + clamp(h.s10, 0, 10) * 2.3;
+            const parts = [`${toTime(h.tMs)} • ${clamp(h.s10, 0, 10)}/10 • ${h.label}`];
+            if (typeof h.audjpyPct === 'number') parts.push(`AUD/JPY ${formatPercent(h.audjpyPct, 2)}`);
+            if (typeof h.premiumPct === 'number') parts.push(`Prêmio ${formatPercent(h.premiumPct, 2)}`);
+            const title = parts.join(' • ');
+            return `<div title="${escapeHtml(title)}" style="width:10px;height:${height}px;background:${toneColor(h.s10)};border-radius:4px;opacity:.92;"></div>`;
+        })
+        .join('');
+
+    setHtml('carry-history', `
+        <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Histórico (últimas janelas)</div>
+                <div style="opacity:.80;font-size:12px;">${escapeHtml(trimmed.length ? `${toTime(trimmed[trimmed.length - 1].tMs)}` : '')}</div>
+            </div>
+            <div style="display:flex;align-items:flex-end;gap:6px;margin-top:10px;min-height:38px;">
+                ${bars || '<div style="opacity:.85;">—</div>'}
+            </div>
+        </div>
+    `);
+
+    const alerts = [];
+    if (typeof audjpyPct === 'number' && Math.abs(audjpyPct) >= 1.0) alerts.push(`AUD/JPY (sintético) ${formatPercent(audjpyPct, 2)}: movimento significativo.`);
+    if (typeof usdjpyPct === 'number' && Math.abs(usdjpyPct) >= 0.8) alerts.push(`USD/JPY ${formatPercent(usdjpyPct, 2)}: funding mexendo forte.`);
+    if (typeof nzdjpyPct === 'number' && Math.abs(nzdjpyPct) >= 1.0) alerts.push(`NZD/JPY (sintético) ${formatPercent(nzdjpyPct, 2)}: early warning possível.`);
+    if (typeof premiumPct === 'number' && Math.abs(premiumPct) >= 0.6) alerts.push(`Prêmio BR vs US ${formatPercent(premiumPct, 2)}: compressão/abertura relevante.`);
+    if (carryStatus === 'Unwinding (severo)') alerts.push('Duplo unwinding: USD/JPY e AUD/USD caindo com força.');
+    if (!hasPremium) alerts.push('Prêmio BR vs US não disponível (US10BR10 ou US10Y/BR10Y ausentes).');
+
+    setHtml('carry-alerts', alerts.length
+        ? `
+            <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="font-weight:900;letter-spacing:1px;opacity:.95;margin-bottom:8px;">Alertas</div>
+                ${alerts.map(t => `<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);opacity:.92;line-height:1.35;">${escapeHtml(t)}</div>`).join('')}
+            </div>
+          `
+        : '');
+}
+
+function renderCarryIntel(data) {
+    const el = document.getElementById('carryIntel');
+    if (!el) return;
+
+    const symbols = {
+        audusd: findAssetSymbol(data, /^AUD\/USD\b/i),
+        nzdusd: findAssetSymbol(data, /^NZD\/USD\b/i),
+        usdjpy: findAssetSymbol(data, /^USD\/JPY\b/i),
+        usdbrl: findAssetSymbol(data, /^USD\/BRL\b/i),
+        dxy: findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index)/i),
+        br10y: findAssetSymbol(data, /^BR10YT=RR$/i),
+        us10y: findAssetSymbol(data, /^US10YT=RR$/i),
+        us10br10: findAssetSymbol(data, /^US10BR10=RR$/i),
+        audjpy: findAssetSymbol(data, /^AUD\/JPY\b/i),
+        nzdjpy: findAssetSymbol(data, /^NZD\/JPY\b/i),
+    };
+
+    const lastOf = symbol => {
+        if (!symbol) return null;
+        const p = getMostRecentPointWithPrice(data, symbol) || getLastPoint(data, symbol);
+        if (!p) return null;
+        const changePct = typeof p.changePct === 'number' && Number.isFinite(p.changePct) ? p.changePct : null;
+        return { changePct };
+    };
+
+    const audusd = lastOf(symbols.audusd);
+    const nzdusd = lastOf(symbols.nzdusd);
+    const usdjpy = lastOf(symbols.usdjpy);
+    const usdbrl = lastOf(symbols.usdbrl);
+    const dxy = lastOf(symbols.dxy);
+    const br10y = lastOf(symbols.br10y);
+    const us10y = lastOf(symbols.us10y);
+    const us10br10 = lastOf(symbols.us10br10);
+    const audjpyDirect = lastOf(symbols.audjpy);
+    const nzdjpyDirect = lastOf(symbols.nzdjpy);
+
+    const pctOf = x => (x && typeof x.changePct === 'number' ? x.changePct : null);
+
+    const audusdPct = pctOf(audusd);
+    const nzdusdPct = pctOf(nzdusd);
+    const usdjpyPct = pctOf(usdjpy);
+    const usdbrlPct = pctOf(usdbrl);
+    const dxyPct = pctOf(dxy);
+
+    const audjpyPct =
+        pctOf(audjpyDirect) !== null
+            ? pctOf(audjpyDirect)
+            : audusdPct !== null && usdjpyPct !== null
+                ? (Math.max(-99, Math.min(99, ((1 + audusdPct / 100) * (1 + usdjpyPct / 100) - 1) * 100)))
+                : null;
+
+    const nzdjpyPct =
+        pctOf(nzdjpyDirect) !== null
+            ? pctOf(nzdjpyDirect)
+            : nzdusdPct !== null && usdjpyPct !== null
+                ? (Math.max(-99, Math.min(99, ((1 + nzdusdPct / 100) * (1 + usdjpyPct / 100) - 1) * 100)))
+                : null;
+
+    const premiumPct = pctOf(us10br10) !== null ? pctOf(us10br10) : null;
+    const hasPremium = premiumPct !== null || pctOf(br10y) !== null || pctOf(us10y) !== null;
+
+    const moveLabel = (pct, { strong = 0.8, medium = 0.3 } = {}) => {
+        if (pct === null) return { txt: 'Sem dado', tone: 'neutral' };
+        if (pct >= strong) return { txt: 'Alta forte', tone: 'positive' };
+        if (pct >= medium) return { txt: 'Alta', tone: 'positive' };
+        if (pct <= -strong) return { txt: 'Queda forte', tone: 'negative' };
+        if (pct <= -medium) return { txt: 'Queda', tone: 'negative' };
+        return { txt: 'Estável', tone: 'neutral' };
+    };
+
+    const moveLabelInverted = (pct, cfg) => {
+        const r = moveLabel(pct, cfg);
+        if (r.tone === 'positive') return { txt: r.txt, tone: 'negative' };
+        if (r.tone === 'negative') return { txt: r.txt, tone: 'positive' };
+        return r;
+    };
+
+    const mk = (tone, txt) => toneBadgeHtmlFromTone(tone, 0, txt, { maxAbs: 1 });
+
+    const coreOk = [audusdPct, usdjpyPct].filter(v => typeof v === 'number').length >= 2;
+    let carryState = 'Inconclusivo';
+    if (coreOk && typeof audjpyPct === 'number') {
+        const severe = typeof usdjpyPct === 'number' && typeof audusdPct === 'number' && usdjpyPct <= -0.8 && audusdPct <= -0.6;
+        if (audjpyPct <= -1.0 && severe) carryState = 'Unwinding (severo)';
+        else if (audjpyPct <= -1.0) carryState = 'Unwinding';
+        else if (audjpyPct >= 1.0) carryState = 'Building';
+        else carryState = 'Neutro';
+    } else if (!coreOk) {
+        carryState = 'Dados insuficientes';
+    }
+
+    let carryFlow = 'Neutro';
+    if (typeof audjpyPct === 'number' && typeof premiumPct === 'number') {
+        const entering = premiumPct < -0.4 && audjpyPct > 0.4 && (typeof dxyPct !== 'number' || dxyPct <= 0.1);
+        const leaving = premiumPct > 0.4 && audjpyPct < -0.4 && (typeof dxyPct !== 'number' || dxyPct >= -0.1);
+        carryFlow = entering ? 'Entrando' : leaving ? 'Saindo' : 'Neutro';
+    } else if (typeof audjpyPct === 'number') {
+        if (audjpyPct > 0.6 && (typeof dxyPct !== 'number' || dxyPct < 0.1) && (typeof usdbrlPct !== 'number' || usdbrlPct < 0.1)) carryFlow = 'Entrando';
+        if (audjpyPct < -0.6 && (typeof dxyPct !== 'number' || dxyPct > -0.1) && (typeof usdbrlPct !== 'number' || usdbrlPct > -0.1)) carryFlow = 'Saindo';
+    }
+
+    const cov = [audjpyPct, usdjpyPct, audusdPct, dxyPct, usdbrlPct, premiumPct].filter(v => typeof v === 'number').length;
+    const confidence = cov >= 5 ? 'Alta' : cov >= 3 ? 'Média' : 'Baixa';
+
+    const rows = [
+        { label: 'Estado do carry', badge: mk(carryState.includes('Unwinding') ? 'negative' : carryState === 'Building' ? 'positive' : 'neutral', carryState) },
+        { label: 'Carrego entrando/saindo', badge: mk(carryFlow === 'Saindo' ? 'negative' : carryFlow === 'Entrando' ? 'positive' : 'neutral', carryFlow) },
+        { label: 'Confiança', badge: mk(confidence === 'Alta' ? 'positive' : confidence === 'Baixa' ? 'negative' : 'neutral', confidence) },
+    ];
+
+    const evidence = [
+        { label: 'AUD/JPY (proxy carry)', ...moveLabel(audjpyPct, { strong: 1.0, medium: 0.4 }), note: pctOf(audjpyDirect) === null ? 'Sintético' : '' },
+        { label: 'USD/JPY (funding)', ...moveLabel(usdjpyPct, { strong: 0.8, medium: 0.3 }) },
+        { label: 'AUD/USD (beta)', ...moveLabel(audusdPct, { strong: 0.8, medium: 0.3 }) },
+        { label: 'DXY (USD global)', ...moveLabelInverted(dxyPct, { strong: 0.7, medium: 0.25 }) },
+        { label: 'USD/BRL (risco BR)', ...moveLabelInverted(usdbrlPct, { strong: 0.7, medium: 0.25 }) },
+        { label: 'Prêmio BR vs US (proxy)', ...(premiumPct === null ? { txt: hasPremium ? 'Disponível (sem var%)' : 'Indisponível', tone: hasPremium ? 'neutral' : 'negative' } : moveLabelInverted(premiumPct, { strong: 0.6, medium: 0.25 })) },
+        { label: 'NZD/JPY (early warning)', ...moveLabel(nzdjpyPct, { strong: 1.0, medium: 0.4 }), note: pctOf(nzdjpyDirect) === null ? 'Sintético' : '' },
+    ];
+
+    const html = `
+        <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+            <div style="display:grid;grid-template-columns:1fr;gap:10px;">
+                ${rows
+                    .map(r => `
+                        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">
+                            <div style="font-weight:900;letter-spacing:.6px;opacity:.92;">${escapeHtml(r.label)}</div>
+                            <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${r.badge}</div>
+                        </div>
+                    `)
+                    .join('')}
+            </div>
+        </div>
+        <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+            <div style="font-weight:900;letter-spacing:1px;opacity:.95;margin-bottom:8px;">Evidências (qualitativas)</div>
+            ${evidence
+                .map(e => {
+                    const badge = mk(e.tone, e.txt);
+                    const note = e.note ? `<span style="opacity:.7;font-size:12px;margin-left:8px;">${escapeHtml(e.note)}</span>` : '';
+                    return `
+                        <div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);align-items:center;">
+                            <div style="opacity:.92;font-weight:800;">${escapeHtml(e.label)}${note}</div>
+                            <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${badge}</div>
+                        </div>
+                    `;
+                })
+                .join('')}
+        </div>
+    `;
+
+    el.innerHTML = html;
 }
 
 function resolveTickerSymbol(data, matchers) {
@@ -2332,10 +3455,109 @@ function renderAllAssetsTable(data) {
     createTable(containerId, rows, data, null, { limit: null, sortable: true, grouped: true, tableKey: 'all', toolbar: true, favorites: true });
 }
 
+function renderBrazilExportBasket(data) {
+    const el = document.getElementById('exportBasket');
+    if (!el) return;
+
+    const mk = (tone, txt) => toneBadgeHtmlFromTone(tone, 0, txt, { maxAbs: 1 });
+    const pctOf = x => (x && typeof x.changePct === 'number' ? x.changePct : null);
+
+    const dirFromPct = pct => {
+        if (pct === null) return { txt: 'Sem dado', tone: 'neutral' };
+        if (pct >= 0.35) return { txt: 'Alta', tone: 'positive' };
+        if (pct <= -0.35) return { txt: 'Queda', tone: 'negative' };
+        return { txt: 'Estável', tone: 'neutral' };
+    };
+
+    const getItem = ({ key, label, matchers, weight }) => {
+        const symbol = resolveTickerSymbol(data, matchers);
+        const last = symbol ? getLastPoint(data, symbol) : null;
+        const pct = pctOf(last);
+        const present = !!(symbol && last && typeof last.price === 'number');
+        return { key, label, symbol, last, pct, present, weight: Number(weight) || 0 };
+    };
+
+    const items = [
+        getItem({ key: 'iron', label: 'Minério', matchers: [/^TIOc1$|^SM58Fc1$/i], weight: 0.28 }),
+        getItem({ key: 'soy', label: 'Soja', matchers: [/^ZS$/i], weight: 0.20 }),
+        getItem({ key: 'oil', label: 'Petróleo', matchers: [/\bBrent\b/i, /\bWTI\b/i], weight: 0.18 }),
+        getItem({ key: 'cattle', label: 'Boi', matchers: [/^LE$/i], weight: 0.12 }),
+        getItem({ key: 'coffee', label: 'Café', matchers: [/^KC$/i], weight: 0.07 }),
+        getItem({ key: 'sugar', label: 'Açúcar', matchers: [/^SB$/i], weight: 0.05 }),
+        getItem({ key: 'corn', label: 'Milho', matchers: [/^ZC$/i], weight: 0.04 }),
+    ];
+
+    const score = (() => {
+        let wSum = 0;
+        let sum = 0;
+        for (const it of items) {
+            if (typeof it.pct !== 'number') continue;
+            const w = Number(it.weight) || 0;
+            if (!Number.isFinite(w) || w <= 0) continue;
+            wSum += w;
+            sum += w * it.pct;
+        }
+        if (!wSum) return null;
+        return sum / wSum;
+    })();
+
+    const basket = (() => {
+        if (score === null) return { label: 'Inconclusivo', tone: 'neutral' };
+        if (score >= 0.25) return { label: 'Favorável', tone: 'positive' };
+        if (score <= -0.25) return { label: 'Desfavorável', tone: 'negative' };
+        return { label: 'Neutro', tone: 'neutral' };
+    })();
+
+    const essentials = ['iron', 'soy', 'oil', 'cattle', 'coffee'];
+    const presentEssentials = essentials.filter(k => items.find(x => x.key === k && x.present)).length;
+    const coverage = presentEssentials >= essentials.length ? { label: 'Completo', tone: 'positive' } : presentEssentials >= 3 ? { label: 'Parcial', tone: 'neutral' } : { label: 'Insuficiente', tone: 'negative' };
+
+    const rowHtml = items
+        .map(it => {
+            const status = it.present ? { label: 'OK', tone: 'positive' } : { label: 'AUSENTE', tone: 'negative' };
+            const dir = dirFromPct(it.pct);
+            const sym = it.symbol ? `<span style="opacity:.7;margin-left:8px;font-size:12px;">${escapeHtml(it.symbol)}</span>` : '';
+            return `
+                <div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);align-items:center;">
+                    <div style="min-width:0;">
+                        <div style="font-weight:900;letter-spacing:.6px;opacity:.92;">${it.present ? '✅' : '❌'} ${escapeHtml(it.label)}${sym}</div>
+                        <div style="opacity:.75;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(it.present ? 'Presente no feed' : 'Não encontrado no feed')}</div>
+                    </div>
+                    <div style="text-align:right;min-width:150px;display:flex;gap:8px;justify-content:flex-end;align-items:center;font-family:'Share Tech Mono',monospace;font-weight:900;">
+                        <span>${mk(status.tone, status.label)}</span>
+                        <span>${mk(dir.tone, dir.txt)}</span>
+                    </div>
+                </div>
+            `;
+        })
+        .join('');
+
+    el.innerHTML = `
+        <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+            <div style="display:grid;grid-template-columns:1fr;gap:10px;">
+                <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">
+                    <div style="font-weight:900;letter-spacing:.6px;opacity:.92;">Export Basket</div>
+                    <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(basket.tone, basket.label)}</div>
+                </div>
+                <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:6px 0;">
+                    <div style="font-weight:900;letter-spacing:.6px;opacity:.92;">Cobertura (essenciais)</div>
+                    <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(coverage.tone, coverage.label)}</div>
+                </div>
+            </div>
+        </div>
+        <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+            <div style="font-weight:900;letter-spacing:1px;opacity:.95;margin-bottom:8px;">Checklist de commodities-chave</div>
+            ${rowHtml}
+        </div>
+    `;
+}
+
 function renderBrazilMarket(data) {
     const tableId = 'brazilTable';
     const chartId = 'brazilChart';
     const assets = data && data.assets ? data.assets : [];
+
+    renderBrazilExportBasket(data);
 
     const allRows = assets.map(a => {
         const last = getLastPoint(data, a.symbol);
@@ -2745,6 +3967,7 @@ function renderAll(data) {
     renderOverview(data);
     renderFavorites(data);
     renderFlowSentinel(data);
+    renderCarryTradeMonitor(data);
     renderIntel(data);
     renderAllAssetsTable(data);
     renderBrazilMarket(data);
@@ -2818,6 +4041,23 @@ function formatUpdaterSummary(payload) {
     }
 }
 
+function requestAutoRefreshPage(reason) {
+    try {
+        sessionStorage.setItem('mercado_force_refresh_once', '1');
+        sessionStorage.setItem('mercado_force_refresh_reason', String(reason || ''));
+        sessionStorage.setItem('mercado_force_refresh_at', String(Date.now()));
+    } catch {
+    }
+
+    try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('r', String(Date.now()));
+        window.location.replace(url.toString());
+    } catch {
+        window.location.reload();
+    }
+}
+
 async function triggerUpdaterAndReload() {
     const baseUrl = getMarketServiceBaseUrl();
     try {
@@ -2864,6 +4104,7 @@ async function triggerUpdaterAndReload() {
         if (updated) renderAll(updated);
         void loadOptionsGammaSummary();
         void loadFinancialJuice();
+        void loadWebNewsModule();
         const sum = formatUpdaterSummary(lastPayload);
         if (sum && sum.text) {
             setDataStatus(sum.text, sum.tone || 'neutral');
@@ -2872,6 +4113,7 @@ async function triggerUpdaterAndReload() {
             setDataStatus('OK • Dados atualizados', 'positive');
             setTimeout(() => setDataStatus('', 'neutral'), 2500);
         }
+        setTimeout(() => requestAutoRefreshPage('manual_update_done'), 650);
         return true;
     } catch (e) {
         setDataStatus('ATUALIZADOR OFFLINE • Rode "Atualizar_Dados_Mercado.bat" e tente novamente', 'negative');
@@ -3050,6 +4292,7 @@ async function boot() {
     adaptSplitLayouts();
     void loadOptionsGammaSummary();
     void loadFinancialJuice();
+    void loadWebNewsModule();
 
     const reloadBtn = document.getElementById('reloadDataBtn');
     if (reloadBtn) {
@@ -3065,6 +4308,7 @@ async function boot() {
                 }
                 void loadOptionsGammaSummary();
                 void loadFinancialJuice();
+                void loadWebNewsModule();
             } catch (e) {
             }
         };
@@ -3091,10 +4335,12 @@ async function boot() {
             if (updated) renderAll(updated);
             void loadOptionsGammaSummary();
             void loadFinancialJuice();
+            void loadWebNewsModule();
             if (source) {
                 setDataStatus('AUTO • Dados atualizados', 'positive');
                 setTimeout(() => setDataStatus('', 'neutral'), 1500);
             }
+            if (source) setTimeout(() => requestAutoRefreshPage('auto_update_done'), 650);
             return true;
         } catch (e) {
             if (location.protocol === 'file:') {
@@ -3103,6 +4349,15 @@ async function boot() {
             return false;
         }
     };
+
+    try {
+        const force = sessionStorage.getItem('mercado_force_refresh_once') === '1';
+        if (force) {
+            sessionStorage.removeItem('mercado_force_refresh_once');
+            void refreshQuotes('');
+        }
+    } catch {
+    }
 
     const scheduleNext = () => {
         const delay = Math.max(0, nextAt - Date.now());

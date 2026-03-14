@@ -2345,20 +2345,30 @@ class StrangerThingsCharts {
     }
 
     updateKeyLevels(data) {
-        const keyLevels = data?.key_levels ?? data?.v3_data?.key_levels;
-        if (!keyLevels) return;
-        
+        const keyLevels = data?.key_levels ?? data?.v3_data?.key_levels ?? null;
+
         const setText = (id, value) => {
             const el = document.getElementById(id);
-            if (el) el.innerText = value !== null ? this.formatNumberBr(value, 2) : 'N/A';
+            if (!el) return;
+            if (value === null || value === undefined) {
+                el.innerText = 'N/A';
+                return;
+            }
+            const n = Number(value);
+            el.innerText = Number.isFinite(n) ? this.formatNumberBr(n, 2) : 'N/A';
         };
 
-        setText('gamma-flip', keyLevels.gamma_flip);
-        setText('call-wall', keyLevels.call_wall);
-        setText('put-wall', keyLevels.put_wall);
-        setText('edi-effective-call', keyLevels.effective_call_wall);
-        setText('edi-effective-put', keyLevels.effective_put_wall);
-        setText('max-pain', keyLevels.max_pain);
+        const get = (key) => {
+            if (!keyLevels || typeof keyLevels !== 'object') return null;
+            return Object.prototype.hasOwnProperty.call(keyLevels, key) ? keyLevels[key] : null;
+        };
+
+        setText('gamma-flip', get('gamma_flip'));
+        setText('call-wall', get('call_wall'));
+        setText('put-wall', get('put_wall'));
+        setText('edi-effective-call', get('effective_call_wall'));
+        setText('edi-effective-put', get('effective_put_wall'));
+        setText('max-pain', get('max_pain'));
     }
 
     updateNtslCode(data) {
@@ -2503,7 +2513,11 @@ class StrangerThingsCharts {
     }
 }
 
-// Initialize charts when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
+const __ediBootCharts = () => {
     window.strangerThingsCharts = new StrangerThingsCharts();
-});
+};
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', __ediBootCharts);
+} else {
+    __ediBootCharts();
+}
