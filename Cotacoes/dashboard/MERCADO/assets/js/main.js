@@ -2462,6 +2462,8 @@ function renderWebNewsModule(payload) {
     const globalTop = summary && Array.isArray(summary.globalTop) ? summary.globalTop : [];
     const brasilTop = summary && Array.isArray(summary.brasilTop) ? summary.brasilTop : [];
     const commoditiesTop = summary && Array.isArray(summary.commoditiesTop) ? summary.commoditiesTop : [];
+    const bullish = summary && Array.isArray(summary.bullish) ? summary.bullish : [];
+    const bearish = summary && Array.isArray(summary.bearish) ? summary.bearish : [];
 
     const sentimentTone =
         sentiment === 'Muito Otimista' || sentiment === 'Otimista' ? 'positive'
@@ -2532,6 +2534,22 @@ function renderWebNewsModule(payload) {
                 ${topicsLine('TOP Brasil', brasilTop)}
                 ${topicsLine('TOP Commodities', commoditiesTop)}
             </div>
+            ${(bullish && bullish.length) || (bearish && bearish.length)
+        ? `
+                <div style="margin-top:12px;border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(0,0,0,.12);">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">
+                        <div>
+                            <div style="font-weight:900;letter-spacing:1px;opacity:.92;margin-bottom:8px;">Bullish (Top 3)</div>
+                            ${(bullish || []).slice(0, 3).map(t => `<div style="opacity:.92;line-height:1.35;">• ${escapeHtml(String(t))}</div>`).join('') || `<div style="opacity:.80;">—</div>`}
+                        </div>
+                        <div>
+                            <div style="font-weight:900;letter-spacing:1px;opacity:.92;margin-bottom:8px;">Bearish (Top 3)</div>
+                            ${(bearish || []).slice(0, 3).map(t => `<div style="opacity:.92;line-height:1.35;">• ${escapeHtml(String(t))}</div>`).join('') || `<div style="opacity:.80;">—</div>`}
+                        </div>
+                    </div>
+                </div>
+              `
+        : ''}
             ${thesis
         ? `
                 <div style="margin-top:12px;border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(0,0,0,.12);">
