@@ -634,22 +634,51 @@ function computeCategoryAverages(data, categoryGroups) {
 }
 
 function computeFlowScore(data) {
-    const assets = data.assets || [];
-    const lastByTag = tag => {
-        const vals = assets
-            .filter(a => (a.tags || []).includes(tag))
-            .map(a => getLastPoint(data, a.symbol))
-            .filter(p => p && typeof p.changePct === 'number')
-            .map(p => p.changePct);
-        return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    const pctOf = (matcher, { invert = false } = {}) => {
+        const sym = findAssetSymbol(data, matcher);
+        if (!sym) return null;
+        const last = getLastPoint(data, sym);
+        const v = last && typeof last.changePct === 'number' ? last.changePct : null;
+        if (v === null || v === undefined || !Number.isFinite(v)) return null;
+        return invert ? -v : v;
     };
 
-    const riskOn = lastByTag('risk_on');
-    const riskOff = lastByTag('risk_off');
-    const score = riskOn - riskOff;
+    const cap = (v, maxAbs) => {
+        const x = typeof v === 'number' && Number.isFinite(v) ? v : 0;
+        const m = typeof maxAbs === 'number' && Number.isFinite(maxAbs) && maxAbs > 0 ? maxAbs : 2;
+        return Math.max(-m, Math.min(m, x));
+    };
+
+    const parts = [
+        { k: 'SPX', w: 0.18, v: pctOf(/(^\.SPX$|\bS&P 500\b|^SPY$|^ES\b|^ES[HMUZ]\\d{2}$)/i) },
+        { k: 'NQ', w: 0.12, v: pctOf(/(^\.NDX$|\bNasdaq 100\b|^QQQ$|^NQ\b|^NQ[HMUZ]\\d{2}$)/i) },
+        { k: 'EEM', w: 0.10, v: pctOf(/^EEM$/i) },
+        { k: 'EWZ', w: 0.08, v: pctOf(/^EWZ$/i) },
+        { k: 'CHINA', w: 0.06, v: pctOf(/(^FXI$|^\.(CSI300)\b|China A50|Shanghai Shenzhen CSI 300)/i) },
+        { k: 'VIX', w: 0.09, v: pctOf(/(^\.VIX$|\bVIX\b|Volatilidade)/i, { invert: true }) },
+        { k: 'DXY', w: 0.08, v: pctOf(/(^\.DXY$|\bDXY\b|US Dollar Index|Indice Dolar)/i, { invert: true }) },
+        { k: 'US10Y', w: 0.06, v: pctOf(/(^US10YT=RR$|\bUnited States 10-Year\b|\bEUA\b\s+a\s+10\s+anos\b)/i, { invert: true }) },
+        { k: 'CDS BR', w: 0.05, v: pctOf(/(^BRGV5YUSAC=R$|\bCDS\b.*\bBrasil\b|\bBrasil\b.*\bCDS\b)/i, { invert: true }) },
+        { k: 'Brent/WTI', w: 0.08, v: pctOf(/(\bBrent\b|\bWTI\b)/i) },
+        { k: 'Minério', w: 0.07, v: pctOf(/(^TIOc1$|^SM58Fc1$|\bmin[eé]rio\b|\biron ore\b)/i) },
+        { k: 'Soja', w: 0.05, v: pctOf(/(^ZS$|\bsoja\b|\bsoy\b)/i) },
+        { k: 'Cobre', w: 0.04, v: pctOf(/(^HG\b|\bcopper\b|\bcobre\b)/i) },
+        { k: 'AUD/USD', w: 0.05, v: pctOf(/^AUD\/USD\b/i) },
+        { k: 'NZD/USD', w: 0.03, v: pctOf(/^NZD\/USD\b/i) },
+        { k: 'USD/CAD', w: 0.03, v: pctOf(/^USD\/CAD\b/i, { invert: true }) },
+        { k: 'USD/RUB', w: 0.03, v: pctOf(/^USD\/RUB\b/i, { invert: true }) },
+        { k: 'USD/JPY', w: 0.03, v: pctOf(/^USD\/JPY\b/i) },
+    ];
+
+    const usable = parts.filter(x => typeof x.v === 'number' && Number.isFinite(x.v) && typeof x.w === 'number' && x.w > 0);
+    const wSum = usable.reduce((s, x) => s + x.w, 0);
+    const score = wSum > 0
+        ? usable.reduce((s, x) => s + ((cap(x.v, 2) / 2) * x.w), 0) / wSum
+        : 0;
+
     let label = 'Neutro';
-    if (score > 0.35) label = 'Risk-On';
-    if (score < -0.35) label = 'Risk-Off';
+    if (score > 0.08) label = 'Risk-On';
+    if (score < -0.08) label = 'Risk-Off';
     return { score, label };
 }
 
@@ -3340,9 +3369,11 @@ function renderGlobalTicker(data) {
         { short: 'EEM', fmt: 'price', matchers: [/^EEM\b/i, /\bMSCI Emerging Markets\b/i] },
         { short: 'DOW', fmt: 'price', matchers: [/^\.(DJI)\b/i, /\bDow Jones\b/i, /^DIA\b/i] },
         { short: 'IBOV', fmt: 'price', matchers: [/^\.(BVSP)\b/i, /\bBovespa\b/i] },
-        { short: 'DXY', fmt: 'price', matchers: [/^\.(DXY)\b/i, /\bUS Dollar Index\b/i] },
+        { short: 'DXY', fmt: 'price', matchers: [/^\.(DXY)\b/i, /^DX\b/i, /\bUS Dollar Index\b/i, /\bÍndice Dólar\b/i, /\bIndice Dolar\b/i] },
         { short: 'VIX', fmt: 'price', matchers: [/^VIX\b/i, /^\.(VIX9D|VIX)\b/i, /\bVolatility\b/i] },
-        { short: 'US10Y', fmt: 'yield', matchers: [/\bUnited States 10-Year\b/i, /^TNc2=/i] },
+        { short: 'US2Y', fmt: 'yield', matchers: [/\bUnited States 2-Year\b/i, /\bEUA\b\s+a\s+2\s+anos\b/i, /\bEstados Unidos\b.*\b2\b.*anos\b/i, /^TUc/i, /^US2YT=RR\b/i] },
+        { short: 'US10Y', fmt: 'yield', matchers: [/\bUnited States 10-Year\b/i, /\bEUA\b\s+a\s+10\s+anos\b/i, /\bEstados Unidos\b.*\b10\b.*anos\b/i, /^TNc2=/i, /^US10YT=RR\b/i] },
+        { short: 'US30Y', fmt: 'yield', matchers: [/\bUnited States 30-Year\b/i, /\bEUA\b\s+a\s+30\s+anos\b/i, /\bEstados Unidos\b.*\b30\b.*anos\b/i, /^WNc/i, /^US30YT=RR\b/i] },
         { short: 'USD/BRL', fmt: 'fx', matchers: [/^USD\/BRL\b/i] },
         { short: 'EUR/USD', fmt: 'fx', matchers: [/^EUR\/USD\b/i] },
         { short: 'OURO', fmt: 'price', matchers: [/\bXAU\/USD\b/i, /\bGold Spot\b/i, /\bSPDR.*Gold\b/i] },
@@ -3447,12 +3478,17 @@ function renderOverview(data) {
 function renderAllAssetsTable(data) {
     const containerId = 'allAssetsTable';
     const groups = [
-        { label: 'Commodities', categories: ['commodities', 'energy', 'agriculture'] },
-        { label: 'Metais', categories: ['metals'] },
-        { label: 'FX / Carry', categories: ['fx_g10', 'fx_emerging'] },
-        { label: 'Emergentes', categories: ['emerging'] },
-        { label: 'Volatilidade', categories: ['volatility'] },
+        { label: 'Ações & ETFs', categories: ['equities'] },
+        { label: 'Emergentes (ETFs/Índices)', categories: ['emerging'] },
+        { label: 'FX G10', categories: ['fx_g10'] },
+        { label: 'FX Emergentes', categories: ['fx_emerging'] },
         { label: 'Juros', categories: ['rates'] },
+        { label: 'Crédito (CDS/Spreads)', categories: ['credit'] },
+        { label: 'Volatilidade', categories: ['volatility'] },
+        { label: 'Commodities • Energia', categories: ['energy'] },
+        { label: 'Commodities • Metais', categories: ['metals'] },
+        { label: 'Commodities • Agrícolas', categories: ['agriculture'] },
+        { label: 'Commodities • Outras', categories: ['commodities'] },
         { label: 'Crypto', categories: ['crypto'] },
     ];
 
@@ -3740,6 +3776,115 @@ function renderCategory(data, containerId, chartId, categories, defaultSymbol) {
     }
 }
 
+function renderMercosul(data) {
+    const tableId = 'mercosulTable';
+    const chartId = 'mercosulChart';
+    const metricsId = 'mercosulMetrics';
+    const pulseId = 'mercosulPulse';
+
+    const metricsEl = document.getElementById(metricsId);
+    const pulseEl = document.getElementById(pulseId);
+    const tableEl = document.getElementById(tableId);
+    if (!metricsEl || !pulseEl || !tableEl) return;
+
+    const assets = data && Array.isArray(data.assets) ? data.assets : [];
+    const assetBySymbol = new Map(assets.map(a => [String(a && a.symbol ? a.symbol : ''), a]));
+
+    const pick = (label, matcher, { invertForScore = false } = {}) => {
+        const symbol = findAssetSymbol(data, matcher);
+        const last = symbol ? getLastPoint(data, symbol) : null;
+        const pct = last && typeof last.changePct === 'number' ? last.changePct : null;
+        const score = pct === null || pct === undefined || !Number.isFinite(pct) ? null : (invertForScore ? -pct : pct);
+        const a = symbol ? (assetBySymbol.get(symbol) || null) : null;
+        return { label, symbol, last, pct, score, asset: a };
+    };
+
+    const components = [
+        pick('USD/BRL (BR)', /^USD\/BRL\b/i, { invertForScore: true }),
+        pick('USD/UYU (UY)', /^USD\/UYU\b/i, { invertForScore: true }),
+        pick('USD/PYG (PY)', /^USD\/PYG\b/i, { invertForScore: true }),
+        pick('USD/ARS (AR)', /^USD\/ARS\b/i, { invertForScore: true }),
+        pick('Ibovespa', /(^\.BVSP$|\bIbovespa\b)/i),
+        pick('EWZ', /^EWZ\b/i),
+    ];
+
+    const fxStrength = avg(components.slice(0, 4).map(x => x.score));
+    const eqStrength = avg(components.slice(4).map(x => x.score));
+    const hasFx = typeof fxStrength === 'number' && Number.isFinite(fxStrength);
+    const hasEq = typeof eqStrength === 'number' && Number.isFinite(eqStrength);
+    const score = hasFx && hasEq ? (0.7 * fxStrength + 0.3 * eqStrength) : hasFx ? fxStrength : hasEq ? eqStrength : null;
+
+    let state = '—';
+    if (typeof score === 'number' && Number.isFinite(score)) {
+        if (score > 0.25) state = 'Entrada (LatAm/BR forte)';
+        else if (score < -0.25) state = 'Saída (USD/Stress LatAm)';
+        else state = 'Misto / neutro';
+    }
+
+    const badge = toneBadgeHtml(score, state, { maxAbs: 1.2 });
+    metricsEl.innerHTML = `
+        <div class="metric-card">
+            <div class="metric-icon">🌎</div>
+            <div class="metric-value">${score === null ? '—' : formatPercent(score, 2)}</div>
+            <div class="metric-label">Mercosul Pulse</div>
+            <div class="metric-change neutral">${badge}</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon">💱</div>
+            <div class="metric-value">${fxStrength === null ? '—' : formatPercent(fxStrength, 2)}</div>
+            <div class="metric-label">Cesta FX (força local)</div>
+            <div class="metric-change neutral">USD/BRL, UYU, PYG, ARS</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon">📊</div>
+            <div class="metric-value">${eqStrength === null ? '—' : formatPercent(eqStrength, 2)}</div>
+            <div class="metric-label">Proxies (Bolsa)</div>
+            <div class="metric-change neutral">Ibovespa + EWZ</div>
+        </div>
+    `;
+
+    const lines = components
+        .filter(x => x && x.symbol)
+        .map(x => {
+            const pctTxt = x && typeof x.pct === 'number' && Number.isFinite(x.pct) ? formatPercent(x.pct, 2) : '—';
+            const tone = toneBadgeHtml(x.pct, pctTxt, { maxAbs: 2.5, inverse: false });
+            return `<div style="display:flex;justify-content:space-between;gap:12px;">
+                <div style="opacity:.92;font-weight:900;">${escapeHtml(x.label)}</div>
+                <div>${tone}</div>
+            </div>`;
+        })
+        .join('');
+
+    pulseEl.innerHTML = lines ? `<div style="display:flex;flex-direction:column;gap:8px;">${lines}</div>` : '<div style="opacity:.85;">Sem dados suficientes para montar o bloco.</div>';
+
+    const rows = components
+        .filter(x => x && x.symbol)
+        .map(x => {
+            const a = x.asset || {};
+            return {
+                symbol: x.symbol,
+                name: x.label,
+                exchange: a && a.exchange ? a.exchange : '',
+                category: a && a.category ? a.category : 'other',
+                tags: a && Array.isArray(a.tags) ? a.tags : [],
+                last: x.last,
+            };
+        })
+        .filter(r => r.last && typeof r.last.price === 'number');
+
+    let selected = rows.length ? rows[0].symbol : null;
+    createTable(tableId, rows, data, symbol => {
+        selected = symbol;
+        const points = data.series[selected] || [];
+        window.MercadoCharts.renderLineChart(chartId, points, selected);
+    }, { limit: 20, sortable: false, tableKey: tableId, toolbar: false, favorites: true });
+
+    if (selected) {
+        const points = data.series[selected] || [];
+        window.MercadoCharts.renderLineChart(chartId, points, selected);
+    }
+}
+
 function renderMarketPanorama(data) {
     const el = document.getElementById('marketPanorama');
     if (!el) return;
@@ -3752,12 +3897,22 @@ function renderMarketPanorama(data) {
         }
     };
 
-    const frozenKey = 'mercado_panorama_frozen_v1';
+    const frozenKey = 'mercado_panorama_frozen_v2';
     const frozen = safeParse(localStorage.getItem(frozenKey)) || {};
+
+    const expandKey = 'mercado_panorama_expand_v1';
+    const expandedState = safeParse(localStorage.getItem(expandKey)) || {};
 
     const saveFrozen = next => {
         try {
             localStorage.setItem(frozenKey, JSON.stringify(next || {}));
+        } catch {
+        }
+    };
+
+    const saveExpanded = next => {
+        try {
+            localStorage.setItem(expandKey, JSON.stringify(next || {}));
         } catch {
         }
     };
@@ -3820,14 +3975,14 @@ function renderMarketPanorama(data) {
         return parsed.map(({ yy, mm, ...rest }) => rest);
     };
 
-    const rowsFor = (categories, { includeDxy = false, excludeSymbols = [] } = {}) => {
+    const rowsFor = (categories, { includeDxy = false, excludeSymbols = [], includeMissing = false } = {}) => {
         const cats = Array.isArray(categories) ? categories : [];
         const exclude = new Set((excludeSymbols || []).map(s => String(s)));
         const base = assets.filter(a => cats.includes(a && a.category ? a.category : ''));
         const rows = base
             .map(a => {
                 const symbol = String(a && a.symbol ? a.symbol : '');
-                const last = getMostRecentPointWithPrice(data, symbol);
+                const last = includeMissing ? getLastPoint(data, symbol) : getMostRecentPointWithPrice(data, symbol);
                 const price = last && typeof last.price === 'number' ? last.price : null;
                 const pct = last && typeof last.changePct === 'number' ? last.changePct : null;
                 const t = last && last.t ? String(last.t) : '';
@@ -3836,7 +3991,7 @@ function renderMarketPanorama(data) {
                 return { label, symbol, icon, price, pct, t };
             })
             .filter(r => r.symbol && !exclude.has(r.symbol))
-            .filter(r => typeof r.price === 'number' && Number.isFinite(r.price));
+            .filter(r => includeMissing ? true : (typeof r.price === 'number' && Number.isFinite(r.price)));
 
         if (includeDxy) {
             const dxySymbol = findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index)/i);
@@ -3856,19 +4011,28 @@ function renderMarketPanorama(data) {
         return rows;
     };
 
-    const groups = [
-        { key: 'asia', title: 'Ásia/Pacífico', categories: ['asia'], opt: {} },
-        { key: 'dxy', title: 'DXY', categories: ['fx_g10'], opt: { includeDxy: true } },
-        { key: 'emerging', title: 'Emergentes', categories: ['fx_emerging', 'emerging'], opt: {} },
-        { key: 'br_di', title: 'Juros Brasil (DI)', kind: 'di' },
-        { key: 'rates', title: 'Títulos', categories: ['rates'], opt: {} },
-        { key: 'metals', title: 'Metais', categories: ['metals'], opt: {} },
-        { key: 'agri', title: 'Agrícolas', categories: ['agriculture'], opt: {} },
-        { key: 'energy', title: 'Energia', categories: ['energy'], opt: {} },
-        { key: 'commodities', title: 'Commodities', categories: ['commodities'], opt: {} },
-        { key: 'principal', title: 'Principais', categories: ['volatility'], opt: { excludeSymbols: [findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index)/i) || ''] } },
-        { key: 'crypto', title: 'Criptos', categories: ['crypto'], opt: {} },
+    const baseGroups = [
+        { key: 'equities', title: 'Ações & ETFs', maxRows: 18, categories: ['equities'], opt: { includeMissing: true } },
+        { key: 'emerging', title: 'Emergentes (ETFs/Índices)', maxRows: 14, categories: ['emerging'], opt: { includeMissing: true } },
+        { key: 'fx_g10', title: 'FX G10', maxRows: 14, categories: ['fx_g10'], opt: { includeDxy: true, includeMissing: true } },
+        { key: 'fx_em', title: 'FX Emergentes', maxRows: 14, categories: ['fx_emerging'], opt: { includeMissing: true } },
+        { key: 'br_di', title: 'Juros Brasil (DI)', maxRows: 16, kind: 'di' },
+        { key: 'rates', title: 'Juros & Títulos', maxRows: 14, categories: ['rates'], opt: { includeMissing: true } },
+        { key: 'credit', title: 'Crédito (CDS/Spreads)', maxRows: 14, categories: ['credit'], opt: { includeMissing: true } },
+        { key: 'vol', title: 'Volatilidade', maxRows: 12, categories: ['volatility'], opt: { includeMissing: true } },
+        { key: 'energy', title: 'Commodities • Energia', maxRows: 12, categories: ['energy'], opt: { includeMissing: true } },
+        { key: 'metals', title: 'Commodities • Metais', maxRows: 12, categories: ['metals'], opt: { includeMissing: true } },
+        { key: 'agri', title: 'Commodities • Agrícolas', maxRows: 12, categories: ['agriculture'], opt: { includeMissing: true } },
+        { key: 'commodities', title: 'Commodities • Outras', maxRows: 12, categories: ['commodities'], opt: { includeMissing: true } },
+        { key: 'crypto', title: 'Criptos', maxRows: 12, categories: ['crypto'], opt: { includeMissing: true } },
     ];
+
+    const usedCats = new Set(baseGroups.flatMap(g => (g && g.categories ? g.categories : [])));
+    const allCats = Array.from(new Set(assets.map(a => (a && a.category ? String(a.category) : '')).filter(Boolean)));
+    const extras = allCats.filter(c => c && !usedCats.has(c));
+    const groups = extras.length
+        ? baseGroups.concat([{ key: 'outros', title: 'Outros', categories: extras, opt: { includeMissing: true } }])
+        : baseGroups;
 
     const buildSnapshot = group => {
         if (group && group.kind === 'di') {
@@ -3880,12 +4044,18 @@ function renderMarketPanorama(data) {
     };
 
     const renderCard = (group, snap, isFrozen) => {
-        const rows = (snap && Array.isArray(snap.rows) ? snap.rows : []).slice().filter(r => r && r.symbol);
+        const allRows = (snap && Array.isArray(snap.rows) ? snap.rows : []).slice().filter(r => r && r.symbol);
+        const maxRows = typeof group.maxRows === 'number' && Number.isFinite(group.maxRows) && group.maxRows > 0 ? group.maxRows : 14;
+        const isExpanded = !!(expandedState && expandedState[group.key]);
+        const canExpand = allRows.length > maxRows;
+        const rows = canExpand && !isExpanded ? allRows.slice(0, maxRows) : allRows;
         const freezeAt = snap && snap.at ? formatDateTime(snap.at) : '';
         const subtitle = isFrozen && freezeAt ? `Congelado • ${freezeAt}` : '';
+        const countTxt = allRows.length ? `${allRows.length}` : '';
         const headRight = `
             <div style="display:flex;gap:10px;align-items:center;">
                 ${subtitle ? `<div style="opacity:.75;font-weight:800;letter-spacing:.6px;font-size:12px;">${escapeHtml(subtitle)}</div>` : ''}
+                ${canExpand ? `<button class="panorama-freeze" data-panorama-expand="${escapeHtml(group.key)}" aria-pressed="${isExpanded ? 'true' : 'false'}">${isExpanded ? 'Recolher' : `Ver tudo (${escapeHtml(countTxt)})`}</button>` : ''}
                 <button class="panorama-freeze" data-panorama-freeze="${escapeHtml(group.key)}" aria-pressed="${isFrozen ? 'true' : 'false'}">Congelar</button>
             </div>
         `;
@@ -3930,7 +4100,7 @@ function renderMarketPanorama(data) {
 
         return `<div class="panorama-card" data-panorama-card="${escapeHtml(group.key)}">
             <div class="panorama-card__header">
-                <div class="panorama-card__title">${escapeHtml(group.title)}</div>
+                <div class="panorama-card__title">${escapeHtml(group.title)}${countTxt ? ` <span style="opacity:.7;font-weight:900;">(${escapeHtml(countTxt)})</span>` : ''}</div>
                 ${headRight}
             </div>
             ${body}
@@ -3969,6 +4139,18 @@ function renderMarketPanorama(data) {
             renderMarketPanorama(data);
         });
     });
+
+    el.querySelectorAll('[data-panorama-expand]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const key = btn.getAttribute('data-panorama-expand') || '';
+            if (!key) return;
+            const next = { ...(expandedState || {}) };
+            if (next[key]) delete next[key];
+            else next[key] = true;
+            saveExpanded(next);
+            renderMarketPanorama(data);
+        });
+    });
 }
 
 function renderAll(data) {
@@ -3993,6 +4175,7 @@ function renderAll(data) {
     renderCategory(data, 'metalsTable', 'metalsChart', ['metals']);
     renderCategory(data, 'fxTable', 'fxChart', ['fx_g10', 'fx_emerging']);
     renderCategory(data, 'emergingTable', 'emergingChart', ['emerging']);
+    renderMercosul(data);
     renderAlerts(data);
     renderMarketPanorama(data);
 }
@@ -4304,7 +4487,16 @@ window.addEventListener('resize', scheduleAdaptSplitLayouts);
 async function boot() {
     setupNav();
 
-    const data = getData();
+    let data = getData();
+    if (!data) {
+        try {
+            await loadScriptFresh('assets/data/market_quotes.js');
+            await loadScriptFresh('assets/data/economic_calendar.js');
+            agendaAutoCache = null;
+            data = getData();
+        } catch {
+        }
+    }
     if (data) renderAll(data);
     else setDataStatus('DADOS NÃO CARREGADOS • Verifique assets/data/market_quotes.js', 'negative');
     adaptSplitLayouts();
