@@ -937,6 +937,12 @@ function renderRegimeConviction(data) {
     const flow = computeFlowScore(data);
     const regimeScore = Number(flow.score.toFixed(3));
     const regimeLabel = flow.label;
+    const regimeOperational =
+        regimeLabel === 'Risk-On'
+            ? { wdo: 'VENDA', win: 'COMPRA', hint: 'Risk-on tende a WDO↓ / WIN↑ (filtro, não gatilho).' }
+            : regimeLabel === 'Risk-Off'
+                ? { wdo: 'COMPRA', win: 'VENDA', hint: 'Risk-off tende a WDO↑ / WIN↓ (filtro, não gatilho).' }
+                : { wdo: '—', win: '—', hint: 'Regime indefinido (filtro, não gatilho).' };
 
     const assets = data.assets || [];
     const nowMs = Date.now();
@@ -1151,6 +1157,12 @@ function renderRegimeConviction(data) {
                 <div class="metric-value">${escapeHtml(regimeLabel)}</div>
                 <div class="metric-label">Regime</div>
                 <div class="metric-change">${toneBadgeHtmlFromTone(regimeScore > 0.35 ? 'positive' : regimeScore < -0.35 ? 'negative' : 'neutral', regimeScore, formatNumber(regimeScore, 2), { maxAbs: 1 })}</div>
+                <div style="margin-top:8px;opacity:.88;font-size:12px;line-height:1.25;">
+                    <span style="font-weight:900;letter-spacing:.8px;">WDO ${escapeHtml(regimeOperational.wdo)}</span>
+                    <span style="opacity:.75;"> • </span>
+                    <span style="font-weight:900;letter-spacing:.8px;">WIN ${escapeHtml(regimeOperational.win)}</span>
+                    <div style="margin-top:6px;opacity:.8;">${escapeHtml(regimeOperational.hint)}</div>
+                </div>
             </div>
             <div class="metric-card">
                 <div class="metric-icon">🧱</div>
@@ -1754,7 +1766,7 @@ function agendaCountryFromCurrency(currency) {
     const c = String(currency || '').toUpperCase().trim();
     if (c === 'BRL') return 'BR';
     if (c === 'USD') return 'EUA';
-    if (c === 'CNY' || c === 'CNH') return 'CHINA/HK';
+    if (c === 'CNY' || c === 'CNH' || c === 'HKD') return 'CHINA/HK';
     return c ? 'OUTRO' : '—';
 }
 
@@ -2020,7 +2032,7 @@ function renderAgendaMatrix() {
     const seen = new Set();
 
     const autoRaw = Array.isArray(agendaAutoCache) ? agendaAutoCache : [];
-    const allowedAutoCurrencies = new Set(['BRL', 'USD', 'EUR', 'CNY', 'CNH', 'JPY', 'GBP']);
+    const allowedAutoCurrencies = new Set(['BRL', 'USD', 'EUR', 'CNY', 'CNH', 'HKD', 'JPY', 'GBP']);
     const autoAll = autoRaw
         .map(x => ({
             id: `auto_${String(x && x.id ? x.id : `${Date.now()}_${Math.random().toString(16).slice(2)}`)}`,

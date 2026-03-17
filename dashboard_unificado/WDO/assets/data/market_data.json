@@ -1,6 +1,6 @@
 {
-    "last_updated": "2026-03-17 10:00:13",
-    "spot_price": 5253.0,
+    "last_updated": "2026-03-17 12:04:17",
+    "spot_price": 5218.0,
     "fed_watch_rates": {
         "source": "Investing Fed Rate Monitor",
         "last_update": "2026-03-17",
@@ -10,8 +10,8 @@
                 "days_remaining": 0,
                 "current_rate": "3.50-3.75",
                 "probs": {
-                    "3.25-3.50": 1.1,
-                    "3.50-3.75": 99.9,
+                    "3.25-3.50": 1.9,
+                    "3.50-3.75": 98.1,
                     "3.75-4.00": 0.1
                 }
             },
@@ -20,9 +20,9 @@
                 "days_remaining": 42,
                 "current_rate": "3.50-3.75",
                 "probs": {
-                    "3.00-3.25": 0.1,
-                    "3.25-3.50": 2.1,
-                    "3.50-3.75": 97.7,
+                    "3.00-3.25": 0.0,
+                    "3.25-3.50": 3.9,
+                    "3.50-3.75": 96.0,
                     "3.75-4.00": 0.1
                 }
             },
@@ -32,9 +32,9 @@
                 "current_rate": "3.50-3.75",
                 "probs": {
                     "2.75-3.00": 0.0,
-                    "3.00-3.25": 0.4,
-                    "3.25-3.50": 21.3,
-                    "3.50-3.75": 78.1,
+                    "3.00-3.25": 0.7,
+                    "3.25-3.50": 20.6,
+                    "3.50-3.75": 78.7,
                     "3.75-4.00": 0.1
                 }
             },
@@ -44,10 +44,10 @@
                 "current_rate": "3.50-3.75",
                 "probs": {
                     "2.50-2.75": 0.0,
-                    "2.75-3.00": 0.1,
-                    "3.00-3.25": 4.6,
-                    "3.25-3.50": 32.6,
-                    "3.50-3.75": 62.6,
+                    "2.75-3.00": 0.2,
+                    "3.00-3.25": 4.7,
+                    "3.25-3.50": 32.1,
+                    "3.50-3.75": 63.0,
                     "3.75-4.00": 0.1
                 }
             },
@@ -58,10 +58,10 @@
                 "probs": {
                     "2.25-2.50": 0.0,
                     "2.50-2.75": 0.0,
-                    "2.75-3.00": 1.1,
+                    "2.75-3.00": 1.2,
                     "3.00-3.25": 10.8,
-                    "3.25-3.50": 39.3,
-                    "3.50-3.75": 48.7,
+                    "3.25-3.50": 39.0,
+                    "3.50-3.75": 49.0,
                     "3.75-4.00": 0.1
                 }
             },
@@ -73,10 +73,10 @@
                     "2.00-2.25": 0.0,
                     "2.25-2.50": 0.0,
                     "2.50-2.75": 0.2,
-                    "2.75-3.00": 2.4,
-                    "3.00-3.25": 14.8,
-                    "3.25-3.50": 40.6,
-                    "3.50-3.75": 42.0,
+                    "2.75-3.00": 2.5,
+                    "3.00-3.25": 14.7,
+                    "3.25-3.50": 40.4,
+                    "3.50-3.75": 42.3,
                     "3.75-4.00": 0.1
                 }
             },
@@ -87,18 +87,18 @@
                 "probs": {
                     "1.75-2.00": 0.0,
                     "2.00-2.25": 0.0,
-                    "2.25-2.50": 0.0,
+                    "2.25-2.50": 0.1,
                     "2.50-2.75": 0.8,
-                    "2.75-3.00": 5.6,
-                    "3.00-3.25": 21.5,
-                    "3.25-3.50": 41.0,
-                    "3.50-3.75": 31.1,
+                    "2.75-3.00": 5.9,
+                    "3.00-3.25": 21.9,
+                    "3.25-3.50": 40.9,
+                    "3.50-3.75": 30.4,
                     "3.75-4.00": 0.0
                 }
             }
         ]
     },
-    "ntsl_script": "// NTSL Indicator - Edi OpenInterest Levels - 17/03/2026 10:00\n// Gerado Automaticamente\n\nconst\n  clCallWall = clBlue;\n  clPutWall = clRed;\n  clGammaFlip = clFuchsia;\n  clDeltaFlip = clYellow;\n  clRangeHigh = clLime;\n  clRangeLow = clRed;\n  clMaxPain = clPurple;\n  clExpMove = clWhite;\n  clEdiWall = clSilver;\n  clEffectiveWall = clAqua;\n  clFib = clYellow;\n  TamanhoFonte = 8;\n\ninput\n  ExibirWalls(true);\n  ExibirFlips(true);\n  ExibirRange(true);\n  ExibirMaxPain(true);\n  ExibirExpMoves(true);\n  ExibirEdiWall(true);\n  ExibirEffectiveWalls(true);\n  MostrarPLUS(true);\n  MostrarPLUS2(true);\n  ExibirMelhoresPontos(false);\n  MostrarTodosPontos(false); // Se falso, limita a +/- 10k pts do Spot\n  ModeloFlip(5);\n  spot(5253.00);\n\nvar\n  GammaVal: Float;\n  LimitUpper, LimitLower: Float;\n  ShowLine: Boolean;\n\nbegin\n  // Inicializa GammaVal com o primeiro disponivel por seguranca\n  GammaVal := 5323.55;\n\n  // Define Limites de Exibicao (Otimizacao)\n  if (MostrarTodosPontos) then begin\n    LimitUpper := 9999999;\n    LimitLower := 0;\n  end else begin\n    LimitUpper := spot + 10000;\n    LimitLower := spot - 10000;\n  end;\n\n  // 1 = Classic (5323.55)\n  // 2 = Spline (5324.39)\n  // 3 = HVL (5300.27)\n  // 4 = HVL Log (5271.37)\n  // 5 = Sigma Kernel (5271.27)\n  // 6 = PVOP (5323.55)\n  // 7 = HVL Gaussian (5320.21)\n\n  // --- Linhas Principais (Com Intercala\u00e7\u00e3o de Texto) ---\n  if (ModeloFlip = 1) then GammaVal := 5323.55;\n  if (ModeloFlip = 2) then GammaVal := 5324.39;\n  if (ModeloFlip = 3) then GammaVal := 5300.27;\n  if (ModeloFlip = 4) then GammaVal := 5271.37;\n  if (ModeloFlip = 5) then GammaVal := 5271.27;\n  if (ModeloFlip = 6) then GammaVal := 5323.55;\n  if (ModeloFlip = 7) then GammaVal := 5320.21;\n  ShowLine := (ExibirWalls) and (4500.00 <= LimitUpper) and (4500.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(4500.00, clPutWall, 1, psDash, \"PutWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5000.00 <= LimitUpper) and (5000.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5000.00, clPutWall, 1, psDash, \"PutWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirRange) and (5000.00 <= LimitUpper) and (5000.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5000.00, clRangeLow, 1, psDot, \"Edi_Range\", TamanhoFonte, tpTopRight, 0, 0);\n  ShowLine := (ExibirWalls) and (5150.00 <= LimitUpper) and (5150.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5150.00, clPutWall, 1, psDash, \"PutWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5200.00 <= LimitUpper) and (5200.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5200.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5200.00 <= LimitUpper) and (5200.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5200.00, clPutWall, 1, psDash, \"PutWall\", TamanhoFonte, tpTopRight, 0, 0);\n  ShowLine := (ExibirExpMoves) and (5213.89 <= LimitUpper) and (5213.89 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5213.89, clExpMove, 1, psDot, \"Edi_ExpMove\", TamanhoFonte, tpTopRight, CurrentDate, 0);\n  ShowLine := (ExibirWalls) and (5250.00 <= LimitUpper) and (5250.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5250.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5250.00 <= LimitUpper) and (5250.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5250.00, clPutWall, 1, psDash, \"PutWall\", TamanhoFonte, tpTopRight, 0, 0);\n  ShowLine := (ExibirExpMoves) and (5292.11 <= LimitUpper) and (5292.11 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5292.11, clExpMove, 1, psDot, \"Edi_ExpMove\", TamanhoFonte, tpTopRight, CurrentDate, 0);\n  ShowLine := (ExibirWalls) and (5300.00 <= LimitUpper) and (5300.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5300.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpBottomRight, 0, 0);\n  ShowLine := (ExibirWalls) and (5350.00 <= LimitUpper) and (5350.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5350.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirRange) and (5350.00 <= LimitUpper) and (5350.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5350.00, clRangeHigh, 1, psDot, \"Edi_Range\", TamanhoFonte, tpTopRight, 0, 0);\n  ShowLine := (ExibirWalls) and (5400.00 <= LimitUpper) and (5400.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5400.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirMaxPain) and (5400.00 <= LimitUpper) and (5400.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5400.00, clMaxPain, 2, psSolid, \"Edi_MaxPain\", TamanhoFonte, tpTopRight, CurrentDate, 0);\n  ShowLine := (ExibirWalls) and (5425.00 <= LimitUpper) and (5425.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5425.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirEffectiveWalls) and (5441.31 <= LimitUpper) and (5441.31 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5441.31, clEffectiveWall, 2, psDashDot, \"Edi Effective Put\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5500.00 <= LimitUpper) and (5500.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5500.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5600.00 <= LimitUpper) and (5600.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5600.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5700.00 <= LimitUpper) and (5700.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5700.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5800.00 <= LimitUpper) and (5800.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5800.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirEffectiveWalls) and (5805.94 <= LimitUpper) and (5805.94 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5805.94, clEffectiveWall, 2, psDashDot, \"Edi Effective Call\", TamanhoFonte, tpTopRight, 0, 0);\n  ShowLine := (ExibirWalls) and (6000.00 <= LimitUpper) and (6000.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(6000.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (6000.00 <= LimitUpper) and (6000.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(6000.00, clPutWall, 1, psDash, \"PutWall\", TamanhoFonte, tpTopRight, 0, 0);\n  ShowLine := (ExibirWalls) and (6200.00 <= LimitUpper) and (6200.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(6200.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n\n  // Flips (Din\u00e2micos)\n  if (ExibirFlips) then begin\n    if (GammaVal > 0) then\n      HorizontalLineCustom(GammaVal, clGammaFlip, 2, psDash, \"Edi_GammaFlip\", TamanhoFonte, tpTopRight, CurrentDate, 0);\n    if (5344.65 > 0) then\n      HorizontalLineCustom(5344.65, clDeltaFlip, 2, psDash, \"Edi_DeltaFlip\", TamanhoFonte, tpTopRight, CurrentDate, 0);\n  end;\n\n  // Edi_Wall (Midpoints) - Grid Completo\n  if (ExibirEdiWall) then begin\n    if (4750.00 <= LimitUpper) and (4750.00 >= LimitLower) then\n      HorizontalLineCustom(4750.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5075.00 <= LimitUpper) and (5075.00 >= LimitLower) then\n      HorizontalLineCustom(5075.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5175.00 <= LimitUpper) and (5175.00 >= LimitLower) then\n      HorizontalLineCustom(5175.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5225.00 <= LimitUpper) and (5225.00 >= LimitLower) then\n      HorizontalLineCustom(5225.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5275.00 <= LimitUpper) and (5275.00 >= LimitLower) then\n      HorizontalLineCustom(5275.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5325.00 <= LimitUpper) and (5325.00 >= LimitLower) then\n      HorizontalLineCustom(5325.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5375.00 <= LimitUpper) and (5375.00 >= LimitLower) then\n      HorizontalLineCustom(5375.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5412.50 <= LimitUpper) and (5412.50 >= LimitLower) then\n      HorizontalLineCustom(5412.50, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5462.50 <= LimitUpper) and (5462.50 >= LimitLower) then\n      HorizontalLineCustom(5462.50, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5550.00 <= LimitUpper) and (5550.00 >= LimitLower) then\n      HorizontalLineCustom(5550.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5650.00 <= LimitUpper) and (5650.00 >= LimitLower) then\n      HorizontalLineCustom(5650.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5750.00 <= LimitUpper) and (5750.00 >= LimitLower) then\n      HorizontalLineCustom(5750.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5900.00 <= LimitUpper) and (5900.00 >= LimitLower) then\n      HorizontalLineCustom(5900.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (6100.00 <= LimitUpper) and (6100.00 >= LimitLower) then\n      HorizontalLineCustom(6100.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n  end;\n\n  if (MostrarPLUS) then begin\n    if (4691.00 <= LimitUpper) and (4691.00 >= LimitLower) then\n      HorizontalLineCustom(4691.00, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (4809.00 <= LimitUpper) and (4809.00 >= LimitLower) then\n      HorizontalLineCustom(4809.00, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5057.30 <= LimitUpper) and (5057.30 >= LimitLower) then\n      HorizontalLineCustom(5057.30, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5092.70 <= LimitUpper) and (5092.70 >= LimitLower) then\n      HorizontalLineCustom(5092.70, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5169.10 <= LimitUpper) and (5169.10 >= LimitLower) then\n      HorizontalLineCustom(5169.10, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5180.90 <= LimitUpper) and (5180.90 >= LimitLower) then\n      HorizontalLineCustom(5180.90, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5219.10 <= LimitUpper) and (5219.10 >= LimitLower) then\n      HorizontalLineCustom(5219.10, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5230.90 <= LimitUpper) and (5230.90 >= LimitLower) then\n      HorizontalLineCustom(5230.90, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5269.10 <= LimitUpper) and (5269.10 >= LimitLower) then\n      HorizontalLineCustom(5269.10, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5280.90 <= LimitUpper) and (5280.90 >= LimitLower) then\n      HorizontalLineCustom(5280.90, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5319.10 <= LimitUpper) and (5319.10 >= LimitLower) then\n      HorizontalLineCustom(5319.10, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5330.90 <= LimitUpper) and (5330.90 >= LimitLower) then\n      HorizontalLineCustom(5330.90, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5369.10 <= LimitUpper) and (5369.10 >= LimitLower) then\n      HorizontalLineCustom(5369.10, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5380.90 <= LimitUpper) and (5380.90 >= LimitLower) then\n      HorizontalLineCustom(5380.90, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5409.55 <= LimitUpper) and (5409.55 >= LimitLower) then\n      HorizontalLineCustom(5409.55, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5415.45 <= LimitUpper) and (5415.45 >= LimitLower) then\n      HorizontalLineCustom(5415.45, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5453.65 <= LimitUpper) and (5453.65 >= LimitLower) then\n      HorizontalLineCustom(5453.65, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5471.35 <= LimitUpper) and (5471.35 >= LimitLower) then\n      HorizontalLineCustom(5471.35, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5538.20 <= LimitUpper) and (5538.20 >= LimitLower) then\n      HorizontalLineCustom(5538.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5561.80 <= LimitUpper) and (5561.80 >= LimitLower) then\n      HorizontalLineCustom(5561.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5638.20 <= LimitUpper) and (5638.20 >= LimitLower) then\n      HorizontalLineCustom(5638.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5661.80 <= LimitUpper) and (5661.80 >= LimitLower) then\n      HorizontalLineCustom(5661.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5738.20 <= LimitUpper) and (5738.20 >= LimitLower) then\n      HorizontalLineCustom(5738.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5761.80 <= LimitUpper) and (5761.80 >= LimitLower) then\n      HorizontalLineCustom(5761.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5876.40 <= LimitUpper) and (5876.40 >= LimitLower) then\n      HorizontalLineCustom(5876.40, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5923.60 <= LimitUpper) and (5923.60 >= LimitLower) then\n      HorizontalLineCustom(5923.60, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (6076.40 <= LimitUpper) and (6076.40 >= LimitLower) then\n      HorizontalLineCustom(6076.40, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (6123.60 <= LimitUpper) and (6123.60 >= LimitLower) then\n      HorizontalLineCustom(6123.60, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n  end;\n\n  if (MostrarPLUS2) then begin\n    if (4618.00 <= LimitUpper) and (4618.00 >= LimitLower) then\n      HorizontalLineCustom(4618.00, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (4882.00 <= LimitUpper) and (4882.00 >= LimitLower) then\n      HorizontalLineCustom(4882.00, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5035.40 <= LimitUpper) and (5035.40 >= LimitLower) then\n      HorizontalLineCustom(5035.40, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5114.60 <= LimitUpper) and (5114.60 >= LimitLower) then\n      HorizontalLineCustom(5114.60, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5161.80 <= LimitUpper) and (5161.80 >= LimitLower) then\n      HorizontalLineCustom(5161.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5188.20 <= LimitUpper) and (5188.20 >= LimitLower) then\n      HorizontalLineCustom(5188.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5211.80 <= LimitUpper) and (5211.80 >= LimitLower) then\n      HorizontalLineCustom(5211.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5238.20 <= LimitUpper) and (5238.20 >= LimitLower) then\n      HorizontalLineCustom(5238.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5261.80 <= LimitUpper) and (5261.80 >= LimitLower) then\n      HorizontalLineCustom(5261.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5288.20 <= LimitUpper) and (5288.20 >= LimitLower) then\n      HorizontalLineCustom(5288.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5311.80 <= LimitUpper) and (5311.80 >= LimitLower) then\n      HorizontalLineCustom(5311.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5338.20 <= LimitUpper) and (5338.20 >= LimitLower) then\n      HorizontalLineCustom(5338.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5361.80 <= LimitUpper) and (5361.80 >= LimitLower) then\n      HorizontalLineCustom(5361.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5388.20 <= LimitUpper) and (5388.20 >= LimitLower) then\n      HorizontalLineCustom(5388.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5405.90 <= LimitUpper) and (5405.90 >= LimitLower) then\n      HorizontalLineCustom(5405.90, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5419.10 <= LimitUpper) and (5419.10 >= LimitLower) then\n      HorizontalLineCustom(5419.10, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5442.70 <= LimitUpper) and (5442.70 >= LimitLower) then\n      HorizontalLineCustom(5442.70, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5482.30 <= LimitUpper) and (5482.30 >= LimitLower) then\n      HorizontalLineCustom(5482.30, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5523.60 <= LimitUpper) and (5523.60 >= LimitLower) then\n      HorizontalLineCustom(5523.60, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5576.40 <= LimitUpper) and (5576.40 >= LimitLower) then\n      HorizontalLineCustom(5576.40, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5623.60 <= LimitUpper) and (5623.60 >= LimitLower) then\n      HorizontalLineCustom(5623.60, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5676.40 <= LimitUpper) and (5676.40 >= LimitLower) then\n      HorizontalLineCustom(5676.40, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5723.60 <= LimitUpper) and (5723.60 >= LimitLower) then\n      HorizontalLineCustom(5723.60, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5776.40 <= LimitUpper) and (5776.40 >= LimitLower) then\n      HorizontalLineCustom(5776.40, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5847.20 <= LimitUpper) and (5847.20 >= LimitLower) then\n      HorizontalLineCustom(5847.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5952.80 <= LimitUpper) and (5952.80 >= LimitLower) then\n      HorizontalLineCustom(5952.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (6047.20 <= LimitUpper) and (6047.20 >= LimitLower) then\n      HorizontalLineCustom(6047.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (6152.80 <= LimitUpper) and (6152.80 >= LimitLower) then\n      HorizontalLineCustom(6152.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n  end;\n\n  if (ExibirMelhoresPontos and LastBarOnChart) then\n  begin\n    HorizontalLineCustom(5260.88, clRed, 1, psDash, \"Edi_Wall_Venda\", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.1);\n    HorizontalLineCustom(5245.12, clLime, 1, psDash, \"Edi_Wall_Compra\", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.1);\n    HorizontalLineCustom(5268.76, clRed, 1, psDash, \"Edi_Wall_MelhorVenda\", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.3);\n    HorizontalLineCustom(5237.24, clLime, 1, psDash, \"Edi_Wall_MelhorCompra\", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.3);\n    HorizontalLineCustom(5283.39, clRed, 1, psDash, \"Edi_Wall_MelhorVenda\", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.5);\n    HorizontalLineCustom(5222.61, clLime, 1, psDash, \"Edi_Wall_MelhorCompra\", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.5);\n    HorizontalLineCustom(5291.27, clRed, 1, psDash, \"Edi_Wall_MelhorVenda\", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.7);\n    HorizontalLineCustom(5214.73, clLime, 1, psDash, \"Edi_Wall_MelhorCompra\", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.7);\n  end;\nend;",
+    "ntsl_script": "// NTSL Indicator - Edi OpenInterest Levels - 17/03/2026 12:04\n// Gerado Automaticamente\n\nconst\n  clCallWall = clBlue;\n  clPutWall = clRed;\n  clGammaFlip = clFuchsia;\n  clDeltaFlip = clYellow;\n  clRangeHigh = clLime;\n  clRangeLow = clRed;\n  clMaxPain = clPurple;\n  clExpMove = clWhite;\n  clEdiWall = clSilver;\n  clEffectiveWall = clAqua;\n  clFib = clYellow;\n  TamanhoFonte = 8;\n\ninput\n  ExibirWalls(true);\n  ExibirFlips(true);\n  ExibirRange(true);\n  ExibirMaxPain(true);\n  ExibirExpMoves(true);\n  ExibirEdiWall(true);\n  ExibirEffectiveWalls(true);\n  MostrarPLUS(true);\n  MostrarPLUS2(true);\n  ExibirMelhoresPontos(false);\n  MostrarTodosPontos(false); // Se falso, limita a +/- 10k pts do Spot\n  ModeloFlip(3);\n  spot(5218.00);\n\nvar\n  GammaVal: Float;\n  LimitUpper, LimitLower: Float;\n  ShowLine: Boolean;\n\nbegin\n  // Inicializa GammaVal com o primeiro disponivel por seguranca\n  GammaVal := 5335.81;\n\n  // Define Limites de Exibicao (Otimizacao)\n  if (MostrarTodosPontos) then begin\n    LimitUpper := 9999999;\n    LimitLower := 0;\n  end else begin\n    LimitUpper := spot + 10000;\n    LimitLower := spot - 10000;\n  end;\n\n  // 1 = Classic (5335.81)\n  // 2 = Spline (5335.53)\n  // 3 = HVL (5317.09)\n  // 4 = HVL Log (4500.00)\n  // 5 = Sigma Kernel (4500.00)\n  // 6 = PVOP (5335.81)\n  // 7 = HVL Gaussian (5342.10)\n\n  // --- Linhas Principais (Com Intercala\u00e7\u00e3o de Texto) ---\n  if (ModeloFlip = 1) then GammaVal := 5335.81;\n  if (ModeloFlip = 2) then GammaVal := 5335.53;\n  if (ModeloFlip = 3) then GammaVal := 5317.09;\n  if (ModeloFlip = 4) then GammaVal := 4500.00;\n  if (ModeloFlip = 5) then GammaVal := 4500.00;\n  if (ModeloFlip = 6) then GammaVal := 5335.81;\n  if (ModeloFlip = 7) then GammaVal := 5342.10;\n  ShowLine := (ExibirWalls) and (4500.00 <= LimitUpper) and (4500.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(4500.00, clPutWall, 1, psDash, \"PutWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5000.00 <= LimitUpper) and (5000.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5000.00, clPutWall, 1, psDash, \"PutWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirRange) and (5000.00 <= LimitUpper) and (5000.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5000.00, clRangeLow, 1, psDot, \"Edi_Range\", TamanhoFonte, tpTopRight, 0, 0);\n  ShowLine := (ExibirEffectiveWalls) and (5037.29 <= LimitUpper) and (5037.29 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5037.29, clEffectiveWall, 2, psDashDot, \"Edi Effective Put\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5150.00 <= LimitUpper) and (5150.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5150.00, clPutWall, 1, psDash, \"PutWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirExpMoves) and (5179.15 <= LimitUpper) and (5179.15 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5179.15, clExpMove, 1, psDot, \"Edi_ExpMove\", TamanhoFonte, tpTopRight, CurrentDate, 0);\n  ShowLine := (ExibirWalls) and (5200.00 <= LimitUpper) and (5200.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5200.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5200.00 <= LimitUpper) and (5200.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5200.00, clPutWall, 1, psDash, \"PutWall\", TamanhoFonte, tpTopRight, 0, 0);\n  ShowLine := (ExibirWalls) and (5250.00 <= LimitUpper) and (5250.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5250.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5250.00 <= LimitUpper) and (5250.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5250.00, clPutWall, 1, psDash, \"PutWall\", TamanhoFonte, tpTopRight, 0, 0);\n  ShowLine := (ExibirExpMoves) and (5256.85 <= LimitUpper) and (5256.85 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5256.85, clExpMove, 1, psDot, \"Edi_ExpMove\", TamanhoFonte, tpBottomRight, CurrentDate, 0);\n  ShowLine := (ExibirWalls) and (5300.00 <= LimitUpper) and (5300.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5300.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5350.00 <= LimitUpper) and (5350.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5350.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirRange) and (5350.00 <= LimitUpper) and (5350.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5350.00, clRangeHigh, 1, psDot, \"Edi_Range\", TamanhoFonte, tpTopRight, 0, 0);\n  ShowLine := (ExibirWalls) and (5400.00 <= LimitUpper) and (5400.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5400.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirMaxPain) and (5400.00 <= LimitUpper) and (5400.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5400.00, clMaxPain, 2, psSolid, \"Edi_MaxPain\", TamanhoFonte, tpTopRight, CurrentDate, 0);\n  ShowLine := (ExibirWalls) and (5425.00 <= LimitUpper) and (5425.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5425.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirEffectiveWalls) and (5456.83 <= LimitUpper) and (5456.83 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5456.83, clEffectiveWall, 2, psDashDot, \"Edi Effective Call\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5500.00 <= LimitUpper) and (5500.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5500.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5600.00 <= LimitUpper) and (5600.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5600.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5700.00 <= LimitUpper) and (5700.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5700.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (5800.00 <= LimitUpper) and (5800.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(5800.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (6000.00 <= LimitUpper) and (6000.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(6000.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n  ShowLine := (ExibirWalls) and (6000.00 <= LimitUpper) and (6000.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(6000.00, clPutWall, 1, psDash, \"PutWall\", TamanhoFonte, tpTopRight, 0, 0);\n  ShowLine := (ExibirWalls) and (6200.00 <= LimitUpper) and (6200.00 >= LimitLower);\n  if (ShowLine) then\n    HorizontalLineCustom(6200.00, clCallWall, 1, psDash, \"CallWall\", TamanhoFonte, tpTopLeft, 0, 0);\n\n  // Flips (Din\u00e2micos)\n  if (ExibirFlips) then begin\n    if (GammaVal > 0) then\n      HorizontalLineCustom(GammaVal, clGammaFlip, 2, psDash, \"Edi_GammaFlip\", TamanhoFonte, tpTopRight, CurrentDate, 0);\n    if (5344.64 > 0) then\n      HorizontalLineCustom(5344.64, clDeltaFlip, 2, psDash, \"Edi_DeltaFlip\", TamanhoFonte, tpTopRight, CurrentDate, 0);\n  end;\n\n  // Edi_Wall (Midpoints) - Grid Completo\n  if (ExibirEdiWall) then begin\n    if (4750.00 <= LimitUpper) and (4750.00 >= LimitLower) then\n      HorizontalLineCustom(4750.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5075.00 <= LimitUpper) and (5075.00 >= LimitLower) then\n      HorizontalLineCustom(5075.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5175.00 <= LimitUpper) and (5175.00 >= LimitLower) then\n      HorizontalLineCustom(5175.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5225.00 <= LimitUpper) and (5225.00 >= LimitLower) then\n      HorizontalLineCustom(5225.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5275.00 <= LimitUpper) and (5275.00 >= LimitLower) then\n      HorizontalLineCustom(5275.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5325.00 <= LimitUpper) and (5325.00 >= LimitLower) then\n      HorizontalLineCustom(5325.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5375.00 <= LimitUpper) and (5375.00 >= LimitLower) then\n      HorizontalLineCustom(5375.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5412.50 <= LimitUpper) and (5412.50 >= LimitLower) then\n      HorizontalLineCustom(5412.50, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5462.50 <= LimitUpper) and (5462.50 >= LimitLower) then\n      HorizontalLineCustom(5462.50, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5550.00 <= LimitUpper) and (5550.00 >= LimitLower) then\n      HorizontalLineCustom(5550.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5650.00 <= LimitUpper) and (5650.00 >= LimitLower) then\n      HorizontalLineCustom(5650.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5750.00 <= LimitUpper) and (5750.00 >= LimitLower) then\n      HorizontalLineCustom(5750.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5900.00 <= LimitUpper) and (5900.00 >= LimitLower) then\n      HorizontalLineCustom(5900.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (6100.00 <= LimitUpper) and (6100.00 >= LimitLower) then\n      HorizontalLineCustom(6100.00, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n  end;\n\n  if (MostrarPLUS) then begin\n    if (4691.00 <= LimitUpper) and (4691.00 >= LimitLower) then\n      HorizontalLineCustom(4691.00, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (4809.00 <= LimitUpper) and (4809.00 >= LimitLower) then\n      HorizontalLineCustom(4809.00, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5057.30 <= LimitUpper) and (5057.30 >= LimitLower) then\n      HorizontalLineCustom(5057.30, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5092.70 <= LimitUpper) and (5092.70 >= LimitLower) then\n      HorizontalLineCustom(5092.70, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5169.10 <= LimitUpper) and (5169.10 >= LimitLower) then\n      HorizontalLineCustom(5169.10, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5180.90 <= LimitUpper) and (5180.90 >= LimitLower) then\n      HorizontalLineCustom(5180.90, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5219.10 <= LimitUpper) and (5219.10 >= LimitLower) then\n      HorizontalLineCustom(5219.10, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5230.90 <= LimitUpper) and (5230.90 >= LimitLower) then\n      HorizontalLineCustom(5230.90, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5269.10 <= LimitUpper) and (5269.10 >= LimitLower) then\n      HorizontalLineCustom(5269.10, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5280.90 <= LimitUpper) and (5280.90 >= LimitLower) then\n      HorizontalLineCustom(5280.90, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5319.10 <= LimitUpper) and (5319.10 >= LimitLower) then\n      HorizontalLineCustom(5319.10, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5330.90 <= LimitUpper) and (5330.90 >= LimitLower) then\n      HorizontalLineCustom(5330.90, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5369.10 <= LimitUpper) and (5369.10 >= LimitLower) then\n      HorizontalLineCustom(5369.10, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5380.90 <= LimitUpper) and (5380.90 >= LimitLower) then\n      HorizontalLineCustom(5380.90, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5409.55 <= LimitUpper) and (5409.55 >= LimitLower) then\n      HorizontalLineCustom(5409.55, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5415.45 <= LimitUpper) and (5415.45 >= LimitLower) then\n      HorizontalLineCustom(5415.45, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5453.65 <= LimitUpper) and (5453.65 >= LimitLower) then\n      HorizontalLineCustom(5453.65, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5471.35 <= LimitUpper) and (5471.35 >= LimitLower) then\n      HorizontalLineCustom(5471.35, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5538.20 <= LimitUpper) and (5538.20 >= LimitLower) then\n      HorizontalLineCustom(5538.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5561.80 <= LimitUpper) and (5561.80 >= LimitLower) then\n      HorizontalLineCustom(5561.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5638.20 <= LimitUpper) and (5638.20 >= LimitLower) then\n      HorizontalLineCustom(5638.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5661.80 <= LimitUpper) and (5661.80 >= LimitLower) then\n      HorizontalLineCustom(5661.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5738.20 <= LimitUpper) and (5738.20 >= LimitLower) then\n      HorizontalLineCustom(5738.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5761.80 <= LimitUpper) and (5761.80 >= LimitLower) then\n      HorizontalLineCustom(5761.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5876.40 <= LimitUpper) and (5876.40 >= LimitLower) then\n      HorizontalLineCustom(5876.40, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5923.60 <= LimitUpper) and (5923.60 >= LimitLower) then\n      HorizontalLineCustom(5923.60, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (6076.40 <= LimitUpper) and (6076.40 >= LimitLower) then\n      HorizontalLineCustom(6076.40, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (6123.60 <= LimitUpper) and (6123.60 >= LimitLower) then\n      HorizontalLineCustom(6123.60, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n  end;\n\n  if (MostrarPLUS2) then begin\n    if (4618.00 <= LimitUpper) and (4618.00 >= LimitLower) then\n      HorizontalLineCustom(4618.00, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (4882.00 <= LimitUpper) and (4882.00 >= LimitLower) then\n      HorizontalLineCustom(4882.00, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5035.40 <= LimitUpper) and (5035.40 >= LimitLower) then\n      HorizontalLineCustom(5035.40, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5114.60 <= LimitUpper) and (5114.60 >= LimitLower) then\n      HorizontalLineCustom(5114.60, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5161.80 <= LimitUpper) and (5161.80 >= LimitLower) then\n      HorizontalLineCustom(5161.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5188.20 <= LimitUpper) and (5188.20 >= LimitLower) then\n      HorizontalLineCustom(5188.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5211.80 <= LimitUpper) and (5211.80 >= LimitLower) then\n      HorizontalLineCustom(5211.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5238.20 <= LimitUpper) and (5238.20 >= LimitLower) then\n      HorizontalLineCustom(5238.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5261.80 <= LimitUpper) and (5261.80 >= LimitLower) then\n      HorizontalLineCustom(5261.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5288.20 <= LimitUpper) and (5288.20 >= LimitLower) then\n      HorizontalLineCustom(5288.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5311.80 <= LimitUpper) and (5311.80 >= LimitLower) then\n      HorizontalLineCustom(5311.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5338.20 <= LimitUpper) and (5338.20 >= LimitLower) then\n      HorizontalLineCustom(5338.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5361.80 <= LimitUpper) and (5361.80 >= LimitLower) then\n      HorizontalLineCustom(5361.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5388.20 <= LimitUpper) and (5388.20 >= LimitLower) then\n      HorizontalLineCustom(5388.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5405.90 <= LimitUpper) and (5405.90 >= LimitLower) then\n      HorizontalLineCustom(5405.90, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5419.10 <= LimitUpper) and (5419.10 >= LimitLower) then\n      HorizontalLineCustom(5419.10, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5442.70 <= LimitUpper) and (5442.70 >= LimitLower) then\n      HorizontalLineCustom(5442.70, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5482.30 <= LimitUpper) and (5482.30 >= LimitLower) then\n      HorizontalLineCustom(5482.30, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5523.60 <= LimitUpper) and (5523.60 >= LimitLower) then\n      HorizontalLineCustom(5523.60, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5576.40 <= LimitUpper) and (5576.40 >= LimitLower) then\n      HorizontalLineCustom(5576.40, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5623.60 <= LimitUpper) and (5623.60 >= LimitLower) then\n      HorizontalLineCustom(5623.60, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5676.40 <= LimitUpper) and (5676.40 >= LimitLower) then\n      HorizontalLineCustom(5676.40, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5723.60 <= LimitUpper) and (5723.60 >= LimitLower) then\n      HorizontalLineCustom(5723.60, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5776.40 <= LimitUpper) and (5776.40 >= LimitLower) then\n      HorizontalLineCustom(5776.40, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5847.20 <= LimitUpper) and (5847.20 >= LimitLower) then\n      HorizontalLineCustom(5847.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (5952.80 <= LimitUpper) and (5952.80 >= LimitLower) then\n      HorizontalLineCustom(5952.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (6047.20 <= LimitUpper) and (6047.20 >= LimitLower) then\n      HorizontalLineCustom(6047.20, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n    if (6152.80 <= LimitUpper) and (6152.80 >= LimitLower) then\n      HorizontalLineCustom(6152.80, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);\n  end;\n\n  if (ExibirMelhoresPontos and LastBarOnChart) then\n  begin\n    HorizontalLineCustom(5225.83, clRed, 1, psDash, \"Edi_Wall_Venda\", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.1);\n    HorizontalLineCustom(5210.17, clLime, 1, psDash, \"Edi_Wall_Compra\", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.1);\n    HorizontalLineCustom(5233.65, clRed, 1, psDash, \"Edi_Wall_MelhorVenda\", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.3);\n    HorizontalLineCustom(5202.35, clLime, 1, psDash, \"Edi_Wall_MelhorCompra\", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.3);\n    HorizontalLineCustom(5248.19, clRed, 1, psDash, \"Edi_Wall_MelhorVenda\", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.5);\n    HorizontalLineCustom(5187.81, clLime, 1, psDash, \"Edi_Wall_MelhorCompra\", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.5);\n    HorizontalLineCustom(5256.02, clRed, 1, psDash, \"Edi_Wall_MelhorVenda\", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.7);\n    HorizontalLineCustom(5179.98, clLime, 1, psDash, \"Edi_Wall_MelhorCompra\", TamanhoFonte, tpTopRight, CurrentDate, CurrentTime, 0.7);\n  end;\nend;",
     "market_sentiment": {
         "score": 65,
         "label": "Bullish",
@@ -106,50 +106,52 @@
     },
     "overview": {
         "total_trades": 42860,
-        "total_volume": 18835,
-        "gamma_exposure": 105026189.28608282,
-        "delta_position": -4154.637037249101,
-        "last_update": "2026-03-17T10:00:13.193014",
-        "spot_price": 5253.0,
-        "dealer_pressure": 0.17242876697687082,
+        "total_volume": 15030,
+        "gamma_exposure": 92356574.9946881,
+        "delta_position": -5473.961709314693,
+        "last_update": "2026-03-17T12:04:17.587202",
+        "spot_price": 5218.0,
+        "dealer_pressure": 0.06304070940851032,
         "regime": "Gamma Positivo"
     },
     "key_levels": {
         "gamma_flip": 4500.0,
         "gamma_flip_hvl": 4500.0,
-        "gamma_flip_hvl_gaussian": 5320.213164305162,
+        "gamma_flip_hvl_gaussian": 5342.0967261488,
+        "gamma_flip_selected": 5317.087414143539,
+        "gamma_flip_model": "HVL",
         "call_wall": 5350.0,
         "put_wall": 5000.0,
-        "effective_call_wall": 5805.940594059406,
-        "effective_put_wall": 5441.305712492153,
+        "effective_call_wall": 5456.832515767344,
+        "effective_put_wall": 5037.294332723949,
         "max_pain": 5400.0,
-        "zero_gamma": 5323.551152647751,
-        "range_low": 5213.886686678666,
-        "range_high": 5292.113313321334,
+        "zero_gamma": 5335.806729954517,
+        "range_low": 5179.147293182806,
+        "range_high": 5256.852706817194,
         "expected_moves": [
             {
                 "label": "1 Dia",
                 "days": 1,
-                "sigma_1_up": 5292.113313321334,
-                "sigma_1_down": 5213.886686678666,
-                "sigma_2_up": 5331.226626642669,
-                "sigma_2_down": 5174.773373357331
+                "sigma_1_up": 5256.852706817194,
+                "sigma_1_down": 5179.147293182806,
+                "sigma_2_up": 5295.705413634389,
+                "sigma_2_down": 5140.294586365611
             },
             {
                 "label": "1 Semana",
                 "days": 5,
-                "sigma_1_up": 5340.460027411751,
-                "sigma_1_down": 5165.539972588249,
-                "sigma_2_up": 5427.920054823502,
-                "sigma_2_down": 5078.079945176498
+                "sigma_1_up": 5304.877293553116,
+                "sigma_1_down": 5131.122706446884,
+                "sigma_2_up": 5391.754587106232,
+                "sigma_2_down": 5044.245412893768
             },
             {
                 "label": "Expira\u00e7\u00e3o",
                 "days": 208,
-                "sigma_1_up": 5817.100226933437,
-                "sigma_1_down": 4688.899773066563,
-                "sigma_2_up": 6381.2004538668725,
-                "sigma_2_down": 4124.7995461331275
+                "sigma_1_up": 5778.341706479853,
+                "sigma_1_down": 4657.658293520147,
+                "sigma_2_up": 6338.683412959707,
+                "sigma_2_down": 4097.316587040293
             }
         ]
     },
@@ -188,36 +190,36 @@
                 3.0
             ],
             "flips": [
-                5281.355866054512,
-                5270.511309180566,
-                5273.030340734948,
-                5274.450766327995,
-                5276.238350317609,
-                5279.538656974621,
-                5284.269531064102,
-                5289.717705926253,
-                5295.236638939674,
-                5300.269234323558,
-                5303.099660832423,
-                5305.522952138576,
-                5307.5917456889965,
-                5309.358571741946,
-                5310.8710888521,
-                5312.170502468783,
-                5313.291537438512,
-                5314.2630655985295,
-                5315.108938028019,
-                5315.848814719464,
-                5316.49890783809,
-                5317.07261399845,
-                5317.581037493577,
-                5318.033416806198,
-                5318.437469538316,
-                5318.799670370759,
-                5319.125474872888,
-                5319.419499886042,
-                5319.685669217752,
-                5319.927331659819
+                4500.0,
+                null,
+                null,
+                5311.310844947278,
+                5299.672351200837,
+                5301.649318011199,
+                5305.936349433913,
+                5310.214791235686,
+                5313.95432254066,
+                5317.087414143539,
+                5319.676881016583,
+                5321.812879239446,
+                5323.580666956496,
+                5325.0521251584305,
+                5326.285241784575,
+                5327.325981315303,
+                5328.210577429241,
+                5328.967608817671,
+                5329.619700946017,
+                5330.1848636671075,
+                5330.677523123545,
+                5331.109311977698,
+                5331.489673788726,
+                5331.826326228546,
+                5332.125617560521,
+                5332.39280240964,
+                5332.632256344947,
+                5332.847643878581,
+                5333.042050818123,
+                5333.21808918697
             ]
         },
         "gamma_flip_cone_nearest": {
@@ -289,110 +291,110 @@
         "gamma_flip_cone_nearest_expiry": "2026-04-01",
         "delta_flip_profile": {
             "spots": [
-                4465.05,
-                4497.211224489796,
-                4529.372448979592,
-                4561.533673469388,
-                4593.694897959183,
-                4625.8561224489795,
-                4658.0173469387755,
-                4690.178571428572,
-                4722.339795918368,
-                4754.501020408164,
-                4786.66224489796,
-                4818.823469387755,
-                4850.984693877551,
-                4883.145918367347,
-                4915.307142857143,
-                4947.468367346939,
-                4979.629591836735,
-                5011.790816326531,
-                5043.952040816326,
-                5076.113265306122,
-                5108.274489795918,
-                5140.435714285714,
-                5172.59693877551,
-                5204.758163265306,
-                5236.919387755102,
-                5269.080612244898,
-                5301.241836734694,
-                5333.40306122449,
-                5365.564285714286,
-                5397.725510204082,
-                5429.886734693878,
-                5462.047959183674,
-                5494.209183673469,
-                5526.370408163265,
-                5558.531632653061,
-                5590.692857142857,
-                5622.854081632653,
-                5655.015306122449,
-                5687.176530612245,
-                5719.33775510204,
-                5751.498979591837,
-                5783.660204081632,
-                5815.821428571428,
-                5847.9826530612245,
-                5880.1438775510205,
-                5912.305102040817,
-                5944.466326530612,
-                5976.627551020409,
-                6008.788775510204,
-                6040.95
+                4435.3,
+                4467.24693877551,
+                4499.193877551021,
+                4531.1408163265305,
+                4563.087755102041,
+                4595.034693877551,
+                4626.981632653062,
+                4658.928571428572,
+                4690.875510204081,
+                4722.822448979592,
+                4754.769387755102,
+                4786.716326530613,
+                4818.663265306122,
+                4850.610204081633,
+                4882.557142857143,
+                4914.504081632653,
+                4946.4510204081635,
+                4978.397959183673,
+                5010.344897959184,
+                5042.291836734694,
+                5074.2387755102045,
+                5106.185714285714,
+                5138.132653061224,
+                5170.079591836735,
+                5202.026530612245,
+                5233.973469387755,
+                5265.920408163265,
+                5297.867346938776,
+                5329.814285714286,
+                5361.7612244897955,
+                5393.708163265306,
+                5425.655102040816,
+                5457.602040816327,
+                5489.5489795918365,
+                5521.495918367347,
+                5553.442857142857,
+                5585.389795918367,
+                5617.336734693878,
+                5649.283673469387,
+                5681.230612244898,
+                5713.177551020408,
+                5745.124489795919,
+                5777.071428571428,
+                5809.018367346938,
+                5840.965306122449,
+                5872.912244897959,
+                5904.8591836734695,
+                5936.806122448979,
+                5968.75306122449,
+                6000.7
             ],
             "deltas": [
-                -17466.410177364374,
-                -17293.399104266202,
-                -17093.013022118233,
-                -16863.555984832583,
-                -16603.731552099784,
-                -16312.709890635713,
-                -15990.175122851571,
-                -15636.348173553748,
-                -15251.981458985674,
-                -14838.322611559355,
-                -14397.044147191842,
-                -13930.133160035373,
-                -13439.728147837184,
-                -12927.87821986192,
-                -12396.18572594568,
-                -11845.285357862564,
-                -11274.126779744898,
-                -10679.08242785158,
-                -10053.006429384797,
-                -9384.507375206298,
-                -8657.812871540842,
-                -7853.61742214984,
-                -6951.1497725252475,
-                -5931.367633153286,
-                -4780.777060051362,
-                -3495.0431560757106,
-                -2081.467421629789,
-                -559.6228756792202,
-                1040.1059913027448,
-                2679.804081239645,
-                4318.437008607404,
-                5916.510097524254,
-                7440.1349962975955,
-                8863.880397061363,
-                10172.08983566015,
-                11358.672547680964,
-                12425.654656593713,
-                13380.968623483845,
-                14236.02320274759,
-                15003.52717751556,
-                15695.870597965228,
-                16324.160879645016,
-                16897.836169363265,
-                17424.67914647019,
-                17911.037791910552,
-                18362.10166930799,
-                18782.146856058727,
-                19174.71991976815,
-                19542.76664608781,
-                19888.724387996845
+                -17603.82121697273,
+                -17455.423076149713,
+                -17281.85673521598,
+                -17081.16548979491,
+                -16851.707691234395,
+                -16592.23468888403,
+                -16301.95488124998,
+                -15980.578545808645,
+                -15628.338958926608,
+                -15245.986357484258,
+                -14834.752081740524,
+                -14396.279925814659,
+                -13932.518984701303,
+                -13445.565603973644,
+                -12937.430760177258,
+                -12409.695692509236,
+                -11863.010905919225,
+                -11296.406511306852,
+                -10706.43272858213,
+                -10086.247205451056,
+                -9424.895318986515,
+                -8707.14127552701,
+                -7914.227024892421,
+                -7025.797791818123,
+                -6022.929616344107,
+                -4891.805184829469,
+                -3627.2591104879707,
+                -2235.305269160291,
+                -733.9395438731681,
+                848.0708880852651,
+                2474.1984073350513,
+                4104.340074102974,
+                5699.342790148973,
+                7225.0507911735385,
+                8655.247140680434,
+                9973.144857837648,
+                11171.39112184896,
+                12250.823637972715,
+                13218.414792322084,
+                14084.920526854812,
+                14862.70509450592,
+                15564.064492885815,
+                16200.176660273237,
+                16780.630827827452,
+                17313.37892923985,
+                17804.921861701983,
+                18260.57468406631,
+                18684.71444331501,
+                19080.971917053193,
+                19452.367143445135
             ],
-            "flip_value": 5344.653815840364
+            "flip_value": 5344.635377408363
         },
         "flow_sentiment": {
             "bull": [
@@ -403,7 +405,7 @@
                 20.0,
                 25.0,
                 1100.0,
-                3905.0,
+                100.0,
                 150.0,
                 9740.0,
                 2500.0,
@@ -432,108 +434,108 @@
         },
         "mm_pnl": {
             "spots": [
-                4465.05,
-                4497.211224489796,
-                4529.372448979592,
-                4561.533673469388,
-                4593.694897959183,
-                4625.8561224489795,
-                4658.0173469387755,
-                4690.178571428572,
-                4722.339795918368,
-                4754.501020408164,
-                4786.66224489796,
-                4818.823469387755,
-                4850.984693877551,
-                4883.145918367347,
-                4915.307142857143,
-                4947.468367346939,
-                4979.629591836735,
-                5011.790816326531,
-                5043.952040816326,
-                5076.113265306122,
-                5108.274489795918,
-                5140.435714285714,
-                5172.59693877551,
-                5204.758163265306,
-                5236.919387755102,
-                5269.080612244898,
-                5301.241836734694,
-                5333.40306122449,
-                5365.564285714286,
-                5397.725510204082,
-                5429.886734693878,
-                5462.047959183674,
-                5494.209183673469,
-                5526.370408163265,
-                5558.531632653061,
-                5590.692857142857,
-                5622.854081632653,
-                5655.015306122449,
-                5687.176530612245,
-                5719.33775510204,
-                5751.498979591837,
-                5783.660204081632,
-                5815.821428571428,
-                5847.9826530612245,
-                5880.1438775510205,
-                5912.305102040817,
-                5944.466326530612,
-                5976.627551020409,
-                6008.788775510204,
-                6040.95
+                4435.3,
+                4467.24693877551,
+                4499.193877551021,
+                4531.1408163265305,
+                4563.087755102041,
+                4595.034693877551,
+                4626.981632653062,
+                4658.928571428572,
+                4690.875510204081,
+                4722.822448979592,
+                4754.769387755102,
+                4786.716326530613,
+                4818.663265306122,
+                4850.610204081633,
+                4882.557142857143,
+                4914.504081632653,
+                4946.4510204081635,
+                4978.397959183673,
+                5010.344897959184,
+                5042.291836734694,
+                5074.2387755102045,
+                5106.185714285714,
+                5138.132653061224,
+                5170.079591836735,
+                5202.026530612245,
+                5233.973469387755,
+                5265.920408163265,
+                5297.867346938776,
+                5329.814285714286,
+                5361.7612244897955,
+                5393.708163265306,
+                5425.655102040816,
+                5457.602040816327,
+                5489.5489795918365,
+                5521.495918367347,
+                5553.442857142857,
+                5585.389795918367,
+                5617.336734693878,
+                5649.283673469387,
+                5681.230612244898,
+                5713.177551020408,
+                5745.124489795919,
+                5777.071428571428,
+                5809.018367346938,
+                5840.965306122449,
+                5872.912244897959,
+                5904.8591836734695,
+                5936.806122448979,
+                5968.75306122449,
+                6000.7
             ],
             "pnl": [
-                -2471300.574009953,
-                -2130179.581346955,
-                -1803973.9579293858,
-                -1493569.3199933153,
-                -1199842.5050734263,
-                -923656.2943445686,
-                -665854.2256164383,
-                -427255.5554602109,
-                -208650.4246973917,
-                -10795.276469893754,
-                165591.4294910133,
-                319833.16879867576,
-                451298.9392196797,
-                559406.4573911168,
-                643624.9467922281,
-                703477.5044492725,
-                738543.0397006795,
-                748457.7838230617,
-                732916.3743518852,
-                691672.5224727038,
-                624539.2758844197,
-                531388.8930266332,
-                412152.34752670676,
-                266818.48416781425,
-                95432.84963429905,
-                -101903.7772139106,
-                -325037.1297137756,
-                -573761.4459038898,
-                -847821.6822969634,
-                -1146915.9220049456,
-                -1470697.950509455,
-                -1818779.972800741,
-                -2190735.446225226,
-                -2586102.004156161,
-                -3004384.446505593,
-                -3445057.774106687,
-                -3907570.2450932097,
-                -4391346.432571268,
-                -4895790.264104079,
-                -5420288.024801372,
-                -5964211.307113308,
-                -6526919.891763011,
-                -7107764.545610424,
-                -7706089.7236091625,
-                -8321236.163398845,
-                -8952543.362455225,
-                -9599351.929096399,
-                -10261005.80000805,
-                -10936854.318295246,
-                -11626254.167388728
+                -3686264.164499415,
+                -3306390.057409432,
+                -2940415.8711721934,
+                -2589212.9858617745,
+                -2253649.08289182,
+                -1934583.0127180964,
+                -1632859.6935969014,
+                -1349305.1002391856,
+                -1084721.3980041184,
+                -839882.2742154337,
+                -615528.513409622,
+                -412363.8580017984,
+                -231051.19014133513,
+                -72209.06458300538,
+                63591.38363253325,
+                175829.13887808472,
+                264035.6000239942,
+                327796.4644592367,
+                366753.19979792647,
+                380604.10680150613,
+                369104.9813689422,
+                332069.38728069514,
+                269368.5547154993,
+                180930.9223925043,
+                66741.34353833832,
+                -73160.02223929204,
+                -238679.10764217377,
+                -429669.6023608595,
+                -645934.8584833369,
+                -887230.0110147148,
+                -1153264.2878149413,
+                -1443703.4834354855,
+                -1758172.5717218164,
+                -2096258.4326139502,
+                -2457512.669295121,
+                -2841454.492679175,
+                -3247573.651174724,
+                -3675333.3846915476,
+                -4124173.382955041,
+                -4593512.729347151,
+                -5082752.812691348,
+                -5591280.190633327,
+                -6118469.389530636,
+                -6663685.627047658,
+                -7226287.44494961,
+                -7805629.24089569,
+                -8401063.689340657,
+                -9011944.042959245,
+                -9637626.3073053,
+                -10277471.282695608
             ]
         },
         "max_pain_profile": {
@@ -579,84 +581,84 @@
                 "options": [
                     {
                         "Strike": 4500.0,
-                        "Call_Now": 941.7789584810225,
+                        "Call_Now": 907.9109871747623,
                         "Call_Sim": 1036.3648263372088,
-                        "Call_Chg": 10.043319295298552,
-                        "Put_Now": 6.844693682240802,
+                        "Call_Chg": 14.148285567307555,
+                        "Put_Now": 7.976722375980302,
                         "Put_Sim": 4.430561538427938,
-                        "Put_Chg": -35.27012684404791
+                        "Put_Chg": -44.45636528896441
                     },
                     {
                         "Strike": 5000.0,
-                        "Call_Now": 515.0288415039067,
+                        "Call_Now": 486.78824067498635,
                         "Call_Sim": 596.2113981430944,
-                        "Call_Chg": 15.762720472533346,
-                        "Put_Now": 59.87965839414983,
+                        "Call_Chg": 22.478595069671474,
+                        "Put_Now": 66.63905756522854,
                         "Put_Sim": 44.062215033336315,
-                        "Put_Chg": -26.41538676907158
+                        "Put_Chg": -33.87929445099559
                     },
                     {
                         "Strike": 5150.0,
-                        "Call_Now": 408.2101367928112,
+                        "Call_Now": 382.91162712302366,
                         "Call_Sim": 481.95142644156385,
-                        "Call_Chg": 18.064541519746808,
-                        "Put_Now": 96.99647818976177,
+                        "Call_Chg": 25.864923471420266,
+                        "Put_Now": 106.69796851997353,
                         "Put_Sim": 73.73776783851304,
-                        "Put_Chg": -23.978922518966005
+                        "Put_Chg": -30.891122988241754
                     },
                     {
                         "Strike": 5200.0,
-                        "Call_Now": 375.54860177600904,
+                        "Call_Now": 351.33184115188396,
                         "Call_Sim": 446.4973254065753,
-                        "Call_Chg": 18.892021776953044,
-                        "Put_Now": 112.31345134186131,
+                        "Call_Chg": 27.087065021684285,
+                        "Put_Now": 123.09669071773646,
                         "Put_Sim": 86.26217497242806,
-                        "Put_Chg": -23.195152546900193
+                        "Put_Chg": -29.9232380095179
                     },
                     {
                         "Strike": 5250.0,
-                        "Call_Now": 344.45191536337416,
+                        "Call_Now": 321.35572207641144,
                         "Call_Sim": 412.4778867890768,
-                        "Call_Chg": 19.749047223017975,
-                        "Put_Now": 129.19527309812838,
+                        "Call_Chg": 28.355544480081953,
+                        "Put_Now": 141.09907981116612,
                         "Put_Sim": 100.22124452383173,
-                        "Put_Chg": -22.426539206500113
+                        "Put_Chg": -28.971014794739613
                     },
                     {
                         "Strike": 5300.0,
-                        "Call_Now": 314.9586068835538,
+                        "Call_Now": 293.01367725058344,
                         "Call_Sim": 379.9508925537166,
-                        "Call_Chg": 20.635183243044917,
-                        "Put_Now": 147.68047278721065,
+                        "Call_Chg": 29.670019542734515,
+                        "Put_Now": 160.73554315424076,
                         "Put_Sim": 115.67275845737367,
-                        "Put_Chg": -21.673626665562036
+                        "Put_Chg": -28.035357838449666
                     },
                     {
                         "Strike": 5350.0,
-                        "Call_Now": 287.0949853064981,
+                        "Call_Now": 266.32342987385846,
                         "Call_Sim": 348.96378656757224,
-                        "Call_Chg": 21.549941457536782,
-                        "Put_Now": 167.79535937905712,
+                        "Call_Chg": 31.030073746367563,
+                        "Put_Now": 182.0238039464184,
                         "Put_Sim": 132.66416064013197,
-                        "Put_Chg": -20.936931074215362
+                        "Put_Chg": -27.117136460249032
                     },
                     {
                         "Strike": 5400.0,
-                        "Call_Now": 260.87488098015865,
+                        "Call_Now": 241.28996644312429,
                         "Call_Sim": 319.5529162252169,
-                        "Call_Chg": 22.492788506349573,
-                        "Put_Now": 189.55376322162056,
+                        "Call_Chg": 32.435227595980614,
+                        "Put_Now": 204.9688486845862,
                         "Put_Sim": 151.23179846667858,
-                        "Put_Chg": -20.216936927882085
+                        "Put_Chg": -26.217179128814937
                     },
                     {
                         "Strike": 5425.0,
-                        "Call_Now": 248.38205999210413,
+                        "Call_Now": 229.39265745754392,
                         "Call_Sim": 305.44676634550933,
-                        "Call_Chg": 22.974568435103258,
-                        "Put_Now": 201.05019631801724,
+                        "Call_Chg": 33.154552430276254,
+                        "Put_Now": 217.06079378345703,
                         "Put_Sim": 161.11490267142221,
-                        "Put_Chg": -19.863344765615732
+                        "Put_Chg": -25.774295826010494
                     }
                 ]
             },
@@ -666,84 +668,84 @@
                 "options": [
                     {
                         "Strike": 4500.0,
-                        "Call_Now": 941.7789584810225,
+                        "Call_Now": 907.9109871747623,
                         "Call_Sim": 701.6484049458936,
-                        "Call_Chg": -25.497549225609262,
-                        "Put_Now": 6.844693682240802,
+                        "Call_Chg": -22.718370538803224,
+                        "Put_Now": 7.976722375980302,
                         "Put_Sim": 19.71414014711246,
-                        "Put_Chg": 188.02078021785897
+                        "Put_Chg": 147.1458729274088
                     },
                     {
                         "Strike": 5000.0,
-                        "Call_Now": 515.0288415039067,
+                        "Call_Now": 486.78824067498635,
                         "Call_Sim": 326.1343799696938,
-                        "Call_Chg": -36.67648223012771,
-                        "Put_Now": 59.87965839414983,
+                        "Call_Chg": -33.00282284603425,
+                        "Put_Now": 66.63905756522854,
                         "Put_Sim": 123.9851968599362,
-                        "Put_Chg": 107.05728820932853
+                        "Put_Chg": 86.05484739722698
                     },
                     {
                         "Strike": 5150.0,
-                        "Call_Now": 408.2101367928112,
+                        "Call_Now": 382.91162712302366,
                         "Call_Sim": 243.22552360859663,
-                        "Call_Chg": -40.41658898538162,
-                        "Put_Now": 96.99647818976177,
+                        "Call_Chg": -36.47998483721885,
+                        "Put_Now": 106.69796851997353,
                         "Put_Sim": 185.0118650055465,
-                        "Put_Chg": 90.74080673691405
+                        "Put_Chg": 73.39773903091027
                     },
                     {
                         "Strike": 5200.0,
-                        "Call_Now": 375.54860177600904,
+                        "Call_Now": 351.33184115188396,
                         "Call_Sim": 219.03913448250432,
-                        "Call_Chg": -41.674890161580926,
-                        "Put_Now": 112.31345134186131,
+                        "Call_Chg": -37.654630515595166,
+                        "Put_Now": 123.09669071773646,
                         "Put_Sim": 208.80398404835614,
-                        "Put_Chg": 85.9118222738927
+                        "Put_Chg": 69.62599305544977
                     },
                     {
                         "Strike": 5250.0,
-                        "Call_Now": 344.45191536337416,
+                        "Call_Now": 321.35572207641144,
                         "Call_Sim": 196.56447306054088,
-                        "Call_Chg": -42.9341326631387,
-                        "Put_Now": 129.19527309812838,
+                        "Call_Chg": -38.83274528598495,
+                        "Put_Now": 141.09907981116612,
                         "Put_Sim": 234.30783079529556,
-                        "Put_Chg": 81.35944541665272
+                        "Put_Chg": 66.05907785427895
                     },
                     {
                         "Strike": 5300.0,
-                        "Call_Now": 314.9586068835538,
+                        "Call_Now": 293.01367725058344,
                         "Call_Sim": 175.77338609338221,
-                        "Call_Chg": -44.19159144986662,
-                        "Put_Now": 147.68047278721065,
+                        "Call_Chg": -40.01188349202487,
+                        "Put_Now": 160.73554315424076,
                         "Put_Sim": 261.4952519970393,
-                        "Put_Chg": 77.06826573735427
+                        "Put_Chg": 62.686638478031085
                     },
                     {
                         "Strike": 5350.0,
-                        "Call_Now": 287.0949853064981,
+                        "Call_Now": 266.32342987385846,
                         "Call_Sim": 156.62554367486928,
-                        "Call_Chg": -45.44469541756074,
-                        "Put_Now": 167.79535937905712,
+                        "Call_Chg": -41.18972418271518,
+                        "Put_Now": 182.0238039464184,
                         "Put_Sim": 290.3259177474288,
-                        "Put_Chg": 73.0238063923864
+                        "Put_Chg": 59.49887402248268
                     },
                     {
                         "Strike": 5400.0,
-                        "Call_Now": 260.87488098015865,
+                        "Call_Now": 241.28996644312429,
                         "Call_Sim": 139.06968381137813,
-                        "Call_Chg": -46.69104082046315,
-                        "Put_Now": 189.55376322162056,
+                        "Call_Chg": -42.364083404952126,
+                        "Put_Now": 204.9688486845862,
                         "Put_Sim": 320.7485660528405,
-                        "Put_Chg": 69.21244959818124
+                        "Put_Chg": 56.48649446551778
                     },
                     {
                         "Strike": 5425.0,
-                        "Call_Now": 248.38205999210413,
+                        "Call_Now": 229.39265745754392,
                         "Call_Sim": 130.87008320137306,
-                        "Call_Chg": -47.31097599982329,
-                        "Put_Now": 201.05019631801724,
+                        "Call_Chg": -42.94931465903849,
+                        "Put_Now": 217.06079378345703,
                         "Put_Sim": 336.5382195272864,
-                        "Put_Chg": 67.39014718242646
+                        "Put_Chg": 55.043300847329334
                     }
                 ]
             },
@@ -753,258 +755,258 @@
                 "options": [
                     {
                         "Strike": 4500.0,
-                        "Call_Now": 941.7789584810225,
+                        "Call_Now": 907.9109871747623,
                         "Call_Sim": 293.52094197272436,
-                        "Call_Chg": -68.83335103959651,
-                        "Put_Now": 6.844693682240802,
+                        "Call_Chg": -67.67073577486897,
+                        "Put_Now": 7.976722375980302,
                         "Put_Sim": 111.58667717394269,
-                        "Put_Chg": 1530.2654633539667
+                        "Put_Chg": 1298.9038594342355
                     },
                     {
                         "Strike": 5000.0,
-                        "Call_Now": 515.0288415039067,
+                        "Call_Now": 486.78824067498635,
                         "Call_Sim": 84.53340643896581,
-                        "Call_Chg": -83.58666551719229,
-                        "Put_Now": 59.87965839414983,
+                        "Call_Chg": -82.634460043293,
+                        "Put_Now": 66.63905756522854,
                         "Put_Sim": 382.38422332920845,
-                        "Put_Chg": 538.5878503384498
+                        "Put_Chg": 473.81397231633713
                     },
                     {
                         "Strike": 5150.0,
-                        "Call_Now": 408.2101367928112,
+                        "Call_Now": 382.91162712302366,
                         "Call_Sim": 53.46725804505104,
-                        "Call_Chg": -86.90202588668478,
-                        "Put_Now": 96.99647818976177,
+                        "Call_Chg": -86.03665852437726,
+                        "Put_Now": 106.69796851997353,
                         "Put_Sim": 495.2535994420009,
-                        "Put_Chg": 410.5892592028936
+                        "Put_Chg": 364.1640382771589
                     },
                     {
                         "Strike": 5200.0,
-                        "Call_Now": 375.54860177600904,
+                        "Call_Now": 351.33184115188396,
                         "Call_Sim": 45.50775063091862,
-                        "Call_Chg": -87.8823272365527,
-                        "Put_Now": 112.31345134186131,
+                        "Call_Chg": -87.04707478783706,
+                        "Put_Now": 123.09669071773646,
                         "Put_Sim": 535.2726001967708,
-                        "Put_Chg": 376.5881502185346
+                        "Put_Chg": 334.8391472392732
                     },
                     {
                         "Strike": 5250.0,
-                        "Call_Now": 344.45191536337416,
+                        "Call_Now": 321.35572207641144,
                         "Call_Sim": 38.5716428202029,
-                        "Call_Chg": -88.80202399817915,
-                        "Put_Now": 129.19527309812838,
+                        "Call_Chg": -87.99721300402692,
+                        "Put_Now": 141.09907981116612,
                         "Put_Sim": 576.3150005549578,
-                        "Put_Chg": 346.08056218684266
+                        "Put_Chg": 308.4470297937054
                     },
                     {
                         "Strike": 5300.0,
-                        "Call_Now": 314.9586068835538,
+                        "Call_Now": 293.01367725058344,
                         "Call_Sim": 32.5579243641306,
-                        "Call_Chg": -89.66279261700954,
-                        "Put_Now": 147.68047278721065,
+                        "Call_Chg": -88.88859910239368,
+                        "Put_Now": 160.73554315424076,
                         "Put_Sim": 618.2797902677871,
-                        "Put_Chg": 318.6604895006343
+                        "Put_Chg": 284.65654710513525
                     },
                     {
                         "Strike": 5350.0,
-                        "Call_Now": 287.0949853064981,
+                        "Call_Now": 266.32342987385846,
                         "Call_Sim": 27.369888907064137,
-                        "Call_Chg": -90.46660850664303,
-                        "Put_Now": 167.79535937905712,
+                        "Call_Chg": -89.72306382505376,
+                        "Put_Now": 182.0238039464184,
                         "Put_Sim": 661.0702629796233,
-                        "Put_Chg": 293.97410359021694
+                        "Put_Chg": 263.17791884748203
                     },
                     {
                         "Strike": 5400.0,
-                        "Call_Now": 260.87488098015865,
+                        "Call_Now": 241.28996644312429,
                         "Call_Sim": 22.916079480195094,
-                        "Call_Chg": -91.2156818647718,
-                        "Put_Now": 189.55376322162056,
+                        "Call_Chg": -90.50268031530571,
+                        "Put_Now": 204.9688486845862,
                         "Put_Sim": 704.5949617216565,
-                        "Put_Chg": 271.7124628635652
+                        "Put_Chg": 243.7570958921245
                     },
                     {
                         "Strike": 5425.0,
-                        "Call_Now": 248.38205999210413,
+                        "Call_Now": 229.39265745754392,
                         "Call_Sim": 20.93753879266052,
-                        "Call_Chg": -91.57043033086765,
-                        "Put_Now": 201.05019631801724,
+                        "Call_Chg": -90.87262032502692,
+                        "Put_Now": 217.06079378345703,
                         "Put_Sim": 726.6056751185733,
-                        "Put_Chg": 261.4051060011117
+                        "Put_Chg": 234.7475435123699
                     }
                 ]
             },
             {
                 "scenario": "+1%",
-                "target_spot": 5305.53,
+                "target_spot": 5270.18,
                 "options": [
                     {
                         "Strike": 4500.0,
-                        "Call_Now": 941.7789584810225,
-                        "Call_Sim": 992.8830498958669,
-                        "Call_Chg": 5.426336079675124,
-                        "Put_Now": 6.844693682240802,
-                        "Put_Sim": 5.418785097086385,
-                        "Put_Chg": -20.832321376982442
+                        "Call_Now": 907.9109871747623,
+                        "Call_Sim": 958.4587386147441,
+                        "Call_Chg": 5.56747876763517,
+                        "Put_Now": 7.976722375980302,
+                        "Put_Sim": 6.344473815961777,
+                        "Put_Chg": -20.462647226304263
                     },
                     {
                         "Strike": 5000.0,
-                        "Call_Now": 515.0288415039067,
-                        "Call_Sim": 558.4894201667721,
-                        "Call_Chg": 8.438474733950546,
-                        "Put_Now": 59.87965839414983,
-                        "Put_Sim": 50.81023705701557,
-                        "Put_Chg": -15.146080622965494
+                        "Call_Now": 486.78824067498635,
+                        "Call_Sim": 529.1050607667607,
+                        "Call_Chg": 8.69306539391695,
+                        "Put_Now": 66.63905756522854,
+                        "Put_Sim": 56.77587765700309,
+                        "Put_Chg": -14.800899455354747
                     },
                     {
                         "Strike": 5150.0,
-                        "Call_Now": 408.2101367928112,
-                        "Call_Sim": 447.50875557599056,
-                        "Call_Chg": 9.627056077523502,
-                        "Put_Now": 96.99647818976177,
-                        "Put_Sim": 83.76509697294091,
-                        "Put_Chg": -13.641094464208567
+                        "Call_Now": 382.91162712302366,
+                        "Call_Sim": 420.89124590095753,
+                        "Call_Chg": 9.918638162881273,
+                        "Put_Now": 106.69796851997353,
+                        "Put_Sim": 92.49758729790665,
+                        "Put_Chg": -13.308951818898606
                     },
                     {
                         "Strike": 5200.0,
-                        "Call_Now": 375.54860177600904,
-                        "Call_Sim": 413.29575802383897,
-                        "Call_Chg": 10.051204043716218,
-                        "Put_Now": 112.31345134186131,
-                        "Put_Sim": 97.5306075896915,
-                        "Put_Chg": -13.162131138837124
+                        "Call_Now": 351.33184115188396,
+                        "Call_Sim": 387.7124902858686,
+                        "Call_Chg": 10.355067452669903,
+                        "Put_Now": 123.09669071773646,
+                        "Put_Sim": 107.29733985172061,
+                        "Put_Chg": -12.83491113684293
                     },
                     {
                         "Strike": 5250.0,
-                        "Call_Now": 344.45191536337416,
-                        "Call_Sim": 380.5807886977241,
-                        "Call_Chg": 10.488800242622059,
-                        "Put_Now": 129.19527309812838,
-                        "Put_Sim": 112.79414643247878,
-                        "Put_Chg": -12.694834936563323
+                        "Call_Now": 321.35572207641144,
+                        "Call_Sim": 356.0777928153261,
+                        "Call_Chg": 10.804870849836158,
+                        "Put_Now": 141.09907981116612,
+                        "Put_Sim": 123.64115055008028,
+                        "Put_Chg": -12.372815814567966
                     },
                     {
                         "Strike": 5300.0,
-                        "Call_Now": 314.9586068835538,
-                        "Call_Sim": 349.4134402016384,
-                        "Call_Chg": 10.93947984435404,
-                        "Put_Now": 147.68047278721065,
-                        "Put_Sim": 129.60530610529554,
-                        "Put_Chg": -12.239374875213999
+                        "Call_Now": 293.01367725058344,
+                        "Call_Sim": 326.0294574626296,
+                        "Call_Chg": 11.267658398010976,
+                        "Put_Now": 160.73554315424076,
+                        "Put_Sim": 141.57132336628615,
+                        "Put_Chg": -11.922826409069181
                     },
                     {
                         "Strike": 5350.0,
-                        "Call_Now": 287.0949853064981,
-                        "Call_Sim": 319.8320073077102,
-                        "Call_Chg": 11.402853994911345,
-                        "Put_Now": 167.79535937905712,
-                        "Put_Sim": 148.0023813802702,
-                        "Put_Chg": -11.795903100081391
+                        "Call_Now": 266.32342987385846,
+                        "Call_Sim": 297.5978414320266,
+                        "Call_Chg": 11.743019220269492,
+                        "Put_Now": 182.0238039464184,
+                        "Put_Sim": 161.1182155045858,
+                        "Put_Chg": -11.485084911194635
                     },
                     {
                         "Strike": 5400.0,
-                        "Call_Now": 260.87488098015865,
-                        "Call_Sim": 291.86294274814736,
-                        "Call_Chg": 11.87851496148668,
-                        "Put_Now": 189.55376322162056,
-                        "Put_Sim": 168.01182498960952,
-                        "Put_Chg": -11.364553183164636
+                        "Call_Now": 241.28996644312429,
+                        "Call_Sim": 270.8009999668643,
+                        "Call_Chg": 12.23052659783772,
+                        "Put_Now": 204.9688486845862,
+                        "Put_Sim": 182.29988220832547,
+                        "Put_Chg": -11.05971303529376
                     },
                     {
                         "Strike": 5425.0,
-                        "Call_Now": 248.38205999210413,
-                        "Call_Sim": 278.4880064021286,
-                        "Call_Chg": 12.120821612873927,
-                        "Put_Now": 201.05019631801724,
-                        "Put_Sim": 178.62614272804194,
-                        "Put_Chg": -11.153460180911923
+                        "Call_Now": 229.39265745754392,
+                        "Call_Sim": 258.0178760811009,
+                        "Call_Chg": 12.478698725941104,
+                        "Put_Now": 217.06079378345703,
+                        "Put_Sim": 193.5060124070137,
+                        "Put_Chg": -10.851697796674376
                     }
                 ]
             },
             {
                 "scenario": "-1%",
-                "target_spot": 5200.47,
+                "target_spot": 5165.82,
                 "options": [
                     {
                         "Strike": 4500.0,
-                        "Call_Now": 941.7789584810225,
-                        "Call_Sim": 891.0097169539413,
-                        "Call_Chg": -5.390781039424155,
-                        "Put_Now": 6.844693682240802,
-                        "Put_Sim": 8.6054521551589,
-                        "Put_Chg": 25.724430553942113
+                        "Call_Now": 907.9109871747623,
+                        "Call_Sim": 857.7363335749692,
+                        "Call_Chg": -5.5263846686035425,
+                        "Put_Now": 7.976722375980302,
+                        "Put_Sim": 9.982068776188498,
+                        "Put_Chg": 25.139979877533957
                     },
                     {
                         "Strike": 5000.0,
-                        "Call_Now": 515.0288415039067,
-                        "Call_Sim": 472.87271041230497,
-                        "Call_Chg": -8.185198127643496,
-                        "Put_Now": 59.87965839414983,
-                        "Put_Sim": 70.25352730254735,
-                        "Put_Chg": 17.324529208421538
+                        "Call_Now": 486.78824067498635,
+                        "Call_Sim": 445.83886987890264,
+                        "Call_Chg": -8.412152836581022,
+                        "Put_Now": 66.63905756522854,
+                        "Put_Sim": 77.86968676914535,
+                        "Put_Chg": 16.85292321687456
                     },
                     {
                         "Strike": 5150.0,
-                        "Call_Now": 408.2101367928112,
-                        "Call_Sim": 370.51892043987846,
-                        "Call_Chg": -9.23328770056073,
-                        "Put_Now": 96.99647818976177,
-                        "Put_Sim": 111.8352618368283,
-                        "Put_Chg": 15.298270539303758
+                        "Call_Now": 382.91162712302366,
+                        "Call_Sim": 346.58845727446214,
+                        "Call_Chg": -9.486045153936116,
+                        "Put_Now": 106.69796851997353,
+                        "Put_Sim": 122.55479867141207,
+                        "Put_Chg": 14.861417111676491
                     },
                     {
                         "Strike": 5200.0,
-                        "Call_Now": 375.54860177600904,
-                        "Call_Sim": 339.49440194594763,
-                        "Call_Chg": -9.600408484962342,
-                        "Put_Now": 112.31345134186131,
-                        "Put_Sim": 128.7892515117992,
-                        "Put_Chg": 14.669480790674488
+                        "Call_Now": 351.33184115188396,
+                        "Call_Sim": 316.68607494911885,
+                        "Call_Chg": -9.861265659603974,
+                        "Put_Now": 123.09669071773646,
+                        "Put_Sim": 140.63092451497164,
+                        "Put_Chg": 14.24427715724834
                     },
                     {
                         "Strike": 5250.0,
-                        "Call_Now": 344.45191536337416,
-                        "Call_Sim": 310.0910776900819,
-                        "Call_Chg": -9.975510699960502,
-                        "Put_Now": 129.19527309812838,
-                        "Put_Sim": 147.36443542483653,
-                        "Put_Chg": 14.063333658428839
+                        "Call_Now": 321.35572207641144,
+                        "Call_Sim": 288.4354639702874,
+                        "Call_Chg": -10.24417984326301,
+                        "Put_Now": 141.09907981116612,
+                        "Put_Sim": 160.3588217050426,
+                        "Put_Chg": 13.64979978583271
                     },
                     {
                         "Strike": 5300.0,
-                        "Call_Now": 314.9586068835538,
-                        "Call_Sim": 282.33508699470394,
-                        "Call_Chg": -10.358034095861804,
-                        "Put_Now": 147.68047278721065,
-                        "Put_Sim": 167.58695289836078,
-                        "Put_Chg": 13.479426044249543
+                        "Call_Now": 293.01367725058344,
+                        "Call_Sim": 261.8539839243681,
+                        "Call_Chg": -10.63421121450511,
+                        "Put_Now": 160.73554315424076,
+                        "Put_Sim": 181.75584982802593,
+                        "Put_Chg": 13.077572179299649
                     },
                     {
                         "Strike": 5350.0,
-                        "Call_Now": 287.0949853064981,
-                        "Call_Sim": 256.2397032189788,
-                        "Call_Chg": -10.747412412856564,
-                        "Put_Now": 167.79535937905712,
-                        "Put_Sim": 189.47007729153847,
-                        "Put_Chg": 12.917352418261588
+                        "Call_Now": 266.32342987385846,
+                        "Call_Sim": 236.9458753950821,
+                        "Call_Chg": -11.0307810667243,
+                        "Put_Now": 182.0238039464184,
+                        "Put_Sim": 204.82624946764145,
+                        "Put_Chg": 12.52717777941576
                     },
                     {
                         "Strike": 5400.0,
-                        "Call_Now": 260.87488098015865,
-                        "Call_Sim": 231.80538751075255,
-                        "Call_Chg": -11.143078766413327,
-                        "Put_Now": 189.55376322162056,
-                        "Put_Sim": 213.0142697522142,
-                        "Put_Chg": 12.376703122039487
+                        "Call_Now": 241.28996644312429,
+                        "Call_Sim": 213.70252786531591,
+                        "Call_Chg": -11.433313612031668,
+                        "Put_Now": 204.9688486845862,
+                        "Put_Sim": 229.5614101067781,
+                        "Put_Chg": 11.998194642755633
                     },
                     {
                         "Strike": 5425.0,
-                        "Call_Now": 248.38205999210413,
-                        "Call_Sim": 220.20784988064952,
-                        "Call_Chg": -11.343093825838407,
-                        "Put_Now": 201.05019631801724,
-                        "Put_Sim": 225.40598620656192,
-                        "Put_Chg": 12.114283066910897
+                        "Call_Now": 229.39265745754392,
+                        "Call_Sim": 202.6990645863075,
+                        "Call_Chg": -11.636637879822677,
+                        "Put_Now": 217.06079378345703,
+                        "Put_Sim": 242.54720091222134,
+                        "Put_Chg": 11.741598602182354
                     }
                 ]
             }
@@ -1016,39 +1018,39 @@
                 "options": [
                     {
                         "Strike": 5300.0,
-                        "Call_Now": 36.116569064641226,
+                        "Call_Now": 23.978490781306846,
                         "Call_Sim": 88.83121721877524,
-                        "Call_Chg": 145.95696523605451,
-                        "Put_Now": 71.56172278921531,
+                        "Call_Chg": 270.46208632957956,
+                        "Put_Now": 94.42364450588002,
                         "Put_Sim": 27.27637094334773,
-                        "Put_Chg": -61.884133192698364
+                        "Put_Chg": -71.11277468044653
                     },
                     {
                         "Strike": 5350.0,
-                        "Call_Now": 20.232199239013653,
+                        "Call_Now": 12.540927707065975,
                         "Call_Sim": 58.6867106572231,
-                        "Call_Chg": 190.06589923283178,
-                        "Put_Now": 105.56834497985574,
+                        "Call_Chg": 367.9614780344923,
+                        "Put_Now": 132.87707344790851,
                         "Put_Sim": 47.022856398066324,
-                        "Put_Chg": -55.45742769100046
+                        "Put_Chg": -64.61176094723325
                     },
                     {
                         "Strike": 5400.0,
-                        "Call_Now": 10.349938188455894,
+                        "Call_Now": 5.962164260839074,
                         "Call_Sim": 35.964639988769704,
-                        "Call_Chg": 247.4865195705605,
-                        "Put_Now": 145.57707594556814,
+                        "Call_Chg": 503.2145109619688,
+                        "Put_Now": 176.18930201795047,
                         "Put_Sim": 74.19177774588206,
-                        "Put_Chg": -49.03608465551083
+                        "Put_Chg": -57.890872546663886
                     },
                     {
                         "Strike": 5500.0,
-                        "Call_Now": 2.029037715978234,
+                        "Call_Now": 0.9992478841995052,
                         "Call_Sim": 10.498727301855752,
-                        "Call_Chg": 417.42396009598747,
-                        "Put_Now": 237.03815950562966,
+                        "Call_Chg": 950.6629503915592,
+                        "Put_Now": 271.0083696738511,
                         "Put_Sim": 148.50784909150843,
-                        "Put_Chg": -37.348547845107035
+                        "Put_Chg": -45.20174809721474
                     }
                 ]
             },
@@ -1058,144 +1060,153 @@
                 "options": [
                     {
                         "Strike": 5300.0,
-                        "Call_Now": 36.116569064641226,
+                        "Call_Now": 23.978490781306846,
                         "Call_Sim": 58.13823672584749,
-                        "Call_Chg": 60.973863884445976,
-                        "Put_Now": 71.56172278921531,
+                        "Call_Chg": 142.45994986127695,
+                        "Put_Now": 94.42364450588002,
                         "Put_Sim": 46.58339045042112,
-                        "Put_Chg": -34.90459894651746
+                        "Put_Chg": -50.665544955193674
                     },
                     {
                         "Strike": 5350.0,
-                        "Call_Now": 20.232199239013653,
+                        "Call_Now": 12.540927707065975,
                         "Call_Sim": 35.45079604938178,
-                        "Call_Chg": 75.21968635531316,
-                        "Put_Now": 105.56834497985574,
+                        "Call_Chg": 182.68081020359938,
+                        "Put_Now": 132.87707344790851,
                         "Put_Sim": 73.78694179022477,
-                        "Put_Chg": -30.105050141399303
+                        "Put_Chg": -44.469772041486685
                     },
                     {
                         "Strike": 5400.0,
-                        "Call_Now": 10.349938188455894,
+                        "Call_Now": 5.962164260839074,
                         "Call_Sim": 19.880265401477573,
-                        "Call_Chg": 92.08100608418712,
-                        "Put_Now": 145.57707594556814,
+                        "Call_Chg": 233.44041746813193,
+                        "Put_Now": 176.18930201795047,
                         "Put_Sim": 108.10740315858993,
-                        "Put_Chg": -25.738717819135392
+                        "Put_Chg": -38.641335245441994
                     },
                     {
                         "Strike": 5500.0,
-                        "Call_Now": 2.029037715978234,
+                        "Call_Now": 0.9992478841995052,
                         "Call_Sim": 4.760463813639944,
-                        "Call_Chg": 134.61682235634754,
-                        "Put_Now": 237.03815950562966,
+                        "Call_Chg": 376.404692860925,
+                        "Put_Now": 271.0083696738511,
                         "Put_Sim": 192.7695856032915,
-                        "Put_Chg": -18.67571617779406
+                        "Put_Chg": -28.86950840843669
                     }
                 ]
             },
             {
                 "scenario": "+1%",
-                "target_spot": 5305.53,
+                "target_spot": 5270.18,
                 "options": [
                     {
                         "Strike": 5300.0,
-                        "Call_Now": 36.116569064641226,
-                        "Call_Sim": 61.17136087243489,
-                        "Call_Chg": 69.3720152735182,
-                        "Put_Now": 71.56172278921531,
-                        "Put_Sim": 44.08651459700923,
-                        "Put_Chg": -38.39372100240539
+                        "Call_Now": 23.978490781306846,
+                        "Call_Sim": 43.38735242658231,
+                        "Call_Chg": 80.9427992040526,
+                        "Put_Now": 94.42364450588002,
+                        "Put_Sim": 61.65250615115565,
+                        "Put_Chg": -34.706495948357116
                     },
                     {
                         "Strike": 5350.0,
-                        "Call_Now": 20.232199239013653,
-                        "Call_Sim": 37.65209163751524,
-                        "Call_Chg": 86.09984605584,
-                        "Put_Now": 105.56834497985574,
-                        "Put_Sim": 70.45823737835826,
-                        "Put_Chg": -33.25817754194886
+                        "Call_Now": 12.540927707065975,
+                        "Call_Sim": 25.096009887027094,
+                        "Call_Chg": 100.11286623466593,
+                        "Put_Now": 132.87707344790851,
+                        "Put_Sim": 93.2521556278698,
+                        "Put_Chg": -29.820733398055143
                     },
                     {
                         "Strike": 5400.0,
-                        "Call_Now": 10.349938188455894,
-                        "Call_Sim": 21.33303879750406,
-                        "Call_Chg": 106.11754784486043,
-                        "Put_Now": 145.57707594556814,
-                        "Put_Sim": 104.0301765546169,
-                        "Put_Chg": -28.53945177912888
+                        "Call_Now": 5.962164260839074,
+                        "Call_Sim": 13.28849065317911,
+                        "Call_Chg": 122.88031781447395,
+                        "Put_Now": 176.18930201795047,
+                        "Put_Sim": 131.33562841029106,
+                        "Put_Chg": -25.457660081478515
                     },
                     {
                         "Strike": 5500.0,
-                        "Call_Now": 2.029037715978234,
-                        "Call_Sim": 5.225556453023842,
-                        "Call_Chg": 157.53865548549015,
-                        "Put_Now": 237.03815950562966,
-                        "Put_Sim": 187.70467824267598,
-                        "Put_Chg": -20.81246385216808
+                        "Call_Now": 0.9992478841995052,
+                        "Call_Sim": 2.8068250134934374,
+                        "Call_Chg": 180.89376598900458,
+                        "Put_Now": 271.0083696738511,
+                        "Put_Sim": 220.6359468031451,
+                        "Put_Chg": -18.587035865839656
                     }
                 ]
             },
             {
                 "scenario": "-1%",
-                "target_spot": 5200.47,
+                "target_spot": 5165.82,
                 "options": [
                     {
                         "Strike": 5300.0,
-                        "Call_Now": 36.116569064641226,
-                        "Call_Sim": 19.160947481716676,
-                        "Call_Chg": -46.94693328310748,
-                        "Put_Now": 71.56172278921531,
-                        "Put_Sim": 107.13610120628937,
-                        "Put_Chg": 49.71146170119214
+                        "Call_Now": 23.978490781306846,
+                        "Call_Sim": 11.817189166169669,
+                        "Call_Chg": -50.71754401080941,
+                        "Put_Now": 94.42364450588002,
+                        "Put_Sim": 134.44234289074393,
+                        "Put_Chg": 42.38207346717255
                     },
                     {
                         "Strike": 5350.0,
-                        "Call_Now": 20.232199239013653,
-                        "Call_Sim": 9.666392203408577,
-                        "Call_Chg": -52.22273125519188,
-                        "Put_Now": 105.56834497985574,
-                        "Put_Sim": 147.5325379442511,
-                        "Put_Chg": 39.750734912442596
+                        "Call_Now": 12.540927707065975,
+                        "Call_Sim": 5.534578699197937,
+                        "Call_Chg": -55.86786856223108,
+                        "Put_Now": 132.87707344790851,
+                        "Put_Sim": 178.05072444004054,
+                        "Put_Chg": 33.99657278713423
                     },
                     {
                         "Strike": 5400.0,
-                        "Call_Now": 10.349938188455894,
-                        "Call_Sim": 4.423610871357084,
-                        "Call_Chg": -57.25954309281684,
-                        "Put_Now": 145.57707594556814,
-                        "Put_Sim": 192.1807486284688,
-                        "Put_Chg": 32.01305726206917
+                        "Call_Now": 5.962164260839074,
+                        "Call_Sim": 2.342728361646607,
+                        "Call_Chg": -60.70674575280977,
+                        "Put_Now": 176.18930201795047,
+                        "Put_Sim": 224.7498661187592,
+                        "Put_Chg": 27.561584922937772
                     },
                     {
                         "Strike": 5500.0,
-                        "Call_Now": 2.029037715978234,
-                        "Call_Sim": 0.6838297634648427,
-                        "Call_Chg": -66.29782886341485,
-                        "Put_Now": 237.03815950562966,
-                        "Put_Sim": 288.2229515531153,
-                        "Put_Chg": 21.59348189094845
+                        "Call_Now": 0.9992478841995052,
+                        "Call_Sim": 0.3073965812188604,
+                        "Call_Chg": -69.23720469369671,
+                        "Put_Now": 271.0083696738511,
+                        "Put_Sim": 322.49651837087094,
+                        "Put_Chg": 18.99873009788737
                     }
                 ]
             }
         ],
         "dealer_pressure_profile": [
-            -0.00010727690676059133,
-            -0.08405252450112714,
-            -9.357753928572292e-05,
-            0.019305495536154387,
-            0.0006901043541761013,
-            0.25676360845315926,
-            0.58547820408015,
-            0.49919743859124005,
-            0.012670999003589499,
-            0.3338948671263812,
-            0.33746382313038714,
-            0.0016003883157750627,
-            0.006568962339546652,
-            0.2647806404827017,
-            0.04476546492140884
-        ]
+            -0.00011074643222754384,
+            -0.03240936340139594,
+            0.0015169595611320627,
+            0.04102201433520375,
+            0.0011525770891863175,
+            0.3039213594584254,
+            0.6053329289429428,
+            0.44191519867206014,
+            0.013809558858604286,
+            0.23610770651457144,
+            0.311345984252962,
+            0.0007262807955827895,
+            0.006988264100660381,
+            0.2755436533830953,
+            0.04522418079533876
+        ],
+        "flip_variations": {
+            "Classic": 5335.806729954517,
+            "Spline": 5335.5337744059525,
+            "HVL": 5317.087414143539,
+            "HVL Log": 4500.0,
+            "Sigma Kernel": 4500.0,
+            "PVOP": 5335.806729954517,
+            "HVL Gaussian": 5342.0967261488
+        }
     },
     "delta_data": {
         "strikes": [
@@ -1216,38 +1227,38 @@
             6200.0
         ],
         "delta_values": [
-            -0.3320188076994962,
-            -1358.448293895574,
-            -56.903528931321425,
-            -601.144160009043,
-            -8.2116989526547,
-            620.0121563469769,
-            1104.7783429326826,
-            476.1832730596885,
-            53.596499467744756,
-            287.4350113218611,
-            617.035764993165,
-            0.31265055234157685,
-            42.957802221895946,
-            -5466.383062866114,
-            134.47422531694974
+            -0.3915511955809614,
+            -1586.0628215010986,
+            -63.17696761194229,
+            -681.5596426455529,
+            -10.236414601329448,
+            464.6020929553074,
+            830.219921395947,
+            304.7500773383586,
+            46.92486381602934,
+            208.7451232807304,
+            501.09588555350706,
+            0.11790674944136442,
+            40.435969710265475,
+            -5650.881832373485,
+            121.4556798147094
         ],
         "delta_cumulative": [
-            -0.3320188076994962,
-            -1358.7803127032735,
-            -1415.683841634595,
-            -2016.828001643638,
-            -2025.0397005962925,
-            -1405.0275442493157,
-            -300.24920131663316,
-            175.9340717430553,
-            229.53057121080008,
-            516.9655825326612,
-            1134.001347525826,
-            1134.3139980781677,
-            1177.2718003000637,
-            -4289.111262566051,
-            -4154.637037249101
+            -0.3915511955809614,
+            -1586.4543726966795,
+            -1649.6313403086217,
+            -2331.1909829541746,
+            -2341.4273975555043,
+            -1876.825304600197,
+            -1046.6053832042498,
+            -741.8553058658913,
+            -694.930442049862,
+            -486.1853187691316,
+            14.910566784375476,
+            15.02847353381684,
+            55.46444324408232,
+            -5595.417389129402,
+            -5473.961709314693
         ]
     },
     "gamma_data": {
@@ -1269,45 +1280,45 @@
             6200.0
         ],
         "gamma_values": [
-            4149.509857482453,
-            16170265.153071309,
-            457883.04030629643,
-            5896411.592579605,
-            149462.5803464636,
-            12181910.983971337,
-            22283964.290792234,
-            14834628.518277276,
-            511473.73892928084,
-            7367251.042176317,
-            9536131.587129408,
-            22000.178274657617,
-            190675.8080295003,
-            14411761.90022451,
-            1008219.3621171225
+            4766.244702528209,
+            17875913.583357237,
+            480068.6682978078,
+            6123599.323992884,
+            153307.36905148675,
+            10945582.805778472,
+            18691259.52373055,
+            10859577.721147275,
+            485488.9344009249,
+            4574767.870202828,
+            7836071.217119163,
+            8903.605083308648,
+            186466.80644675792,
+            13191456.128331564,
+            939345.1930453174
         ],
         "gamma_call": [
             0.0,
             0.0,
             0.0,
-            173617.15271403192,
-            46168.4609694443,
-            12181910.983971337,
-            22283964.290792234,
-            14834628.518277276,
-            511473.73892928084,
-            7367251.042176317,
-            9536131.587129408,
-            22000.178274657617,
-            190675.8080295003,
-            6127650.194698893,
-            1008219.3621171225
+            179004.67874799366,
+            47312.73337174623,
+            10945582.805778472,
+            18691259.52373055,
+            10859577.721147275,
+            485488.9344009249,
+            4574767.870202828,
+            7836071.217119163,
+            8903.605083308648,
+            186466.80644675792,
+            5608795.737311867,
+            939345.1930453174
         ],
         "gamma_put": [
-            4149.509857482453,
-            16170265.153071309,
-            457883.04030629643,
-            5722794.439865573,
-            103294.11937701929,
+            4766.244702528209,
+            17875913.583357237,
+            480068.6682978078,
+            5944594.64524489,
+            105994.63567974052,
             0.0,
             0.0,
             0.0,
@@ -1316,25 +1327,25 @@
             0.0,
             0.0,
             0.0,
-            8284111.705525618,
+            7582660.391019697,
             0.0
         ],
         "gamma_exposure": [
-            4149.509857482453,
-            16174414.662928792,
-            16632297.703235088,
-            22528709.295814693,
-            22678171.876161158,
-            34860082.86013249,
-            57144047.15092473,
-            71978675.669202,
-            72490149.40813129,
-            79857400.45030761,
-            89393532.03743702,
-            89415532.21571168,
-            89606208.02374119,
-            104017969.92396569,
-            105026189.28608282
+            4766.244702528209,
+            17880679.828059766,
+            18360748.496357575,
+            24484347.82035046,
+            24637655.189401947,
+            35583237.99518042,
+            54274497.518910974,
+            65134075.24005825,
+            65619564.174459174,
+            70194332.044662,
+            78030403.26178116,
+            78039306.86686446,
+            78225773.67331122,
+            91417229.80164278,
+            92356574.9946881
         ]
     },
     "oi_data": {
@@ -1441,86 +1452,86 @@
         {
             "expiry": "2026-04-01",
             "days_to_exp": 11,
-            "abs_call": 51767689.58933548,
+            "abs_call": 40384643.24576214,
             "abs_put": 0.0,
-            "net": 51767689.58933548
+            "net": 40384643.24576214
         },
         {
             "expiry": "2026-05-01",
             "days_to_exp": 33,
-            "abs_call": 13090767.673469897,
+            "abs_call": 11178543.127409264,
             "abs_put": 0.0,
-            "net": 13090767.673469897
+            "net": 11178543.127409264
         },
         {
             "expiry": "2026-06-01",
             "days_to_exp": 54,
-            "abs_call": 511473.73892928084,
+            "abs_call": 485488.9344009249,
             "abs_put": 0.0,
-            "net": 511473.73892928084
+            "net": 485488.9344009249
         },
         {
             "expiry": "2026-07-01",
             "days_to_exp": 76,
             "abs_call": 0.0,
-            "abs_put": 21865302.991461746,
-            "net": 21865302.991461746
+            "abs_put": 23791841.439056713,
+            "net": 23791841.439056713
         },
         {
             "expiry": "2026-08-03",
             "days_to_exp": 99,
             "abs_call": 0.0,
-            "abs_put": 457883.04030629643,
-            "net": 457883.04030629643
+            "abs_put": 480068.6682978078,
+            "net": 480068.6682978078
         },
         {
             "expiry": "2026-09-01",
             "days_to_exp": 120,
-            "abs_call": 46168.4609694443,
+            "abs_call": 47312.73337174623,
             "abs_put": 0.0,
-            "net": 46168.4609694443
+            "net": 47312.73337174623
         },
         {
             "expiry": "2026-10-01",
             "days_to_exp": 142,
-            "abs_call": 6127650.194698893,
-            "abs_put": 8284111.705525618,
-            "net": 14411761.90022451
+            "abs_call": 5608795.737311867,
+            "abs_put": 7582660.391019697,
+            "net": 13191456.128331564
         },
         {
             "expiry": "2026-11-02",
             "days_to_exp": 164,
             "abs_call": 0.0,
-            "abs_put": 31906.111332617373,
-            "net": 31906.111332617373
+            "abs_put": 33433.0342479421,
+            "net": 33433.0342479421
         },
         {
             "expiry": "2026-12-01",
             "days_to_exp": 185,
-            "abs_call": 961559.6026775336,
+            "abs_call": 945725.3434980272,
             "abs_put": 0.0,
-            "net": 961559.6026775336
+            "net": 945725.3434980272
         },
         {
             "expiry": "2027-01-01",
             "days_to_exp": 208,
-            "abs_call": 1008219.3621171225,
+            "abs_call": 939345.1930453174,
             "abs_put": 0.0,
-            "net": 1008219.3621171225
+            "net": 939345.1930453174
         },
         {
             "expiry": "2027-02-01",
             "days_to_exp": 229,
             "abs_call": 0.0,
-            "abs_put": 103294.11937701929,
-            "net": 103294.11937701929
+            "abs_put": 105994.63567974052,
+            "net": 105994.63567974052
         },
         {
             "expiry": "2027-03-01",
             "days_to_exp": 249,
-            "abs_call": 770162.6958818557,
+            "abs_call": 772722.5115869199,
             "abs_put": 0.0,
-            "net": 770162.6958818557
+            "net": 772722.5115869199
         }
     ],
     "oi_by_expiry": [
@@ -1635,7 +1646,7 @@
             20.0,
             25.0,
             1100.0,
-            3905.0,
+            100.0,
             150.0,
             9740.0,
             2500.0,
@@ -1669,7 +1680,7 @@
             40.0,
             25.0,
             1100.0,
-            3905.0,
+            100.0,
             150.0,
             9740.0,
             2500.0,
@@ -1778,7 +1789,7 @@
                 "strike": 5400.0,
                 "type": "CALL",
                 "oi": 3080,
-                "volume": 3905,
+                "volume": 100,
                 "expiry": "2026-04-01 00:00:00",
                 "iv": 0.0
             },
@@ -1865,14 +1876,6 @@
                 "iv": 0.0
             },
             {
-                "strike": 5400.0,
-                "type": "CALL",
-                "oi": 3080,
-                "volume": 3905,
-                "expiry": "2026-04-01 00:00:00",
-                "iv": 0.0
-            },
-            {
                 "strike": 5600.0,
                 "type": "CALL",
                 "oi": 4400,
@@ -1889,19 +1892,19 @@
                 "iv": 0.0
             },
             {
-                "strike": 6200.0,
-                "type": "CALL",
-                "oi": 1000,
-                "volume": 500,
-                "expiry": "2027-01-01 00:00:00",
-                "iv": 0.0
-            },
-            {
                 "strike": 5600.0,
                 "type": "CALL",
                 "oi": 500,
                 "volume": 500,
                 "expiry": "2026-12-01 00:00:00",
+                "iv": 0.0
+            },
+            {
+                "strike": 6200.0,
+                "type": "CALL",
+                "oi": 1000,
+                "volume": 500,
+                "expiry": "2027-01-01 00:00:00",
                 "iv": 0.0
             },
             {
@@ -1937,7 +1940,7 @@
                 "iv": 0.0
             },
             {
-                "strike": 5200.0,
+                "strike": 5800.0,
                 "type": "CALL",
                 "oi": 120,
                 "volume": 120,
@@ -1945,7 +1948,7 @@
                 "iv": 0.0
             },
             {
-                "strike": 5800.0,
+                "strike": 5200.0,
                 "type": "CALL",
                 "oi": 120,
                 "volume": 120,
@@ -1957,6 +1960,14 @@
                 "type": "CALL",
                 "oi": 465,
                 "volume": 105,
+                "expiry": "2026-04-01 00:00:00",
+                "iv": 0.0
+            },
+            {
+                "strike": 5400.0,
+                "type": "CALL",
+                "oi": 3080,
+                "volume": 100,
                 "expiry": "2026-04-01 00:00:00",
                 "iv": 0.0
             },
@@ -1983,24 +1994,24 @@
             "expiry": "2026-04-01",
             "days_to_exp": 14,
             "iv_atm": 0.0,
-            "spot": 5253.0,
+            "spot": 5218.0,
             "prob_data": [
                 {
                     "sd": 1,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.6826894921370859
                 },
                 {
                     "sd": 2,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9544997361036416
                 },
                 {
                     "sd": 3,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9973002039367398
                 }
             ]
@@ -2009,24 +2020,24 @@
             "expiry": "2026-05-01",
             "days_to_exp": 44,
             "iv_atm": 0.0,
-            "spot": 5253.0,
+            "spot": 5218.0,
             "prob_data": [
                 {
                     "sd": 1,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.6826894921370859
                 },
                 {
                     "sd": 2,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9544997361036416
                 },
                 {
                     "sd": 3,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9973002039367398
                 }
             ]
@@ -2035,24 +2046,24 @@
             "expiry": "2026-06-01",
             "days_to_exp": 75,
             "iv_atm": 0.0,
-            "spot": 5253.0,
+            "spot": 5218.0,
             "prob_data": [
                 {
                     "sd": 1,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.6826894921370859
                 },
                 {
                     "sd": 2,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9544997361036416
                 },
                 {
                     "sd": 3,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9973002039367398
                 }
             ]
@@ -2061,24 +2072,24 @@
             "expiry": "2026-07-01",
             "days_to_exp": 105,
             "iv_atm": 0.0,
-            "spot": 5253.0,
+            "spot": 5218.0,
             "prob_data": [
                 {
                     "sd": 1,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.6826894921370859
                 },
                 {
                     "sd": 2,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9544997361036416
                 },
                 {
                     "sd": 3,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9973002039367398
                 }
             ]
@@ -2087,24 +2098,24 @@
             "expiry": "2026-08-03",
             "days_to_exp": 138,
             "iv_atm": 0.0,
-            "spot": 5253.0,
+            "spot": 5218.0,
             "prob_data": [
                 {
                     "sd": 1,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.6826894921370859
                 },
                 {
                     "sd": 2,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9544997361036416
                 },
                 {
                     "sd": 3,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9973002039367398
                 }
             ]
@@ -2113,24 +2124,24 @@
             "expiry": "2026-09-01",
             "days_to_exp": 167,
             "iv_atm": 0.0,
-            "spot": 5253.0,
+            "spot": 5218.0,
             "prob_data": [
                 {
                     "sd": 1,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.6826894921370859
                 },
                 {
                     "sd": 2,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9544997361036416
                 },
                 {
                     "sd": 3,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9973002039367398
                 }
             ]
@@ -2139,24 +2150,24 @@
             "expiry": "2026-10-01",
             "days_to_exp": 197,
             "iv_atm": 0.0,
-            "spot": 5253.0,
+            "spot": 5218.0,
             "prob_data": [
                 {
                     "sd": 1,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.6826894921370859
                 },
                 {
                     "sd": 2,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9544997361036416
                 },
                 {
                     "sd": 3,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9973002039367398
                 }
             ]
@@ -2165,24 +2176,24 @@
             "expiry": "2026-11-02",
             "days_to_exp": 229,
             "iv_atm": 0.0,
-            "spot": 5253.0,
+            "spot": 5218.0,
             "prob_data": [
                 {
                     "sd": 1,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.6826894921370859
                 },
                 {
                     "sd": 2,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9544997361036416
                 },
                 {
                     "sd": 3,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9973002039367398
                 }
             ]
@@ -2191,24 +2202,24 @@
             "expiry": "2026-12-01",
             "days_to_exp": 258,
             "iv_atm": 0.0,
-            "spot": 5253.0,
+            "spot": 5218.0,
             "prob_data": [
                 {
                     "sd": 1,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.6826894921370859
                 },
                 {
                     "sd": 2,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9544997361036416
                 },
                 {
                     "sd": 3,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9973002039367398
                 }
             ]
@@ -2217,24 +2228,24 @@
             "expiry": "2027-01-01",
             "days_to_exp": 289,
             "iv_atm": 0.0,
-            "spot": 5253.0,
+            "spot": 5218.0,
             "prob_data": [
                 {
                     "sd": 1,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.6826894921370859
                 },
                 {
                     "sd": 2,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9544997361036416
                 },
                 {
                     "sd": 3,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9973002039367398
                 }
             ]
@@ -2243,24 +2254,24 @@
             "expiry": "2027-02-01",
             "days_to_exp": 320,
             "iv_atm": 0.0,
-            "spot": 5253.0,
+            "spot": 5218.0,
             "prob_data": [
                 {
                     "sd": 1,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.6826894921370859
                 },
                 {
                     "sd": 2,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9544997361036416
                 },
                 {
                     "sd": 3,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9973002039367398
                 }
             ]
@@ -2269,24 +2280,24 @@
             "expiry": "2027-03-01",
             "days_to_exp": 348,
             "iv_atm": 0.0,
-            "spot": 5253.0,
+            "spot": 5218.0,
             "prob_data": [
                 {
                     "sd": 1,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.6826894921370859
                 },
                 {
                     "sd": 2,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9544997361036416
                 },
                 {
                     "sd": 3,
-                    "upper": 5253.0,
-                    "lower": 5253.0,
+                    "upper": 5218.0,
+                    "lower": 5218.0,
                     "prob_inside": 0.9973002039367398
                 }
             ]
@@ -2353,276 +2364,276 @@
             6200.0
         ],
         "charm": [
-            -0.750052314770393,
-            -1725.3382338549306,
-            3.0112314663786055,
-            142.28970562987288,
-            8.396933996847402,
-            3192.46330148671,
-            9374.384427296394,
-            10237.392821016381,
-            106.06195818938772,
-            7746.413574844374,
-            4815.216680128299,
-            42.79338316462139,
-            29.981538104162038,
-            4221.799994576742,
-            259.91609646019674
+            -0.8125731806272052,
+            -1511.0707500832937,
+            11.326862259779036,
+            280.3947870934258,
+            10.056976298961906,
+            4548.996384407387,
+            10142.82882639496,
+            9145.591543976368,
+            115.8199971602888,
+            5290.278218825063,
+            4254.31530361354,
+            18.857516797680965,
+            30.581292900811388,
+            4020.8128847745643,
+            249.7683541981338
         ],
         "vanna": [
-            -12.732327787542602,
-            -17057.42260113118,
-            -285.8639724278089,
-            -2415.4291261461976,
-            -86.36377326880185,
-            1458.1349482630599,
-            5928.398820793199,
-            6453.800356425811,
-            200.15738608024387,
-            5177.197690161234,
-            8959.308031208846,
-            31.13516755722276,
-            183.37510200520592,
-            26453.269531037426,
-            2217.5399970314566
+            -14.087727195038813,
+            -16855.556302584748,
+            -245.32409023459212,
+            -1812.0977236396375,
+            -71.18180236218868,
+            2551.979493863687,
+            7047.0117031801055,
+            5933.510483256372,
+            245.0215957959116,
+            3624.98014363882,
+            8167.116556618791,
+            14.091034283669513,
+            200.46430214615862,
+            25680.30659803372,
+            2170.5643926320045
         ],
         "vex": [
-            3353.4742885239425,
-            6055988.835507044,
-            223379.89613355807,
-            2368335.2862800276,
-            143865.4124768251,
-            660332.1447152508,
-            1697533.033254977,
-            804125.2376919441,
-            136104.17026302405,
-            875360.9558438605,
-            2270980.2666510446,
-            1192.5407206913073,
-            233964.12771622365,
-            10084625.036741966,
-            1033410.0973610962
+            3826.2310334550016,
+            6650171.49376756,
+            232642.7717281132,
+            2442027.851350914,
+            146606.1459390506,
+            589362.6128169347,
+            1468221.1180929653,
+            584731.6870550809,
+            128328.79067014964,
+            720777.0895007665,
+            1969449.5850030947,
+            479.4127501934986,
+            227275.11498623822,
+            9169213.560493983,
+            956399.980154827
         ],
         "theta": [
-            -0.8497468160265378,
-            -3244.234492854161,
-            -71.19739418288125,
-            -1048.6478703770426,
-            -32.32266095130283,
-            -4182.820635976039,
-            -7618.07340227022,
-            -4810.32831820448,
-            -202.80697491900324,
-            -2431.4081073466864,
-            -3397.062058556934,
-            -6.730907104139861,
-            -96.95180863787577,
-            2379.123949835953,
-            -426.530361092907
+            -0.95827557553403,
+            -3469.8601514380653,
+            -70.21046284024797,
+            -1019.3973801163944,
+            -31.041692047969285,
+            -3640.0733285307533,
+            -6250.251529158948,
+            -3453.473413544092,
+            -187.3666522584626,
+            -1527.5019139817566,
+            -2766.291609236542,
+            -2.6970675556607486,
+            -92.74449908656777,
+            2951.7797755773795,
+            -391.1251077058312
         ],
         "charm_cum": [
-            -0.750052314770393,
-            -1726.088286169701,
-            -1723.0770547033223,
-            -1580.7873490734494,
-            -1572.390415076602,
-            1620.072886410108,
-            10994.457313706502,
-            21231.85013472288,
-            21337.91209291227,
-            29084.325667756642,
-            33899.54234788494,
-            33942.33573104956,
-            33972.317269153726,
-            38194.11726373047,
-            38454.03336019067
+            -0.8125731806272052,
+            -1511.8833232639208,
+            -1500.5564610041417,
+            -1220.161673910716,
+            -1210.104697611754,
+            3338.891686795633,
+            13481.720513190594,
+            22627.312057166964,
+            22743.132054327252,
+            28033.410273152316,
+            32287.725576765857,
+            32306.58309356354,
+            32337.16438646435,
+            36357.97727123891,
+            36607.74562543704
         ],
         "vanna_cum": [
-            -12.732327787542602,
-            -17070.154928918724,
-            -17356.01890134653,
-            -19771.44802749273,
-            -19857.81180076153,
-            -18399.67685249847,
-            -12471.278031705271,
-            -6017.4776752794605,
-            -5817.320289199217,
-            -640.1225990379826,
-            8319.185432170863,
-            8350.320599728086,
-            8533.695701733292,
-            34986.965232770715,
-            37204.50522980217
+            -14.087727195038813,
+            -16869.644029779785,
+            -17114.96812001438,
+            -18927.065843654018,
+            -18998.247646016207,
+            -16446.26815215252,
+            -9399.256448972414,
+            -3465.7459657160416,
+            -3220.72436992013,
+            404.2557737186903,
+            8571.37233033748,
+            8585.46336462115,
+            8785.927666767308,
+            34466.23426480102,
+            36636.79865743303
         ],
         "theta_cum": [
-            -0.8497468160265378,
-            -3245.084239670188,
-            -3316.2816338530693,
-            -4364.929504230112,
-            -4397.252165181415,
-            -8580.072801157454,
-            -16198.146203427674,
-            -21008.474521632153,
-            -21211.281496551157,
-            -23642.689603897845,
-            -27039.75166245478,
-            -27046.482569558917,
-            -27143.434378196795,
-            -24764.31042836084,
-            -25190.84078945375
+            -0.95827557553403,
+            -3470.8184270135994,
+            -3541.0288898538474,
+            -4560.426269970242,
+            -4591.467962018211,
+            -8231.541290548965,
+            -14481.792819707913,
+            -17935.266233252005,
+            -18122.632885510466,
+            -19650.13479949222,
+            -22416.426408728763,
+            -22419.123476284425,
+            -22511.86797537099,
+            -19560.088199793612,
+            -19951.21330749944
         ],
         "r_gamma": [
-            4149.509857482453,
-            16170265.153071309,
-            457883.04030629643,
-            5896411.592579605,
-            149462.5803464636,
-            -12181910.983971337,
-            -22283964.290792234,
-            -14834628.518277276,
-            -511473.73892928084,
-            -7367251.042176317,
-            -9536131.587129408,
-            -22000.178274657617,
-            -190675.8080295003,
-            -14411761.900224512,
-            -1008219.3621171225
+            4766.244702528209,
+            17875913.583357237,
+            480068.6682978078,
+            6123599.323992884,
+            -153307.36905148675,
+            -10945582.805778472,
+            -18691259.52373055,
+            -10859577.721147275,
+            -485488.9344009249,
+            -4574767.870202828,
+            -7836071.217119163,
+            -8903.605083308648,
+            -186466.80644675792,
+            -13191456.128331564,
+            -939345.1930453174
         ],
         "r_gamma_cum": [
-            4149.509857482453,
-            16174414.662928792,
-            16632297.703235088,
-            22528709.295814693,
-            22678171.876161158,
-            10496260.892189821,
-            -11787703.398602413,
-            -26622331.91687969,
-            -27133805.65580897,
-            -34501056.69798529,
-            -44037188.2851147,
-            -44059188.46338936,
-            -44249864.27141886,
-            -58661626.17164338,
-            -59669845.533760495
+            4766.244702528209,
+            17880679.828059766,
+            18360748.496357575,
+            24484347.82035046,
+            24331040.451298974,
+            13385457.645520503,
+            -5305801.878210047,
+            -16165379.599357322,
+            -16650868.533758247,
+            -21225636.403961077,
+            -29061707.621080242,
+            -29070611.22616355,
+            -29257078.03261031,
+            -42448534.16094187,
+            -43387879.35398719
         ]
     },
     "detailed_data": [
         {
             "strike": 4500.0,
-            "delta": -0.3320188076994962,
-            "gamma": 4149.509857482453,
+            "delta": -0.3915511955809614,
+            "gamma": 4766.244702528209,
             "volume": 15,
             "oi": 15,
             "iv": 11.82
         },
         {
             "strike": 5000.0,
-            "delta": -1358.448293895574,
-            "gamma": 16170265.153071309,
+            "delta": -1586.0628215010986,
+            "gamma": 17875913.583357237,
             "volume": 160,
             "oi": 8900,
             "iv": 11.82
         },
         {
             "strike": 5150.0,
-            "delta": -56.903528931321425,
-            "gamma": 457883.04030629643,
+            "delta": -63.17696761194229,
+            "gamma": 480068.6682978078,
             "volume": 200,
             "oi": 200,
             "iv": 11.82
         },
         {
             "strike": 5200.0,
-            "delta": -601.144160009043,
-            "gamma": 5896411.592579605,
+            "delta": -681.5596426455529,
+            "gamma": 6123599.323992884,
             "volume": 215,
             "oi": 2160,
             "iv": 11.82
         },
         {
             "strike": 5250.0,
-            "delta": -8.2116989526547,
-            "gamma": 149462.5803464636,
+            "delta": -10.236414601329448,
+            "gamma": 153307.36905148675,
             "volume": 40,
             "oi": 85,
             "iv": 11.82
         },
         {
             "strike": 5300.0,
-            "delta": 620.0121563469769,
-            "gamma": 12181910.983971337,
+            "delta": 464.6020929553074,
+            "gamma": 10945582.805778472,
             "volume": 25,
             "oi": 1560,
             "iv": 11.82
         },
         {
             "strike": 5350.0,
-            "delta": 1104.7783429326826,
-            "gamma": 22283964.290792234,
+            "delta": 830.219921395947,
+            "gamma": 18691259.52373055,
             "volume": 1100,
             "oi": 3700,
             "iv": 11.82
         },
         {
             "strike": 5400.0,
-            "delta": 476.1832730596885,
-            "gamma": 14834628.518277276,
-            "volume": 3905,
+            "delta": 304.7500773383586,
+            "gamma": 10859577.721147275,
+            "volume": 100,
             "oi": 3080,
             "iv": 11.82
         },
         {
             "strike": 5425.0,
-            "delta": 53.596499467744756,
-            "gamma": 511473.73892928084,
+            "delta": 46.92486381602934,
+            "gamma": 485488.9344009249,
             "volume": 150,
             "oi": 150,
             "iv": 11.82
         },
         {
             "strike": 5500.0,
-            "delta": 287.4350113218611,
-            "gamma": 7367251.042176317,
+            "delta": 208.7451232807304,
+            "gamma": 4574767.870202828,
             "volume": 9740,
             "oi": 4295,
             "iv": 11.82
         },
         {
             "strike": 5600.0,
-            "delta": 617.035764993165,
-            "gamma": 9536131.587129408,
+            "delta": 501.09588555350706,
+            "gamma": 7836071.217119163,
             "volume": 2500,
             "oi": 4900,
             "iv": 11.82
         },
         {
             "strike": 5700.0,
-            "delta": 0.31265055234157685,
-            "gamma": 22000.178274657617,
+            "delta": 0.11790674944136442,
+            "gamma": 8903.605083308648,
             "volume": 105,
             "oi": 465,
             "iv": 11.82
         },
         {
             "strike": 5800.0,
-            "delta": 42.957802221895946,
-            "gamma": 190675.8080295003,
+            "delta": 40.435969710265475,
+            "gamma": 186466.80644675792,
             "volume": 120,
             "oi": 120,
             "iv": 11.82
         },
         {
             "strike": 6000.0,
-            "delta": -5466.383062866114,
-            "gamma": 14411761.90022451,
+            "delta": -5650.881832373485,
+            "gamma": 13191456.128331564,
             "volume": 60,
             "oi": 12230,
             "iv": 11.82
         },
         {
             "strike": 6200.0,
-            "delta": 134.47422531694974,
-            "gamma": 1008219.3621171225,
+            "delta": 121.4556798147094,
+            "gamma": 939345.1930453174,
             "volume": 500,
             "oi": 1000,
             "iv": 11.82
