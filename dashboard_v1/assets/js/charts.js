@@ -1990,7 +1990,7 @@ class StrangerThingsCharts {
             return Object.prototype.hasOwnProperty.call(keyLevels, key) ? keyLevels[key] : null;
         };
 
-        setText('gamma-flip', get('gamma_flip'));
+        setText('gamma-flip', get('gamma_flip_selected') ?? get('gamma_flip'));
         setText('call-wall', get('call_wall'));
         setText('put-wall', get('put_wall'));
         setText('edi-effective-call', get('effective_call_wall'));
