@@ -1747,143 +1747,484 @@ function fetchAgendaAuto() {
         });
 }
 
+let agendaReportCache = { br: null, us: null, cn: null };
+let agendaReportLoading = { br: false, us: false, cn: false };
+
+function agendaCountryFromCurrency(currency) {
+    const c = String(currency || '').toUpperCase().trim();
+    if (c === 'BRL') return 'BR';
+    if (c === 'USD') return 'EUA';
+    if (c === 'CNY' || c === 'CNH') return 'CHINA/HK';
+    return c ? 'OUTRO' : '—';
+}
+
+function agendaCountryLabel(country) {
+    const c = String(country || '').toUpperCase().trim();
+    if (c === 'BR') return 'BR';
+    if (c === 'EUA') return 'EUA';
+    if (c === 'CHINA/HK' || c === 'CHN' || c === 'CN') return 'CHINA/HK';
+    if (c === 'OUTRO') return 'OUTRO';
+    return '—';
+}
+
+function agendaLoadPrefs() {
+    try {
+        const view = String(localStorage.getItem('mercado_agenda_view') || 'agenda');
+        const filter = String(localStorage.getItem('mercado_agenda_filter') || 'TODOS');
+        const impact = String(localStorage.getItem('mercado_agenda_impact') || 'ALTO+MÉDIO');
+        return { view, filter, impact };
+    } catch {
+        return { view: 'agenda', filter: 'TODOS', impact: 'ALTO+MÉDIO' };
+    }
+}
+
+function agendaSavePrefs(next) {
+    try {
+        if (next && typeof next.view === 'string') localStorage.setItem('mercado_agenda_view', next.view);
+        if (next && typeof next.filter === 'string') localStorage.setItem('mercado_agenda_filter', next.filter);
+        if (next && typeof next.impact === 'string') localStorage.setItem('mercado_agenda_impact', next.impact);
+    } catch {
+    }
+}
+
+function agendaTabsHtml(current) {
+    const cur = String(current || 'agenda');
+    const tabs = [
+        { k: 'agenda', label: 'AGENDA' },
+        { k: 'br', label: 'BRASIL' },
+        { k: 'us', label: 'EUA' },
+        { k: 'cn', label: 'CHINA/HK' },
+    ];
+    const chip = t => {
+        const active = cur === t.k;
+        return `<button type="button" data-agenda-view="${escapeHtml(t.k)}" style="background:${active ? '#1b1b1b' : '#141414'};color:#e0e0e0;border:1px solid ${active ? 'rgba(255,255,255,.28)' : '#333'};padding:8px 12px;border-radius:999px;font-weight:900;cursor:pointer;letter-spacing:1px;">${escapeHtml(t.label)}</button>`;
+    };
+    return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">${tabs.map(chip).join('')}</div>`;
+}
+
+function agendaExtractSection(text, startMarker, endMarkers) {
+    const src = String(text || '');
+    const startAt = src.indexOf(startMarker);
+    if (startAt < 0) return '';
+    const from = startAt + startMarker.length;
+    let endAt = src.length;
+    (Array.isArray(endMarkers) ? endMarkers : []).forEach(m => {
+        const idx = src.indexOf(m, from);
+        if (idx >= 0 && idx < endAt) endAt = idx;
+    });
+    return src.slice(from, endAt).trim();
+}
+
+function agendaRenderMarkdownBlock(raw) {
+    const text = String(raw || '').replace(/\r\n/g, '\n');
+    const lines = text.split('\n');
+    const out = [];
+
+    const flushPara = buf => {
+        const t = buf.join(' ').trim();
+        if (t) out.push(`<div style="opacity:.92;line-height:1.45;margin:8px 0;">${escapeHtml(t)}</div>`);
+    };
+
+    const renderTable = rows => {
+        const cells = r => r
+            .trim()
+            .replace(/^\|/, '')
+            .replace(/\|$/, '')
+            .split('|')
+            .map(x => escapeHtml(String(x || '').trim()));
+        const head = cells(rows[0] || '');
+        const body = rows.slice(2).map(cells).filter(r => r.length && r.some(x => x));
+        const th = head.map(x => `<th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);white-space:nowrap;">${x}</th>`).join('');
+        const tr = body
+            .map(r => `<tr>${r.map(x => `<td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);opacity:.92;">${x || '—'}</td>`).join('')}</tr>`)
+            .join('');
+        return `<table class="data-table" style="width:100%;border-collapse:collapse;table-layout:auto;margin:10px 0;">${th ? `<thead><tr>${th}</tr></thead>` : ''}<tbody>${tr}</tbody></table>`;
+    };
+
+    let para = [];
+    let i = 0;
+    while (i < lines.length) {
+        const line = String(lines[i] || '');
+        const t = line.trim();
+
+        const isTableStart = t.startsWith('|') && i + 1 < lines.length && String(lines[i + 1] || '').trim().includes('|---');
+        if (isTableStart) {
+            flushPara(para);
+            para = [];
+            const rows = [];
+            while (i < lines.length && String(lines[i] || '').trim().startsWith('|')) {
+                rows.push(String(lines[i] || ''));
+                i += 1;
+            }
+            out.push(renderTable(rows));
+            continue;
+        }
+
+        const isHeading = /^#{2,4}\s+/.test(t);
+        if (isHeading) {
+            flushPara(para);
+            para = [];
+            const title = t.replace(/^#{2,4}\s+/, '').trim();
+            out.push(`<div style="margin:14px 0 6px;font-weight:900;letter-spacing:1px;opacity:.95;">${escapeHtml(title)}</div>`);
+            i += 1;
+            continue;
+        }
+
+        const isListItem = /^(\d+\.)\s+/.test(t) || /^-\s+/.test(t);
+        if (isListItem) {
+            flushPara(para);
+            para = [];
+            const items = [];
+            const isOrdered = /^\d+\.\s+/.test(t);
+            while (i < lines.length) {
+                const tt = String(lines[i] || '').trim();
+                if (isOrdered && /^\d+\.\s+/.test(tt)) items.push(tt.replace(/^\d+\.\s+/, '').trim());
+                else if (!isOrdered && /^-\s+/.test(tt)) items.push(tt.replace(/^-+\s+/, '').trim());
+                else break;
+                i += 1;
+            }
+            out.push(
+                `<${isOrdered ? 'ol' : 'ul'} style="margin:8px 0 10px 18px;opacity:.92;line-height:1.45;">${items
+                    .map(x => `<li style="margin:4px 0;">${escapeHtml(x)}</li>`)
+                    .join('')}</${isOrdered ? 'ol' : 'ul'}>`,
+            );
+            continue;
+        }
+
+        if (!t) {
+            flushPara(para);
+            para = [];
+            i += 1;
+            continue;
+        }
+
+        if (/^={6,}/.test(t)) {
+            flushPara(para);
+            para = [];
+            i += 1;
+            continue;
+        }
+
+        para.push(t);
+        i += 1;
+    }
+    flushPara(para);
+
+    return out.join('');
+}
+
+function agendaFetchReport(key) {
+    const k = String(key || '');
+    if (!['br', 'us', 'cn'].includes(k)) return Promise.resolve(null);
+    if (agendaReportCache[k] !== null) return Promise.resolve(agendaReportCache[k]);
+    if (agendaReportLoading[k]) return Promise.resolve(null);
+
+    try {
+        const pre = window.AGENDA_REPORTS_SNIPPETS;
+        const txt = pre && typeof pre === 'object' ? pre[k] : null;
+        if (typeof txt === 'string' && txt.trim()) {
+            agendaReportCache[k] = txt;
+            return Promise.resolve(txt);
+        }
+    } catch {
+    }
+
+    agendaReportLoading[k] = true;
+
+    const pathsByKey = {
+        br: ['../../Ideias/Relatorios Brasil (padrao).txt', '../../Ideias/Relatorios Brasil.txt'],
+        us: ['../../Ideias/Relatorios USA (padrao).txt', '../../Ideias/Relatorios USA.txt'],
+        cn: ['../../Ideias/Relatorios CNY (padrao).txt', '../../Ideias/Relatorios CNY,txt'],
+    };
+
+    const candidates = pathsByKey[k] || [];
+    const tryOne = idx => {
+        const path = candidates[idx];
+        if (!path) return Promise.resolve(null);
+        return fetch(`${path}?ts=${Date.now()}`)
+            .then(r => (r && r.ok ? r.text() : null))
+            .catch(() => null)
+            .then(t => (t ? t : tryOne(idx + 1)));
+    };
+
+    return tryOne(0)
+        .then(text => {
+            agendaReportCache[k] = text;
+            return text;
+        })
+        .finally(() => {
+            agendaReportLoading[k] = false;
+        });
+}
+
+function agendaRenderReference(key, targetEl) {
+    const k = String(key || '');
+    const host = targetEl;
+    if (!host) return;
+
+    const renderError = () => {
+        host.innerHTML = `<div style="padding:12px;opacity:.9;line-height:1.45;">
+            Arquivo de referência não disponível. Para habilitar:
+            <br>- mantenha os arquivos em <b>Ideias/</b> (Relatorios Brasil/USA/CNY)
+            <br>- abra este dashboard via servidor (evita bloqueio do navegador em <b>file://</b>)
+        </div>`;
+    };
+
+    agendaFetchReport(k).then(text => {
+        if (!text) return renderError();
+
+        if (k === 'br') {
+            const agenda = agendaExtractSection(text, '## AGENDA (ALTA FREQUÊNCIA)', ['## MATRIZ', '# ', '===============================================================================']);
+            const matrix = agendaExtractSection(text, '## MATRIZ (SE-ENTÃO) — BRASIL', ['===============================================================================', '# ', '## ']);
+            const matrixCut = matrix ? matrix.split('\n').slice(0, 120).join('\n') : '';
+            host.innerHTML = agendaRenderMarkdownBlock(`## AGENDA (ALTA FREQUÊNCIA)\n${agenda}\n\n## MATRIZ (SE-ENTÃO) — BRASIL\n${matrixCut}`);
+            return;
+        }
+
+        if (k === 'us') {
+            const conv = agendaExtractSection(text, '## CONVERSAO ET->BRT', ['## ', '# ', '===============================================================================']);
+            const matrix = agendaExtractSection(text, '## MATRIZ DE REACAO CRUZADA', ['## ', '# ', '===============================================================================']);
+            const danger = agendaExtractSection(text, '## COMBINACOES PERIGOSAS', ['## ', '# ', '===============================================================================']);
+            const dangerCut = danger ? danger.split('\n').slice(0, 30).join('\n') : '';
+            host.innerHTML = agendaRenderMarkdownBlock(
+                `## CONVERSAO ET->BRT\n${conv}\n\n## MATRIZ DE REACAO CRUZADA\n${matrix}\n\n## COMBINACOES PERIGOSAS\n${dangerCut}`,
+            );
+            return;
+        }
+
+        if (k === 'cn') {
+            const trig = agendaExtractSection(text, '## GATILHOS-CHAVE (TOP)', ['## MATRIZ', '# ', '===============================================================================']);
+            const matrix = agendaExtractSection(text, '## MATRIZ (SE-ENTAO) — CHINA->BR (preencher)', ['## ', '# ', '===============================================================================']);
+            const matrixCut = matrix ? matrix.split('\n').slice(0, 120).join('\n') : '';
+            host.innerHTML = agendaRenderMarkdownBlock(
+                `## GATILHOS-CHAVE (TOP)\n${trig}\n\n## MATRIZ (SE-ENTAO) — CHINA->BR (preencher)\n${matrixCut}`,
+            );
+            return;
+        }
+
+        renderError();
+    });
+}
+
 function renderAgendaMatrix() {
     const el = document.getElementById('agendaMatrix');
     if (!el) return;
 
     fetchAgendaAuto();
 
-    const manualItems = loadAgenda()
-        .map(x => ({
-            id: String(x && x.id ? x.id : ''),
-            time: String(x && x.time ? x.time : ''),
-            event: String(x && x.event ? x.event : ''),
-            impact: String(x && x.impact ? x.impact : 'MÉDIO').toUpperCase(),
-            wdo: String(x && x.wdo ? x.wdo : ''),
-            win: String(x && x.win ? x.win : ''),
-            src: 'manual',
-        }))
-        .filter(x => x.event || x.time);
+    const prefs = agendaLoadPrefs();
+    const view = String(prefs.view || 'agenda');
+    const filter = String(prefs.filter || 'TODOS');
+    const impactFilter = String(prefs.impact || 'ALTO+MÉDIO');
 
-    const seen = new Set(manualItems.map(x => `${x.time}::${x.event}`));
+    const seen = new Set();
 
     const autoRaw = Array.isArray(agendaAutoCache) ? agendaAutoCache : [];
     const allowedAutoCurrencies = new Set(['BRL', 'USD', 'EUR', 'CNY', 'CNH', 'JPY', 'GBP']);
-    const autoItems = autoRaw
+    const autoAll = autoRaw
         .map(x => ({
             id: `auto_${String(x && x.id ? x.id : `${Date.now()}_${Math.random().toString(16).slice(2)}`)}`,
             time: String(x && x.time ? x.time : ''),
             currency: String(x && x.currency ? x.currency : '').toUpperCase(),
             event: String(x && x.event ? x.event : ''),
+            country: agendaCountryFromCurrency(x && x.currency ? x.currency : ''),
             impact: String(x && x.impact ? x.impact : 'MÉDIO').toUpperCase(),
             wdo: String(x && x.wdo ? x.wdo : ''),
             win: String(x && x.win ? x.win : ''),
             src: 'auto',
         }))
-        .filter(x => (x.event || x.time) && x.impact !== 'BAIXO' && allowedAutoCurrencies.has(x.currency))
+        .filter(x => (x.event || x.time) && allowedAutoCurrencies.has(x.currency))
         .filter(x => {
-            const k = `${x.time}::${x.event}`;
+            const k = `${x.country}::${x.time}::${x.event}`;
             if (seen.has(k)) return false;
             seen.add(k);
             return true;
         })
-        .slice(0, 18);
+        .sort((a, b) => {
+            const aa = String(a.time || '').replace(/[^\d:]/g, '');
+            const bb = String(b.time || '').replace(/[^\d:]/g, '');
+            return aa.localeCompare(bb) || String(a.event || '').localeCompare(String(b.event || ''));
+        });
 
-    const items = manualItems.concat(autoItems).sort((a, b) => {
+    const byCountryKey = items => {
+        const out = { BR: [], EUA: [], 'CHINA/HK': [], OUTRO: [] };
+        items.forEach(x => {
+            const k = agendaCountryLabel(x && x.country ? x.country : '');
+            if (k === 'BR') out.BR.push(x);
+            else if (k === 'EUA') out.EUA.push(x);
+            else if (k === 'CHINA/HK') out['CHINA/HK'].push(x);
+            else out.OUTRO.push(x);
+        });
+        return out;
+    };
+
+    const sortItems = list => list.slice().sort((a, b) => {
         const aa = String(a.time || '').replace(/[^\d:]/g, '');
         const bb = String(b.time || '').replace(/[^\d:]/g, '');
         return aa.localeCompare(bb) || String(a.event || '').localeCompare(String(b.event || ''));
     });
 
+    const autoByCountry = byCountryKey(autoAll);
+    const autoItems = []
+        .concat(sortItems(autoByCountry.BR).slice(0, 14))
+        .concat(sortItems(autoByCountry.EUA).slice(0, 14))
+        .concat(sortItems(autoByCountry['CHINA/HK']).slice(0, 14))
+        .concat(sortItems(autoByCountry.OUTRO).slice(0, 10));
+
+    const allItems = autoItems;
+    const viewKey = String(view || 'agenda').toLowerCase();
+    const viewCountry = viewKey === 'br' ? 'BR' : viewKey === 'us' ? 'EUA' : viewKey === 'cn' ? 'CHINA/HK' : null;
+    const wanted = String(viewCountry || filter || 'TODOS').toUpperCase();
+    const impactWanted = String(impactFilter || 'ALTO+MÉDIO').toUpperCase();
+    const impactOk = impact => {
+        const v = String(impact || '').toUpperCase();
+        if (impactWanted === 'TODOS') return true;
+        if (impactWanted === 'ALTO+MÉDIO') return v === 'ALTO' || v === 'MÉDIO';
+        return v === impactWanted;
+    };
+    const filteredItems = (wanted !== 'TODOS'
+        ? allItems.filter(x => String(agendaCountryLabel(x.country) || '').toUpperCase() === wanted)
+        : allItems).filter(x => impactOk(x.impact));
+
     const autoKnownEmpty = Array.isArray(agendaAutoCache) && agendaAutoCache.length === 0;
     const emptyMessage = agendaAutoLoading
         ? 'Carregando eventos automáticos…'
         : autoKnownEmpty
-            ? 'Sem eventos automáticos (captura bloqueada/indisponível). Você ainda pode adicionar manualmente.'
-            : 'Sem eventos cadastrados.';
+            ? 'Sem eventos automáticos (captura bloqueada/indisponível).'
+            : 'Sem eventos do dia.';
 
-    const rowHtml = items
+    const rowHtml = list => list
         .map(x => {
             const tone = x.impact === 'ALTO' ? 'negative' : x.impact === 'BAIXO' ? 'neutral' : 'positive';
             const ev = x.src === 'auto' ? `AUTO • ${x.event}` : x.event;
-            const action = x.src === 'auto'
-                ? `<span style="opacity:.55;">—</span>`
-                : `<button type="button" data-agenda-del="${escapeHtml(x.id)}" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:6px;font-weight:900;cursor:pointer;">Remover</button>`;
             return `<tr>
                 <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.9;">${escapeHtml(x.time || '—')}</td>
                 <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);font-weight:800;opacity:.95;">${escapeHtml(ev || '—')}</td>
                 <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);"><span class="${tone}" style="font-weight:900;">${escapeHtml(x.impact)}</span></td>
                 <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);opacity:.9;">${escapeHtml(x.wdo || '—')}</td>
                 <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);opacity:.9;">${escapeHtml(x.win || '—')}</td>
-                <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;">
-                    ${action}
-                </td>
             </tr>`;
         })
         .join('');
 
-    el.innerHTML = `
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
-            <input id="agendaTime" type="text" placeholder="HH:MM" style="width:110px;background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 10px;border-radius:6px;font-weight:800;" />
-            <input id="agendaEvent" type="text" placeholder="Evento" style="flex:1;min-width:220px;background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 10px;border-radius:6px;font-weight:800;" />
-            <select id="agendaImpact" style="width:140px;background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 10px;border-radius:6px;font-weight:900;">
-                <option value="ALTO">ALTO</option>
-                <option value="MÉDIO" selected>MÉDIO</option>
-                <option value="BAIXO">BAIXO</option>
-            </select>
-            <input id="agendaWdo" type="text" placeholder="SE–ENTÃO WDO" style="flex:1;min-width:180px;background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 10px;border-radius:6px;font-weight:800;" />
-            <input id="agendaWin" type="text" placeholder="SE–ENTÃO WIN" style="flex:1;min-width:180px;background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 10px;border-radius:6px;font-weight:800;" />
-            <button id="agendaAdd" type="button" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 12px;border-radius:6px;font-weight:900;cursor:pointer;">Adicionar</button>
-            <button id="agendaClear" type="button" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 12px;border-radius:6px;font-weight:900;cursor:pointer;opacity:.85;">Limpar</button>
-        </div>
+    const tableHtml = (title, list) => {
+        const rows = rowHtml(list);
+        const msg = agendaAutoLoading && agendaAutoCache === null ? 'Carregando…' : emptyMessage;
+        return `
+            <div style="margin:14px 0 8px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">${escapeHtml(title)}</div>
+                <div style="opacity:.75;font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(String(list.length))} itens</div>
+            </div>
+            <table class="data-table" style="width:100%;border-collapse:collapse;table-layout:auto;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);min-width:90px;width:1%;">Hora</th>
+                        <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);">Evento</th>
+                        <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);min-width:90px;width:1%;">Impacto</th>
+                        <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);">Reação WDO</th>
+                        <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);">Reação WIN</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows || `<tr><td colspan="5" style="padding:12px;opacity:.85;">${escapeHtml(msg)}</td></tr>`}
+                </tbody>
+            </table>
+        `;
+    };
 
-        <table class="data-table" style="width:100%;border-collapse:collapse;table-layout:auto;">
-            <thead>
-                <tr>
-                    <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);min-width:90px;width:1%;">Hora</th>
-                    <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);">Evento</th>
-                    <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);min-width:90px;width:1%;">Impacto</th>
-                    <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);">Reação WDO</th>
-                    <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);">Reação WIN</th>
-                    <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);min-width:110px;width:1%;">Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${rowHtml || `<tr><td colspan="6" style="padding:12px;opacity:.85;">${escapeHtml(emptyMessage)}</td></tr>`}
-            </tbody>
-        </table>
+    const shown = wanted !== 'TODOS'
+        ? { [wanted]: sortItems(filteredItems) }
+        : {
+            BR: sortItems(filteredItems.filter(x => agendaCountryLabel(x.country) === 'BR')),
+            EUA: sortItems(filteredItems.filter(x => agendaCountryLabel(x.country) === 'EUA')),
+            'CHINA/HK': sortItems(filteredItems.filter(x => agendaCountryLabel(x.country) === 'CHINA/HK')),
+            OUTRO: sortItems(filteredItems.filter(x => agendaCountryLabel(x.country) === 'OUTRO')),
+        };
+
+    const filterBarAgenda = `
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 12px;">
+            <div style="opacity:.88;font-weight:900;letter-spacing:1px;">Mostrar</div>
+            <select id="agendaFilter" style="width:160px;background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 10px;border-radius:6px;font-weight:900;">
+                <option value="TODOS">TODOS</option>
+                <option value="BR">BR</option>
+                <option value="EUA">EUA</option>
+                <option value="CHINA/HK">CHINA/HK</option>
+                <option value="OUTRO">OUTRO</option>
+            </select>
+            <div style="opacity:.88;font-weight:900;letter-spacing:1px;">Impacto</div>
+            <select id="agendaImpactFilter" style="width:180px;background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 10px;border-radius:6px;font-weight:900;">
+                <option value="ALTO+MÉDIO">ALTO+MÉDIO</option>
+                <option value="ALTO">ALTO</option>
+                <option value="MÉDIO">MÉDIO</option>
+                <option value="BAIXO">BAIXO</option>
+                <option value="TODOS">TODOS</option>
+            </select>
+        </div>
+    `;
+    const filterBarCountry = `
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 12px;">
+            <div style="opacity:.88;font-weight:900;letter-spacing:1px;">Impacto</div>
+            <select id="agendaImpactFilter" style="width:180px;background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 10px;border-radius:6px;font-weight:900;">
+                <option value="ALTO+MÉDIO">ALTO+MÉDIO</option>
+                <option value="ALTO">ALTO</option>
+                <option value="MÉDIO">MÉDIO</option>
+                <option value="BAIXO">BAIXO</option>
+                <option value="TODOS">TODOS</option>
+            </select>
+        </div>
+    `;
+    el.innerHTML =
+        viewKey !== 'agenda'
+            ? `
+        ${agendaTabsHtml(view)}
+        ${filterBarCountry}
+        <div>
+            ${tableHtml(`${agendaCountryLabel(wanted)} (eventos do dia)`, shown[wanted] || [])}
+        </div>
+    `
+            : `
+        ${agendaTabsHtml(view)}
+        ${filterBarAgenda}
+        <div>
+            ${wanted === 'TODOS'
+                ? `${tableHtml('BRASIL (eventos do dia)', shown.BR)}${tableHtml('EUA (eventos do dia)', shown.EUA)}${tableHtml('CHINA/HK (eventos do dia)', shown['CHINA/HK'])}${shown.OUTRO && shown.OUTRO.length ? tableHtml('OUTRO', shown.OUTRO) : ''}`
+                : tableHtml(agendaCountryLabel(wanted), shown[wanted] || [])}
+        </div>
     `;
 
-    const addBtn = document.getElementById('agendaAdd');
-    const clearBtn = document.getElementById('agendaClear');
-    if (addBtn) {
-        addBtn.onclick = () => {
-            const time = String(document.getElementById('agendaTime')?.value || '').trim();
-            const event = String(document.getElementById('agendaEvent')?.value || '').trim();
-            const impact = String(document.getElementById('agendaImpact')?.value || 'MÉDIO').trim();
-            const wdo = String(document.getElementById('agendaWdo')?.value || '').trim();
-            const win = String(document.getElementById('agendaWin')?.value || '').trim();
-            if (!event) return;
-            const next = loadAgenda();
-            next.push({ id: `${Date.now()}_${Math.random().toString(16).slice(2)}`, time, event, impact, wdo, win });
-            saveAgenda(next);
-            renderAgendaMatrix();
-        };
-    }
-    if (clearBtn) {
-        clearBtn.onclick = () => {
-            saveAgenda([]);
-            renderAgendaMatrix();
-        };
-    }
-    el.querySelectorAll('button[data-agenda-del]').forEach(btn => {
+    el.querySelectorAll('button[data-agenda-view]').forEach(btn => {
         btn.addEventListener('click', () => {
-            const id = btn.getAttribute('data-agenda-del') || '';
-            const next = loadAgenda().filter(x => String(x && x.id ? x.id : '') !== id);
-            saveAgenda(next);
+            const nextView = btn.getAttribute('data-agenda-view') || 'agenda';
+            agendaSavePrefs({ view: nextView });
             renderAgendaMatrix();
         });
     });
+
+    const filterSel = document.getElementById('agendaFilter');
+    if (filterSel) {
+        try {
+            filterSel.value = filter || 'TODOS';
+        } catch {
+        }
+        filterSel.addEventListener('change', () => {
+            const nextFilter = String(filterSel.value || 'TODOS');
+            agendaSavePrefs({ filter: nextFilter });
+            renderAgendaMatrix();
+        });
+    }
+
+    const impactSel = document.getElementById('agendaImpactFilter');
+    if (impactSel) {
+        try {
+            impactSel.value = impactFilter || 'ALTO+MÉDIO';
+        } catch {
+        }
+        impactSel.addEventListener('change', () => {
+            const nextImpact = String(impactSel.value || 'ALTO+MÉDIO');
+            agendaSavePrefs({ impact: nextImpact });
+            renderAgendaMatrix();
+        });
+    }
 }
 
 function renderDataAudit(data) {
