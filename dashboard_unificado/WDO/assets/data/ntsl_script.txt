@@ -1,4 +1,4 @@
-// NTSL Indicator - Edi OpenInterest Levels - 16/03/2026 21:58
+// NTSL Indicator - Edi OpenInterest Levels - 17/03/2026 08:18
 // Gerado Automaticamente
 
 const
@@ -37,7 +37,7 @@ var
 
 begin
   // Inicializa GammaVal com o primeiro disponivel por seguranca
-  GammaVal := 5598.45;
+  GammaVal := 5830.82;
 
   // Define Limites de Exibicao (Otimizacao)
   if (MostrarTodosPontos) then begin
@@ -48,22 +48,22 @@ begin
     LimitLower := spot - 10000;
   end;
 
-  // 1 = Classic (5598.45)
-  // 2 = Spline (4969.11)
+  // 1 = Classic (5830.82)
+  // 2 = Spline (4968.78)
   // 3 = HVL (4500.00)
   // 4 = HVL Log (4500.00)
   // 5 = Sigma Kernel (4500.00)
-  // 6 = PVOP (5598.45)
-  // 7 = HVL Gaussian (5669.66)
+  // 6 = PVOP (5830.82)
+  // 7 = HVL Gaussian (5745.52)
 
   // --- Linhas Principais (Com Intercalação de Texto) ---
-  if (ModeloFlip = 1) then GammaVal := 5598.45;
-  if (ModeloFlip = 2) then GammaVal := 4969.11;
+  if (ModeloFlip = 1) then GammaVal := 5830.82;
+  if (ModeloFlip = 2) then GammaVal := 4968.78;
   if (ModeloFlip = 3) then GammaVal := 4500.00;
   if (ModeloFlip = 4) then GammaVal := 4500.00;
   if (ModeloFlip = 5) then GammaVal := 4500.00;
-  if (ModeloFlip = 6) then GammaVal := 5598.45;
-  if (ModeloFlip = 7) then GammaVal := 5669.66;
+  if (ModeloFlip = 6) then GammaVal := 5830.82;
+  if (ModeloFlip = 7) then GammaVal := 5745.52;
   ShowLine := (ExibirWalls) and (4500.00 <= LimitUpper) and (4500.00 >= LimitLower);
   if (ShowLine) then
     HorizontalLineCustom(4500.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
@@ -147,8 +147,8 @@ begin
   if (ExibirFlips) then begin
     if (GammaVal > 0) then
       HorizontalLineCustom(GammaVal, clGammaFlip, 2, psDash, "Edi_GammaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    if (5346.76 > 0) then
-      HorizontalLineCustom(5346.76, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    if (5348.43 > 0) then
+      HorizontalLineCustom(5348.43, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
   end;
 
   // Edi_Wall (Midpoints) - Grid Completo
