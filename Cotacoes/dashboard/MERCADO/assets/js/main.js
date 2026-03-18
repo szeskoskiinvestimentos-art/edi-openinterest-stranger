@@ -634,8 +634,8 @@ function computeCategoryAverages(data, categoryGroups) {
 }
 
 function computeFlowScore(data) {
-    const pctOf = (matcher, { invert = false } = {}) => {
-        const sym = findAssetSymbol(data, matcher);
+    const pctOf = (matcherOrAlias, { invert = false } = {}) => {
+        const sym = typeof matcherOrAlias === 'string' ? findAliasSymbol(data, matcherOrAlias) : findAssetSymbol(data, matcherOrAlias);
         if (!sym) return null;
         const last = getLastPoint(data, sym);
         const v = last && typeof last.changePct === 'number' ? last.changePct : null;
@@ -650,19 +650,20 @@ function computeFlowScore(data) {
     };
 
     const parts = [
-        { k: 'SPX', w: 0.18, v: pctOf(/(^\.SPX$|\bS&P 500\b|^SPY$|^ES\b|^ES[HMUZ]\\d{2}$)/i) },
-        { k: 'NQ', w: 0.12, v: pctOf(/(^\.NDX$|\bNasdaq 100\b|^QQQ$|^NQ\b|^NQ[HMUZ]\\d{2}$)/i) },
+        { k: 'SPX', w: 0.18, v: pctOf('SPX') },
+        { k: 'NQ', w: 0.12, v: pctOf('NDX') },
         { k: 'EEM', w: 0.10, v: pctOf(/^EEM$/i) },
         { k: 'EWZ', w: 0.08, v: pctOf(/^EWZ$/i) },
-        { k: 'CHINA', w: 0.06, v: pctOf(/(^FXI$|^\.(CSI300)\b|China A50|Shanghai Shenzhen CSI 300)/i) },
-        { k: 'VIX', w: 0.09, v: pctOf(/(^\.VIX$|\bVIX\b|Volatilidade)/i, { invert: true }) },
-        { k: 'DXY', w: 0.08, v: pctOf(/(^\.DXY$|\bDXY\b|US Dollar Index|Indice Dolar)/i, { invert: true }) },
-        { k: 'US10Y', w: 0.06, v: pctOf(/(^US10YT=RR$|\bUnited States 10-Year\b|\bEUA\b\s+a\s+10\s+anos\b)/i, { invert: true }) },
+        { k: 'CHINA', w: 0.06, v: pctOf('CHINA') },
+        { k: 'VIX', w: 0.09, v: pctOf('VIX', { invert: true }) },
+        { k: 'DXY', w: 0.08, v: pctOf('DXY', { invert: true }) },
+        { k: 'US10Y', w: 0.06, v: pctOf('US10Y', { invert: true }) },
         { k: 'CDS BR', w: 0.05, v: pctOf(/(^BRGV5YUSAC=R$|\bCDS\b.*\bBrasil\b|\bBrasil\b.*\bCDS\b)/i, { invert: true }) },
-        { k: 'Brent/WTI', w: 0.08, v: pctOf(/(\bBrent\b|\bWTI\b)/i) },
-        { k: 'Minério', w: 0.07, v: pctOf(/(^TIOc1$|^SM58Fc1$|\bmin[eé]rio\b|\biron ore\b)/i) },
-        { k: 'Soja', w: 0.05, v: pctOf(/(^ZS$|\bsoja\b|\bsoy\b)/i) },
-        { k: 'Cobre', w: 0.04, v: pctOf(/(^HG\b|\bcopper\b|\bcobre\b)/i) },
+        { k: 'Brent/WTI', w: 0.08, v: pctOf('OIL') },
+        { k: 'Minério', w: 0.07, v: pctOf('IRON') },
+        { k: 'Soja', w: 0.05, v: pctOf('SOY') },
+        { k: 'Cobre', w: 0.04, v: pctOf('COPPER') },
+        { k: 'BCI', w: 0.03, v: pctOf('BCI') },
         { k: 'AUD/USD', w: 0.05, v: pctOf(/^AUD\/USD\b/i) },
         { k: 'NZD/USD', w: 0.03, v: pctOf(/^NZD\/USD\b/i) },
         { k: 'USD/CAD', w: 0.03, v: pctOf(/^USD\/CAD\b/i, { invert: true }) },
@@ -961,23 +962,23 @@ function renderRegimeConviction(data) {
     const freshnessRatio = withTime.length ? fresh.length / withTime.length : 0;
 
     const criticalMatchers = [
-        { k: 'USD/BRL', r: /^USD\/BRL\b/i },
+        { k: 'USD/BRL', a: 'USD_BRL' },
         { k: 'WDO', r: /^WDO/i },
         { k: 'WIN', r: /^WIN/i },
         { k: 'IBOV', r: /(^\.BVSP$|\bIbovespa\b)/i },
         { k: 'EWZ', r: /^EWZ$/i },
         { k: 'BOVA11', r: /^BOVA11\.SA$/i },
-        { k: 'DXY', r: /(^\.DXY$|\bDXY\b)/i },
-        { k: 'Brent/WTI', r: /\bBrent\b|\bWTI\b/i },
-        { k: 'FXI', r: /^FXI$/i },
-        { k: 'CSI300', r: /^\.(CSI300)\b/i },
-        { k: 'Minério', r: /^TIOc1$|^SM58Fc1$/i },
-        { k: 'Soja', r: /^ZS$/i },
-        { k: 'Cobre', r: /^HG$|\bCopper\b|\bCobre\b/i },
+        { k: 'DXY', a: 'DXY' },
+        { k: 'Brent/WTI', a: 'OIL' },
+        { k: 'FXI', a: 'FXI' },
+        { k: 'CSI300', a: 'CSI300' },
+        { k: 'Minério', a: 'IRON' },
+        { k: 'Soja', a: 'SOY' },
+        { k: 'Cobre', a: 'COPPER' },
         { k: 'BR10Y', r: /^BR10YT=RR$/i },
     ];
 
-    const criticalFound = criticalMatchers.filter(m => findAssetSymbol(data, m.r)).length;
+    const criticalFound = criticalMatchers.filter(m => (m.a ? findAliasSymbol(data, m.a) : findAssetSymbol(data, m.r))).length;
     const criticalRatio = criticalMatchers.length ? criticalFound / criticalMatchers.length : 0;
 
     let convictionScore = 0.5 * coverageRatio + 0.3 * freshnessRatio + 0.2 * criticalRatio;
@@ -999,12 +1000,12 @@ function renderRegimeConviction(data) {
         divergences.push(`Emergentes (${emGateLabel}) sugerem bid enquanto o regime aponta risk-off`);
     }
 
-    const hasFxi = !!findAssetSymbol(data, /^FXI$/i);
-    const hasCsi = !!findAssetSymbol(data, /^\.(CSI300)\b/i);
+    const hasFxi = !!findAliasSymbol(data, 'FXI');
+    const hasCsi = !!findAliasSymbol(data, 'CSI300');
     const hasChinaCore = hasFxi || hasCsi;
-    const hasIron = !!findAssetSymbol(data, /^TIOc1$|^SM58Fc1$/i);
-    const hasSoy = !!findAssetSymbol(data, /^ZS$/i);
-    const hasCopper = !!findAssetSymbol(data, /^HG$|\bCopper\b|\bCobre\b/i);
+    const hasIron = !!findAliasSymbol(data, 'IRON');
+    const hasSoy = !!findAliasSymbol(data, 'SOY');
+    const hasCopper = !!findAliasSymbol(data, 'COPPER');
 
     let downgrade = 0;
     if (!hasChinaCore) {
@@ -1200,25 +1201,26 @@ function renderChinaBrazil(data) {
     if (!el) return;
 
     const sym = {
-        fxi: findAssetSymbol(data, /^FXI$/i),
-        csi: findAssetSymbol(data, /^\.(CSI300)\b/i),
+        fxi: findAliasSymbol(data, 'FXI'),
+        csi: findAliasSymbol(data, 'CSI300'),
         hsi: findAssetSymbol(data, /\bHSI\b|Hang Seng|^\.HSI/i),
         mchi: findAssetSymbol(data, /^MCHI$/i),
         ashr: findAssetSymbol(data, /^ASHR$/i),
         kweb: findAssetSymbol(data, /^KWEB$/i),
-        iron: findAssetSymbol(data, /^TIOc1$|^SM58Fc1$/i),
+        iron: findAliasSymbol(data, 'IRON'),
         ironDalian: findAssetSymbol(data, /^DCE_I0$/i),
-        soy: findAssetSymbol(data, /^ZS$/i),
+        soy: findAliasSymbol(data, 'SOY'),
         corn: findAssetSymbol(data, /^ZC$/i),
         coffee: findAssetSymbol(data, /^KC$/i),
         sugar: findAssetSymbol(data, /^SB$/i),
-        copper: findAssetSymbol(data, /^HG$|\bCopper\b|\bCobre\b/i),
-        brent: findAssetSymbol(data, /\bBrent\b/i),
-        wti: findAssetSymbol(data, /\bWTI\b/i),
+        copper: findAliasSymbol(data, 'COPPER'),
+        bci: findAliasSymbol(data, 'BCI'),
+        brent: findAliasSymbol(data, 'BRENT'),
+        wti: findAliasSymbol(data, 'WTI'),
         ewz: findAssetSymbol(data, /^EWZ$/i),
         bova11: findAssetSymbol(data, /^BOVA11\.SA$/i),
         ibov: findAssetSymbol(data, /(^\.BVSP$|\bIbovespa\b)/i),
-        usdbbrl: findAssetSymbol(data, /^USD\/BRL\b/i),
+        usdbbrl: findAliasSymbol(data, 'USD_BRL'),
     };
 
     const pick = (label, symbol) => {
@@ -1239,6 +1241,7 @@ function renderChinaBrazil(data) {
         pick('Café (KC)', sym.coffee),
         pick('Açúcar (SB)', sym.sugar),
         pick('Cobre (HG)', sym.copper),
+        pick('BCI (ETF commodities)', sym.bci),
         pick('Brent', sym.brent),
         pick('WTI', sym.wti),
     ];
@@ -1341,6 +1344,7 @@ function renderChinaBrazil(data) {
         const hasSoy = !!sym.soy;
         const hasOil = !!(sym.brent || sym.wti);
         const hasCopper = !!sym.copper;
+        const hasBci = !!sym.bci;
         const missingCritical = [];
         const missingOptional = [];
         if (!hasChinaCore) missingCritical.push('FXI/CSI300');
@@ -1348,6 +1352,7 @@ function renderChinaBrazil(data) {
         if (!hasSoy) missingCritical.push('Soja');
         if (!hasOil) missingCritical.push('Petróleo (Brent/WTI)');
         if (!hasCopper) missingOptional.push('Cobre (HG)');
+        if (!hasBci) missingOptional.push('BCI (ETF commodities)');
 
         const status = missingCritical.length === 0 ? { tone: 'positive', label: 'OK' } : missingCritical.length === 1 ? { tone: 'neutral', label: 'Parcial' } : { tone: 'negative', label: 'Crítico' };
         const conviction = missingCritical.length === 0 ? { tone: 'positive', label: 'Sem redução' } : { tone: 'negative', label: 'Convicção reduzida' };
@@ -1364,6 +1369,7 @@ function renderChinaBrazil(data) {
                 { label: 'Minério (TIO/SM58F)', ok: hasIron },
                 { label: 'Soja (ZS)', ok: hasSoy },
                 { label: 'Cobre (HG)', ok: hasCopper },
+                { label: 'BCI (ETF commodities)', ok: hasBci },
                 { label: 'Petróleo (Brent/WTI)', ok: hasOil },
             ],
         };
@@ -1576,8 +1582,8 @@ function renderRatesBuckets(data) {
     const seriesKeys = Object.keys((data && data.series) || {});
     const diMatcher = /^DI1[FGHJKMNQUVXZ]\d{2}$/i;
     const fmtRate = v => typeof v === 'number' && Number.isFinite(v) ? `${formatNumber(v, 2)}%` : '—';
-    const takeGlobal = (label, matcher) => {
-        const symbol = findAssetSymbol(data, matcher);
+    const takeGlobal = (label, matcherOrAlias) => {
+        const symbol = typeof matcherOrAlias === 'string' ? findAliasSymbol(data, matcherOrAlias) : findAssetSymbol(data, matcherOrAlias);
         const last = getMostRecentPointWithPrice(data, symbol);
         const rate = last && typeof last.price === 'number' ? last.price : null;
         const pct = last && typeof last.changePct === 'number' ? last.changePct : null;
@@ -1586,10 +1592,10 @@ function renderRatesBuckets(data) {
     };
 
     const gl = [
-        takeGlobal('US 2Y', /(^US2YT=RR$|^TUc1=$|\bUnited States 2-Year\b|\bEUA\b\s+a\s+2\s+anos\b|^US2Y\b)/i),
+        takeGlobal('US 2Y', 'US2Y'),
         takeGlobal('US 5Y', /(^US5YT=RR$|\bUnited States 5-Year\b|^US5Y\b)/i),
-        takeGlobal('US 10Y', /(^TNc2=$|\bUnited States 10-Year\b|^US10YT=RR$|^US10Y\b)/i),
-        takeGlobal('US 30Y', /(^US30YT=RR$|^USc1=$|\bUnited States 30-Year\b|\bEUA\b\s+a\s+30\s+anos\b|^US30Y\b)/i),
+        takeGlobal('US 10Y', 'US10Y'),
+        takeGlobal('US 30Y', 'US30Y'),
         takeGlobal('DE 10Y', /(^DE10YT=RR$|\bGermany 10-Year\b|^DE10Y\b)/i),
         takeGlobal('GB 10Y', /(^GB10YT=RR$|\bUnited Kingdom 10-Year\b|^GB10Y\b)/i),
         takeGlobal('IT 10Y', /(^IT10YT=RR$|\bItaly 10-Year\b|^IT10Y\b)/i),
@@ -3190,6 +3196,52 @@ function findAssetSymbol(data, matcher) {
     return null;
 }
 
+function findAssetSymbolAny(data, matchers) {
+    const list = Array.isArray(matchers) ? matchers : [];
+    for (const m of list) {
+        if (!(m instanceof RegExp)) continue;
+        const sym = findAssetSymbol(data, m);
+        if (sym) return sym;
+    }
+    return null;
+}
+
+function assetAliasMatchers(key) {
+    const k = String(key || '').toUpperCase().trim();
+    if (!k) return [];
+
+    if (k === 'US2Y') return [/^US2YT=RR$/i, /^TUc1=$/i, /\bUnited States 2-Year\b/i, /\bEUA\b\s+a\s+2\s+anos\b/i, /^US2Y\b/i];
+    if (k === 'US10Y') return [/^US10YT=RR$/i, /^TNc2=$/i, /\bUnited States 10-Year\b/i, /\bEUA\b\s+a\s+10\s+anos\b/i, /^US10Y\b/i];
+    if (k === 'US30Y') return [/^US30YT=RR$/i, /^USc1=$/i, /\bUnited States 30-Year\b/i, /\bEUA\b\s+a\s+30\s+anos\b/i, /^US30Y\b/i];
+
+    if (k === 'DXY') return [/^\.DXY$/i, /\bDXY\b/i, /US Dollar Index/i, /Indice Dolar/i];
+    if (k === 'VIX') return [/^\.VIX$/i, /\bVIX\b/i, /Volatilidade/i];
+
+    if (k === 'BRENT') return [/\bBrent\b/i];
+    if (k === 'WTI') return [/\bWTI\b/i];
+    if (k === 'OIL') return [/\bBrent\b/i, /\bWTI\b/i];
+
+    if (k === 'IRON') return [/^TIOc1$/i, /^SM58Fc1$/i, /\bmin[eé]rio\b/i, /\biron ore\b/i];
+    if (k === 'SOY') return [/^ZS$/i, /\bsoja\b/i, /\bsoy\b/i];
+    if (k === 'COPPER') return [/^HG\b/i, /\bcopper\b/i, /\bcobre\b/i];
+    if (k === 'BCI') return [/^BCI$/i, /\babrdn Bloomberg All Commodity Strategy\b/i];
+
+    if (k === 'SPX') return [/^\.SPX$/i, /\bS&P 500\b/i, /^SPY$/i, /^ES\b/i, /^ES[HMUZ]\d{2}$/i];
+    if (k === 'NDX') return [/^\.NDX$/i, /\bNasdaq 100\b/i, /^QQQ$/i, /^NQ\b/i, /^NQ[HMUZ]\d{2}$/i];
+    if (k === 'CHINA') return [/^FXI$/i, /^\.(CSI300)\b/i, /China A50/i, /Shanghai Shenzhen CSI 300/i];
+
+    if (k === 'FXI') return [/^FXI$/i];
+    if (k === 'CSI300') return [/^\.(CSI300)\b/i];
+
+    if (k === 'USD_BRL') return [/^USD\/BRL\b/i];
+
+    return [];
+}
+
+function findAliasSymbol(data, key) {
+    return findAssetSymbolAny(data, assetAliasMatchers(key));
+}
+
 function getChangePct(data, symbol) {
     if (!symbol) return null;
     const last = getLastPoint(data, symbol);
@@ -3210,9 +3262,9 @@ function renderFlowSentinel(data) {
         usdjpy: findAssetSymbol(data, /^USD\/JPY\b/i),
         usdchf: findAssetSymbol(data, /^USD\/CHF\b/i),
         usdsek: findAssetSymbol(data, /^USD\/SEK\b/i),
-        dxy: findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index)/i),
-        brent: findAssetSymbol(data, /\bBrent\b/i),
-        wti: findAssetSymbol(data, /\bWTI\b/i),
+        dxy: findAliasSymbol(data, 'DXY'),
+        brent: findAliasSymbol(data, 'BRENT'),
+        wti: findAliasSymbol(data, 'WTI'),
     };
 
     const neutralThreshold = 0.12;
@@ -3633,10 +3685,10 @@ function renderCarryTradeMonitor(data) {
         audusd: findAssetSymbol(data, /^AUD\/USD\b/i),
         nzdusd: findAssetSymbol(data, /^NZD\/USD\b/i),
         usdjpy: findAssetSymbol(data, /^USD\/JPY\b/i),
-        usdbrl: findAssetSymbol(data, /^USD\/BRL\b/i),
-        dxy: findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index)/i),
+        usdbrl: findAliasSymbol(data, 'USD_BRL'),
+        dxy: findAliasSymbol(data, 'DXY'),
         br10y: findAssetSymbol(data, /^BR10YT=RR$/i),
-        us10y: findAssetSymbol(data, /(^US10YT=RR$|^TNc2=$|\bUnited States 10-Year\b|\bEUA\b\s+a\s+10\s+anos\b)/i),
+        us10y: findAliasSymbol(data, 'US10Y'),
         us10br10: findAssetSymbol(data, /^US10BR10=RR$/i),
         audjpy: findAssetSymbol(data, /^AUD\/JPY\b/i),
         nzdjpy: findAssetSymbol(data, /^NZD\/JPY\b/i),
