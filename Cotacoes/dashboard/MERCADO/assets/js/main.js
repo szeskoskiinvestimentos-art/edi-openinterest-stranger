@@ -1586,10 +1586,10 @@ function renderRatesBuckets(data) {
     };
 
     const gl = [
-        takeGlobal('US 2Y', /(^US2YT=RR$|\bUnited States 2-Year\b|^US2Y\b)/i),
+        takeGlobal('US 2Y', /(^US2YT=RR$|^TUc1=$|\bUnited States 2-Year\b|\bEUA\b\s+a\s+2\s+anos\b|^US2Y\b)/i),
         takeGlobal('US 5Y', /(^US5YT=RR$|\bUnited States 5-Year\b|^US5Y\b)/i),
         takeGlobal('US 10Y', /(^TNc2=$|\bUnited States 10-Year\b|^US10YT=RR$|^US10Y\b)/i),
-        takeGlobal('US 30Y', /(^US30YT=RR$|\bUnited States 30-Year\b|^US30Y\b)/i),
+        takeGlobal('US 30Y', /(^US30YT=RR$|^USc1=$|\bUnited States 30-Year\b|\bEUA\b\s+a\s+30\s+anos\b|^US30Y\b)/i),
         takeGlobal('DE 10Y', /(^DE10YT=RR$|\bGermany 10-Year\b|^DE10Y\b)/i),
         takeGlobal('GB 10Y', /(^GB10YT=RR$|\bUnited Kingdom 10-Year\b|^GB10Y\b)/i),
         takeGlobal('IT 10Y', /(^IT10YT=RR$|\bItaly 10-Year\b|^IT10Y\b)/i),
@@ -1753,6 +1753,8 @@ function renderBrazilFixedIncomeFlow(data) {
     const el = document.getElementById('brazilFixedIncomeFlow');
     if (!el) return;
 
+    const mk = (tone, txt) => toneBadgeHtmlFromTone(tone, 0, txt, { maxAbs: 1 });
+
     const assets = data && Array.isArray(data.assets) ? data.assets : [];
     const rates = assets.filter(a => String(a && a.category ? a.category : '') === 'rates');
 
@@ -1811,8 +1813,8 @@ function renderBrazilFixedIncomeFlow(data) {
 
     if (!items.length) {
         el.innerHTML = `<div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);opacity:.9;">
-            <div style="font-weight:900;letter-spacing:1px;margin-bottom:6px;">Renda Fixa BR (Investing)</div>
-            <div style="opacity:.85;line-height:1.4;">Sem ativos de Tesouro/curva BR detectados no CSV. Selecione os títulos na carteira do Investing e rode <b>npm run market:update</b>.</div>
+            <div style="font-weight:900;letter-spacing:1px;margin-bottom:6px;">Renda Fixa Brasil</div>
+            <div style="opacity:.85;line-height:1.4;">Sem títulos/curva do Brasil no monitoramento no momento. Atualize o pacote de dados e clique em <b>↻ Dados</b>.</div>
         </div>`;
         return;
     }
@@ -1857,7 +1859,7 @@ function renderBrazilFixedIncomeFlow(data) {
     const summary = `
         <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
             <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;">
-                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Renda Fixa BR (Investing)</div>
+                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Renda Fixa Brasil</div>
                 <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;">Shape: ${escapeHtml(shape)}</div>
             </div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:10px;">
@@ -1883,7 +1885,7 @@ function renderBrazilFixedIncomeFlow(data) {
                 </div>
             </div>
             <div style="margin-top:10px;opacity:.82;font-size:12px;line-height:1.35;">
-                Interpretação: <b>yield ↓</b> tende a indicar <b>compra/entrada</b> em renda fixa; <b>yield ↑</b> tende a indicar <b>venda/saída</b>. Confirmação cross-asset usa EWZ, USD/BRL e CDS quando disponíveis.
+                Operacional: <b>yield ↓</b> costuma indicar <b>demanda por renda fixa</b> (entrada/compra); <b>yield ↑</b> costuma indicar <b>redução de posição</b> (saída/venda). Confirmação cross-asset usa EWZ, USD/BRL e CDS quando disponíveis.
             </div>
         </div>
     `;
@@ -1908,7 +1910,7 @@ function renderBrazilFixedIncomeFlow(data) {
                 <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Títulos / Curva (último ponto)</div>
                 <div style="opacity:.75;font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(String(items.length))} itens</div>
             </div>
-            <div style="margin-top:6px;opacity:.75;font-size:12px;">Δ em bp (aprox.) a partir do campo Change do Investing (1bp ≈ 0,01 p.p.).</div>
+            <div style="margin-top:6px;opacity:.75;font-size:12px;">Δ em bp (aprox.) a partir da variação do yield no último ponto (1bp ≈ 0,01 p.p.).</div>
             <div style="margin-top:10px;">
                 ${items.slice(0, 18).map(row).join('')}
             </div>
@@ -3634,7 +3636,7 @@ function renderCarryTradeMonitor(data) {
         usdbrl: findAssetSymbol(data, /^USD\/BRL\b/i),
         dxy: findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index)/i),
         br10y: findAssetSymbol(data, /^BR10YT=RR$/i),
-        us10y: findAssetSymbol(data, /^US10YT=RR$/i),
+        us10y: findAssetSymbol(data, /(^US10YT=RR$|^TNc2=$|\bUnited States 10-Year\b|\bEUA\b\s+a\s+10\s+anos\b)/i),
         us10br10: findAssetSymbol(data, /^US10BR10=RR$/i),
         audjpy: findAssetSymbol(data, /^AUD\/JPY\b/i),
         nzdjpy: findAssetSymbol(data, /^NZD\/JPY\b/i),
