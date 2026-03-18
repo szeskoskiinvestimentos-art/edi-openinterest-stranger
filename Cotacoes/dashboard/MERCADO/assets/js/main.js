@@ -1749,6 +1749,173 @@ function renderRatesBuckets(data) {
     `;
 }
 
+function renderBrazilFixedIncomeFlow(data) {
+    const el = document.getElementById('brazilFixedIncomeFlow');
+    if (!el) return;
+
+    const assets = data && Array.isArray(data.assets) ? data.assets : [];
+    const rates = assets.filter(a => String(a && a.category ? a.category : '') === 'rates');
+
+    const looksLikeBrazilFixedIncome = a => {
+        const name = String(a && a.name ? a.name : '');
+        const sym = symbolKey(a && a.symbol ? a.symbol : '');
+        if (!name && !sym) return false;
+        if (isBrazilRelated({ symbol: sym, name, category: 'rates' })) return true;
+        if (/\btesouro\b|\btesouro direto\b|\bntn\b|\bltn\b|\blft\b|\bipca\b|\bselic\b|\bcupom\b|\bprefixad|\bpre[-\s]?fixad/i.test(name)) return true;
+        if (/^BR\d+(YT|MT)=RR$/i.test(sym) || /^US10BR10=RR$/i.test(sym) || /^DAPC\d+$/i.test(sym) || /^DDIC/i.test(sym)) return true;
+        return false;
+    };
+
+    const fmtRate = v => typeof v === 'number' && Number.isFinite(v) ? `${formatNumber(v, 2)}%` : '—';
+    const avg = xs => {
+        const ns = (xs || []).filter(x => typeof x === 'number' && Number.isFinite(x));
+        if (!ns.length) return null;
+        return ns.reduce((a, b) => a + b, 0) / ns.length;
+    };
+
+    const extractYear = s => {
+        const m = String(s || '').match(/\b(20\d{2})\b/);
+        if (!m) return null;
+        const y = Number(m[1]);
+        if (!Number.isFinite(y) || y < 2000 || y > 2100) return null;
+        return y;
+    };
+
+    const items = rates
+        .filter(looksLikeBrazilFixedIncome)
+        .map(a => {
+            const symbol = String(a && a.symbol ? a.symbol : '');
+            const last = getMostRecentPointWithPrice(data, symbol);
+            if (!last || !(typeof last.price === 'number' && Number.isFinite(last.price))) return null;
+            const bps = typeof last.change === 'number' && Number.isFinite(last.change) ? last.change * 100 : null;
+            const year = extractYear(a.name) || extractYear(symbol);
+            const nowY = new Date().getFullYear();
+            const yrs = typeof year === 'number' ? year - nowY : null;
+            const bucket = typeof yrs === 'number' ? (yrs <= 3 ? 'Curto' : yrs <= 7 ? 'Médio' : 'Longo') : '—';
+            return {
+                symbol,
+                name: String(a && a.name ? a.name : symbol),
+                rate: last.price,
+                bps,
+                year,
+                yrs,
+                bucket,
+            };
+        })
+        .filter(Boolean)
+        .sort((x, y) => {
+            const ax = typeof x.year === 'number' ? x.year : 9999;
+            const ay = typeof y.year === 'number' ? y.year : 9999;
+            return ax - ay || String(x.name).localeCompare(String(y.name));
+        });
+
+    if (!items.length) {
+        el.innerHTML = `<div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);opacity:.9;">
+            <div style="font-weight:900;letter-spacing:1px;margin-bottom:6px;">Renda Fixa BR (Investing)</div>
+            <div style="opacity:.85;line-height:1.4;">Sem ativos de Tesouro/curva BR detectados no CSV. Selecione os títulos na carteira do Investing e rode <b>npm run market:update</b>.</div>
+        </div>`;
+        return;
+    }
+
+    const byBucket = bucket => items.filter(x => x.bucket === bucket);
+    const shortAvg = avg(byBucket('Curto').map(x => x.rate));
+    const midAvg = avg(byBucket('Médio').map(x => x.rate));
+    const longAvg = avg(byBucket('Longo').map(x => x.rate));
+    const slope = typeof longAvg === 'number' && typeof shortAvg === 'number' ? longAvg - shortAvg : null;
+    const shape = slope === null ? 'N/A' : slope > 0.15 ? 'STEEPEN' : slope < -0.15 ? 'FLATTEN' : '≈';
+
+    const avgBps = avg(items.map(x => x.bps));
+    const flowFi = (() => {
+        if (!(typeof avgBps === 'number' && Number.isFinite(avgBps))) return { tone: 'neutral', label: 'n/d', detail: 'Δ —' };
+        const d = `${avgBps > 0 ? '+' : ''}${formatNumber(avgBps, 1)} bp`;
+        if (avgBps <= -3) return { tone: 'positive', label: 'Entrada', detail: `Δ ${d}` };
+        if (avgBps >= 3) return { tone: 'negative', label: 'Saída', detail: `Δ ${d}` };
+        return { tone: 'neutral', label: 'Neutro', detail: `Δ ${d}` };
+    })();
+
+    const symEwz = findAssetSymbol(data, /^EWZ$/i);
+    const symUsdbbrl = findAssetSymbol(data, /^USD\/BRL\b/i);
+    const symBrCds = findAssetSymbol(data, /^BRGV/i) || findAssetSymbol(data, /\bBrazil\b.*\bCDS\b|\bCDS\b.*\bBrazil\b/i);
+
+    const ewz = getChangePct(data, symEwz);
+    const usdbbrl = getChangePct(data, symUsdbbrl);
+    const cds = getChangePct(data, symBrCds);
+
+    const flowBr = (() => {
+        const parts = [
+            typeof ewz === 'number' && Number.isFinite(ewz) ? ewz : null,
+            typeof usdbbrl === 'number' && Number.isFinite(usdbbrl) ? -usdbbrl : null,
+            typeof cds === 'number' && Number.isFinite(cds) ? -cds : null,
+        ].filter(x => typeof x === 'number' && Number.isFinite(x));
+        const score = parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : null;
+        if (!(typeof score === 'number' && Number.isFinite(score))) return { tone: 'neutral', label: 'n/d', detail: 'sem confirmação' };
+        if (score > 0.25) return { tone: 'positive', label: 'Entrada', detail: `score ${formatNumber(score, 2)}` };
+        if (score < -0.25) return { tone: 'negative', label: 'Saída', detail: `score ${formatNumber(score, 2)}` };
+        return { tone: 'neutral', label: 'Neutro', detail: `score ${formatNumber(score, 2)}` };
+    })();
+
+    const summary = `
+        <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Renda Fixa BR (Investing)</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;">Shape: ${escapeHtml(shape)}</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:10px;">
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
+                    <div style="opacity:.85;font-weight:800;">Curto</div>
+                    <div style="font-weight:900;">${escapeHtml(shortAvg === null ? '—' : fmtRate(shortAvg))}</div>
+                </div>
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
+                    <div style="opacity:.85;font-weight:800;">Médio</div>
+                    <div style="font-weight:900;">${escapeHtml(midAvg === null ? '—' : fmtRate(midAvg))}</div>
+                </div>
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
+                    <div style="opacity:.85;font-weight:800;">Longo</div>
+                    <div style="font-weight:900;">${escapeHtml(longAvg === null ? '—' : fmtRate(longAvg))}</div>
+                </div>
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
+                    <div style="opacity:.85;font-weight:800;">Fluxo (Renda Fixa)</div>
+                    <div style="font-weight:900;">${mk(flowFi.tone, `${flowFi.label} • ${flowFi.detail}`)}</div>
+                </div>
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
+                    <div style="opacity:.85;font-weight:800;">Fluxo (BR • confirmação)</div>
+                    <div style="font-weight:900;">${mk(flowBr.tone, `${flowBr.label} • ${flowBr.detail}`)}</div>
+                </div>
+            </div>
+            <div style="margin-top:10px;opacity:.82;font-size:12px;line-height:1.35;">
+                Interpretação: <b>yield ↓</b> tende a indicar <b>compra/entrada</b> em renda fixa; <b>yield ↑</b> tende a indicar <b>venda/saída</b>. Confirmação cross-asset usa EWZ, USD/BRL e CDS quando disponíveis.
+            </div>
+        </div>
+    `;
+
+    const row = x => {
+        const bpsTxt = x.bps === null ? '—' : `${x.bps > 0 ? '+' : ''}${formatNumber(x.bps, 1)} bp`;
+        const bpsTone = x.bps === null ? 'neutral' : x.bps < 0 ? 'positive' : x.bps > 0 ? 'negative' : 'neutral';
+        const bpsHtml = x.bps === null ? escapeHtml(bpsTxt) : toneBadgeHtmlFromTone(bpsTone, x.bps, bpsTxt, { maxAbs: 20 });
+        return `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">
+            <div style="opacity:.92;font-weight:900;letter-spacing:.6px;">${escapeHtml(x.name || x.symbol)}</div>
+            <div style="display:flex;gap:14px;align-items:center;">
+                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;min-width:84px;text-align:right;">${escapeHtml(fmtRate(x.rate))}</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;min-width:86px;text-align:right;">${bpsHtml}</div>
+            </div>
+        </div>`;
+    };
+
+    el.innerHTML = `
+        ${summary}
+        <div style="margin-top:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Títulos / Curva (último ponto)</div>
+                <div style="opacity:.75;font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(String(items.length))} itens</div>
+            </div>
+            <div style="margin-top:6px;opacity:.75;font-size:12px;">Δ em bp (aprox.) a partir do campo Change do Investing (1bp ≈ 0,01 p.p.).</div>
+            <div style="margin-top:10px;">
+                ${items.slice(0, 18).map(row).join('')}
+            </div>
+        </div>
+    `;
+}
+
 function loadAgenda() {
     try {
         const raw = localStorage.getItem('mercado_agenda');
@@ -2534,6 +2701,7 @@ function renderIntel(data) {
     renderChinaBrazil(data);
     renderCarryIntel(data);
     renderRatesBuckets(data);
+    renderBrazilFixedIncomeFlow(data);
     renderAgendaMatrix();
     renderDataAudit(data);
     renderSectorHeatmap(data);
