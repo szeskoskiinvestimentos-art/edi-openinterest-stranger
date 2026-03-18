@@ -1207,6 +1207,7 @@ function renderChinaBrazil(data) {
         ashr: findAssetSymbol(data, /^ASHR$/i),
         kweb: findAssetSymbol(data, /^KWEB$/i),
         iron: findAssetSymbol(data, /^TIOc1$|^SM58Fc1$/i),
+        ironDalian: findAssetSymbol(data, /^DCE_I0$/i),
         soy: findAssetSymbol(data, /^ZS$/i),
         corn: findAssetSymbol(data, /^ZC$/i),
         coffee: findAssetSymbol(data, /^KC$/i),
@@ -1232,6 +1233,7 @@ function renderChinaBrazil(data) {
     const china = chinaExtra.length ? [...chinaCore, ...chinaExtra] : chinaCore;
     const comm = [
         pick('Minério (TIO/SM58F)', sym.iron),
+        pick('Minério Dalian (Sina)', sym.ironDalian),
         pick('Soja (ZS)', sym.soy),
         pick('Milho (ZC)', sym.corn),
         pick('Café (KC)', sym.coffee),
@@ -1412,6 +1414,7 @@ function renderChinaBrazil(data) {
     const fxi = getChangePct(data, sym.fxi);
     const csi = getChangePct(data, sym.csi);
     const iron = getChangePct(data, sym.iron);
+    const ironDalian = getChangePct(data, sym.ironDalian);
     const soy = getChangePct(data, sym.soy);
     const oil = oilPct;
     const copper = getChangePct(data, sym.copper);
@@ -1420,6 +1423,17 @@ function renderChinaBrazil(data) {
     if (typeof csi === 'number' && typeof soy === 'number' && csi < -0.4 && soy > 0.4) divergences.push('Soja forte com China fraca (ver oferta/clima)');
     if (typeof fxi === 'number' && typeof copper === 'number' && fxi > 0.4 && copper < -0.4) divergences.push('China forte sem confirmação em Cobre');
     if (typeof oil === 'number' && typeof usdbbrl === 'number' && oil > 0.7 && usdbbrl > 0.2) divergences.push('Petróleo ajuda, mas USD/BRL não confirma (stress local)');
+
+    const ironConfirm = (() => {
+        if (typeof iron !== 'number' || !Number.isFinite(iron)) return null;
+        if (typeof ironDalian !== 'number' || !Number.isFinite(ironDalian)) return null;
+        const strong = v => Math.abs(v) >= 0.25;
+        if (!strong(iron) && !strong(ironDalian)) return { tone: 'neutral', txt: 'Confirmação Minério: neutro (baixa variação)' };
+        if (iron * ironDalian > 0) return { tone: 'positive', txt: 'Confirmação Minério: Dalian (Sina) confirma TIO/SM58F (Investing)' };
+        if (strong(iron) && strong(ironDalian) && iron * ironDalian < 0) return { tone: 'negative', txt: 'Confirmação Minério: Dalian (Sina) diverge do TIO/SM58F (Investing)' };
+        return { tone: 'neutral', txt: 'Confirmação Minério: mista' };
+    })();
+    if (ironConfirm && ironConfirm.tone === 'negative') divergences.push(ironConfirm.txt);
 
     const renderList = (title, items) => `
         <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
@@ -1461,6 +1475,12 @@ function renderChinaBrazil(data) {
                 </div>
             </div>
             <div style="margin-top:10px;opacity:.82;font-size:12px;">${escapeHtml(chinaScenario.hint)}</div>
+            ${ironConfirm
+                ? `<div style="margin-top:10px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+                    <div style="font-weight:900;letter-spacing:1px;opacity:.92;">Confirmação Minério</div>
+                    <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(ironConfirm.tone, ironConfirm.txt)}</div>
+                </div>`
+                : ''}
             <div style="margin-top:12px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px;">
                 <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
                     <div style="font-weight:900;letter-spacing:1px;opacity:.92;">Auditoria de cobertura</div>
