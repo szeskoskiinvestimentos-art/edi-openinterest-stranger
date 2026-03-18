@@ -1819,11 +1819,33 @@ function renderBrazilFixedIncomeFlow(data) {
 
     if (!items.length) {
         el.innerHTML = `<div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);opacity:.9;">
-            <div style="font-weight:900;letter-spacing:1px;margin-bottom:6px;">Renda Fixa Brasil</div>
+            <div style="font-weight:900;letter-spacing:1px;margin-bottom:6px;">🇧🇷 Renda Fixa Brasil &amp; Fluxo</div>
             <div style="opacity:.85;line-height:1.4;">Sem títulos/curva do Brasil no monitoramento no momento. Atualize o pacote de dados e clique em <b>↻ Dados</b>.</div>
         </div>`;
         return;
     }
+
+    const pick = (label, matcher) => {
+        const symbol = findAssetSymbol(data, matcher);
+        const last = getMostRecentPointWithPrice(data, symbol);
+        if (!symbol || !last || !(typeof last.price === 'number' && Number.isFinite(last.price))) return null;
+        const bps = typeof last.change === 'number' && Number.isFinite(last.change) ? last.change * 100 : null;
+        return { label, symbol, rate: last.price, bps };
+    };
+
+    const essentials = [
+        pick('BR 3M', /^BR3MT=RR$/i),
+        pick('BR 1Y', /^BR1YT=RR$/i),
+        pick('BR 2Y', /^BR2YT=RR$/i),
+        pick('BR 5Y', /^BR5YT=RR$/i),
+        pick('BR 10Y', /^BR10YT=RR$/i),
+        pick('IPCA+ (real)', /^BRNB10YT=RR$/i),
+    ].filter(Boolean);
+
+    const eByLabel = new Map(essentials.map(x => [x.label, x]));
+    const br2y = eByLabel.get('BR 2Y') || null;
+    const br10y = eByLabel.get('BR 10Y') || null;
+    const slope10_2 = br2y && br10y && typeof br2y.rate === 'number' && typeof br10y.rate === 'number' ? br10y.rate - br2y.rate : null;
 
     const byBucket = bucket => items.filter(x => x.bucket === bucket);
     const shortAvg = avg(byBucket('Curto').map(x => x.rate));
@@ -1833,16 +1855,38 @@ function renderBrazilFixedIncomeFlow(data) {
     const shape = slope === null ? 'N/A' : slope > 0.15 ? 'STEEPEN' : slope < -0.15 ? 'FLATTEN' : '≈';
 
     const avgBps = avg(items.map(x => x.bps));
+    const keyBps = essentials.map(x => x.bps).filter(v => typeof v === 'number' && Number.isFinite(v));
+    const avgKeyAbs = keyBps.length ? (keyBps.map(v => Math.abs(v)).reduce((a, b) => a + b, 0) / keyBps.length) : null;
+
+    const shortKeyBps = avg([eByLabel.get('BR 3M')?.bps, eByLabel.get('BR 1Y')?.bps, eByLabel.get('BR 2Y')?.bps]);
+    const longKeyBps = avg([eByLabel.get('BR 5Y')?.bps, eByLabel.get('BR 10Y')?.bps]);
+    const termPremiumBps = typeof longKeyBps === 'number' && typeof shortKeyBps === 'number' ? longKeyBps - shortKeyBps : null;
+
+    const reference = (() => {
+        if (!(essentials.length >= 3) || !(typeof avgKeyAbs === 'number' && Number.isFinite(avgKeyAbs))) return { tone: 'neutral', label: 'n/d', detail: '—' };
+        if (avgKeyAbs <= 0.8) return { tone: 'neutral', label: 'Fraca', detail: 'taxas travadas' };
+        return { tone: 'positive', label: 'Ativa', detail: 'boa leitura' };
+    })();
+
     const flowFi = (() => {
-        if (!(typeof avgBps === 'number' && Number.isFinite(avgBps))) return { tone: 'neutral', label: 'n/d', detail: 'Δ —' };
-        const d = `${avgBps > 0 ? '+' : ''}${formatNumber(avgBps, 1)} bp`;
-        if (avgBps <= -3) return { tone: 'positive', label: 'Entrada', detail: `Δ ${d}` };
-        if (avgBps >= 3) return { tone: 'negative', label: 'Saída', detail: `Δ ${d}` };
+        const src = typeof avgKeyAbs === 'number' && Number.isFinite(avgKeyAbs) && keyBps.length >= 3 ? avg(keyBps) : avgBps;
+        if (!(typeof src === 'number' && Number.isFinite(src))) return { tone: 'neutral', label: 'n/d', detail: 'Δ —' };
+        const d = `${src > 0 ? '+' : ''}${formatNumber(src, 1)} bp`;
+        if (src <= -3) return { tone: 'positive', label: 'Entrada', detail: `Δ ${d}` };
+        if (src >= 3) return { tone: 'negative', label: 'Saída', detail: `Δ ${d}` };
+        return { tone: 'neutral', label: 'Neutro', detail: `Δ ${d}` };
+    })();
+
+    const termPremium = (() => {
+        if (!(typeof termPremiumBps === 'number' && Number.isFinite(termPremiumBps))) return { tone: 'neutral', label: 'n/d', detail: '—' };
+        const d = `${termPremiumBps > 0 ? '+' : ''}${formatNumber(termPremiumBps, 1)} bp`;
+        if (termPremiumBps >= 3) return { tone: 'negative', label: 'Abrindo', detail: `Δ ${d}` };
+        if (termPremiumBps <= -3) return { tone: 'positive', label: 'Fechando', detail: `Δ ${d}` };
         return { tone: 'neutral', label: 'Neutro', detail: `Δ ${d}` };
     })();
 
     const symEwz = findAssetSymbol(data, /^EWZ$/i);
-    const symUsdbbrl = findAssetSymbol(data, /^USD\/BRL\b/i);
+    const symUsdbbrl = findAliasSymbol(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i);
     const symBrCds = findAssetSymbol(data, /^BRGV/i) || findAssetSymbol(data, /\bBrazil\b.*\bCDS\b|\bCDS\b.*\bBrazil\b/i);
 
     const ewz = getChangePct(data, symEwz);
@@ -1865,7 +1909,7 @@ function renderBrazilFixedIncomeFlow(data) {
     const summary = `
         <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
             <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;">
-                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Renda Fixa Brasil</div>
+                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">🇧🇷 Renda Fixa Brasil &amp; Fluxo</div>
                 <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;">Shape: ${escapeHtml(shape)}</div>
             </div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:10px;">
@@ -1882,6 +1926,18 @@ function renderBrazilFixedIncomeFlow(data) {
                     <div style="font-weight:900;">${escapeHtml(longAvg === null ? '—' : fmtRate(longAvg))}</div>
                 </div>
                 <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
+                    <div style="opacity:.85;font-weight:800;">10Y−2Y (nível)</div>
+                    <div style="font-weight:900;">${escapeHtml(slope10_2 === null ? '—' : `${formatNumber(slope10_2, 2)} p.p.`)}</div>
+                </div>
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
+                    <div style="opacity:.85;font-weight:800;">Referência (Tesouro)</div>
+                    <div style="font-weight:900;">${mk(reference.tone, `${reference.label} • ${reference.detail}`)}</div>
+                </div>
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
+                    <div style="opacity:.85;font-weight:800;">Prêmio (Δ long−short)</div>
+                    <div style="font-weight:900;">${mk(termPremium.tone, `${termPremium.label} • ${termPremium.detail}`)}</div>
+                </div>
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
                     <div style="opacity:.85;font-weight:800;">Fluxo (Renda Fixa)</div>
                     <div style="font-weight:900;">${mk(flowFi.tone, `${flowFi.label} • ${flowFi.detail}`)}</div>
                 </div>
@@ -1891,10 +1947,23 @@ function renderBrazilFixedIncomeFlow(data) {
                 </div>
             </div>
             <div style="margin-top:10px;opacity:.82;font-size:12px;line-height:1.35;">
-                Operacional: <b>yield ↓</b> costuma indicar <b>demanda por renda fixa</b> (entrada/compra); <b>yield ↑</b> costuma indicar <b>redução de posição</b> (saída/venda). Confirmação cross-asset usa EWZ, USD/BRL e CDS quando disponíveis.
+                Operacional: <b>yield ↓</b> costuma indicar <b>demanda por renda fixa</b> (entrada/compra); <b>yield ↑</b> costuma indicar <b>redução de posição</b> (saída/venda). Confirmação cross-asset usa EWZ, USD/BRL e CDS quando disponíveis. Se a <b>Referência</b> estiver <b>fraca</b> (taxas travadas), trate o sinal como <b>baixo peso</b> (ex.: dias de leilão/cancelamento/feriado).
             </div>
         </div>
     `;
+
+    const essentialsRow = x => {
+        const bpsTxt = x.bps === null ? '—' : `${x.bps > 0 ? '+' : ''}${formatNumber(x.bps, 1)} bp`;
+        const bpsTone = x.bps === null ? 'neutral' : x.bps < 0 ? 'positive' : x.bps > 0 ? 'negative' : 'neutral';
+        const bpsHtml = x.bps === null ? escapeHtml(bpsTxt) : toneBadgeHtmlFromTone(bpsTone, x.bps, bpsTxt, { maxAbs: 20 });
+        return `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">
+            <div style="opacity:.92;font-weight:900;letter-spacing:.6px;">${escapeHtml(x.label)}</div>
+            <div style="display:flex;gap:14px;align-items:center;">
+                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;min-width:84px;text-align:right;">${escapeHtml(fmtRate(x.rate))}</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;min-width:86px;text-align:right;">${bpsHtml}</div>
+            </div>
+        </div>`;
+    };
 
     const row = x => {
         const bpsTxt = x.bps === null ? '—' : `${x.bps > 0 ? '+' : ''}${formatNumber(x.bps, 1)} bp`;
@@ -1911,6 +1980,17 @@ function renderBrazilFixedIncomeFlow(data) {
 
     el.innerHTML = `
         ${summary}
+        ${essentials.length
+            ? `<div style="margin-top:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                    <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Essenciais (nominal + real)</div>
+                    <div style="opacity:.75;font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(String(essentials.length))} itens</div>
+                </div>
+                <div style="margin-top:10px;">
+                    ${essentials.map(essentialsRow).join('')}
+                </div>
+            </div>`
+            : ''}
         <div style="margin-top:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
             <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
                 <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Títulos / Curva (último ponto)</div>
