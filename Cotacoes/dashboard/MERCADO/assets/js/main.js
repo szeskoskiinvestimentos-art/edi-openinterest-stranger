@@ -1840,12 +1840,18 @@ function renderBrazilFixedIncomeFlow(data) {
         pick('BR 5Y', /^BR5YT=RR$/i),
         pick('BR 10Y', /^BR10YT=RR$/i),
         pick('IPCA+ (real)', /^BRNB10YT=RR$/i),
+        pick('DAP 1 (real)', /^DAPc1$/i),
+        pick('DAP 2 (real)', /^DAPc2$/i),
+        pick('DAP 3 (real)', /^DAPc3$/i),
     ].filter(Boolean);
 
     const eByLabel = new Map(essentials.map(x => [x.label, x]));
     const br2y = eByLabel.get('BR 2Y') || null;
     const br10y = eByLabel.get('BR 10Y') || null;
     const slope10_2 = br2y && br10y && typeof br2y.rate === 'number' && typeof br10y.rate === 'number' ? br10y.rate - br2y.rate : null;
+
+    const essentialsNominal = essentials.filter(x => /^BR\s+\d/i.test(String(x.label || '')));
+    const essentialsReal = essentials.filter(x => /(real)|(^DAP\s+)/i.test(String(x.label || '')));
 
     const byBucket = bucket => items.filter(x => x.bucket === bucket);
     const shortAvg = avg(byBucket('Curto').map(x => x.rate));
@@ -1855,26 +1861,36 @@ function renderBrazilFixedIncomeFlow(data) {
     const shape = slope === null ? 'N/A' : slope > 0.15 ? 'STEEPEN' : slope < -0.15 ? 'FLATTEN' : '≈';
 
     const avgBps = avg(items.map(x => x.bps));
-    const keyBps = essentials.map(x => x.bps).filter(v => typeof v === 'number' && Number.isFinite(v));
-    const avgKeyAbs = keyBps.length ? (keyBps.map(v => Math.abs(v)).reduce((a, b) => a + b, 0) / keyBps.length) : null;
+    const keyBpsNominal = essentialsNominal.map(x => x.bps).filter(v => typeof v === 'number' && Number.isFinite(v));
+    const keyBpsReal = essentialsReal.map(x => x.bps).filter(v => typeof v === 'number' && Number.isFinite(v));
+    const avgNominalAbs = keyBpsNominal.length ? (keyBpsNominal.map(v => Math.abs(v)).reduce((a, b) => a + b, 0) / keyBpsNominal.length) : null;
 
     const shortKeyBps = avg([eByLabel.get('BR 3M')?.bps, eByLabel.get('BR 1Y')?.bps, eByLabel.get('BR 2Y')?.bps]);
     const longKeyBps = avg([eByLabel.get('BR 5Y')?.bps, eByLabel.get('BR 10Y')?.bps]);
     const termPremiumBps = typeof longKeyBps === 'number' && typeof shortKeyBps === 'number' ? longKeyBps - shortKeyBps : null;
 
     const reference = (() => {
-        if (!(essentials.length >= 3) || !(typeof avgKeyAbs === 'number' && Number.isFinite(avgKeyAbs))) return { tone: 'neutral', label: 'n/d', detail: '—' };
-        if (avgKeyAbs <= 0.8) return { tone: 'neutral', label: 'Fraca', detail: 'taxas travadas' };
+        if (!(essentialsNominal.length >= 3) || !(typeof avgNominalAbs === 'number' && Number.isFinite(avgNominalAbs))) return { tone: 'neutral', label: 'n/d', detail: '—' };
+        if (avgNominalAbs <= 0.8) return { tone: 'neutral', label: 'Fraca', detail: 'taxas travadas' };
         return { tone: 'positive', label: 'Ativa', detail: 'boa leitura' };
     })();
 
-    const flowFi = (() => {
-        const src = typeof avgKeyAbs === 'number' && Number.isFinite(avgKeyAbs) && keyBps.length >= 3 ? avg(keyBps) : avgBps;
+    const classifyFlowBps = (src) => {
         if (!(typeof src === 'number' && Number.isFinite(src))) return { tone: 'neutral', label: 'n/d', detail: 'Δ —' };
         const d = `${src > 0 ? '+' : ''}${formatNumber(src, 1)} bp`;
         if (src <= -3) return { tone: 'positive', label: 'Entrada', detail: `Δ ${d}` };
         if (src >= 3) return { tone: 'negative', label: 'Saída', detail: `Δ ${d}` };
         return { tone: 'neutral', label: 'Neutro', detail: `Δ ${d}` };
+    };
+
+    const flowNominal = (() => {
+        const src = keyBpsNominal.length >= 3 ? avg(keyBpsNominal) : avgBps;
+        return classifyFlowBps(src);
+    })();
+
+    const flowReal = (() => {
+        const src = keyBpsReal.length >= 2 ? avg(keyBpsReal) : keyBpsReal.length >= 1 ? keyBpsReal[0] : null;
+        return keyBpsReal.length ? classifyFlowBps(src) : { tone: 'neutral', label: 'n/d', detail: 'sem real' };
     })();
 
     const termPremium = (() => {
@@ -1883,6 +1899,24 @@ function renderBrazilFixedIncomeFlow(data) {
         if (termPremiumBps >= 3) return { tone: 'negative', label: 'Abrindo', detail: `Δ ${d}` };
         if (termPremiumBps <= -3) return { tone: 'positive', label: 'Fechando', detail: `Δ ${d}` };
         return { tone: 'neutral', label: 'Neutro', detail: `Δ ${d}` };
+    })();
+
+    const riskAlert = (() => {
+        if (reference.label !== 'Ativa') return null;
+        const br10 = eByLabel.get('BR 10Y');
+        const br10Bps = br10 && typeof br10.bps === 'number' && Number.isFinite(br10.bps) ? br10.bps : null;
+        const shock = (typeof br10Bps === 'number' && br10Bps >= 10)
+            || (typeof longKeyBps === 'number' && longKeyBps >= 8 && (typeof termPremiumBps !== 'number' || termPremiumBps >= 6))
+            || (typeof termPremiumBps === 'number' && termPremiumBps >= 10);
+        if (!shock) return null;
+        const br10Txt = typeof br10Bps === 'number' ? `${br10Bps > 0 ? '+' : ''}${formatNumber(br10Bps, 1)} bp` : '—';
+        const premTxt = typeof termPremiumBps === 'number' ? `${termPremiumBps > 0 ? '+' : ''}${formatNumber(termPremiumBps, 1)} bp` : '—';
+        const longTxt = typeof longKeyBps === 'number' ? `${longKeyBps > 0 ? '+' : ''}${formatNumber(longKeyBps, 1)} bp` : '—';
+        return {
+            title: 'Alerta: long end abrindo (prêmio/fiscal)',
+            detail: `BR10Y ${br10Txt} • long ${longTxt} • Δ long−short ${premTxt}`,
+            op: 'Tende a pressionar USD/BRL e a piorar a convexidade do índice. Procure confirmação em USD/BRL↑, EWZ↓ e CDS↑.',
+        };
     })();
 
     const symEwz = findAssetSymbol(data, /^EWZ$/i);
@@ -1938,8 +1972,12 @@ function renderBrazilFixedIncomeFlow(data) {
                     <div style="font-weight:900;">${mk(termPremium.tone, `${termPremium.label} • ${termPremium.detail}`)}</div>
                 </div>
                 <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
-                    <div style="opacity:.85;font-weight:800;">Fluxo (Renda Fixa)</div>
-                    <div style="font-weight:900;">${mk(flowFi.tone, `${flowFi.label} • ${flowFi.detail}`)}</div>
+                    <div style="opacity:.85;font-weight:800;">Fluxo (Nominal)</div>
+                    <div style="font-weight:900;">${mk(flowNominal.tone, `${flowNominal.label} • ${flowNominal.detail}`)}</div>
+                </div>
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
+                    <div style="opacity:.85;font-weight:800;">Fluxo (Real)</div>
+                    <div style="font-weight:900;">${mk(flowReal.tone, `${flowReal.label} • ${flowReal.detail}`)}</div>
                 </div>
                 <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
                     <div style="opacity:.85;font-weight:800;">Fluxo (BR • confirmação)</div>
@@ -1947,7 +1985,7 @@ function renderBrazilFixedIncomeFlow(data) {
                 </div>
             </div>
             <div style="margin-top:10px;opacity:.82;font-size:12px;line-height:1.35;">
-                Operacional: <b>yield ↓</b> costuma indicar <b>demanda por renda fixa</b> (entrada/compra); <b>yield ↑</b> costuma indicar <b>redução de posição</b> (saída/venda). Confirmação cross-asset usa EWZ, USD/BRL e CDS quando disponíveis. Se a <b>Referência</b> estiver <b>fraca</b> (taxas travadas), trate o sinal como <b>baixo peso</b> (ex.: dias de leilão/cancelamento/feriado).
+                Operacional: <b>yield ↓</b> costuma indicar <b>demanda por renda fixa</b> (entrada/compra); <b>yield ↑</b> costuma indicar <b>redução de posição</b> (saída/venda). Separe <b>nominal</b> (prefixado/curva) de <b>real</b> (IPCA+/cupom) quando houver divergência. Se a <b>Referência</b> estiver <b>fraca</b> (taxas travadas), trate o sinal como <b>baixo peso</b> (ex.: dias de leilão/cancelamento/feriado).
             </div>
         </div>
     `;
@@ -1980,6 +2018,15 @@ function renderBrazilFixedIncomeFlow(data) {
 
     el.innerHTML = `
         ${summary}
+        ${riskAlert
+            ? `<div style="margin-top:14px;border:1px solid rgba(255,80,90,.35);border-radius:12px;padding:12px;background:rgba(255,80,90,.08);">
+                <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;">
+                    <div style="font-weight:900;letter-spacing:1px;opacity:.95;">${escapeHtml(riskAlert.title)}</div>
+                    <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.9;">${escapeHtml(riskAlert.detail)}</div>
+                </div>
+                <div style="margin-top:8px;opacity:.9;line-height:1.35;">${escapeHtml(riskAlert.op)}</div>
+            </div>`
+            : ''}
         ${essentials.length
             ? `<div style="margin-top:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
                 <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
