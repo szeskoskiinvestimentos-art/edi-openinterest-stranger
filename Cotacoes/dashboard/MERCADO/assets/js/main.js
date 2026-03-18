@@ -973,6 +973,7 @@ function renderRegimeConviction(data) {
         { k: 'CSI300', r: /^\.(CSI300)\b/i },
         { k: 'Minério', r: /^TIOc1$|^SM58Fc1$/i },
         { k: 'Soja', r: /^ZS$/i },
+        { k: 'Cobre', r: /^HG$|\bCopper\b|\bCobre\b/i },
         { k: 'BR10Y', r: /^BR10YT=RR$/i },
     ];
 
@@ -1003,6 +1004,7 @@ function renderRegimeConviction(data) {
     const hasChinaCore = hasFxi || hasCsi;
     const hasIron = !!findAssetSymbol(data, /^TIOc1$|^SM58Fc1$/i);
     const hasSoy = !!findAssetSymbol(data, /^ZS$/i);
+    const hasCopper = !!findAssetSymbol(data, /^HG$|\bCopper\b|\bCobre\b/i);
 
     let downgrade = 0;
     if (!hasChinaCore) {
@@ -1020,6 +1022,10 @@ function renderRegimeConviction(data) {
     } else if (!hasSoy) {
         convictionScore *= 0.96;
         divergences.push('Commodities BR parciais: Soja ausente');
+    }
+    if (!hasCopper) {
+        convictionScore *= 0.985;
+        divergences.push('Commodities BR parciais: Cobre ausente');
     }
 
     convictionScore = Math.max(0, Math.min(1, convictionScore));
@@ -1205,6 +1211,7 @@ function renderChinaBrazil(data) {
         corn: findAssetSymbol(data, /^ZC$/i),
         coffee: findAssetSymbol(data, /^KC$/i),
         sugar: findAssetSymbol(data, /^SB$/i),
+        copper: findAssetSymbol(data, /^HG$|\bCopper\b|\bCobre\b/i),
         brent: findAssetSymbol(data, /\bBrent\b/i),
         wti: findAssetSymbol(data, /\bWTI\b/i),
         ewz: findAssetSymbol(data, /^EWZ$/i),
@@ -1229,6 +1236,7 @@ function renderChinaBrazil(data) {
         pick('Milho (ZC)', sym.corn),
         pick('Café (KC)', sym.coffee),
         pick('Açúcar (SB)', sym.sugar),
+        pick('Cobre (HG)', sym.copper),
         pick('Brent', sym.brent),
         pick('WTI', sym.wti),
     ];
@@ -1253,12 +1261,13 @@ function renderChinaBrazil(data) {
     const usdbbrl = getChangePct(data, sym.usdbbrl);
 
     const brlImpulse = wAvg([
-        { symbol: sym.iron, w: 0.28 },
+        { symbol: sym.iron, w: 0.27 },
         { symbol: sym.soy, w: 0.20 },
-        { symbol: sym.corn, w: 0.09 },
+        { symbol: sym.corn, w: 0.08 },
         { symbol: sym.coffee, w: 0.05 },
-        { symbol: sym.sugar, w: 0.05 },
-        { symbol: sym.brent || sym.wti, w: 0.33 },
+        { symbol: sym.sugar, w: 0.04 },
+        { symbol: sym.copper, w: 0.06 },
+        { symbol: sym.brent || sym.wti, w: 0.30 },
     ]);
 
     const ibovImpulse = wAvg([
@@ -1329,13 +1338,19 @@ function renderChinaBrazil(data) {
         const hasIron = !!sym.iron;
         const hasSoy = !!sym.soy;
         const hasOil = !!(sym.brent || sym.wti);
-        const missing = [];
-        if (!hasChinaCore) missing.push('FXI/CSI300');
-        if (!hasIron) missing.push('Minério');
+        const hasCopper = !!sym.copper;
+        const missingCritical = [];
+        const missingOptional = [];
+        if (!hasChinaCore) missingCritical.push('FXI/CSI300');
+        if (!hasIron) missingCritical.push('Minério');
+        if (!hasSoy) missingCritical.push('Soja');
+        if (!hasOil) missingCritical.push('Petróleo (Brent/WTI)');
+        if (!hasCopper) missingOptional.push('Cobre (HG)');
 
-        const status = missing.length === 0 ? { tone: 'positive', label: 'OK' } : missing.length === 1 ? { tone: 'neutral', label: 'Parcial' } : { tone: 'negative', label: 'Crítico' };
-        const conviction = missing.length === 0 ? { tone: 'positive', label: 'Sem redução' } : { tone: 'negative', label: 'Convicção reduzida' };
-        const why = missing.length ? `Faltando: ${missing.join(', ')}` : 'Cobertura adequada para o módulo China↔Brasil.';
+        const status = missingCritical.length === 0 ? { tone: 'positive', label: 'OK' } : missingCritical.length === 1 ? { tone: 'neutral', label: 'Parcial' } : { tone: 'negative', label: 'Crítico' };
+        const conviction = missingCritical.length === 0 ? { tone: 'positive', label: 'Sem redução' } : { tone: 'negative', label: 'Convicção reduzida' };
+        const missingTxt = [...missingCritical, ...missingOptional].filter(Boolean).join(', ');
+        const why = missingTxt ? `Faltando: ${missingTxt}` : 'Cobertura adequada para o módulo China↔Brasil.';
 
         return {
             status,
@@ -1346,6 +1361,7 @@ function renderChinaBrazil(data) {
                 { label: 'HSI (fallback)', ok: hasHsi },
                 { label: 'Minério (TIO/SM58F)', ok: hasIron },
                 { label: 'Soja (ZS)', ok: hasSoy },
+                { label: 'Cobre (HG)', ok: hasCopper },
                 { label: 'Petróleo (Brent/WTI)', ok: hasOil },
             ],
         };
@@ -1398,9 +1414,11 @@ function renderChinaBrazil(data) {
     const iron = getChangePct(data, sym.iron);
     const soy = getChangePct(data, sym.soy);
     const oil = oilPct;
+    const copper = getChangePct(data, sym.copper);
 
     if (typeof fxi === 'number' && typeof iron === 'number' && fxi > 0.4 && iron < -0.4) divergences.push('China forte sem confirmação em Minério');
     if (typeof csi === 'number' && typeof soy === 'number' && csi < -0.4 && soy > 0.4) divergences.push('Soja forte com China fraca (ver oferta/clima)');
+    if (typeof fxi === 'number' && typeof copper === 'number' && fxi > 0.4 && copper < -0.4) divergences.push('China forte sem confirmação em Cobre');
     if (typeof oil === 'number' && typeof usdbbrl === 'number' && oil > 0.7 && usdbbrl > 0.2) divergences.push('Petróleo ajuda, mas USD/BRL não confirma (stress local)');
 
     const renderList = (title, items) => `
@@ -1466,7 +1484,7 @@ function renderChinaBrazil(data) {
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
             ${renderList('China (Proxies)', china)}
-            ${renderList('Commodities BR (críticas)', comm)}
+            ${renderList('Commodities BR (críticas + cobre)', comm)}
             ${renderList('Brasil (Proxies)', br)}
         </div>
         <div style="margin-top:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
