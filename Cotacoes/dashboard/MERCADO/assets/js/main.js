@@ -1034,6 +1034,16 @@ function renderRegimeConviction(data) {
     const convictionLabel = downgrade ? downgradeConvictionLabel(baseLabel, downgrade) : baseLabel;
     const convictionTone = convictionLabel === 'ALTA' ? 'positive' : convictionLabel === 'MÉDIA' ? 'neutral' : 'negative';
 
+    const convictionAssets = {
+        wdo: findAssetSymbol(data, /^WDO/i),
+        win: findAssetSymbol(data, /^WIN/i),
+        usdbrl: findAliasSymbol(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i),
+        dxy: findAliasSymbol(data, 'DXY') || findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index)/i),
+        oil: findAliasSymbol(data, 'OIL') || findAssetSymbol(data, /\bBrent\b|\bWTI\b/i),
+        iron: findAssetSymbol(data, /^DCE_I0$/i) || findAliasSymbol(data, 'IRON'),
+        copper: findAliasSymbol(data, 'COPPER'),
+    };
+
     const drivers = [];
     drivers.push({ k: 'Risco (tags)', v: regimeScore, fmt: x => formatNumber(x, 2), tone: regimeScore > 0.35 ? 'positive' : regimeScore < -0.35 ? 'negative' : 'neutral' });
     drivers.push({ k: 'Beta Δ', v: betaDelta, fmt: x => formatNumber(x, 3), tone: betaDelta > 0.25 ? 'positive' : betaDelta < -0.25 ? 'negative' : 'neutral' });
@@ -1176,6 +1186,10 @@ function renderRegimeConviction(data) {
                 <div class="metric-value">${escapeHtml(convictionLabel)}</div>
                 <div class="metric-label">Convicção</div>
                 <div class="metric-change">${toneBadgeHtmlFromTone(convictionTone, convictionScore * 100, `${formatNumber(convictionScore * 100, 0)}%`, { maxAbs: 100 })}</div>
+                <div style="margin-top:8px;opacity:.88;font-size:12px;line-height:1.25;">
+                    <div style="opacity:.85;">Base: ${escapeHtml(convictionAssets.wdo || 'WDO N/A')} • ${escapeHtml(convictionAssets.win || 'WIN N/A')}</div>
+                    <div style="opacity:.80;">Chaves: ${escapeHtml([convictionAssets.usdbrl, convictionAssets.dxy, convictionAssets.iron, convictionAssets.copper, convictionAssets.oil].filter(Boolean).join(' • ') || '—')}</div>
+                </div>
             </div>
             <div class="metric-card">
                 <div class="metric-icon">🧾</div>
