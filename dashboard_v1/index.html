@@ -602,11 +602,8 @@
             const isFile = location.protocol === 'file:';
             const version = String(Date.now());
             const suffix = isFile ? '' : `?v=${version}`;
-            const href = location.href || '';
-            const inUnified = href.indexOf('dashboard_unificado') !== -1;
-            const primary = inUnified
-                ? `../shared/js/chart_data_utils.js${suffix}`
-                : `../dashboard_unificado/shared/js/chart_data_utils.js${suffix}`;
+            const localShared = `../shared/js/chart_data_utils.js${suffix}`;
+            const localUnified = `../dashboard_unificado/shared/js/chart_data_utils.js${suffix}`;
             const fallback = `https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/dashboard_unificado/shared/js/chart_data_utils.js${suffix}`;
 
             window.__ediAssetVersion = version;
@@ -622,9 +619,12 @@
 
             addScript(`assets/data/market_data.js${suffix}`);
             addScript(`assets/data/yahoo_ewz_options.js${suffix}`);
-            addScript(primary, function(){
-                this.onerror = null;
-                this.src = fallback;
+            addScript(localShared, function(){
+                this.onerror = function(){
+                    this.onerror = null;
+                    this.src = fallback;
+                };
+                this.src = localUnified;
             });
             addScript(`assets/js/charts.js${suffix}`);
             addScript(`assets/js/main.js${suffix}`);
