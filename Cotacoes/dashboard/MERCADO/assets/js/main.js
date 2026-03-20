@@ -3135,6 +3135,40 @@ function getMarketServiceBaseUrl() {
     return 'http://127.0.0.1:3033';
 }
 
+let marketServiceOnlineCache = { atMs: 0, ok: null };
+let marketServiceOnlineInFlight = null;
+
+async function ensureMarketServiceOnline(force = false) {
+    const now = Date.now();
+    if (!force && marketServiceOnlineCache.ok !== null && now - marketServiceOnlineCache.atMs < 30000) {
+        return marketServiceOnlineCache.ok;
+    }
+
+    if (!force && marketServiceOnlineInFlight) {
+        return await marketServiceOnlineInFlight;
+    }
+
+    const run = (async () => {
+        const atMs = Date.now();
+        const baseUrl = getMarketServiceBaseUrl();
+        try {
+            await fetchJsonWithTimeout(`${baseUrl}/api/market/health?t=${atMs}`, 1200);
+            marketServiceOnlineCache = { atMs, ok: true };
+            return true;
+        } catch {
+            marketServiceOnlineCache = { atMs, ok: false };
+            return false;
+        }
+    })();
+
+    marketServiceOnlineInFlight = run;
+    try {
+        return await run;
+    } finally {
+        if (marketServiceOnlineInFlight === run) marketServiceOnlineInFlight = null;
+    }
+}
+
 async function fetchJsonWithTimeout(url, timeoutMs = 3500) {
     const once = async u => {
         const ctrl = new AbortController();
@@ -3309,6 +3343,8 @@ function renderOptionsGammaSummary(payload) {
 async function loadOptionsGammaSummary() {
     const baseUrl = getMarketServiceBaseUrl();
     try {
+        const online = await ensureMarketServiceOnline();
+        if (!online) throw new Error('market_service_offline');
         const payload = await fetchJsonWithTimeout(`${baseUrl}/api/options/summary?t=${Date.now()}`, 2500);
         renderOptionsGammaSummary(payload);
         return true;
@@ -3366,6 +3402,8 @@ function renderFinancialJuice(payload) {
 async function loadFinancialJuice() {
     const baseUrl = getMarketServiceBaseUrl();
     try {
+        const online = await ensureMarketServiceOnline();
+        if (!online) throw new Error('market_service_offline');
         const payload = await fetchJsonWithTimeout(`${baseUrl}/api/news/financialjuice/headlines?limit=40&t=${Date.now()}`, 4500);
         renderFinancialJuice(payload);
         return true;
@@ -3524,6 +3562,8 @@ function renderWebNewsModule(payload) {
 async function loadWebNewsModule() {
     const baseUrl = getMarketServiceBaseUrl();
     try {
+        const online = await ensureMarketServiceOnline();
+        if (!online) throw new Error('market_service_offline');
         const payload = await fetchJsonWithTimeout(`${baseUrl}/api/news/web/module?limit=40&t=${Date.now()}`, 5500);
         renderWebNewsModule(payload);
         return true;

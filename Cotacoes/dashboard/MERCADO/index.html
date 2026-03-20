@@ -884,24 +884,42 @@
                 <div class="split-layout" style="margin-top: 18px;">
                     <div class="context-box">
                         <h3>📆 Calendário Econômico (Investing)</h3>
-                        <p>Widget do Investing.com para consulta visual. A captura tenta transformar o calendário em lista no módulo <b>Agenda &amp; Matriz</b>.</p>
+                        <p>O Investing pode bloquear incorporação em iframe (X-Frame-Options). Use o link para abrir em nova aba. A captura tenta transformar o calendário em lista no módulo <b>Agenda &amp; Matriz</b>.</p>
                     </div>
                     <div class="table-container calendar-widget">
                         <div class="calendar-widget__inner">
-                            <iframe
-                                class="calendar-widget__iframe"
-                                src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&features=datepicker,timezone,timeselector,filters&countries=110,32,6,37,5,39,35,7,72&calType=day&timeZone=12&lang=12"
-                                frameborder="0"
-                                allowtransparency="true"
-                                marginwidth="0"
-                                marginheight="0"
-                            ></iframe>
                             <div class="poweredBy calendar-widget__poweredby">
                                 <span>
-                                    Calendário Econômico fornecido por
-                                    <a href="https://br.investing.com/" rel="nofollow" target="_blank" class="underline_link">Investing.com Brasil</a>
+                                    <a
+                                        href="https://br.investing.com/economic-calendar/"
+                                        rel="nofollow"
+                                        target="_blank"
+                                        class="underline_link"
+                                    >Abrir Calendário do Investing</a>
                                 </span>
                             </div>
+                            <details id="investingCalendarWidget" style="margin-top:10px;">
+                                <summary style="cursor:pointer;opacity:.9;font-weight:900;">Tentar exibir o widget aqui</summary>
+                                <div style="margin-top:10px;border:1px solid rgba(255,255,255,.10);border-radius:12px;overflow:hidden;">
+                                    <iframe
+                                        class="calendar-widget__iframe"
+                                        src="about:blank"
+                                        data-src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&features=datepicker,timezone,timeselector,filters&countries=110,32,6,37,5,39,35,7,72&calType=day&timeZone=12&lang=12"
+                                        width="650"
+                                        height="467"
+                                        frameborder="0"
+                                        allowtransparency="true"
+                                        marginwidth="0"
+                                        marginheight="0"
+                                    ></iframe>
+                                </div>
+                                <div class="poweredBy" style="font-family: Arial, Helvetica, sans-serif;margin-top:8px;">
+                                    <span style="font-size: 11px;color: #cfcfcf;text-decoration: none;">
+                                        Calendário Econômico fornecido por
+                                        <a href="https://br.investing.com/" rel="nofollow" target="_blank" style="font-size: 11px;color: #6fb7ff; font-weight: bold;" class="underline_link">Investing.com Brasil</a>, o portal líder financeiro.
+                                    </span>
+                                </div>
+                            </details>
                         </div>
                     </div>
                 </div>
@@ -1306,7 +1324,6 @@
         </div>
     </main>
 
-    <script src="../WDO/assets/js/particles.js"></script>
     <script src="assets/data/market_quotes.js"></script>
     <script src="assets/data/economic_calendar.js"></script>
     <script src="assets/data/agenda_reports.js"></script>
@@ -1497,6 +1514,25 @@
             document.addEventListener('keydown', e => {
                 if (e.key === 'Escape') setOpen(false);
             });
+        })();
+    </script>
+    <script>
+        (function () {
+            const details = document.getElementById('investingCalendarWidget');
+            if (!details) return;
+            const iframe = details.querySelector && details.querySelector('iframe[data-src]');
+            if (!iframe) return;
+            let loaded = false;
+            function tryLoad() {
+                if (loaded) return;
+                if (!details.open) return;
+                const url = iframe.getAttribute('data-src');
+                if (!url) return;
+                iframe.setAttribute('src', url);
+                loaded = true;
+            }
+            details.addEventListener('toggle', tryLoad);
+            tryLoad();
         })();
     </script>
 </body>
