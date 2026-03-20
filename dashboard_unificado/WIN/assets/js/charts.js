@@ -772,23 +772,88 @@ class StrangerThingsCharts {
         const oiSrc = oiAll ?? oiNearest;
         if (!oiSrc) return;
 
-        // Gráfico de Barras Empilhadas (Call vs Put) para Total OI
+        const storageKey = `oiStrikeScope:${location.pathname}`;
+        const getSelectedScope = () => {
+            const saved = (localStorage.getItem(storageKey) || '').toLowerCase();
+            if (saved === 'nearest' && oiNearest) return 'nearest';
+            return 'all';
+        };
+        const setSelectedScope = (scope) => localStorage.setItem(storageKey, scope);
+        const resolveOiData = (scope) => (scope === 'nearest' && oiNearest ? oiNearest : (oiAll ?? oiNearest));
+
+        const titleFor = (scope) => {
+            const suffix = scope === 'nearest' ? ' | Venc. mais próximo' : ' | Todos vencimentos';
+            return 'Total Open Interest (Call vs Put)' + (oiAll && oiNearest ? suffix : '');
+        };
+
+        const scope = oiAll && oiNearest ? getSelectedScope() : (oiNearest ? 'nearest' : 'all');
+        const src = resolveOiData(scope);
+
+        if (oiAll && oiNearest) {
+            const host = ctx.parentElement;
+            if (host) {
+                const existing = host.querySelector('#oiStrikeScopeToggle');
+                const toggle = existing || document.createElement('div');
+                toggle.id = 'oiStrikeScopeToggle';
+                toggle.style.display = 'flex';
+                toggle.style.gap = '8px';
+                toggle.style.margin = '0 0 10px 0';
+                toggle.style.flexWrap = 'wrap';
+
+                toggle.innerHTML = `
+                    <button type="button" data-scope="all" style="padding:6px 10px;border:1px solid #00f3ff;background:transparent;color:#e0e0e0;border-radius:6px;cursor:pointer;font-family:Orbitron;">Todos vencimentos</button>
+                    <button type="button" data-scope="nearest" style="padding:6px 10px;border:1px solid #00f3ff;background:transparent;color:#e0e0e0;border-radius:6px;cursor:pointer;font-family:Orbitron;">Venc. mais próximo</button>
+                `;
+
+                const applyActive = (activeScope) => {
+                    toggle.querySelectorAll('button[data-scope]').forEach((btn) => {
+                        const isActive = btn.getAttribute('data-scope') === activeScope;
+                        btn.style.background = isActive ? 'rgba(0, 243, 255, 0.12)' : 'transparent';
+                        btn.style.borderColor = isActive ? '#ff00ff' : '#00f3ff';
+                        btn.style.color = isActive ? '#ffffff' : '#e0e0e0';
+                    });
+                };
+
+                if (!existing) host.insertBefore(toggle, ctx);
+                applyActive(scope);
+
+                toggle.querySelectorAll('button[data-scope]').forEach((btn) => {
+                    btn.onclick = () => {
+                        const nextScope = btn.getAttribute('data-scope') || 'all';
+                        setSelectedScope(nextScope);
+                        applyActive(nextScope);
+                        const nextSrc = resolveOiData(nextScope);
+                        const chart = this.charts.oiStrike;
+                        if (chart) {
+                            chart.data.labels = nextSrc.strikes.map((s) => this.formatNumberBr(s, 0));
+                            chart.data.datasets[0].data = nextSrc.call_oi;
+                            chart.data.datasets[1].data = nextSrc.put_oi;
+                            if (chart.options?.plugins?.title) chart.options.plugins.title.text = titleFor(nextScope);
+                            chart.update();
+                        }
+                    };
+                });
+            }
+        }
+
+        if (this.charts.oiStrike) this.charts.oiStrike.destroy();
+
         this.charts.oiStrike = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: oiSrc.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: src.strikes.map(s => this.formatNumberBr(s, 0)),
                 datasets: [
                     {
                         label: 'Call OI',
-                        data: oiSrc.call_oi,
-                        backgroundColor: 'rgba(0, 255, 0, 0.6)', // Verde Neon
+                        data: src.call_oi,
+                        backgroundColor: 'rgba(0, 255, 0, 0.6)',
                         borderColor: '#00ff00',
                         borderWidth: 1
                     },
                     {
                         label: 'Put OI',
-                        data: oiSrc.put_oi,
-                        backgroundColor: 'rgba(255, 7, 58, 0.6)', // Vermelho Neon
+                        data: src.put_oi,
+                        backgroundColor: 'rgba(255, 7, 58, 0.6)',
                         borderColor: '#ff073a',
                         borderWidth: 1
                     }
@@ -800,7 +865,7 @@ class StrangerThingsCharts {
                     ...this.chartOptions.plugins,
                     title: {
                         display: true,
-                        text: 'Total Open Interest (Call vs Put)',
+                        text: titleFor(scope),
                         color: '#ff00ff',
                         font: {
                             family: 'Orbitron',
