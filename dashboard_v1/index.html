@@ -208,6 +208,23 @@
                         <canvas id="oiByExpiryChart"></canvas>
                     </div>
                 </div>
+
+                <div class="split-layout" style="margin-top: 50px;">
+                    <div class="context-box">
+                        <h3>📌 Open Interest por Strike (Proxy via EWZ)</h3>
+                        <p>Open Interest de Calls e Puts por strike usando um proxy de Índice. Os valores são convertidos para a escala do WIN para facilitar leitura junto do SPOT.</p>
+                    </div>
+                    <div class="chart-container">
+                        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+                            <label style="color:#b3b3b3;font-family:'Share Tech Mono';">Venc:</label>
+                            <select id="ewzOptionsExpirySelect" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;"></select>
+                            <label style="color:#b3b3b3;font-family:'Share Tech Mono';">min OI:</label>
+                            <input id="ewzOptionsMinOi" type="number" value="5" min="0" step="1" style="width:90px;background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;">
+                        </div>
+                        <div id="ewzOptionsMeansAll" style="margin-bottom:10px;color:#b3b3b3;font-family:'Share Tech Mono';"></div>
+                        <canvas id="ewzOptionsOiChart"></canvas>
+                    </div>
+                </div>
             </section>
 
             <!-- Delta & Gamma Section -->
@@ -604,6 +621,7 @@
             };
 
             addScript(`assets/data/market_data.js${suffix}`);
+            addScript(`assets/data/yahoo_ewz_options.js${suffix}`);
             addScript(primary, function(){
                 this.onerror = null;
                 this.src = fallback;
