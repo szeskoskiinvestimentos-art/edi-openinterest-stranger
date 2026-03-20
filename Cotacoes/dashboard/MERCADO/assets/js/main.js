@@ -3277,7 +3277,15 @@ async function fetchJsonWithTimeout(url, timeoutMs = 3500) {
         const t = setTimeout(() => ctrl.abort(), timeoutMs);
         try {
             const res = await fetch(u, { method: 'GET', signal: ctrl.signal });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            if (!res.ok) {
+                if (res.status === 0) {
+                    const txt = await res.text();
+                    const clean = String(txt || '').trim();
+                    if (!clean) throw new Error('HTTP 0');
+                    return JSON.parse(clean);
+                }
+                throw new Error(`HTTP ${res.status}`);
+            }
             return await res.json();
         } finally {
             clearTimeout(t);
@@ -3366,11 +3374,13 @@ function toneFromRegimeText(regime) {
 }
 
 function renderOptionsGammaSummary(payload) {
-    if (!payload || payload.ok !== true || !payload.items) {
-        setHtml(
-            'optionsGammaSummary',
-            `<div style="padding:12px;opacity:.9;">Indisponível • Ative o serviço local e confirme o dashboard_unificado.</div>`,
-        );
+    if (!payload) {
+        setHtml('optionsGammaSummary', `<div style="padding:12px;opacity:.9;">Indisponível • Sem dados.</div>`);
+        return;
+    }
+    if (payload.ok !== true || !payload.items) {
+        const msg = payload && payload.message ? String(payload.message) : 'Indisponível • Sem dados.';
+        setHtml('optionsGammaSummary', `<div style="padding:12px;opacity:.9;">${escapeHtml(msg)}</div>`);
         return;
     }
 
@@ -3445,13 +3455,118 @@ function renderOptionsGammaSummary(payload) {
 async function loadOptionsGammaSummary() {
     const baseUrl = getMarketServiceBaseUrl();
     try {
+        const local = (() => {
+            try {
+                return window.OPTIONS_GAMMA_SUMMARY_DATA || null;
+            } catch {
+                return null;
+            }
+        })();
+        if (local) {
+            renderOptionsGammaSummary(local);
+            return true;
+        }
+        try {
+            const fromFile = await fetchJsonWithTimeout(`assets/data/options_gamma_summary.json?ts=${Date.now()}`, 1200);
+            if (fromFile) {
+                renderOptionsGammaSummary(fromFile);
+                return true;
+            }
+        } catch {
+        }
+
+        const fromUnifiedDashboard = await (async () => {
+            const normalize = raw => {
+                const overview = raw && raw.overview ? raw.overview : null;
+                const key = raw && raw.key_levels ? raw.key_levels : null;
+                const overviewSpot = overview && typeof overview.spot_price === 'number' ? overview.spot_price : null;
+                const topSpot = raw && typeof raw.spot_price === 'number' ? raw.spot_price : null;
+                const flip =
+                    key && typeof key.gamma_flip === 'number'
+                        ? key.gamma_flip
+                        : key && typeof key.gamma_flip_hvl === 'number'
+                            ? key.gamma_flip_hvl
+                            : key && typeof key.gamma_flip_hvl_gaussian === 'number'
+                                ? key.gamma_flip_hvl_gaussian
+                                : null;
+                return {
+                    updatedAt: (overview && overview.last_update) || raw.last_updated || null,
+                    spot: overviewSpot ?? topSpot,
+                    regime: (overview && overview.regime) || null,
+                    keyLevels: {
+                        gammaFlip: flip,
+                        callWall: key && typeof key.call_wall === 'number' ? key.call_wall : null,
+                        putWall: key && typeof key.put_wall === 'number' ? key.put_wall : null,
+                        effectiveCallWall: key && typeof key.effective_call_wall === 'number' ? key.effective_call_wall : null,
+                        effectivePutWall: key && typeof key.effective_put_wall === 'number' ? key.effective_put_wall : null,
+                        maxPain: key && typeof key.max_pain === 'number' ? key.max_pain : null,
+                        rangeLow: key && typeof key.range_low === 'number' ? key.range_low : null,
+                        rangeHigh: key && typeof key.range_high === 'number' ? key.range_high : null,
+                    },
+                };
+            };
+
+            const tryOneBase = async base => {
+                const pick = async symbol => {
+                    const dataUrl = new URL(`${symbol}/assets/data/market_data.json?ts=${Date.now()}`, base).toString();
+                    const raw = await fetchJsonWithTimeout(dataUrl, 450);
+                    const dashUrl = new URL(`${symbol}/index.html`, base).toString();
+                    const mapped = normalize(raw || {});
+                    return {
+                        symbol,
+                        ...mapped,
+                        links: { dashboard: dashUrl, data: dataUrl.split('?ts=')[0] || dataUrl },
+                    };
+                };
+
+                const out = { ok: true, generatedAt: new Date().toISOString(), source: { kind: 'dashboard_unificado', base }, items: {} };
+                try {
+                    const wdo = await pick('WDO');
+                    out.items.WDO = wdo;
+                } catch {
+                }
+                try {
+                    const win = await pick('WIN');
+                    out.items.WIN = win;
+                } catch {
+                }
+                return Object.keys(out.items).length ? out : null;
+            };
+
+            try {
+                const here = new URL('./', location.href);
+                const candidates = [
+                    new URL(`../../../B3_System/dashboard_unificado/`, here).toString(),
+                    new URL(`../../../../B3_System/dashboard_unificado/`, here).toString(),
+                ];
+
+                for (const b of candidates) {
+                    try {
+                        const payload = await tryOneBase(b);
+                        if (payload) return payload;
+                    } catch {
+                    }
+                }
+            } catch {
+            }
+
+            return null;
+        })();
+        if (fromUnifiedDashboard) {
+            renderOptionsGammaSummary(fromUnifiedDashboard);
+            return true;
+        }
+
         const online = await ensureMarketServiceOnline();
         if (!online) throw new Error('market_service_offline');
         const payload = await fetchJsonWithTimeout(`${baseUrl}/api/options/summary?t=${Date.now()}`, 2500);
         renderOptionsGammaSummary(payload);
         return true;
     } catch {
-        renderOptionsGammaSummary(null);
+        renderOptionsGammaSummary({
+            ok: false,
+            message: 'Indisponível • Sem pacote local, sem leitura do dashboard_unificado e sem serviço HTTP.',
+        });
         return false;
     }
 }
@@ -3664,13 +3779,36 @@ function renderWebNewsModule(payload) {
 async function loadWebNewsModule() {
     const baseUrl = getMarketServiceBaseUrl();
     try {
+        const local = (() => {
+            try {
+                return window.WEB_NEWS_MODULE_DATA || null;
+            } catch {
+                return null;
+            }
+        })();
+        if (local) {
+            renderWebNewsModule(local);
+            return true;
+        }
+        try {
+            const fromFile = await fetchJsonWithTimeout(`assets/data/web_news_module.json?ts=${Date.now()}`, 1600);
+            if (fromFile) {
+                renderWebNewsModule(fromFile);
+                return true;
+            }
+        } catch {
+        }
+
         const online = await ensureMarketServiceOnline();
         if (!online) throw new Error('market_service_offline');
         const payload = await fetchJsonWithTimeout(`${baseUrl}/api/news/web/module?limit=40&t=${Date.now()}`, 5500);
         renderWebNewsModule(payload);
         return true;
     } catch {
-        renderWebNewsModule({ ok: false, message: 'Web News Module offline. Rode "Atualizar_Dados_Mercado.bat" para subir o serviço.' });
+        renderWebNewsModule({
+            ok: false,
+            message: 'Web News Module indisponível • Sem pacote local (assets/data/web_news_module.json) e sem serviço HTTP.',
+        });
         return false;
     }
 }
