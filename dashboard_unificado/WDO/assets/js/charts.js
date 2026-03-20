@@ -161,7 +161,11 @@ class StrangerThingsCharts {
                             ctx.fillStyle = color;
                             ctx.font = pluginOptions?.font ?? '12px Orbitron';
                             ctx.textBaseline = 'top';
-                            ctx.fillText(labelText, xPixel + 6, chartArea.top + 6);
+                            const offsetX = Number(pluginOptions?.labelOffsetX ?? 0);
+                            const offsetY = Number(pluginOptions?.labelOffsetY ?? 0);
+                            const x = xPixel + 6 + (Number.isFinite(offsetX) ? offsetX : 0);
+                            const y = chartArea.top + 6 + (Number.isFinite(offsetY) ? offsetY : 0);
+                            ctx.fillText(labelText, x, y);
                         }
 
                         ctx.restore();
@@ -851,6 +855,8 @@ class StrangerThingsCharts {
             if (!points || points.length === 0) return;
             const means = calcMeans(points);
             if (!means) return;
+            const spotProxy = Number(yahoo.spot);
+            const spotLabel = String(yahoo.ticker_used || 'UUP');
 
             if (this.charts.uupOi) this.charts.uupOi.destroy();
             const ctx = canvas.getContext('2d');
@@ -881,6 +887,18 @@ class StrangerThingsCharts {
                     ...this.chartOptions,
                     plugins: {
                         ...this.chartOptions.plugins,
+                        ...(Number.isFinite(spotProxy)
+                            ? {
+                                spotLine: {
+                                    value: spotProxy,
+                                    color: '#f7ff00',
+                                    dash: [2, 4],
+                                    width: 2,
+                                    labelOffsetY: 54,
+                                    labelText: `SPOT ${spotLabel} ${this.formatNumberBr(spotProxy, 4)}`
+                                }
+                            }
+                            : {}),
                         vLines: {
                             lines: [
                                 {
@@ -1074,6 +1092,8 @@ class StrangerThingsCharts {
             if (!points || points.length === 0) return;
             const means = calcMeans(points);
             if (!means) return;
+            const spotProxy = Number(yahoo.spot);
+            const spotLabel = String(yahoo.ticker_used || 'USDU');
 
             if (this.charts.usduOi) this.charts.usduOi.destroy();
             const ctx = canvas.getContext('2d');
@@ -1104,6 +1124,18 @@ class StrangerThingsCharts {
                     ...this.chartOptions,
                     plugins: {
                         ...this.chartOptions.plugins,
+                        ...(Number.isFinite(spotProxy)
+                            ? {
+                                spotLine: {
+                                    value: spotProxy,
+                                    color: '#f7ff00',
+                                    dash: [2, 4],
+                                    width: 2,
+                                    labelOffsetY: 54,
+                                    labelText: `SPOT ${spotLabel} ${this.formatNumberBr(spotProxy, 4)}`
+                                }
+                            }
+                            : {}),
                         vLines: {
                             lines: [
                                 {
@@ -1161,6 +1193,7 @@ class StrangerThingsCharts {
         const container = document.getElementById('usdBetaTableContainer');
         if (!container) return;
 
+        const chartCanvas = document.getElementById('usdBetaChart');
         const proxySelect = document.getElementById('usdBetaProxySelect');
         const expirySelect = document.getElementById('usdBetaExpirySelect');
         const windowSelect = document.getElementById('usdBetaWindowSelect');
@@ -1217,6 +1250,10 @@ class StrangerThingsCharts {
             const strikes = Array.isArray(row?.strikes) ? row.strikes : null;
             if (!strikes || strikes.length === 0) return [];
 
+            const callsIn = Array.isArray(row?.call_oi) ? row.call_oi : null;
+            const putsIn = Array.isArray(row?.put_oi) ? row.put_oi : null;
+            const hasOi = !!callsIn && !!putsIn && callsIn.length === strikes.length && putsIn.length === strikes.length;
+
             const latest = data?.usdbrl_beta?.latest || null;
             const proxyClose = Number(latest?.proxy_close ?? data?.spot);
             const fxClose = Number(latest?.fx_close);
@@ -1227,19 +1264,21 @@ class StrangerThingsCharts {
             if (!Number.isFinite(alpha) || !Number.isFinite(beta)) return [];
 
             return strikes
-                .map((s) => Number(s))
-                .filter((s) => Number.isFinite(s))
-                .sort((a, b) => a - b)
-                .map((strike) => {
-                    const varProxy = (strike - proxyClose) / proxyClose;
+                .map((s, i) => ({ strike: Number(s), i }))
+                .filter((p) => Number.isFinite(p.strike))
+                .sort((a, b) => a.strike - b.strike)
+                .map((p) => {
+                    const varProxy = (p.strike - proxyClose) / proxyClose;
                     const varFx = alpha + beta * varProxy;
                     const fxProj = fxClose * (1 + varFx);
                     return {
-                        strike,
+                        strike: p.strike,
                         varProxy,
                         varFx,
                         fxProj,
-                        fxProjPoints: fxProj * 1000.0
+                        fxProjPoints: fxProj * 1000.0,
+                        callOi: hasOi ? Number(callsIn[p.i]) : null,
+                        putOi: hasOi ? Number(putsIn[p.i]) : null
                     };
                 });
         };
@@ -1250,6 +1289,7 @@ class StrangerThingsCharts {
             if (!data) {
                 container.innerHTML = '<div class="loading-text">Dados indisponíveis (Yahoo).</div>';
                 if (statsEl) statsEl.innerText = '';
+                if (this.charts.usdBeta) this.charts.usdBeta.destroy();
                 return;
             }
 
@@ -1262,6 +1302,7 @@ class StrangerThingsCharts {
             if (!betaRow || !latest) {
                 container.innerHTML = '<div class="loading-text">Beta indisponível. Rode o exportador para atualizar.</div>';
                 if (statsEl) statsEl.innerText = '';
+                if (this.charts.usdBeta) this.charts.usdBeta.destroy();
                 return;
             }
 
@@ -1287,7 +1328,93 @@ class StrangerThingsCharts {
             const rows = buildMapping(data, expiry, betaRow);
             if (rows.length === 0) {
                 container.innerHTML = '<div class="loading-text">Sem strikes para o vencimento selecionado.</div>';
+                if (this.charts.usdBeta) this.charts.usdBeta.destroy();
                 return;
+            }
+
+            if (chartCanvas) {
+                const canPlot = rows.every((r) => Number.isFinite(Number(r?.callOi)) && Number.isFinite(Number(r?.putOi)));
+                if (this.charts.usdBeta) this.charts.usdBeta.destroy();
+                if (canPlot) {
+                    const ctx = chartCanvas.getContext('2d');
+                    if (ctx) {
+                        const title = `Open Interest por Strike (corrigido β) | ${proxyKey} → USD/BRL`;
+                        this.charts.usdBeta = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: rows.map((r) => this.formatNumberBr(r.fxProjPoints, 0)),
+                                datasets: [
+                                    {
+                                        label: 'Call OI',
+                                        data: rows.map((r) => Number(r.callOi)),
+                                        backgroundColor: 'rgba(0, 255, 0, 0.6)',
+                                        borderColor: '#00ff00',
+                                        borderWidth: 1
+                                    },
+                                    {
+                                        label: 'Put OI',
+                                        data: rows.map((r) => Number(r.putOi)),
+                                        backgroundColor: 'rgba(255, 7, 58, 0.6)',
+                                        borderColor: '#ff073a',
+                                        borderWidth: 1
+                                    }
+                                ]
+                            },
+                            options: {
+                                ...this.chartOptions,
+                                plugins: {
+                                    ...this.chartOptions.plugins,
+                                    spotLine: Number.isFinite(wdoSpot)
+                                        ? {
+                                            value: wdoSpot,
+                                            color: '#00f3ff',
+                                            dash: [4, 4],
+                                            width: 2,
+                                            labelText: `SPOT WDO ${this.formatNumberBr(wdoSpot, 2)}`
+                                        }
+                                        : undefined,
+                                    title: {
+                                        display: true,
+                                        text: title,
+                                        color: '#ff00ff',
+                                        font: {
+                                            family: 'Orbitron',
+                                            size: 16,
+                                            weight: 'bold'
+                                        }
+                                    },
+                                    tooltip: {
+                                        ...this.chartOptions.plugins.tooltip,
+                                        callbacks: {
+                                            ...this.chartOptions.plugins.tooltip?.callbacks,
+                                            afterBody: (items) => {
+                                                const it = Array.isArray(items) && items.length > 0 ? items[0] : null;
+                                                const idx = it ? it.dataIndex : null;
+                                                const r = Number.isInteger(idx) ? rows[idx] : null;
+                                                if (!r) return [];
+                                                const proxyStrike = this.formatNumberBr(r.strike, 2);
+                                                const varProxy = formatPct(r.varProxy);
+                                                const varFx = formatPct(r.varFx);
+                                                return [`Strike proxy: ${proxyStrike}`, `Var% proxy: ${varProxy}`, `Var% USD/BRL (est.): ${varFx}`];
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    ...this.chartOptions.scales,
+                                    x: {
+                                        ...this.chartOptions.scales.x,
+                                        stacked: true
+                                    },
+                                    y: {
+                                        ...this.chartOptions.scales.y,
+                                        stacked: true
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
             }
 
             let html = '<table class="data-table"><thead><tr><th>Strike Proxy</th><th>Var% Proxy</th><th>Var% USD/BRL (est.)</th><th>USD/BRL Projetado</th></tr></thead><tbody>';
@@ -1313,7 +1440,13 @@ class StrangerThingsCharts {
                         expiry,
                         window_days: win,
                         usdbrl_beta: data?.usdbrl_beta || null,
-                        mapping: rows
+                        mapping: rows.map((r) => ({
+                            strike: r.strike,
+                            varProxy: r.varProxy,
+                            varFx: r.varFx,
+                            fxProj: r.fxProj,
+                            fxProjPoints: r.fxProjPoints
+                        }))
                     };
                     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
                     const url = URL.createObjectURL(blob);

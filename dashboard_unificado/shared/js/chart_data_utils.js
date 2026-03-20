@@ -134,7 +134,11 @@
                      ctx.fillStyle = color;
                      ctx.font = pluginOptions?.font ?? '12px Orbitron';
                      ctx.textBaseline = 'top';
-                     ctx.fillText(labelText, xPixel + 6, chartArea.top + 6);
+                    const offsetX = Number(pluginOptions?.labelOffsetX ?? 0);
+                    const offsetY = Number(pluginOptions?.labelOffsetY ?? 0);
+                    const x = xPixel + 6 + (Number.isFinite(offsetX) ? offsetX : 0);
+                    const y = chartArea.top + 6 + (Number.isFinite(offsetY) ? offsetY : 0);
+                    ctx.fillText(labelText, x, y);
                  }
  
                  ctx.restore();
