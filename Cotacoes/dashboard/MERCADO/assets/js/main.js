@@ -110,17 +110,119 @@ function assetIcon(row) {
     const sym = String(row && row.symbol ? row.symbol : '').toLowerCase();
     const tags = Array.isArray(row && row.tags) ? row.tags.map(t => String(t).toLowerCase()) : [];
 
-    if (name.includes('brent') || name.includes('wti') || name.includes('crude') || sym.includes('wti') || sym.includes('brent')) return '🛢️';
-    if (name.includes('gold') || name.includes('silver') || name.includes('copper') || cat.includes('metals')) return '🪙';
-    if (cat.includes('fx') || name.includes('usd/') || name.includes('/usd') || name.includes('dollar') || name.includes('eur/') || name.includes('/eur')) return '💱';
-    if (cat.includes('rates') || name.includes('yield') || name.includes('bond') || sym.includes('=rr')) return '📈';
-    if (cat.includes('crypto') || name.includes('bitcoin') || name.includes('ethereum') || sym.includes('btc') || sym.includes('eth')) return '₿';
-    if (cat.includes('volatility') || name.includes('vix') || name.includes('volatility')) return '🌡️';
-    if (cat.includes('energy') || cat.includes('agriculture') || cat.includes('commodities')) return '🌾';
-    if (tags.includes('risk_on')) return '🟢';
-    if (tags.includes('risk_off')) return '🔴';
-    if (cat.includes('emerging')) return '🌍';
-    return '🔹';
+    const flagFromCurrency = ccy => {
+        const c = String(ccy || '').toUpperCase().trim();
+        if (!c) return '';
+        if (c === 'USD') return '🇺🇸';
+        if (c === 'BRL') return '🇧🇷';
+        if (c === 'EUR') return '🇪🇺';
+        if (c === 'GBP') return '🇬🇧';
+        if (c === 'JPY') return '🇯🇵';
+        if (c === 'CHF') return '🇨🇭';
+        if (c === 'AUD') return '🇦🇺';
+        if (c === 'NZD') return '🇳🇿';
+        if (c === 'CAD') return '🇨🇦';
+        if (c === 'CNY' || c === 'CNH') return '🇨🇳';
+        if (c === 'MXN') return '🇲🇽';
+        if (c === 'ZAR') return '🇿🇦';
+        if (c === 'TRY') return '🇹🇷';
+        if (c === 'KRW') return '🇰🇷';
+        if (c === 'INR') return '🇮🇳';
+        if (c === 'NOK') return '🇳🇴';
+        if (c === 'SEK') return '🇸🇪';
+        if (c === 'DKK') return '🇩🇰';
+        return '';
+    };
+
+    const flagFromIso2 = iso2 => {
+        const c = String(iso2 || '').toUpperCase().trim();
+        if (!c) return '';
+        if (c === 'US') return '🇺🇸';
+        if (c === 'BR') return '🇧🇷';
+        if (c === 'CN') return '🇨🇳';
+        if (c === 'JP') return '🇯🇵';
+        if (c === 'MX') return '🇲🇽';
+        if (c === 'GB') return '🇬🇧';
+        if (c === 'DE') return '🇩🇪';
+        if (c === 'FR') return '🇫🇷';
+        if (c === 'IT') return '🇮🇹';
+        if (c === 'ES') return '🇪🇸';
+        if (c === 'CA') return '🇨🇦';
+        if (c === 'AU') return '🇦🇺';
+        if (c === 'NZ') return '🇳🇿';
+        if (c === 'CH') return '🇨🇭';
+        if (c === 'SE') return '🇸🇪';
+        if (c === 'NO') return '🇳🇴';
+        if (c === 'DK') return '🇩🇰';
+        if (c === 'TR') return '🇹🇷';
+        if (c === 'AR') return '🇦🇷';
+        if (c === 'CL') return '🇨🇱';
+        if (c === 'CO') return '🇨🇴';
+        if (c === 'PE') return '🇵🇪';
+        if (c === 'ZA') return '🇿🇦';
+        if (c === 'RU') return '🇷🇺';
+        if (c === 'IN') return '🇮🇳';
+        if (c === 'KR') return '🇰🇷';
+        if (c === 'ID') return '🇮🇩';
+        return '';
+    };
+
+    const fxPairFlags = raw => {
+        const s = String(raw || '').toUpperCase().trim();
+        const m = s.match(/^([A-Z]{3})\/([A-Z]{3})\b/);
+        if (!m) return '';
+        const a = flagFromCurrency(m[1]);
+        const b = flagFromCurrency(m[2]);
+        return a || b ? `${a}${b}` : '';
+    };
+
+    const countryHint = () => {
+        const s = String(row && row.symbol ? row.symbol : '');
+        const n = String(row && row.name ? row.name : '');
+        const ex = String(row && row.exchange ? row.exchange : '');
+
+        const cdsIso2 = s.match(/^([A-Z]{2})GV/i);
+        if (cdsIso2) {
+            const f = flagFromIso2(cdsIso2[1]);
+            if (f) return f;
+        }
+
+        if (s.endsWith('.SA') || /\bbrasil\b|\bbrazil\b/i.test(n) || /\bB3\b/i.test(ex)) return '🇧🇷';
+        if (/^US\d+(YT|MT)=RR$/i.test(s) || /\bUnited States\b|\bEUA\b/i.test(n)) return '🇺🇸';
+        if (/^BR\d+(YT|MT)=RR$/i.test(s) || /\bBrazil\b|\bBrasil\b/i.test(n)) return '🇧🇷';
+        if (/\bChina\b|\bCNY\b|\bCNH\b/i.test(n) || /\bCSI 300\b/i.test(n)) return '🇨🇳';
+        if (/\bJapan\b|\bJPY\b/i.test(n)) return '🇯🇵';
+        if (/\bMexico\b|\bMéxico\b|\bMXN\b/i.test(n)) return '🇲🇽';
+        if (/\bTurkey\b|\bTurquia\b|\bTRY\b/i.test(n)) return '🇹🇷';
+        if (/\bRussia\b|\bRússia\b|\bRUB\b/i.test(n)) return '🇷🇺';
+        if (/\bEurope\b|\bEuro\b/i.test(n)) return '🇪🇺';
+        if (/\bUK\b|\bBritain\b|\bGBP\b/i.test(n)) return '🇬🇧';
+        return '';
+    };
+
+    const risk = tags.includes('risk_on') ? '🟢' : tags.includes('risk_off') ? '🔴' : '';
+
+    if (name.includes('brent') || name.includes('wti') || name.includes('crude') || sym.includes('wti') || sym.includes('brent')) return `🛢️${risk ? ` ${risk}` : ''}`;
+    if (name.includes('gold') || name.includes('silver') || name.includes('copper') || cat.includes('metals')) return `🪙${risk ? ` ${risk}` : ''}`;
+    if (cat.includes('crypto') || name.includes('bitcoin') || name.includes('ethereum') || sym.includes('btc') || sym.includes('eth')) return `₿${risk ? ` ${risk}` : ''}`;
+    if (cat.includes('volatility') || name.includes('vix') || name.includes('volatility')) return `🌡️${risk ? ` ${risk}` : ''}`;
+    if (cat.includes('energy') || cat.includes('agriculture') || cat.includes('commodities')) return `🌾${risk ? ` ${risk}` : ''}`;
+    if (cat.includes('rates') || name.includes('yield') || name.includes('bond') || sym.includes('=rr')) {
+        const f = countryHint();
+        return `${f || '📈'}${risk ? ` ${risk}` : ''}`;
+    }
+    if (cat.includes('credit') || name.includes('cds') || tags.includes('credit')) {
+        const f = countryHint();
+        return `${f || '🧾'}${risk ? ` ${risk}` : ''}`;
+    }
+    if (cat.includes('fx') || name.includes('usd/') || name.includes('/usd') || name.includes('dollar') || name.includes('eur/') || name.includes('/eur')) {
+        const flags = fxPairFlags(row && row.symbol ? row.symbol : row && row.name ? row.name : '');
+        return `${flags || '💱'}${risk ? ` ${risk}` : ''}`;
+    }
+    if (cat.includes('emerging')) return `🌍${risk ? ` ${risk}` : ''}`;
+
+    const f = countryHint();
+    return `${f || '🔹'}${risk ? ` ${risk}` : ''}`;
 }
 
 function symbolKey(symbol) {
@@ -5110,6 +5212,53 @@ function renderMarketPanorama(data) {
     const assetBySymbol = new Map(assets.map(a => [String(a && a.symbol ? a.symbol : ''), a]));
     const seriesKeys = Object.keys((data && data.series) || {});
     const diMatcher = /^DI1[FGHJKMNQUVXZ]\d{2}$/i;
+    const favorites = loadFavorites();
+
+    const isFav = symbol => {
+        const s = String(symbol || '');
+        if (!s) return false;
+        return favorites.has(s) || favorites.has(symbolKey(s));
+    };
+
+    const pinnedMatchers = groupKey => {
+        const k = String(groupKey || '');
+        if (k === 'fx_g10') return [/^\.(DXY)\b/i, /^EUR\/USD\b/i, /^USD\/JPY\b/i, /^GBP\/USD\b/i, /^AUD\/USD\b/i, /^NZD\/USD\b/i, /^USD\/CHF\b/i, /^USD\/CAD\b/i];
+        if (k === 'fx_em') return [/^USD\/BRL\b/i, /^USD\/MXN\b/i, /^USD\/ZAR\b/i, /^USD\/TRY\b/i, /^USD\/(CNY|CNH)\b/i];
+        if (k === 'rates' || k === 'credit') return [/^US2YT=RR$/i, /^US10YT=RR$/i, /^US30YT=RR$/i, /^BR2YT=RR$/i, /^BR10YT=RR$/i, /^US10BR10=RR$/i];
+        if (k === 'equities') return [/^\.(SPX|NDX)\b/i, /^SPY$/i, /^QQQ$/i, /^IWM$/i, /^DIA$/i, /^EWZ$/i];
+        if (k === 'emerging') return [/^FXI$/i, /^\.(CSI300)\b/i, /^EEM$/i, /^EWW$/i];
+        if (k === 'energy') return [/\bBrent\b/i, /\bWTI\b/i, /^CO1\b/i, /^CL1\b/i];
+        if (k === 'metals') return [/\bGold\b/i, /\bSilver\b/i, /\bCopper\b/i, /^GC1\b/i, /^SI1\b/i, /^HG\b/i];
+        if (k === 'agri') return [/\bSoy\b/i, /\bCorn\b/i, /\bWheat\b/i];
+        if (k === 'crypto') return [/\bBTC\b/i, /\bETH\b/i];
+        if (k === 'vol') return [/\bVIX\b/i, /^\.VIX\b/i];
+        return [];
+    };
+
+    const pinnedIndex = (groupKey, row) => {
+        const matchers = pinnedMatchers(groupKey);
+        if (!matchers.length) return 999;
+        const s = String(row && row.symbol ? row.symbol : '');
+        const n = String(row && row.label ? row.label : '');
+        for (let i = 0; i < matchers.length; i++) {
+            const re = matchers[i];
+            if (re.test(s) || re.test(n)) return i;
+        }
+        return 999;
+    };
+
+    const sortRows = (groupKey, rows) => {
+        const key = String(groupKey || '');
+        rows.sort((a, b) => {
+            const af = isFav(a && a.symbol ? a.symbol : '') ? 0 : 1;
+            const bf = isFav(b && b.symbol ? b.symbol : '') ? 0 : 1;
+            if (af !== bf) return af - bf;
+            const ap = pinnedIndex(key, a);
+            const bp = pinnedIndex(key, b);
+            if (ap !== bp) return ap - bp;
+            return String(a && a.label ? a.label : '').localeCompare(String(b && b.label ? b.label : ''), 'pt-BR');
+        });
+    };
 
     const diMonthNum = code => {
         const c = String(code || '').toUpperCase();
@@ -5148,7 +5297,7 @@ function renderMarketPanorama(data) {
         return parsed.map(({ yy, mm, ...rest }) => rest);
     };
 
-    const rowsFor = (categories, { includeDxy = false, excludeSymbols = [], includeMissing = false } = {}) => {
+    const rowsFor = (groupKey, categories, { includeDxy = false, excludeSymbols = [], includeMissing = false } = {}) => {
         const cats = Array.isArray(categories) ? categories : [];
         const exclude = new Set((excludeSymbols || []).map(s => String(s)));
         const base = assets.filter(a => cats.includes(a && a.category ? a.category : ''));
@@ -5180,7 +5329,7 @@ function renderMarketPanorama(data) {
             }
         }
 
-        rows.sort((x, y) => String(x.label || '').localeCompare(String(y.label || ''), 'pt-BR'));
+        sortRows(groupKey, rows);
         return rows;
     };
 
@@ -5203,16 +5352,34 @@ function renderMarketPanorama(data) {
     const usedCats = new Set(baseGroups.flatMap(g => (g && g.categories ? g.categories : [])));
     const allCats = Array.from(new Set(assets.map(a => (a && a.category ? String(a.category) : '')).filter(Boolean)));
     const extras = allCats.filter(c => c && !usedCats.has(c));
-    const groups = extras.length
-        ? baseGroups.concat([{ key: 'outros', title: 'Outros', categories: extras, opt: { includeMissing: true } }])
-        : baseGroups;
+    const uncategorized = assets.filter(a => !(a && a.category)).filter(a => a && a.symbol);
+    const groups = []
+        .concat(baseGroups)
+        .concat(extras.length ? [{ key: 'outros', title: 'Outros', categories: extras, opt: { includeMissing: true } }] : [])
+        .concat(uncategorized.length ? [{ key: 'sem_categoria', title: 'Sem categoria', kind: 'uncategorized', maxRows: 12 }] : []);
 
     const buildSnapshot = group => {
         if (group && group.kind === 'di') {
             const rows = diRows();
             return { at: new Date().toISOString(), rows };
         }
-        const rows = rowsFor(group.categories, group.opt);
+        if (group && group.kind === 'uncategorized') {
+            const rows = uncategorized
+                .map(a => {
+                    const symbol = String(a && a.symbol ? a.symbol : '');
+                    const last = getLastPoint(data, symbol);
+                    const price = last && typeof last.price === 'number' ? last.price : null;
+                    const pct = last && typeof last.changePct === 'number' ? last.changePct : null;
+                    const t = last && last.t ? String(last.t) : '';
+                    const label = String(a && a.name ? a.name : symbol);
+                    const icon = assetIcon({ symbol, name: label, category: '', tags: a && a.tags ? a.tags : [] });
+                    return { label, symbol, icon, price, pct, t };
+                })
+                .filter(r => r && r.symbol);
+            sortRows(group.key, rows);
+            return { at: new Date().toISOString(), rows };
+        }
+        const rows = rowsFor(group.key, group.categories, group.opt);
         return { at: new Date().toISOString(), rows };
     };
 
@@ -5280,6 +5447,40 @@ function renderMarketPanorama(data) {
         </div>`;
     };
 
+    const monitoredSymbols = assets.map(a => String(a && a.symbol ? a.symbol : '')).filter(Boolean);
+    const monitoredUnique = new Set(monitoredSymbols);
+    const duplicates = monitoredSymbols.length - monitoredUnique.size;
+
+    const panoramaSet = new Set();
+    for (const g of groups) {
+        const snap = buildSnapshot(g);
+        const rows = snap && Array.isArray(snap.rows) ? snap.rows : [];
+        for (const r of rows) {
+            const s = String(r && r.symbol ? r.symbol : '');
+            if (s) panoramaSet.add(s);
+        }
+    }
+    const missingInPanorama = Array.from(monitoredUnique).filter(s => !panoramaSet.has(s));
+    const inPanoramaCount = Array.from(monitoredUnique).filter(s => panoramaSet.has(s)).length;
+    const extrasInPanorama = Array.from(panoramaSet).filter(s => !monitoredUnique.has(s)).length;
+
+    const coverageHtml = `
+        <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);margin-bottom:12px;">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Cobertura do Panorama</div>
+                <div style="opacity:.80;font-size:12px;">Ativos: ${escapeHtml(String(monitoredUnique.size))} • No panorama: ${escapeHtml(String(inPanoramaCount))}${extrasInPanorama ? ` • Extras: ${escapeHtml(String(extrasInPanorama))}` : ''}${duplicates ? ` • Duplicados: ${escapeHtml(String(duplicates))}` : ''}</div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+                <span class="neutral" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">Sem categoria: ${escapeHtml(String(uncategorized.length))}</span>
+                <span class="${missingInPanorama.length ? 'negative' : 'positive'}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">Fora do panorama: ${escapeHtml(String(missingInPanorama.length))}</span>
+            </div>
+            ${missingInPanorama.length
+        ? `<div style="margin-top:10px;opacity:.88;line-height:1.35;">Faltando: ${escapeHtml(missingInPanorama.slice(0, 14).join(' • '))}${missingInPanorama.length > 14 ? ' • …' : ''}</div>`
+        : ''
+    }
+        </div>
+    `;
+
     const cards = groups
         .map(g => {
             const snap = frozen && frozen[g.key] ? frozen[g.key] : buildSnapshot(g);
@@ -5291,7 +5492,7 @@ function renderMarketPanorama(data) {
         .filter(Boolean)
         .join('');
 
-    el.innerHTML = cards ? `<div class="panorama-grid">${cards}</div>` : '<div style="opacity:.85;">Sem dados suficientes para montar o panorama.</div>';
+    el.innerHTML = `${coverageHtml}${cards ? `<div class="panorama-grid">${cards}</div>` : '<div style="opacity:.85;">Sem dados suficientes para montar o panorama.</div>'}`;
 
     el.querySelectorAll('[data-panorama-freeze]').forEach(btn => {
         btn.addEventListener('click', () => {
