@@ -890,6 +890,190 @@ class StrangerThingsCharts {
         if (minOiInput) minOiInput.onchange = render;
     }
 
+    createYahooUsdbrlBetaMappingBlock() {
+        const container = document.getElementById('usdBetaTableContainer');
+        if (!container) return;
+
+        const proxySelect = document.getElementById('usdBetaProxySelect');
+        const expirySelect = document.getElementById('usdBetaExpirySelect');
+        const windowSelect = document.getElementById('usdBetaWindowSelect');
+        const statsEl = document.getElementById('usdBetaStats');
+        const downloadBtn = document.getElementById('usdBetaDownloadBtn');
+
+        const datasets = {
+            UUP: window.yahooUupOptionsData || null,
+            USDU: window.yahooUsduOptionsData || null
+        };
+
+        const formatPct = (v) => {
+            const n = Number(v);
+            if (!Number.isFinite(n)) return '-';
+            const s = (n * 100).toFixed(2);
+            return `${s.replace('.', ',')}%`;
+        };
+
+        const getWdoSpotPoints = () => {
+            const d = this.data ?? window.marketData ?? null;
+            const spot = Number(d?.overview?.spot_price ?? d?.overview?.spot ?? d?.spot_price ?? d?.spot);
+            return Number.isFinite(spot) ? spot : null;
+        };
+
+        const getProxyKey = () => {
+            const v = String(proxySelect?.value || 'UUP').trim().toUpperCase();
+            return v === 'USDU' ? 'USDU' : 'UUP';
+        };
+
+        const getData = () => datasets[getProxyKey()];
+
+        const getBetaForWindow = (data, w) => {
+            const usdbrl = data?.usdbrl_beta || null;
+            const windows = usdbrl?.windows || null;
+            if (!windows || typeof windows !== 'object') return null;
+            const key = String(w || '').trim();
+            return windows[key] || null;
+        };
+
+        const ensureExpiryOptions = (data) => {
+            if (!expirySelect) return;
+            const expiries = Array.isArray(data?.expiries) ? data.expiries.map(String).filter(Boolean) : [];
+            expirySelect.innerHTML = expiries
+                .slice()
+                .sort()
+                .map((e) => `<option value="${e}">${e}</option>`)
+                .join('');
+            if (!expirySelect.value && expiries.length > 0) expirySelect.value = expiries[0];
+        };
+
+        const buildMapping = (data, expiry, betaRow) => {
+            const by = data?.by_expiry || null;
+            const row = by?.[expiry] || null;
+            const strikes = Array.isArray(row?.strikes) ? row.strikes : null;
+            if (!strikes || strikes.length === 0) return [];
+
+            const latest = data?.usdbrl_beta?.latest || null;
+            const proxyClose = Number(latest?.proxy_close ?? data?.spot);
+            const fxClose = Number(latest?.fx_close);
+            if (!Number.isFinite(proxyClose) || !Number.isFinite(fxClose)) return [];
+
+            const alpha = Number(betaRow?.alpha);
+            const beta = Number(betaRow?.beta);
+            if (!Number.isFinite(alpha) || !Number.isFinite(beta)) return [];
+
+            return strikes
+                .map((s) => Number(s))
+                .filter((s) => Number.isFinite(s))
+                .sort((a, b) => a - b)
+                .map((strike) => {
+                    const varProxy = (strike - proxyClose) / proxyClose;
+                    const varFx = alpha + beta * varProxy;
+                    const fxProj = fxClose * (1 + varFx);
+                    return {
+                        strike,
+                        varProxy,
+                        varFx,
+                        fxProj,
+                        fxProjPoints: fxProj * 1000.0
+                    };
+                });
+        };
+
+        const render = () => {
+            const proxyKey = getProxyKey();
+            const data = getData();
+            if (!data) {
+                container.innerHTML = '<div class="loading-text">Dados indisponíveis (Yahoo).</div>';
+                if (statsEl) statsEl.innerText = '';
+                return;
+            }
+
+            ensureExpiryOptions(data);
+            const expiry = String(expirySelect?.value || '').trim();
+            const win = String(windowSelect?.value || '90').trim();
+            const betaRow = getBetaForWindow(data, win);
+            const latest = data?.usdbrl_beta?.latest || null;
+
+            if (!betaRow || !latest) {
+                container.innerHTML = '<div class="loading-text">Beta indisponível. Rode o exportador para atualizar.</div>';
+                if (statsEl) statsEl.innerText = '';
+                return;
+            }
+
+            const proxyClose = Number(latest.proxy_close ?? data?.spot);
+            const fxClose = Number(latest.fx_close);
+            const fxPoints = Number(latest.fx_points);
+            const wdoSpot = getWdoSpotPoints();
+
+            const alpha = Number(betaRow.alpha);
+            const beta = Number(betaRow.beta);
+            const corr = Number(betaRow.corr);
+            const r2 = Number(betaRow.r2);
+            const n = Number(betaRow.n);
+
+            if (statsEl) {
+                const proxyTxt = Number.isFinite(proxyClose) ? this.formatNumberBr(proxyClose, 4) : '-';
+                const fxTxt = Number.isFinite(fxClose) ? this.formatNumberBr(fxClose, 4) : '-';
+                const fxPtsTxt = Number.isFinite(fxPoints) ? this.formatNumberBr(fxPoints, 2) : '-';
+                const wdoTxt = Number.isFinite(wdoSpot) ? this.formatNumberBr(wdoSpot, 2) : '-';
+                statsEl.innerText = `Ativo: ${proxyKey} | Venc: ${expiry || '-'} | Janela: ${win}d | α=${alpha.toFixed(6)} | β=${beta.toFixed(4)} | r=${Number.isFinite(corr) ? corr.toFixed(3) : '-'} | R²=${Number.isFinite(r2) ? r2.toFixed(3) : '-'} | n=${Number.isFinite(n) ? n : '-'} | Proxy=${proxyTxt} | USDBRL=${fxTxt} (${fxPtsTxt}) | Spot WDO=${wdoTxt}`;
+            }
+
+            const rows = buildMapping(data, expiry, betaRow);
+            if (rows.length === 0) {
+                container.innerHTML = '<div class="loading-text">Sem strikes para o vencimento selecionado.</div>';
+                return;
+            }
+
+            let html = '<table class="data-table"><thead><tr><th>Strike Proxy</th><th>Var% Proxy</th><th>Var% USD/BRL (est.)</th><th>USD/BRL Projetado</th></tr></thead><tbody>';
+            for (const r of rows) {
+                const strikeTxt = this.formatNumberBr(r.strike, 2);
+                const fxPtsTxt = this.formatNumberBr(r.fxProjPoints, 2);
+                const clsProxy = r.varProxy >= 0 ? 'positive' : 'negative';
+                const clsFx = r.varFx >= 0 ? 'positive' : 'negative';
+                html += `<tr>
+                    <td>${strikeTxt}</td>
+                    <td class="${clsProxy}">${formatPct(r.varProxy)}</td>
+                    <td class="${clsFx}">${formatPct(r.varFx)}</td>
+                    <td>${fxPtsTxt}</td>
+                </tr>`;
+            }
+            html += '</tbody></table>';
+            container.innerHTML = html;
+
+            if (downloadBtn) {
+                downloadBtn.onclick = () => {
+                    const payload = {
+                        proxy: proxyKey,
+                        expiry,
+                        window_days: win,
+                        usdbrl_beta: data?.usdbrl_beta || null,
+                        mapping: rows
+                    };
+                    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `usdbrl_beta_${proxyKey}_${expiry || 'NA'}_${win}d.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    setTimeout(() => URL.revokeObjectURL(url), 500);
+                };
+            }
+        };
+
+        const onProxyChanged = () => {
+            const data = getData();
+            if (data) ensureExpiryOptions(data);
+            render();
+        };
+
+        if (proxySelect) proxySelect.onchange = onProxyChanged;
+        if (expirySelect) expirySelect.onchange = render;
+        if (windowSelect) windowSelect.onchange = render;
+
+        onProxyChanged();
+    }
+
     createMostActivesTable(data) {
         const container = document.getElementById('most-actives-container');
         if (!container) return;
