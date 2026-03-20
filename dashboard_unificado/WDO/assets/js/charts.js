@@ -171,6 +171,120 @@ class StrangerThingsCharts {
                 window.__ediSpotLinePluginRegistered = true;
             };
 
+            const ensureVLinesPlugin = () => {
+                const Chart = window?.Chart;
+                if (!Chart || typeof Chart.register !== 'function') return;
+                if (window.__ediVLinesPluginRegistered) return;
+
+                const parseMaybePtBrNumber = (val) => {
+                    if (typeof val === 'number') return val;
+                    if (typeof val !== 'string') return Number(val);
+                    const s = val.trim();
+                    const looksLikePtBrThousands = /^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s);
+                    const looksLikePtBrDecimal = /^-?\d+(,\d+)?$/.test(s);
+                    if (!looksLikePtBrThousands && !looksLikePtBrDecimal) return Number(s);
+                    const normalized = s.includes(',')
+                        ? s.replace(/\./g, '').replace(',', '.')
+                        : s.replace(/\./g, '');
+                    return Number(normalized);
+                };
+
+                Chart.register({
+                    id: 'vLines',
+                    afterDatasetsDraw(chart) {
+                        const lines = chart?.options?.plugins?.vLines?.lines;
+                        if (!Array.isArray(lines) || lines.length === 0) return;
+
+                        const xScale = chart?.scales?.x ?? Object.values(chart?.scales ?? {}).find((s) => s?.axis === 'x');
+                        if (!xScale || typeof xScale.getPixelForValue !== 'function') return;
+                        const chartArea = chart?.chartArea;
+                        if (!chartArea) return;
+
+                        const ctx = chart.ctx;
+                        ctx.save();
+
+                        let labelRow = 0;
+                        for (const l of lines) {
+                            const value = Number(l?.value);
+                            if (!Number.isFinite(value)) continue;
+
+                            let xPixel = null;
+                            if (xScale.type === 'category') {
+                                const labelsIn = chart?.data?.labels;
+                                const labels = Array.isArray(labelsIn) ? labelsIn : [];
+                                const numericLabels = labels
+                                    .map((lab) => parseMaybePtBrNumber(lab))
+                                    .map((n, i) => ({ n, i }))
+                                    .filter((p) => Number.isFinite(p.n));
+                                if (numericLabels.length === 0) continue;
+
+                                const min = Math.min(...numericLabels.map((p) => p.n));
+                                const max = Math.max(...numericLabels.map((p) => p.n));
+                                if (value < min || value > max) continue;
+
+                                let lo = null;
+                                let hi = null;
+                                for (let i = 0; i < numericLabels.length; i++) {
+                                    const p = numericLabels[i];
+                                    if (p.n <= value) lo = p;
+                                    if (p.n >= value) {
+                                        hi = p;
+                                        break;
+                                    }
+                                }
+                                if (!lo && hi) lo = hi;
+                                if (!hi && lo) hi = lo;
+                                if (!lo || !hi) continue;
+
+                                if (lo.i === hi.i || lo.n === hi.n) {
+                                    xPixel = xScale.getPixelForValue(lo.i);
+                                } else {
+                                    const x0 = xScale.getPixelForValue(lo.i);
+                                    const x1 = xScale.getPixelForValue(hi.i);
+                                    const t = (value - lo.n) / (hi.n - lo.n);
+                                    xPixel = x0 + (x1 - x0) * t;
+                                }
+                            } else {
+                                const min = Number(xScale.min);
+                                const max = Number(xScale.max);
+                                if (Number.isFinite(min) && Number.isFinite(max) && (value < min || value > max)) continue;
+                                xPixel = xScale.getPixelForValue(value);
+                            }
+
+                            if (!Number.isFinite(xPixel)) continue;
+
+                            const color = l?.color ?? '#ff00ff';
+                            const width = Number(l?.width ?? 2);
+                            const dash = Array.isArray(l?.dash) ? l.dash : [6, 4];
+
+                            ctx.lineWidth = Number.isFinite(width) ? width : 2;
+                            ctx.strokeStyle = color;
+                            if (typeof ctx.setLineDash === 'function') ctx.setLineDash(dash);
+                            ctx.beginPath();
+                            ctx.moveTo(xPixel, chartArea.top);
+                            ctx.lineTo(xPixel, chartArea.bottom);
+                            ctx.stroke();
+                            if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+
+                            const labelText = typeof l?.labelText === 'string' ? l.labelText : '';
+                            if (labelText) {
+                                ctx.fillStyle = color;
+                                ctx.font = l?.font ?? '12px Orbitron';
+                                ctx.textBaseline = 'top';
+                                const offsetY = Number(l?.labelOffsetY ?? 0);
+                                const y = chartArea.top + 6 + offsetY + (labelRow * 14);
+                                ctx.fillText(labelText, xPixel + 6, y);
+                                labelRow += 1;
+                            }
+                        }
+
+                        ctx.restore();
+                    }
+                });
+
+                window.__ediVLinesPluginRegistered = true;
+            };
+
             const getSpotFallback = (d) => {
                 const spot = Number(d?.overview?.spot_price ?? d?.overview?.spot ?? d?.spot_price ?? d?.spot);
                 return Number.isFinite(spot) ? spot : null;
@@ -210,6 +324,13 @@ class StrangerThingsCharts {
                     utils.registerSpotLinePlugin();
                 } else {
                     ensureSpotLinePlugin();
+                }
+            });
+            safe('registerVLinesPlugin', () => {
+                if (utils?.registerVLinesPlugin) {
+                    utils.registerVLinesPlugin();
+                } else {
+                    ensureVLinesPlugin();
                 }
             });
             safe('createDeltaChart', () => this.createDeltaChart(data));
@@ -597,6 +718,7 @@ class StrangerThingsCharts {
         const select = document.getElementById('uupExpirySelect');
         const minOiInput = document.getElementById('uupMinOiInput');
         const metaEl = document.getElementById('uupOiMeta');
+        const meansAllEl = document.getElementById('uupOiMeansAll');
 
         const yahoo = window.yahooUupOptionsData || null;
         if (!yahoo || !Array.isArray(yahoo.expiries) || !yahoo.by_expiry) {
@@ -644,7 +766,27 @@ class StrangerThingsCharts {
             return Math.floor(raw);
         };
 
-        const buildSeries = (expiry) => {
+        const getWdoSpotPoints = () => {
+            const d = this.data ?? window.marketData ?? null;
+            const spot = Number(d?.overview?.spot_price ?? d?.overview?.spot ?? d?.spot_price ?? d?.spot);
+            return Number.isFinite(spot) ? spot : null;
+        };
+
+        const toWdoScale = (strikeProxy) => {
+            const strike = Number(strikeProxy);
+            if (!Number.isFinite(strike)) return null;
+            const wdoSpot = getWdoSpotPoints();
+            if (!Number.isFinite(wdoSpot)) return strike;
+            const centena = Math.floor(wdoSpot / 100) * 100;
+            return centena + strike;
+        };
+
+        const formatMeanWdo = (strikeProxy) => {
+            const wdo = toWdoScale(strikeProxy);
+            return wdo === null ? '-' : this.formatNumberBr(wdo, 2);
+        };
+
+        const buildPoints = (expiry) => {
             const row = yahoo.by_expiry?.[expiry] || null;
             const strikesIn = row?.strikes;
             const callsIn = row?.call_oi;
@@ -653,7 +795,7 @@ class StrangerThingsCharts {
             if (strikesIn.length === 0 || callsIn.length !== strikesIn.length || putsIn.length !== strikesIn.length) return null;
 
             const minOi = parseMinOi();
-            const points = strikesIn
+            return strikesIn
                 .map((s, i) => ({
                     strike: Number(s),
                     call: Number(callsIn[i]),
@@ -662,21 +804,53 @@ class StrangerThingsCharts {
                 .filter((p) => Number.isFinite(p.strike) && Number.isFinite(p.call) && Number.isFinite(p.put))
                 .filter((p) => p.call + p.put >= minOi)
                 .sort((a, b) => a.strike - b.strike);
+        };
 
-            if (points.length === 0) return { labels: [], call: [], put: [] };
-            return {
-                labels: points.map((p) => this.formatNumberBr(p.strike, 0)),
-                call: points.map((p) => p.call),
-                put: points.map((p) => p.put)
-            };
+        const calcMeans = (points) => {
+            if (!Array.isArray(points) || points.length === 0) return null;
+            const strikes = points.map((p) => Number(p.strike)).filter((n) => Number.isFinite(n));
+            if (strikes.length === 0) return null;
+            const min = Math.min(...strikes);
+            const max = Math.max(...strikes);
+            const midRange = (min + max) / 2;
+
+            let wSum = 0;
+            let vSum = 0;
+            for (const p of points) {
+                const s = Number(p.strike);
+                const w = Number(p.call) + Number(p.put);
+                if (!Number.isFinite(s) || !Number.isFinite(w) || w < 0) continue;
+                wSum += s * w;
+                vSum += w;
+            }
+            const meanByOi = vSum > 0 ? (wSum / vSum) : (strikes.reduce((a, b) => a + b, 0) / strikes.length);
+            return { midRange, meanByOi };
+        };
+
+        const updateMeansAll = () => {
+            if (!meansAllEl) return;
+            const allPoints = [];
+            for (const e of expiries) {
+                const pts = buildPoints(e);
+                if (Array.isArray(pts) && pts.length > 0) allPoints.push(...pts);
+            }
+            const means = calcMeans(allPoints);
+            if (!means) {
+                meansAllEl.innerText = '';
+                return;
+            }
+            meansAllEl.innerText = `Médias (todos vencimentos): Intervalo ${formatMeanWdo(means.midRange)} | Por OI ${formatMeanWdo(means.meanByOi)}`;
         };
 
         const render = () => {
             const expiry = select ? String(select.value || '') : pickDefaultExpiry();
             localStorage.setItem(storageKey, expiry);
             setMeta(expiry);
-            const series = buildSeries(expiry);
-            if (!series) return;
+            updateMeansAll();
+            const points = buildPoints(expiry);
+            if (!points || points.length === 0) return;
+            const means = calcMeans(points);
+            if (!means) return;
 
             if (this.charts.uupOi) this.charts.uupOi.destroy();
             const ctx = canvas.getContext('2d');
@@ -685,18 +859,18 @@ class StrangerThingsCharts {
             this.charts.uupOi = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: series.labels,
+                    labels: points.map((p) => this.formatNumberBr(p.strike, 0)),
                     datasets: [
                         {
                             label: 'Call OI',
-                            data: series.call,
+                            data: points.map((p) => p.call),
                             backgroundColor: 'rgba(0, 255, 0, 0.6)',
                             borderColor: '#00ff00',
                             borderWidth: 1
                         },
                         {
                             label: 'Put OI',
-                            data: series.put,
+                            data: points.map((p) => p.put),
                             backgroundColor: 'rgba(255, 7, 58, 0.6)',
                             borderColor: '#ff073a',
                             borderWidth: 1
@@ -707,6 +881,26 @@ class StrangerThingsCharts {
                     ...this.chartOptions,
                     plugins: {
                         ...this.chartOptions.plugins,
+                        vLines: {
+                            lines: [
+                                {
+                                    value: means.midRange,
+                                    color: '#00f3ff',
+                                    dash: [6, 4],
+                                    width: 2,
+                                    labelText: `Média (intervalo): ${formatMeanWdo(means.midRange)}`,
+                                    labelOffsetY: 0
+                                },
+                                {
+                                    value: means.meanByOi,
+                                    color: '#ff00ff',
+                                    dash: [2, 6],
+                                    width: 2,
+                                    labelText: `Média (por OI): ${formatMeanWdo(means.meanByOi)}`,
+                                    labelOffsetY: 18
+                                }
+                            ]
+                        },
                         title: {
                             display: true,
                             text: 'Open Interest por Strike (Proxy Dólar via Yahoo) | UUP',
@@ -747,6 +941,7 @@ class StrangerThingsCharts {
         const select = document.getElementById('usduExpirySelect');
         const minOiInput = document.getElementById('usduMinOiInput');
         const metaEl = document.getElementById('usduOiMeta');
+        const meansAllEl = document.getElementById('usduOiMeansAll');
 
         const yahoo = window.yahooUsduOptionsData || null;
         if (!yahoo || !Array.isArray(yahoo.expiries) || !yahoo.by_expiry) {
@@ -794,7 +989,27 @@ class StrangerThingsCharts {
             return Math.floor(raw);
         };
 
-        const buildSeries = (expiry) => {
+        const getWdoSpotPoints = () => {
+            const d = this.data ?? window.marketData ?? null;
+            const spot = Number(d?.overview?.spot_price ?? d?.overview?.spot ?? d?.spot_price ?? d?.spot);
+            return Number.isFinite(spot) ? spot : null;
+        };
+
+        const toWdoScale = (strikeProxy) => {
+            const strike = Number(strikeProxy);
+            if (!Number.isFinite(strike)) return null;
+            const wdoSpot = getWdoSpotPoints();
+            if (!Number.isFinite(wdoSpot)) return strike;
+            const centena = Math.floor(wdoSpot / 100) * 100;
+            return centena + strike;
+        };
+
+        const formatMeanWdo = (strikeProxy) => {
+            const wdo = toWdoScale(strikeProxy);
+            return wdo === null ? '-' : this.formatNumberBr(wdo, 2);
+        };
+
+        const buildPoints = (expiry) => {
             const row = yahoo.by_expiry?.[expiry] || null;
             const strikesIn = row?.strikes;
             const callsIn = row?.call_oi;
@@ -803,7 +1018,7 @@ class StrangerThingsCharts {
             if (strikesIn.length === 0 || callsIn.length !== strikesIn.length || putsIn.length !== strikesIn.length) return null;
 
             const minOi = parseMinOi();
-            const points = strikesIn
+            return strikesIn
                 .map((s, i) => ({
                     strike: Number(s),
                     call: Number(callsIn[i]),
@@ -812,21 +1027,53 @@ class StrangerThingsCharts {
                 .filter((p) => Number.isFinite(p.strike) && Number.isFinite(p.call) && Number.isFinite(p.put))
                 .filter((p) => p.call + p.put >= minOi)
                 .sort((a, b) => a.strike - b.strike);
+        };
 
-            if (points.length === 0) return { labels: [], call: [], put: [] };
-            return {
-                labels: points.map((p) => this.formatNumberBr(p.strike, 0)),
-                call: points.map((p) => p.call),
-                put: points.map((p) => p.put)
-            };
+        const calcMeans = (points) => {
+            if (!Array.isArray(points) || points.length === 0) return null;
+            const strikes = points.map((p) => Number(p.strike)).filter((n) => Number.isFinite(n));
+            if (strikes.length === 0) return null;
+            const min = Math.min(...strikes);
+            const max = Math.max(...strikes);
+            const midRange = (min + max) / 2;
+
+            let wSum = 0;
+            let vSum = 0;
+            for (const p of points) {
+                const s = Number(p.strike);
+                const w = Number(p.call) + Number(p.put);
+                if (!Number.isFinite(s) || !Number.isFinite(w) || w < 0) continue;
+                wSum += s * w;
+                vSum += w;
+            }
+            const meanByOi = vSum > 0 ? (wSum / vSum) : (strikes.reduce((a, b) => a + b, 0) / strikes.length);
+            return { midRange, meanByOi };
+        };
+
+        const updateMeansAll = () => {
+            if (!meansAllEl) return;
+            const allPoints = [];
+            for (const e of expiries) {
+                const pts = buildPoints(e);
+                if (Array.isArray(pts) && pts.length > 0) allPoints.push(...pts);
+            }
+            const means = calcMeans(allPoints);
+            if (!means) {
+                meansAllEl.innerText = '';
+                return;
+            }
+            meansAllEl.innerText = `Médias (todos vencimentos): Intervalo ${formatMeanWdo(means.midRange)} | Por OI ${formatMeanWdo(means.meanByOi)}`;
         };
 
         const render = () => {
             const expiry = select ? String(select.value || '') : pickDefaultExpiry();
             localStorage.setItem(storageKey, expiry);
             setMeta(expiry);
-            const series = buildSeries(expiry);
-            if (!series) return;
+            updateMeansAll();
+            const points = buildPoints(expiry);
+            if (!points || points.length === 0) return;
+            const means = calcMeans(points);
+            if (!means) return;
 
             if (this.charts.usduOi) this.charts.usduOi.destroy();
             const ctx = canvas.getContext('2d');
@@ -835,18 +1082,18 @@ class StrangerThingsCharts {
             this.charts.usduOi = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: series.labels,
+                    labels: points.map((p) => this.formatNumberBr(p.strike, 0)),
                     datasets: [
                         {
                             label: 'Call OI',
-                            data: series.call,
+                            data: points.map((p) => p.call),
                             backgroundColor: 'rgba(0, 255, 0, 0.6)',
                             borderColor: '#00ff00',
                             borderWidth: 1
                         },
                         {
                             label: 'Put OI',
-                            data: series.put,
+                            data: points.map((p) => p.put),
                             backgroundColor: 'rgba(255, 7, 58, 0.6)',
                             borderColor: '#ff073a',
                             borderWidth: 1
@@ -857,6 +1104,26 @@ class StrangerThingsCharts {
                     ...this.chartOptions,
                     plugins: {
                         ...this.chartOptions.plugins,
+                        vLines: {
+                            lines: [
+                                {
+                                    value: means.midRange,
+                                    color: '#00f3ff',
+                                    dash: [6, 4],
+                                    width: 2,
+                                    labelText: `Média (intervalo): ${formatMeanWdo(means.midRange)}`,
+                                    labelOffsetY: 0
+                                },
+                                {
+                                    value: means.meanByOi,
+                                    color: '#ff00ff',
+                                    dash: [2, 6],
+                                    width: 2,
+                                    labelText: `Média (por OI): ${formatMeanWdo(means.meanByOi)}`,
+                                    labelOffsetY: 18
+                                }
+                            ]
+                        },
                         title: {
                             display: true,
                             text: 'Open Interest por Strike (Proxy Dólar via Yahoo) | USDU',

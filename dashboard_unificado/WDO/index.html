@@ -532,6 +532,7 @@
                             <input id="uupMinOiInput" type="number" value="5" min="0" step="1" aria-label="Open Interest mínimo" style="width:90px;background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;">
                         </div>
                         <div id="uupOiMeta" style="margin-top: 10px; color: var(--secondary-neon); font-size: 12px;"></div>
+                        <div id="uupOiMeansAll" style="margin-top: 6px; color: var(--secondary-neon); font-size: 12px;"></div>
                     </div>
                     <div class="chart-container">
                         <canvas id="uupOiChart"></canvas>
@@ -551,6 +552,7 @@
                             <input id="usduMinOiInput" type="number" value="5" min="0" step="1" aria-label="Open Interest mínimo" style="width:90px;background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;">
                         </div>
                         <div id="usduOiMeta" style="margin-top: 10px; color: var(--secondary-neon); font-size: 12px;"></div>
+                        <div id="usduOiMeansAll" style="margin-top: 6px; color: var(--secondary-neon); font-size: 12px;"></div>
                     </div>
                     <div class="chart-container">
                         <canvas id="usduOiChart"></canvas>
@@ -695,11 +697,8 @@
             const isFile = location.protocol === 'file:';
             const version = String(Date.now());
             const suffix = isFile ? '' : `?v=${version}`;
-            const href = location.href || '';
-            const inUnified = href.indexOf('dashboard_unificado') !== -1;
-            const primary = inUnified
-                ? `../shared/js/chart_data_utils.js${suffix}`
-                : `../dashboard_unificado/shared/js/chart_data_utils.js${suffix}`;
+            const localShared = `../shared/js/chart_data_utils.js${suffix}`;
+            const localUnified = `../dashboard_unificado/shared/js/chart_data_utils.js${suffix}`;
             const fallback = `https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/dashboard_unificado/shared/js/chart_data_utils.js${suffix}`;
 
             window.__ediAssetVersion = version;
@@ -716,9 +715,12 @@
             addScript(`assets/data/market_data.js${suffix}`);
             addScript(`assets/data/yahoo_uup_options.js${suffix}`);
             addScript(`assets/data/yahoo_usdu_options.js${suffix}`);
-            addScript(primary, function(){
-                this.onerror = null;
-                this.src = fallback;
+            addScript(localShared, function(){
+                this.onerror = function(){
+                    this.onerror = null;
+                    this.src = fallback;
+                };
+                this.src = localUnified;
             });
             addScript(`assets/js/charts.js${suffix}`);
             addScript(`assets/js/main.js${suffix}`);
