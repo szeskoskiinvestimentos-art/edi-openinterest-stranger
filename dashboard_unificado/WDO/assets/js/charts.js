@@ -237,6 +237,9 @@ class StrangerThingsCharts {
             safe('createDeltaAgregadoChart', () => this.createDeltaAgregadoChart(data));
             safe('createFedWatchTable', () => this.createFedWatchTable(data));
             safe('createMostActivesTable', () => this.createMostActivesTable(data));
+            safe('createYahooUupOiChart', () => this.createYahooUupOiChart());
+            safe('createYahooUsduOiChart', () => this.createYahooUsduOiChart());
+            safe('createYahooUsdbrlBetaMappingBlock', () => this.createYahooUsdbrlBetaMappingBlock());
             safe('createOIByExpiryChart', () => this.createOIByExpiryChart(data));
             safe('createVolumeVolatilityChart', () => this.createVolumeVolatilityChart(data));
         } catch (error) {
@@ -585,6 +588,306 @@ class StrangerThingsCharts {
 
         html += '</tbody></table>';
         container.innerHTML = html;
+    }
+
+    createYahooUupOiChart() {
+        const canvas = document.getElementById('uupOiChart');
+        if (!canvas) return;
+
+        const select = document.getElementById('uupExpirySelect');
+        const minOiInput = document.getElementById('uupMinOiInput');
+        const metaEl = document.getElementById('uupOiMeta');
+
+        const yahoo = window.yahooUupOptionsData || null;
+        if (!yahoo || !Array.isArray(yahoo.expiries) || !yahoo.by_expiry) {
+            if (metaEl) metaEl.innerText = 'Dados indisponíveis (Yahoo). Execute o exportador para gerar o cache.';
+            return;
+        }
+
+        const expiries = yahoo.expiries.map(String).filter(Boolean);
+        if (expiries.length === 0) {
+            if (metaEl) metaEl.innerText = 'Sem vencimentos disponíveis (Yahoo).';
+            return;
+        }
+
+        const storageKey = 'uupOiExpiry';
+        const pickDefaultExpiry = () => {
+            const saved = (localStorage.getItem(storageKey) || '').trim();
+            if (saved && expiries.includes(saved)) return saved;
+            const sorted = [...expiries].sort();
+            return sorted[0];
+        };
+
+        const setMeta = (expiry) => {
+            if (!metaEl) return;
+            const spot = Number(yahoo.spot);
+            const spotText = Number.isFinite(spot) ? `Spot proxy: ${this.formatNumberBr(spot, 4)}` : 'Spot proxy: N/A';
+            const label = String(yahoo.ticker_used || 'UUP');
+            const captured = String(yahoo.captured_at_utc || '');
+            metaEl.innerText = `Fonte: Yahoo (${label}) | ${spotText} | Captura: ${captured} | Venc: ${expiry}`;
+        };
+
+        const ensureSelect = () => {
+            if (!select) return;
+            const current = pickDefaultExpiry();
+            select.innerHTML = expiries
+                .slice()
+                .sort()
+                .map((e) => `<option value="${e}">${e}</option>`)
+                .join('');
+            select.value = current;
+        };
+
+        const parseMinOi = () => {
+            const raw = Number(minOiInput?.value);
+            if (!Number.isFinite(raw) || raw < 0) return 0;
+            return Math.floor(raw);
+        };
+
+        const buildSeries = (expiry) => {
+            const row = yahoo.by_expiry?.[expiry] || null;
+            const strikesIn = row?.strikes;
+            const callsIn = row?.call_oi;
+            const putsIn = row?.put_oi;
+            if (!Array.isArray(strikesIn) || !Array.isArray(callsIn) || !Array.isArray(putsIn)) return null;
+            if (strikesIn.length === 0 || callsIn.length !== strikesIn.length || putsIn.length !== strikesIn.length) return null;
+
+            const minOi = parseMinOi();
+            const points = strikesIn
+                .map((s, i) => ({
+                    strike: Number(s),
+                    call: Number(callsIn[i]),
+                    put: Number(putsIn[i])
+                }))
+                .filter((p) => Number.isFinite(p.strike) && Number.isFinite(p.call) && Number.isFinite(p.put))
+                .filter((p) => p.call + p.put >= minOi)
+                .sort((a, b) => a.strike - b.strike);
+
+            if (points.length === 0) return { labels: [], call: [], put: [] };
+            return {
+                labels: points.map((p) => this.formatNumberBr(p.strike, 0)),
+                call: points.map((p) => p.call),
+                put: points.map((p) => p.put)
+            };
+        };
+
+        const render = () => {
+            const expiry = select ? String(select.value || '') : pickDefaultExpiry();
+            localStorage.setItem(storageKey, expiry);
+            setMeta(expiry);
+            const series = buildSeries(expiry);
+            if (!series) return;
+
+            if (this.charts.uupOi) this.charts.uupOi.destroy();
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            this.charts.uupOi = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: series.labels,
+                    datasets: [
+                        {
+                            label: 'Call OI',
+                            data: series.call,
+                            backgroundColor: 'rgba(0, 255, 0, 0.6)',
+                            borderColor: '#00ff00',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Put OI',
+                            data: series.put,
+                            backgroundColor: 'rgba(255, 7, 58, 0.6)',
+                            borderColor: '#ff073a',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    ...this.chartOptions,
+                    plugins: {
+                        ...this.chartOptions.plugins,
+                        title: {
+                            display: true,
+                            text: 'Open Interest por Strike (Proxy Dólar via Yahoo) | UUP',
+                            color: '#ff00ff',
+                            font: {
+                                family: 'Orbitron',
+                                size: 16,
+                                weight: 'bold'
+                            }
+                        }
+                    },
+                    scales: {
+                        ...this.chartOptions.scales,
+                        x: {
+                            ...this.chartOptions.scales.x,
+                            stacked: true
+                        },
+                        y: {
+                            ...this.chartOptions.scales.y,
+                            stacked: true
+                        }
+                    }
+                }
+            });
+        };
+
+        ensureSelect();
+        render();
+
+        if (select) select.onchange = render;
+        if (minOiInput) minOiInput.onchange = render;
+    }
+
+    createYahooUsduOiChart() {
+        const canvas = document.getElementById('usduOiChart');
+        if (!canvas) return;
+
+        const select = document.getElementById('usduExpirySelect');
+        const minOiInput = document.getElementById('usduMinOiInput');
+        const metaEl = document.getElementById('usduOiMeta');
+
+        const yahoo = window.yahooUsduOptionsData || null;
+        if (!yahoo || !Array.isArray(yahoo.expiries) || !yahoo.by_expiry) {
+            if (metaEl) metaEl.innerText = 'Dados indisponíveis (Yahoo). Execute o exportador para gerar o cache.';
+            return;
+        }
+
+        const expiries = yahoo.expiries.map(String).filter(Boolean);
+        if (expiries.length === 0) {
+            if (metaEl) metaEl.innerText = 'Sem vencimentos disponíveis (Yahoo).';
+            return;
+        }
+
+        const storageKey = 'usduOiExpiry';
+        const pickDefaultExpiry = () => {
+            const saved = (localStorage.getItem(storageKey) || '').trim();
+            if (saved && expiries.includes(saved)) return saved;
+            const sorted = [...expiries].sort();
+            return sorted[0];
+        };
+
+        const setMeta = (expiry) => {
+            if (!metaEl) return;
+            const spot = Number(yahoo.spot);
+            const spotText = Number.isFinite(spot) ? `Spot proxy: ${this.formatNumberBr(spot, 4)}` : 'Spot proxy: N/A';
+            const label = String(yahoo.ticker_used || 'USDU');
+            const captured = String(yahoo.captured_at_utc || '');
+            metaEl.innerText = `Fonte: Yahoo (${label}) | ${spotText} | Captura: ${captured} | Venc: ${expiry}`;
+        };
+
+        const ensureSelect = () => {
+            if (!select) return;
+            const current = pickDefaultExpiry();
+            select.innerHTML = expiries
+                .slice()
+                .sort()
+                .map((e) => `<option value="${e}">${e}</option>`)
+                .join('');
+            select.value = current;
+        };
+
+        const parseMinOi = () => {
+            const raw = Number(minOiInput?.value);
+            if (!Number.isFinite(raw) || raw < 0) return 0;
+            return Math.floor(raw);
+        };
+
+        const buildSeries = (expiry) => {
+            const row = yahoo.by_expiry?.[expiry] || null;
+            const strikesIn = row?.strikes;
+            const callsIn = row?.call_oi;
+            const putsIn = row?.put_oi;
+            if (!Array.isArray(strikesIn) || !Array.isArray(callsIn) || !Array.isArray(putsIn)) return null;
+            if (strikesIn.length === 0 || callsIn.length !== strikesIn.length || putsIn.length !== strikesIn.length) return null;
+
+            const minOi = parseMinOi();
+            const points = strikesIn
+                .map((s, i) => ({
+                    strike: Number(s),
+                    call: Number(callsIn[i]),
+                    put: Number(putsIn[i])
+                }))
+                .filter((p) => Number.isFinite(p.strike) && Number.isFinite(p.call) && Number.isFinite(p.put))
+                .filter((p) => p.call + p.put >= minOi)
+                .sort((a, b) => a.strike - b.strike);
+
+            if (points.length === 0) return { labels: [], call: [], put: [] };
+            return {
+                labels: points.map((p) => this.formatNumberBr(p.strike, 0)),
+                call: points.map((p) => p.call),
+                put: points.map((p) => p.put)
+            };
+        };
+
+        const render = () => {
+            const expiry = select ? String(select.value || '') : pickDefaultExpiry();
+            localStorage.setItem(storageKey, expiry);
+            setMeta(expiry);
+            const series = buildSeries(expiry);
+            if (!series) return;
+
+            if (this.charts.usduOi) this.charts.usduOi.destroy();
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            this.charts.usduOi = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: series.labels,
+                    datasets: [
+                        {
+                            label: 'Call OI',
+                            data: series.call,
+                            backgroundColor: 'rgba(0, 255, 0, 0.6)',
+                            borderColor: '#00ff00',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Put OI',
+                            data: series.put,
+                            backgroundColor: 'rgba(255, 7, 58, 0.6)',
+                            borderColor: '#ff073a',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    ...this.chartOptions,
+                    plugins: {
+                        ...this.chartOptions.plugins,
+                        title: {
+                            display: true,
+                            text: 'Open Interest por Strike (Proxy Dólar via Yahoo) | USDU',
+                            color: '#ff00ff',
+                            font: {
+                                family: 'Orbitron',
+                                size: 16,
+                                weight: 'bold'
+                            }
+                        }
+                    },
+                    scales: {
+                        ...this.chartOptions.scales,
+                        x: {
+                            ...this.chartOptions.scales.x,
+                            stacked: true
+                        },
+                        y: {
+                            ...this.chartOptions.scales.y,
+                            stacked: true
+                        }
+                    }
+                }
+            });
+        };
+
+        ensureSelect();
+        render();
+
+        if (select) select.onchange = render;
+        if (minOiInput) minOiInput.onchange = render;
     }
 
     createMostActivesTable(data) {

@@ -225,12 +225,16 @@ class StrangerThingsCharts {
                     ensureSpotLinePlugin();
                 }
             });
+            safe('registerVLinesPlugin', () => {
+                if (utils?.registerVLinesPlugin) utils.registerVLinesPlugin();
+            });
             safe('createDeltaChart', () => this.createDeltaChart(data));
             safe('createGammaChart', () => this.createGammaChart(data));
             safe('createVolatilityChart', () => this.createVolatilityChart(data));
             safe('createFedWatchTable', () => this.createFedWatchTable(data));
             safe('createMostActivesTable', () => this.createMostActivesTable(data));
             safe('createOIByExpiryChart', () => this.createOIByExpiryChart(data));
+            safe('createEwzOptionsOiChart', () => this.createEwzOptionsOiChart(data));
             safe('createVolumeVolatilityChart', () => this.createVolumeVolatilityChart(data));
             safe('createOIStrikeChart', () => this.createOIStrikeChart(data));
             safe('createGexSplitChart', () => this.createGexSplitChart(data));
@@ -612,6 +616,25 @@ class StrangerThingsCharts {
                     }
                 }
             }
+        });
+    }
+
+    createEwzOptionsOiChart(data) {
+        const utils = window.ChartDataUtils;
+        if (!utils?.renderEwzOptionsOiChart) return;
+        utils.renderEwzOptionsOiChart({
+            marketData: data,
+            payload: window.yahooEwzOptionsData,
+            canvas: document.getElementById('ewzOptionsOiChart'),
+            select: document.getElementById('ewzOptionsExpirySelect'),
+            minOiEl: document.getElementById('ewzOptionsMinOi'),
+            meansAllEl: document.getElementById('ewzOptionsMeansAll'),
+            charts: this.charts,
+            chartKey: 'ewzOptionsOi',
+            chartOptions: this.chartOptions,
+            formatStrikeLabel: (n) => this.formatNumberBr(n, 0),
+            formatMeanValue: (n) => this.formatNumberBr(n, 0),
+            formatYTick: (n) => this.formatNumberBr(n, 0)
         });
     }
 

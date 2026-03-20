@@ -519,6 +519,73 @@
                     </div>
                 </div>
 
+                <!-- Opções de Dólar (Proxy Yahoo) -->
+                <div class="split-layout" style="margin-bottom: 50px;">
+                    <div class="context-box">
+                        <h3>💵 Opções de Dólar (UUP - Yahoo)</h3>
+                        <p>Fonte externa e separada dos CSVs: Open Interest de Calls e Puts por strike usando o UUP (proxy do Dólar) via Yahoo Finance.</p>
+                        <p>O UUP busca replicar o DXY/USDX (via futuros na ICE), que mede o dólar contra uma cesta fixa de 6 moedas: EUR, JPY, GBP, CAD, SEK e CHF (com peso dominante do EUR).</p>
+                        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px;">
+                            <label for="uupExpirySelect" style="font-size:12px;color:var(--text-muted);">Vencimento</label>
+                            <select id="uupExpirySelect" aria-label="Selecionar vencimento (Yahoo)" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;min-width:140px;"></select>
+                            <label for="uupMinOiInput" style="font-size:12px;color:var(--text-muted);">OI mín</label>
+                            <input id="uupMinOiInput" type="number" value="5" min="0" step="1" aria-label="Open Interest mínimo" style="width:90px;background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;">
+                        </div>
+                        <div id="uupOiMeta" style="margin-top: 10px; color: var(--secondary-neon); font-size: 12px;"></div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="uupOiChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Opções de Dólar (USDU - Yahoo) -->
+                <div class="split-layout" style="margin-bottom: 50px;">
+                    <div class="context-box">
+                        <h3>💵 Opções de Dólar (USDU - Yahoo)</h3>
+                        <p>Fonte externa e separada dos CSVs: Open Interest de Calls e Puts por strike usando o USDU via Yahoo Finance.</p>
+                        <p>O USDU (WisdomTree Bloomberg U.S. Dollar Bullish) tende a ser mais amplo que o UUP porque acompanha a família Bloomberg Dollar Index (ex.: BBDXY), com cesta dinâmica baseada em liquidez e relevância de comércio. Em geral inclui 10 moedas: EUR, JPY, CAD, GBP, MXN, AUD, CHF, KRW, CNH e INR.</p>
+                        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px;">
+                            <label for="usduExpirySelect" style="font-size:12px;color:var(--text-muted);">Vencimento</label>
+                            <select id="usduExpirySelect" aria-label="Selecionar vencimento (Yahoo)" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;min-width:140px;"></select>
+                            <label for="usduMinOiInput" style="font-size:12px;color:var(--text-muted);">OI mín</label>
+                            <input id="usduMinOiInput" type="number" value="5" min="0" step="1" aria-label="Open Interest mínimo" style="width:90px;background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;">
+                        </div>
+                        <div id="usduOiMeta" style="margin-top: 10px; color: var(--secondary-neon); font-size: 12px;"></div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="usduOiChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Mapeamento Proxy -> USD/BRL (Beta) -->
+                <div class="split-layout" style="margin-bottom: 50px;">
+                    <div class="context-box">
+                        <h3>🧮 Mapeamento Proxy → USD/BRL (Beta)</h3>
+                        <p>Conversão estatística por regressão (retornos diários): USDBRL_projetado = USDBRL_atual × (1 + α + β × Var%_Proxy). Fonte Yahoo, isolada dos CSVs.</p>
+                        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px;">
+                            <label for="usdBetaProxySelect" style="font-size:12px;color:var(--text-muted);">Ativo</label>
+                            <select id="usdBetaProxySelect" aria-label="Selecionar ativo" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;min-width:120px;">
+                                <option value="UUP">UUP</option>
+                                <option value="USDU">USDU</option>
+                            </select>
+                            <label for="usdBetaExpirySelect" style="font-size:12px;color:var(--text-muted);">Vencimento</label>
+                            <select id="usdBetaExpirySelect" aria-label="Selecionar vencimento" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;min-width:140px;"></select>
+                            <label for="usdBetaWindowSelect" style="font-size:12px;color:var(--text-muted);">Janela</label>
+                            <select id="usdBetaWindowSelect" aria-label="Selecionar janela" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;min-width:110px;">
+                                <option value="30">30d</option>
+                                <option value="60">60d</option>
+                                <option value="90" selected>90d</option>
+                                <option value="252">252d</option>
+                            </select>
+                            <button id="usdBetaDownloadBtn" class="copy-btn" type="button" style="height:36px;line-height:36px;padding:0 14px;">📥 Baixar JSON</button>
+                        </div>
+                        <div id="usdBetaStats" style="margin-top: 10px; color: var(--secondary-neon); font-size: 12px;"></div>
+                    </div>
+                    <div class="table-container" id="usdBetaTableContainer">
+                        <div class="loading-text">Carregando mapeamento...</div>
+                    </div>
+                </div>
+
                 <!-- Volume vs Volatility -->
                 <div class="split-layout">
                     <div class="context-box">
@@ -647,6 +714,8 @@
             };
 
             addScript(`assets/data/market_data.js${suffix}`);
+            addScript(`assets/data/yahoo_uup_options.js${suffix}`);
+            addScript(`assets/data/yahoo_usdu_options.js${suffix}`);
             addScript(primary, function(){
                 this.onerror = null;
                 this.src = fallback;
