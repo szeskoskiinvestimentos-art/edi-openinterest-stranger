@@ -2096,6 +2096,7 @@ function renderBrazilFixedIncomeFlow(data) {
     };
 
     const fmtRate = v => typeof v === 'number' && Number.isFinite(v) ? `${formatNumber(v, 2)}%` : '—';
+    const fmtMoney = v => typeof v === 'number' && Number.isFinite(v) ? `R$ ${formatNumber(v, 2)}` : '—';
     const avg = xs => {
         const ns = (xs || []).filter(x => typeof x === 'number' && Number.isFinite(x));
         if (!ns.length) return null;
@@ -2110,13 +2111,72 @@ function renderBrazilFixedIncomeFlow(data) {
         return y;
     };
 
+    const toBrtDateKey = ms => {
+        if (!Number.isFinite(ms)) return '';
+        const d = new Date(ms);
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yy = String(d.getFullYear());
+        return `${yy}-${mm}-${dd}`;
+    };
+
+    const pointMs = p => {
+        const t = p && p.t ? Date.parse(p.t) : NaN;
+        return Number.isFinite(t) ? t : NaN;
+    };
+
+    const lastAndPrev = symbol => {
+        const series = (data && data.series && data.series[symbol]) ? data.series[symbol] : [];
+        const last = getMostRecentPointWithPrice(data, symbol) || getLastPoint(data, symbol);
+        if (!last || typeof last.price !== 'number' || !Number.isFinite(last.price)) return { last: null, prev: null };
+        const lastMs = pointMs(last);
+        const lastKey = toBrtDateKey(lastMs);
+        let prev = null;
+        let prevMs = -Infinity;
+        for (const p of series) {
+            if (!p || typeof p.price !== 'number' || !Number.isFinite(p.price)) continue;
+            const ms = pointMs(p);
+            if (!Number.isFinite(ms)) continue;
+            const key = toBrtDateKey(ms);
+            if (key >= lastKey) continue;
+            if (ms > prevMs) {
+                prevMs = ms;
+                prev = p;
+            }
+        }
+        return { last, prev };
+    };
+
+    const isYieldLike = (asset, symKey) => {
+        const name = String(asset && asset.name ? asset.name : '');
+        const sym = String(symKey || '');
+        if (/^BR\d+(YT|MT)=RR$/i.test(sym) || /^US\d+(YT|MT)=RR$/i.test(sym) || /^US10BR10=RR$/i.test(sym)) return true;
+        if (/^DAPC\d+$/i.test(sym) || /^DDIC/i.test(sym) || /^DI\d/i.test(sym) || /^DI1/i.test(sym)) return true;
+        if (/\byield\b|\btaxa\b|\bjuros\b|\bselic\b/i.test(name) && !/\btesouro\b/i.test(name)) return true;
+        return false;
+    };
+
+    const isTesouroDiretoPrice = (asset, symKey) => {
+        const name = String(asset && asset.name ? asset.name : '');
+        const sym = String(symKey || '');
+        if (!/\btesouro\b/i.test(name)) return false;
+        if (isYieldLike(asset, sym)) return false;
+        return true;
+    };
+
     const items = rates
         .filter(looksLikeBrazilFixedIncome)
         .map(a => {
             const symbol = String(a && a.symbol ? a.symbol : '');
-            const last = getMostRecentPointWithPrice(data, symbol);
+            const { last, prev } = lastAndPrev(symbol);
             if (!last || !(typeof last.price === 'number' && Number.isFinite(last.price))) return null;
-            const bps = typeof last.change === 'number' && Number.isFinite(last.change) ? last.change * 100 : null;
+            const delta = typeof last.change === 'number' && Number.isFinite(last.change)
+                ? last.change
+                : (prev && typeof prev.price === 'number' && Number.isFinite(prev.price) ? last.price - prev.price : null);
+            const yieldLike = isYieldLike(a, symbol);
+            const tesouroPrice = isTesouroDiretoPrice(a, symbol);
+            const unit = tesouroPrice && !yieldLike ? 'price' : 'yield';
+            const bps = unit === 'yield' && typeof delta === 'number' && Number.isFinite(delta) ? delta * 100 : null;
             const year = extractYear(a.name) || extractYear(symbol);
             const nowY = new Date().getFullYear();
             const yrs = typeof year === 'number' ? year - nowY : null;
@@ -2126,9 +2186,12 @@ function renderBrazilFixedIncomeFlow(data) {
                 name: String(a && a.name ? a.name : symbol),
                 rate: last.price,
                 bps,
+                delta,
+                unit,
                 year,
                 yrs,
                 bucket,
+                updatedAt: last.t || null,
             };
         })
         .filter(Boolean)
@@ -2146,11 +2209,16 @@ function renderBrazilFixedIncomeFlow(data) {
         return;
     }
 
+    const yieldItems = items.filter(x => x && x.unit === 'yield');
+
     const pick = (label, matcher) => {
         const symbol = findAssetSymbol(data, matcher);
-        const last = getMostRecentPointWithPrice(data, symbol);
+        const { last, prev } = lastAndPrev(symbol);
         if (!symbol || !last || !(typeof last.price === 'number' && Number.isFinite(last.price))) return null;
-        const bps = typeof last.change === 'number' && Number.isFinite(last.change) ? last.change * 100 : null;
+        const delta = typeof last.change === 'number' && Number.isFinite(last.change)
+            ? last.change
+            : (prev && typeof prev.price === 'number' && Number.isFinite(prev.price) ? last.price - prev.price : null);
+        const bps = typeof delta === 'number' && Number.isFinite(delta) ? delta * 100 : null;
         return { label, symbol, rate: last.price, bps };
     };
 
@@ -2174,14 +2242,14 @@ function renderBrazilFixedIncomeFlow(data) {
     const essentialsNominal = essentials.filter(x => /^BR\s+\d/i.test(String(x.label || '')));
     const essentialsReal = essentials.filter(x => /(real)|(^DAP\s+)/i.test(String(x.label || '')));
 
-    const byBucket = bucket => items.filter(x => x.bucket === bucket);
+    const byBucket = bucket => yieldItems.filter(x => x.bucket === bucket);
     const shortAvg = avg(byBucket('Curto').map(x => x.rate));
     const midAvg = avg(byBucket('Médio').map(x => x.rate));
     const longAvg = avg(byBucket('Longo').map(x => x.rate));
     const slope = typeof longAvg === 'number' && typeof shortAvg === 'number' ? longAvg - shortAvg : null;
     const shape = slope === null ? 'N/A' : slope > 0.15 ? 'STEEPEN' : slope < -0.15 ? 'FLATTEN' : '≈';
 
-    const avgBps = avg(items.map(x => x.bps));
+    const avgBps = avg(yieldItems.map(x => x.bps));
     const keyBpsNominal = essentialsNominal.map(x => x.bps).filter(v => typeof v === 'number' && Number.isFinite(v));
     const keyBpsReal = essentialsReal.map(x => x.bps).filter(v => typeof v === 'number' && Number.isFinite(v));
     const avgNominalAbs = keyBpsNominal.length ? (keyBpsNominal.map(v => Math.abs(v)).reduce((a, b) => a + b, 0) / keyBpsNominal.length) : null;
@@ -2312,27 +2380,39 @@ function renderBrazilFixedIncomeFlow(data) {
     `;
 
     const essentialsRow = x => {
-        const bpsTxt = x.bps === null ? '—' : `${x.bps > 0 ? '+' : ''}${formatNumber(x.bps, 1)} bp`;
-        const bpsTone = x.bps === null ? 'neutral' : x.bps < 0 ? 'positive' : x.bps > 0 ? 'negative' : 'neutral';
-        const bpsHtml = x.bps === null ? escapeHtml(bpsTxt) : toneBadgeHtmlFromTone(bpsTone, x.bps, bpsTxt, { maxAbs: 20 });
+        const deltaTxt = x.unit === 'price'
+            ? (typeof x.delta === 'number' && Number.isFinite(x.delta) ? `${x.delta > 0 ? '+' : ''}${formatNumber(x.delta, 2)} R$` : '—')
+            : (x.bps === null ? '—' : `${x.bps > 0 ? '+' : ''}${formatNumber(x.bps, 1)} bp`);
+        const deltaTone = x.unit === 'price'
+            ? (typeof x.delta === 'number' && Number.isFinite(x.delta) ? (x.delta > 0 ? 'positive' : x.delta < 0 ? 'negative' : 'neutral') : 'neutral')
+            : (x.bps === null ? 'neutral' : x.bps < 0 ? 'positive' : x.bps > 0 ? 'negative' : 'neutral');
+        const deltaHtml = (x.unit === 'yield' && x.bps !== null) || (x.unit === 'price' && typeof x.delta === 'number' && Number.isFinite(x.delta))
+            ? toneBadgeHtmlFromTone(deltaTone, x.unit === 'price' ? x.delta : x.bps, deltaTxt, { maxAbs: x.unit === 'price' ? 2 : 20 })
+            : escapeHtml(deltaTxt);
         return `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">
             <div style="opacity:.92;font-weight:900;letter-spacing:.6px;">${escapeHtml(x.label)}</div>
             <div style="display:flex;gap:14px;align-items:center;">
-                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;min-width:84px;text-align:right;">${escapeHtml(fmtRate(x.rate))}</div>
-                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;min-width:86px;text-align:right;">${bpsHtml}</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;min-width:92px;text-align:right;">${escapeHtml(x.unit === 'price' ? fmtMoney(x.rate) : fmtRate(x.rate))}</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;min-width:92px;text-align:right;">${deltaHtml}</div>
             </div>
         </div>`;
     };
 
     const row = x => {
-        const bpsTxt = x.bps === null ? '—' : `${x.bps > 0 ? '+' : ''}${formatNumber(x.bps, 1)} bp`;
-        const bpsTone = x.bps === null ? 'neutral' : x.bps < 0 ? 'positive' : x.bps > 0 ? 'negative' : 'neutral';
-        const bpsHtml = x.bps === null ? escapeHtml(bpsTxt) : toneBadgeHtmlFromTone(bpsTone, x.bps, bpsTxt, { maxAbs: 20 });
+        const deltaTxt = x.unit === 'price'
+            ? (typeof x.delta === 'number' && Number.isFinite(x.delta) ? `${x.delta > 0 ? '+' : ''}${formatNumber(x.delta, 2)} R$` : '—')
+            : (x.bps === null ? '—' : `${x.bps > 0 ? '+' : ''}${formatNumber(x.bps, 1)} bp`);
+        const deltaTone = x.unit === 'price'
+            ? (typeof x.delta === 'number' && Number.isFinite(x.delta) ? (x.delta > 0 ? 'positive' : x.delta < 0 ? 'negative' : 'neutral') : 'neutral')
+            : (x.bps === null ? 'neutral' : x.bps < 0 ? 'positive' : x.bps > 0 ? 'negative' : 'neutral');
+        const deltaHtml = (x.unit === 'yield' && x.bps !== null) || (x.unit === 'price' && typeof x.delta === 'number' && Number.isFinite(x.delta))
+            ? toneBadgeHtmlFromTone(deltaTone, x.unit === 'price' ? x.delta : x.bps, deltaTxt, { maxAbs: x.unit === 'price' ? 2 : 20 })
+            : escapeHtml(deltaTxt);
         return `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">
             <div style="opacity:.92;font-weight:900;letter-spacing:.6px;">${escapeHtml(x.name || x.symbol)}</div>
             <div style="display:flex;gap:14px;align-items:center;">
-                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;min-width:84px;text-align:right;">${escapeHtml(fmtRate(x.rate))}</div>
-                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;min-width:86px;text-align:right;">${bpsHtml}</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;min-width:92px;text-align:right;">${escapeHtml(x.unit === 'price' ? fmtMoney(x.rate) : fmtRate(x.rate))}</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;min-width:92px;text-align:right;">${deltaHtml}</div>
             </div>
         </div>`;
     };
@@ -2364,7 +2444,7 @@ function renderBrazilFixedIncomeFlow(data) {
                 <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Títulos / Curva (último ponto)</div>
                 <div style="opacity:.75;font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(String(items.length))} itens</div>
             </div>
-            <div style="margin-top:6px;opacity:.75;font-size:12px;">Δ em bp (aprox.) a partir da variação do yield no último ponto (1bp ≈ 0,01 p.p.).</div>
+            <div style="margin-top:6px;opacity:.75;font-size:12px;">Para <b>yields</b>: Δ em <b>bp</b> (1bp ≈ 0,01 p.p.). Para <b>Tesouro Direto (PU)</b>: Δ em <b>R$</b>.</div>
             <div style="margin-top:10px;">
                 ${items.slice(0, 18).map(row).join('')}
             </div>
@@ -3399,6 +3479,11 @@ function renderOptionsGammaSummary(payload) {
         const badge = toneBadgeHtmlFromTone(tone, 1, regime, { maxAbs: 1 });
 
         const key = item && item.keyLevels ? item.keyLevels : {};
+        const model = key && key.gammaFlipModel ? String(key.gammaFlipModel) : '';
+        const gammaTxt = fmt0(key.gammaFlip);
+        const gammaHtml = model
+            ? `${escapeHtml(gammaTxt)}<div style="opacity:.72;font-size:11px;margin-top:2px;line-height:1.1;">${escapeHtml(model)}</div>`
+            : escapeHtml(gammaTxt);
 
         const range =
             typeof key.rangeLow === 'number' && typeof key.rangeHigh === 'number'
@@ -3417,7 +3502,7 @@ function renderOptionsGammaSummary(payload) {
                 <td style="font-weight:900;letter-spacing:.5px;">${escapeHtml(item.symbol || '—')}</td>
                 <td>${badge}</td>
                 <td>${fmt2(item.spot)}</td>
-                <td>${fmt0(key.gammaFlip)}</td>
+                <td>${gammaHtml}</td>
                 <td>${fmt0(key.putWall)}</td>
                 <td>${fmt0(key.callWall)}</td>
                 <td>${range}</td>
@@ -3482,19 +3567,22 @@ async function loadOptionsGammaSummary() {
                 const overviewSpot = overview && typeof overview.spot_price === 'number' ? overview.spot_price : null;
                 const topSpot = raw && typeof raw.spot_price === 'number' ? raw.spot_price : null;
                 const flip =
-                    key && typeof key.gamma_flip === 'number'
-                        ? key.gamma_flip
-                        : key && typeof key.gamma_flip_hvl === 'number'
-                            ? key.gamma_flip_hvl
-                            : key && typeof key.gamma_flip_hvl_gaussian === 'number'
-                                ? key.gamma_flip_hvl_gaussian
-                                : null;
+                    key && typeof key.gamma_flip_selected === 'number'
+                        ? key.gamma_flip_selected
+                        : key && typeof key.gamma_flip === 'number'
+                            ? key.gamma_flip
+                            : key && typeof key.gamma_flip_hvl === 'number'
+                                ? key.gamma_flip_hvl
+                                : key && typeof key.gamma_flip_hvl_gaussian === 'number'
+                                    ? key.gamma_flip_hvl_gaussian
+                                    : null;
                 return {
                     updatedAt: (overview && overview.last_update) || raw.last_updated || null,
                     spot: overviewSpot ?? topSpot,
                     regime: (overview && overview.regime) || null,
                     keyLevels: {
                         gammaFlip: flip,
+                        gammaFlipModel: key && typeof key.gamma_flip_model === 'string' ? key.gamma_flip_model : null,
                         callWall: key && typeof key.call_wall === 'number' ? key.call_wall : null,
                         putWall: key && typeof key.put_wall === 'number' ? key.put_wall : null,
                         effectiveCallWall: key && typeof key.effective_call_wall === 'number' ? key.effective_call_wall : null,
