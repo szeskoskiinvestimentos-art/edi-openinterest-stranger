@@ -2032,21 +2032,21 @@ function renderRatesBuckets(data) {
         </div>`;
     };
 
-    const renderDiTable = (list, { detectedCount } = {}) => {
+    const renderDiTable = (list, { detectedCount, limit, title } = {}) => {
         if (!list.length) {
             const det = typeof detectedCount === 'number' && Number.isFinite(detectedCount) ? detectedCount : 0;
             const msg = det
                 ? `DI detectado no histórico (${det} contratos), mas sem preços válidos no momento.`
                 : 'Sem DI disponível no histórico.';
             return `<div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);opacity:.9;">
-                <div style="font-weight:900;letter-spacing:1px;margin-bottom:8px;">${escapeHtml('DI (B3)')}</div>
+                <div style="font-weight:900;letter-spacing:1px;margin-bottom:8px;">${escapeHtml(title || 'DI (B3)')}</div>
                 <div style="opacity:.85;">${escapeHtml(msg)}</div>
             </div>`;
         }
         return `<div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
-            <div style="font-weight:900;letter-spacing:1px;opacity:.95;margin-bottom:8px;">${escapeHtml('DI (B3)')}</div>
+            <div style="font-weight:900;letter-spacing:1px;opacity:.95;margin-bottom:8px;">${escapeHtml(title || 'DI (B3)')}</div>
             ${list
-                .slice(0, 18)
+                .slice(0, typeof limit === 'number' && Number.isFinite(limit) ? limit : 18)
                 .map(x => {
                     const dTxt = x.chgPct === null ? '—' : `${x.chgPct > 0 ? '+' : ''}${formatNumber(x.chgPct, 2)}%`
                     const dHtml = x.chgPct === null ? escapeHtml(dTxt) : toneBadgeHtml(x.chgPct, dTxt, { maxAbs: 1 });
@@ -2084,11 +2084,18 @@ function renderRatesBuckets(data) {
     const slope = typeof diLong === 'number' && typeof diShort === 'number' ? diLong - diShort : null;
     const shape = slope === null ? 'N/A' : slope > 0.15 ? 'STEEPEN' : slope < -0.15 ? 'FLATTEN' : '≈';
 
+    const diHeads = diList.filter(x => x.month === 1).sort((a, b) => (a.year - b.year));
+    const diAnchor = diHeads.find(x => x.symbol === 'DI1F35') || (diHeads.length ? diHeads[diHeads.length - 1] : null);
+    const diTopChanges = diList.filter(x => typeof x.chgPct === 'number' && Number.isFinite(x.chgPct)).slice().sort((a, b) => Math.abs(b.chgPct) - Math.abs(a.chgPct)).slice(0, 12);
+
     const summary = `
         <div style="margin:0 0 14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
             <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
                 <div style="font-weight:900;letter-spacing:1px;opacity:.95;">${escapeHtml(diList.length ? 'DI Buckets' : 'BR Buckets (proxy)')}</div>
-                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;">Shape: ${escapeHtml(shape)}</div>
+                <div style="display:flex;gap:12px;align-items:center;font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;">
+                    <span>Shape: ${escapeHtml(shape)}</span>
+                    ${diAnchor ? `<span>Âncora: ${escapeHtml(diAnchor.symbol)}</span>` : ''}
+                </div>
             </div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:10px;">
                 <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
@@ -2118,8 +2125,12 @@ function renderRatesBuckets(data) {
     el.innerHTML = `
         ${summary}
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
-            ${renderDiTable(diList, { detectedCount: diSymbolsAll.length })}
+            ${renderDiTable(diList, { detectedCount: diSymbolsAll.length, limit: 18, title: 'DI (B3) • Principais' })}
             ${renderGlobalTable('Globais (10Y/5Y)', gl)}
+        </div>
+        <div style="margin-top:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
+            ${renderDiTable(diHeads, { detectedCount: diHeads.length, limit: 9999, title: 'DI Cabeças de Ano (DI1F)' })}
+            ${renderDiTable(diTopChanges, { detectedCount: diList.length, limit: 12, title: 'Maiores variações (DI %)' })}
         </div>
     `;
 }
@@ -2157,6 +2168,18 @@ function renderBrazilFixedIncomeFlow(data) {
         const y = Number(m[1]);
         if (!Number.isFinite(y) || y < 2000 || y > 2100) return null;
         return y;
+    };
+
+    const inferTenorYears = (name, symbol) => {
+        const src = `${String(symbol || '')} ${String(name || '')}`.toUpperCase();
+        const m = src.match(/\b(?:BR|US|BRNB)(\d+)([YM])T=RR\b/);
+        if (m) {
+            const n = Number(m[1]);
+            const u = m[2];
+            if (!Number.isFinite(n) || n <= 0) return null;
+            return u === 'M' ? n / 12 : n;
+        }
+        return null;
     };
 
     const toBrtDateKey = ms => {
@@ -2227,7 +2250,8 @@ function renderBrazilFixedIncomeFlow(data) {
             const bps = unit === 'yield' && typeof delta === 'number' && Number.isFinite(delta) ? delta * 100 : null;
             const year = extractYear(a.name) || extractYear(symbol);
             const nowY = new Date().getFullYear();
-            const yrs = typeof year === 'number' ? year - nowY : null;
+            const tenorYrs = inferTenorYears(a.name, symbol);
+            const yrs = typeof year === 'number' ? year - nowY : (typeof tenorYrs === 'number' ? tenorYrs : null);
             const bucket = typeof yrs === 'number' ? (yrs <= 3 ? 'Curto' : yrs <= 7 ? 'Médio' : 'Longo') : '—';
             return {
                 symbol,
@@ -2258,6 +2282,18 @@ function renderBrazilFixedIncomeFlow(data) {
     }
 
     const yieldItems = items.filter(x => x && x.unit === 'yield');
+    const latestUpdate = (() => {
+        const msList = items
+            .map(x => (x && x.updatedAt ? Date.parse(String(x.updatedAt)) : NaN))
+            .filter(ms => typeof ms === 'number' && Number.isFinite(ms));
+        if (!msList.length) return '';
+        const ms = Math.max(...msList);
+        try {
+            return formatDateTime(new Date(ms).toISOString());
+        } catch {
+            return '';
+        }
+    })();
 
     const pick = (label, matcher) => {
         const symbol = findAssetSymbol(data, matcher);
@@ -2381,7 +2417,7 @@ function renderBrazilFixedIncomeFlow(data) {
         <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
             <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;">
                 <div style="font-weight:900;letter-spacing:1px;opacity:.95;">🇧🇷 Renda Fixa Brasil &amp; Fluxo</div>
-                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;">Shape: ${escapeHtml(shape)}</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;">Shape: ${escapeHtml(shape)}${latestUpdate ? ` • Atualização: ${escapeHtml(latestUpdate)}` : ''}</div>
             </div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:10px;">
                 <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
@@ -2490,7 +2526,7 @@ function renderBrazilFixedIncomeFlow(data) {
         <div style="margin-top:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
             <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
                 <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Títulos / Curva (último ponto)</div>
-                <div style="opacity:.75;font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(String(items.length))} itens</div>
+                <div style="opacity:.75;font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(String(Math.min(items.length, 18)))} / ${escapeHtml(String(items.length))}</div>
             </div>
             <div style="margin-top:6px;opacity:.75;font-size:12px;">Para <b>yields</b>: Δ em <b>bp</b> (1bp ≈ 0,01 p.p.). Para <b>Tesouro Direto (PU)</b>: Δ em <b>R$</b>.</div>
             <div style="margin-top:10px;">
