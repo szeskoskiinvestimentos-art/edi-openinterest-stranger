@@ -1309,6 +1309,54 @@ function renderRegimeConviction(data) {
         ${listHtml}
     `;
 
+    operationalInputs.regime = {
+        label: regimeLabel,
+        score: regimeScore,
+        convictionLabel,
+        convictionScore,
+        operational: regimeOperational,
+        divergences,
+        updatedAt: (data && data.meta && data.meta.generatedAt) ? String(data.meta.generatedAt) : null,
+    };
+    try {
+        const aliasSym = k => findAliasSymbol(data, k);
+        const pctOfAlias = k => {
+            const s = aliasSym(k);
+            return s ? getChangePct(data, s) : null;
+        };
+        const dxyPct = pctOfAlias('DXY');
+        const oilPct = pctOfAlias('OIL');
+        const ironPct = pctOfAlias('IRON');
+        const soyPct = pctOfAlias('SOY');
+        const copperPct = pctOfAlias('COPPER');
+        const us10yPct = pctOfAlias('US10Y');
+        const br10yPct = (() => {
+            const s = findAssetSymbol(data, /^BR10YT=RR$/i);
+            return s ? getChangePct(data, s) : null;
+        })();
+        const weights = { iron: 0.28, soy: 0.20, oil: 0.18, copper: 0.12 };
+        const basketParts = [
+            { v: ironPct, w: weights.iron },
+            { v: soyPct, w: weights.soy },
+            { v: oilPct, w: weights.oil },
+            { v: copperPct, w: weights.copper },
+        ].filter(x => typeof x.v === 'number' && Number.isFinite(x.v) && typeof x.w === 'number' && x.w > 0);
+        const wSum = basketParts.reduce((s, x) => s + x.w, 0);
+        const exportScore = wSum > 0 ? basketParts.reduce((s, x) => s + (x.v * x.w), 0) / wSum : null;
+        const tipsEtfPct = pctOfAlias('TIPS_ETF');
+        operationalInputs.macro = {
+            flow: { label: regimeLabel, score: regimeScore },
+            betaDelta,
+            dxyPct,
+            oilPct: typeof oilScore === 'number' ? oilScore : null,
+            em: { state: emGateState, pct: typeof emBasketPct === 'number' ? emBasketPct : null },
+            exportScore,
+            yields: { us10yPct, br10yPct, tipsEtfPct },
+        };
+    } catch {
+    }
+    try { renderOperationalBriefing(); } catch { }
+
     el.innerHTML = html;
 }
 
@@ -2472,6 +2520,30 @@ function saveAgenda(items) {
 let agendaAutoCache = null;
 let agendaAutoLoading = false;
 
+let operationalInputs = {
+    regime: null,
+    optionsGamma: null,
+    webNews: null,
+    macro: null,
+};
+
+const operationalTuning = {
+    threshold: { dxy: 0.12, em: 0.12, export: 0.25, yields: 0.12 },
+    weight: { flow: 0.5, dxy: 0.4, export: 0.3, em: 0.4, yields: 0.25 },
+};
+
+function loadOperationalTuning() {
+    try {
+        const raw = localStorage.getItem('mercado_operational_tuning_v1');
+        if (!raw) return;
+        const cfg = JSON.parse(raw);
+        if (cfg && cfg.threshold) Object.assign(operationalTuning.threshold, cfg.threshold);
+        if (cfg && cfg.weight) Object.assign(operationalTuning.weight, cfg.weight);
+    } catch {
+    }
+}
+loadOperationalTuning();
+
 function fetchAgendaAuto() {
     if (agendaAutoLoading || agendaAutoCache !== null) return;
     try {
@@ -3470,6 +3542,9 @@ function renderOptionsGammaSummary(payload) {
         return;
     }
 
+    operationalInputs.optionsGamma = payload;
+    try { renderOperationalBriefing(); } catch { }
+
     const fmt0 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 0) : '—');
     const fmt2 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 2) : '—');
 
@@ -3742,6 +3817,9 @@ function renderWebNewsModule(payload) {
         return;
     }
 
+    operationalInputs.webNews = payload;
+    try { renderOperationalBriefing(); } catch { }
+
     const sentiment = summary && summary.sentiment ? String(summary.sentiment) : 'Neutro';
     const conflicts = summary && Array.isArray(summary.conflicts) ? summary.conflicts : [];
     const thesis = summary && summary.thesis ? summary.thesis : null;
@@ -3901,6 +3979,578 @@ async function loadWebNewsModule() {
     }
 }
 
+function renderOperationalBriefing() {
+    const el = document.getElementById('operationalBriefing');
+    if (!el) return;
+
+    const regime = operationalInputs.regime;
+    const options = operationalInputs.optionsGamma && operationalInputs.optionsGamma.ok === true ? operationalInputs.optionsGamma : null;
+    const web = operationalInputs.webNews && operationalInputs.webNews.ok === true ? operationalInputs.webNews : null;
+
+    const fmt0 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 0) : '—');
+    const fmt1 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 1) : '—');
+
+    if (!regime && !options && !web) {
+        el.innerHTML = `<div style="padding:12px;opacity:.88;">Carregando sinais…</div>`;
+        return;
+    }
+
+    const biasFromLabel = raw => {
+        const s = String(raw || '').toUpperCase();
+        if (s.includes('COMPRA')) return 'buy';
+        if (s.includes('VENDA')) return 'sell';
+        return 'neutral';
+    };
+
+    const regimeBias = regime && regime.operational
+        ? { wdo: biasFromLabel(regime.operational.wdo), win: biasFromLabel(regime.operational.win) }
+        : { wdo: 'neutral', win: 'neutral' };
+
+    const newsTilt = (() => {
+        const items = web && Array.isArray(web.items) ? web.items.slice(0, 8) : [];
+        const weight = conf => {
+            const c = String(conf || '').toLowerCase();
+            if (c.includes('alta')) return 2.0;
+            if (c.includes('média') || c.includes('media')) return 1.0;
+            if (c.includes('baixa')) return 0.5;
+            return 0.75;
+        };
+        const aScore = a => (a === '↑' ? 1 : a === '↓' ? -1 : 0);
+        const sum = { wdo: 0, win: 0, w: 0 };
+        for (const it of items) {
+            const w = weight(it && it.confidence);
+            const impact = it && it.impact ? it.impact : null;
+            sum.wdo += w * aScore(impact && impact.wdo ? String(impact.wdo) : '≈');
+            sum.win += w * aScore(impact && impact.win ? String(impact.win) : '≈');
+            sum.w += w;
+        }
+        const norm = k => (sum.w > 0 ? sum[k] / sum.w : 0);
+        const toBias = v => (v > 0.22 ? 'buy' : v < -0.22 ? 'sell' : 'neutral');
+        return {
+            wdo: { bias: toBias(norm('wdo')), score: norm('wdo'), w: sum.w },
+            win: { bias: toBias(norm('win')), score: norm('win'), w: sum.w },
+        };
+    })();
+
+    const combine = (a, b) => {
+        if (a === 'neutral') return { bias: b, conflict: false };
+        if (b === 'neutral') return { bias: a, conflict: false };
+        if (a === b) return { bias: a, conflict: false };
+        return { bias: 'neutral', conflict: true };
+    };
+
+    const combined = {
+        wdo: combine(regimeBias.wdo, newsTilt.wdo.bias),
+        win: combine(regimeBias.win, newsTilt.win.bias),
+    };
+
+    const macro = operationalInputs.macro || null;
+    const macroBiasFor = symbol => {
+        if (!macro) return { bias: 'neutral', score: 0 };
+        const neutral = t => String(t || '').toLowerCase().includes('neutro');
+        let s = 0;
+        let w = 0;
+        const push = (val, wVal) => {
+            s += val * wVal;
+            w += wVal;
+        };
+        if (macro.flow && !neutral(macro.flow.label)) {
+            const b = macro.flow.label === 'Risk-On' ? (symbol === 'WDO' ? -1 : +1) : (symbol === 'WDO' ? +1 : -1);
+            push(b, operationalTuning.weight.flow);
+        }
+        if (typeof macro.dxyPct === 'number' && Number.isFinite(macro.dxyPct)) {
+            const dir = macro.dxyPct > operationalTuning.threshold.dxy ? +1 : macro.dxyPct < -operationalTuning.threshold.dxy ? -1 : 0;
+            const b = symbol === 'WDO' ? dir : -dir;
+            push(b, operationalTuning.weight.dxy);
+        }
+        if (typeof macro.exportScore === 'number' && Number.isFinite(macro.exportScore)) {
+            const dir = macro.exportScore > operationalTuning.threshold.export ? +1 : macro.exportScore < -operationalTuning.threshold.export ? -1 : 0;
+            const b = symbol === 'WDO' ? -dir : +dir;
+            push(b, operationalTuning.weight.export);
+        }
+        if (macro.em && typeof macro.em.pct === 'number' && Number.isFinite(macro.em.pct)) {
+            const dir = macro.em.pct > operationalTuning.threshold.em ? +1 : macro.em.pct < -operationalTuning.threshold.em ? -1 : 0;
+            const b = symbol === 'WDO' ? dir : -dir;
+            push(b, operationalTuning.weight.em);
+        }
+        if (macro.yields) {
+            const y = macro.yields;
+            if (typeof y.us10yPct === 'number' && Number.isFinite(y.us10yPct)) {
+                const dir = y.us10yPct > operationalTuning.threshold.yields ? +1 : y.us10yPct < -operationalTuning.threshold.yields ? -1 : 0;
+                const b = symbol === 'WDO' ? dir : -dir;
+                push(b, operationalTuning.weight.yields);
+            }
+            if (typeof y.br10yPct === 'number' && Number.isFinite(y.br10yPct)) {
+                const dir = y.br10yPct > operationalTuning.threshold.yields ? +1 : y.br10yPct < -operationalTuning.threshold.yields ? -1 : 0;
+                const b = symbol === 'WDO' ? dir : -dir;
+                push(b, operationalTuning.weight.yields * 0.8);
+            }
+        }
+        const score = w > 0 ? s / w : 0;
+        const bias = score > 0.22 ? 'buy' : score < -0.22 ? 'sell' : 'neutral';
+        return { bias, score };
+    };
+
+    const macroWdo = macroBiasFor('WDO');
+    const macroWin = macroBiasFor('WIN');
+
+    const resolved = {
+        wdo: combined.wdo.conflict ? macroWdo : combined.wdo,
+        win: combined.win.conflict ? macroWin : combined.win,
+    };
+
+    const confidence = (() => {
+        const base = regime && typeof regime.convictionScore === 'number' && Number.isFinite(regime.convictionScore)
+            ? regime.convictionScore
+            : 0.55;
+        const conflicts = (combined.wdo.conflict ? 1 : 0) + (combined.win.conflict ? 1 : 0);
+        const newsW = newsTilt.wdo.w || 0;
+        const newsAdj = newsW >= 4 ? 0.06 : newsW >= 2 ? 0.03 : 0;
+        const macroAdj = (() => {
+            let adj = 0;
+            if (macroWdo.bias !== 'neutral' && macroWdo.bias === combined.wdo.bias) adj += 0.03;
+            if (macroWin.bias !== 'neutral' && macroWin.bias === combined.win.bias) adj += 0.03;
+            if (combined.wdo.conflict || combined.win.conflict) {
+                if (macroWdo.bias === 'neutral' && macroWin.bias === 'neutral') adj -= 0.04;
+                else adj += 0.00;
+            }
+            return adj;
+        })();
+        const out = Math.max(0, Math.min(1, base + newsAdj + macroAdj - conflicts * 0.10));
+        const label = out >= 0.72 ? 'ALTA' : out >= 0.56 ? 'MÉDIA' : 'BAIXA';
+        return { score: out, label };
+    })();
+
+    const badge = (tone, text) => {
+        const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
+        return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
+    };
+
+    const biasTone = b => (b === 'buy' ? 'positive' : b === 'sell' ? 'negative' : 'neutral');
+    const biasLabel = (symbol, b) => {
+        if (b === 'buy') return `${symbol}: COMPRA`;
+        if (b === 'sell') return `${symbol}: VENDA`;
+        return `${symbol}: NEUTRO`;
+    };
+
+    const finalScoreFor = symbol => {
+        const rb = symbol === 'WDO' ? regimeBias.wdo : regimeBias.win;
+        const nb = symbol === 'WDO' ? newsTilt.wdo.score : newsTilt.win.score;
+        const mb = symbol === 'WDO' ? macroWdo.score : macroWin.score;
+        const dir = rb === 'buy' ? 1 : rb === 'sell' ? -1 : 0;
+        const s = (0.5 * dir) + (0.4 * nb) + (0.3 * mb);
+        const c = Math.max(-1, Math.min(1, s));
+        return c;
+    };
+
+    const gaugeHtml = (label, score) => {
+        const deg = Math.round(Math.max(-1, Math.min(1, score)) * 60);
+        const tone = score > 0.22 ? 'positive' : score < -0.22 ? 'negative' : 'neutral';
+        const arcGrad = 'linear-gradient(90deg, rgba(255,60,80,.85) 0%, rgba(255,210,74,.85) 50%, rgba(0,255,160,.85) 100%)';
+        const glow = tone === 'positive' ? '0 0 18px rgba(0,255,160,.35)' : tone === 'negative' ? '0 0 18px rgba(255,60,80,.35)' : '0 0 18px rgba(255,210,74,.28)';
+        return `
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:98px;height:54px;border:1px solid rgba(255,255,255,.18);border-radius:98px 98px 0 0;background:rgba(0,0,0,.22);position:relative;overflow:hidden;box-shadow:${glow};">
+                    <div style="position:absolute;left:6px;right:6px;bottom:6px;height:10px;border-radius:999px;background:${arcGrad};opacity:.85;"></div>
+                    <div style="position:absolute;left:50%;bottom:6px;width:3px;height:42px;background:${tone === 'positive' ? 'rgba(0,255,160,.95)' : tone === 'negative' ? 'rgba(255,60,80,.95)' : 'rgba(255,210,74,.95)'};transform-origin:bottom center;transform:translateX(-50%) rotate(${deg}deg);box-shadow:0 0 14px rgba(255,255,255,.22);border-radius:3px;"></div>
+                    <div style="position:absolute;left:10px;bottom:6px;width:6px;height:6px;border-radius:999px;background:rgba(255,255,255,.35);"></div>
+                    <div style="position:absolute;left:26px;bottom:6px;width:6px;height:6px;border-radius:999px;background:rgba(255,255,255,.25);"></div>
+                    <div style="position:absolute;right:26px;bottom:6px;width:6px;height:6px;border-radius:999px;background:rgba(255,255,255,.25);"></div>
+                    <div style="position:absolute;right:10px;bottom:6px;width:6px;height:6px;border-radius:999px;background:rgba(255,255,255,.35);"></div>
+                </div>
+                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;letter-spacing:.5px;">${escapeHtml(label)} ${toneBadgeHtmlFromTone(tone, score, formatNumber(score, 2), { maxAbs: 1 })}</div>
+            </div>
+        `;
+    };
+
+    const makePlan = item => {
+        const sym = item && item.symbol ? String(item.symbol) : '—';
+        const spot = item && typeof item.spot === 'number' ? item.spot : null;
+        const r = item && item.regime ? String(item.regime) : '';
+        const gammaTone = /negativo/i.test(r) ? 'negative' : /positivo/i.test(r) ? 'positive' : 'neutral';
+        const gammaLabel = r ? r : 'Gamma N/A';
+        const key = item && item.keyLevels ? item.keyLevels : {};
+
+        const gf = typeof key.gammaFlip === 'number' && Number.isFinite(key.gammaFlip) ? key.gammaFlip : null;
+        const put = typeof key.effectivePutWall === 'number' && Number.isFinite(key.effectivePutWall)
+            ? key.effectivePutWall
+            : (typeof key.putWall === 'number' && Number.isFinite(key.putWall) ? key.putWall : null);
+        const call = typeof key.effectiveCallWall === 'number' && Number.isFinite(key.effectiveCallWall)
+            ? key.effectiveCallWall
+            : (typeof key.callWall === 'number' && Number.isFinite(key.callWall) ? key.callWall : null);
+        const rangeLow = typeof key.rangeLow === 'number' && Number.isFinite(key.rangeLow) ? key.rangeLow : null;
+        const rangeHigh = typeof key.rangeHigh === 'number' && Number.isFinite(key.rangeHigh) ? key.rangeHigh : null;
+        const maxPain = typeof key.maxPain === 'number' && Number.isFinite(key.maxPain) ? key.maxPain : null;
+
+        const width = (typeof rangeLow === 'number' && typeof rangeHigh === 'number' && rangeHigh > rangeLow)
+            ? rangeHigh - rangeLow
+            : (typeof spot === 'number' ? Math.abs(spot) * 0.012 : 0);
+        const near = width > 0 ? width * 0.12 : 0;
+        const isNear = (a, b) => typeof a === 'number' && typeof b === 'number' && near > 0 ? Math.abs(a - b) <= near : false;
+
+        const bias = sym === 'WDO' ? combined.wdo.bias : sym === 'WIN' ? combined.win.bias : 'neutral';
+
+        const gate = (() => {
+            if (bias === 'buy') {
+                if (typeof gf === 'number' && typeof spot === 'number') return spot >= gf ? `Manter compra acima do Gamma Flip (${fmt0(gf)})` : `Aguardar retomar Gamma Flip (${fmt0(gf)})`;
+                return 'Comprar apenas com confirmação (evitar “chase”).';
+            }
+            if (bias === 'sell') {
+                if (typeof gf === 'number' && typeof spot === 'number') return spot <= gf ? `Manter venda abaixo do Gamma Flip (${fmt0(gf)})` : `Aguardar perder Gamma Flip (${fmt0(gf)})`;
+                return 'Vender apenas com confirmação (evitar “chase”).';
+            }
+            if (/positivo/i.test(r)) return 'Sem viés claro: priorize range (comprar perto do fundo, vender perto do topo).';
+            if (/negativo/i.test(r)) return 'Sem viés claro: aguarde rompimento com confirmação (tendência).';
+            return 'Sem viés claro: reduzir tamanho e operar só nos níveis.';
+        })();
+
+        const targets = (() => {
+            if (bias === 'buy') {
+                const t1 = typeof call === 'number' ? `Alvo 1: ${fmt0(call)} (CallWall)` : (typeof rangeHigh === 'number' ? `Alvo 1: ${fmt0(rangeHigh)} (Range High)` : null);
+                const t2 = typeof maxPain === 'number' ? `Referência: ${fmt0(maxPain)} (MaxPain)` : null;
+                return [t1, t2].filter(Boolean).join(' • ') || 'Alvos: —';
+            }
+            if (bias === 'sell') {
+                const t1 = typeof put === 'number' ? `Alvo 1: ${fmt0(put)} (PutWall)` : (typeof rangeLow === 'number' ? `Alvo 1: ${fmt0(rangeLow)} (Range Low)` : null);
+                const t2 = typeof maxPain === 'number' ? `Referência: ${fmt0(maxPain)} (MaxPain)` : null;
+                return [t1, t2].filter(Boolean).join(' • ') || 'Alvos: —';
+            }
+            return `Níveis: GF ${fmt0(gf)} • Put ${fmt0(put)} • Call ${fmt0(call)} • Range ${fmt0(rangeLow)}–${fmt0(rangeHigh)}`;
+        })();
+
+        const stop = (() => {
+            if (bias === 'buy') {
+                const s = typeof put === 'number' ? `Stop: abaixo de ${fmt0(put)} (PutWall)` : (typeof rangeLow === 'number' ? `Stop: abaixo de ${fmt0(rangeLow)} (Range Low)` : 'Stop: invalidar no rompimento contra.');
+                return s;
+            }
+            if (bias === 'sell') {
+                const s = typeof call === 'number' ? `Stop: acima de ${fmt0(call)} (CallWall)` : (typeof rangeHigh === 'number' ? `Stop: acima de ${fmt0(rangeHigh)} (Range High)` : 'Stop: invalidar no rompimento contra.');
+                return s;
+            }
+            return '';
+        })();
+
+        const zone = (() => {
+            if (typeof spot !== 'number') return 'Zona: —';
+            if (isNear(spot, rangeHigh) || isNear(spot, call)) return 'Zona: perto do topo';
+            if (isNear(spot, rangeLow) || isNear(spot, put)) return 'Zona: perto do fundo';
+            if (typeof gf === 'number') return `Zona: ${spot >= gf ? 'acima' : 'abaixo'} do Gamma Flip`;
+            return 'Zona: —';
+        })();
+
+        const note = /positivo/i.test(r)
+            ? 'Gamma +: tende a mean reversion; prefira entradas “bem posicionadas” em nível.'
+            : /negativo/i.test(r)
+                ? 'Gamma -: tende a acelerar; prefira rompimento confirmado e gestão rápida.'
+                : 'Gamma: sem leitura.';
+
+        return `
+            <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <div style="font-weight:900;letter-spacing:1px;">${escapeHtml(sym)}</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        ${badge(biasTone(bias), biasLabel(sym, bias))}
+                        ${badge(gammaTone, gammaLabel)}
+                    </div>
+                    <div style="margin-top:8px;width:100%;">${gaugeHtml(sym, finalScoreFor(sym))}</div>
+                </div>
+                <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+                    <div style="opacity:.92;">
+                        <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">Spot: ${fmt0(spot)}</div>
+                        <div style="opacity:.85;margin-top:6px;">${escapeHtml(zone)}</div>
+                        <div style="opacity:.85;margin-top:6px;">GF ${fmt0(gf)} • Put ${fmt0(put)} • Call ${fmt0(call)}</div>
+                        <div style="opacity:.85;margin-top:6px;">Range ${fmt0(rangeLow)}–${fmt0(rangeHigh)} • MaxPain ${fmt0(maxPain)}</div>
+                    </div>
+                    <div style="opacity:.92;line-height:1.4;">
+                        <div style="font-weight:900;letter-spacing:.6px;">Plano</div>
+                        <div style="margin-top:6px;">${escapeHtml(gate)}</div>
+                        <div style="margin-top:6px;">${escapeHtml(targets)}</div>
+                        ${stop ? `<div style="margin-top:6px;opacity:.90;">${escapeHtml(stop)}</div>` : ''}
+                        <div style="margin-top:6px;opacity:.78;font-size:12px;">${escapeHtml(note)}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    };
+
+    const items = options && options.items ? [options.items.WDO, options.items.WIN].filter(Boolean) : [];
+
+    const regimeLine = regime
+        ? `${String(regime.label || '—')} • convicção ${String(regime.convictionLabel || '—')} (${fmt0((regime.convictionScore || 0) * 100)}%)`
+        : 'Regime: —';
+
+    const newsLine = web
+        ? `News tilt (0–1): WDO ${fmt1(newsTilt.wdo.score)} • WIN ${fmt1(newsTilt.win.score)}`
+        : 'News tilt: —';
+
+    const macroLine = macro
+        ? `Flow ${escapeHtml(String(macro.flow ? macro.flow.label : '—'))} • DXY ${typeof macro.dxyPct === 'number' ? formatPercent(macro.dxyPct, 2) : '—'} • Export ${typeof macro.exportScore === 'number' ? formatPercent(macro.exportScore, 2) : '—'} • EM ${typeof (macro.em && macro.em.pct) === 'number' ? formatPercent(macro.em.pct, 2) : '—'}`
+        : 'Macro: —';
+
+    el.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+            <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Roteiro do momento</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                ${badge(confidence.score >= 0.72 ? 'positive' : confidence.score >= 0.56 ? 'neutral' : 'negative', `Prioridade: ${confidence.label}`)}
+                ${badge('neutral', regime ? `Regime: ${regime.label}` : 'Regime: —')}
+                <button type="button" id="opTuningToggle" style="border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:4px 10px;background:#151515;color:#e0e0e0;font-weight:900;letter-spacing:.6px;cursor:pointer;">Ajustes</button>
+            </div>
+        </div>
+        <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+            ${escapeHtml(regimeLine)} • ${escapeHtml(newsLine)} • ${escapeHtml(macroLine)}
+        </div>
+        <div id="opTuningPanel" style="display:none;margin-top:10px;border:1px dashed rgba(255,255,255,.20);border-radius:12px;padding:10px;background:rgba(0,0,0,.18);">
+            <div style="font-weight:900;letter-spacing:.8px;margin-bottom:8px;opacity:.92;">Calibração rápida</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;">
+                <div>
+                    <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Threshold DXY (${formatNumber(operationalTuning.threshold.dxy, 2)})</div>
+                    <input id="op-th-dxy" type="range" min="0" max="0.5" step="0.01" value="${operationalTuning.threshold.dxy}" />
+                </div>
+                <div>
+                    <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Threshold EM (${formatNumber(operationalTuning.threshold.em, 2)})</div>
+                    <input id="op-th-em" type="range" min="0" max="0.5" step="0.01" value="${operationalTuning.threshold.em}" />
+                </div>
+                <div>
+                    <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Threshold Export (${formatNumber(operationalTuning.threshold.export, 2)})</div>
+                    <input id="op-th-export" type="range" min="0" max="0.6" step="0.01" value="${operationalTuning.threshold.export}" />
+                </div>
+                <div>
+                    <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Threshold Juros (${formatNumber(operationalTuning.threshold.yields, 2)})</div>
+                    <input id="op-th-yields" type="range" min="0" max="0.5" step="0.01" value="${operationalTuning.threshold.yields}" />
+                </div>
+            </div>
+            <div style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;">
+                <div>
+                    <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Peso Flow (${formatNumber(operationalTuning.weight.flow, 2)})</div>
+                    <input id="op-w-flow" type="range" min="0" max="1" step="0.01" value="${operationalTuning.weight.flow}" />
+                </div>
+                <div>
+                    <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Peso DXY (${formatNumber(operationalTuning.weight.dxy, 2)})</div>
+                    <input id="op-w-dxy" type="range" min="0" max="1" step="0.01" value="${operationalTuning.weight.dxy}" />
+                </div>
+                <div>
+                    <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Peso Export (${formatNumber(operationalTuning.weight.export, 2)})</div>
+                    <input id="op-w-export" type="range" min="0" max="1" step="0.01" value="${operationalTuning.weight.export}" />
+                </div>
+                <div>
+                    <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Peso EM (${formatNumber(operationalTuning.weight.em, 2)})</div>
+                    <input id="op-w-em" type="range" min="0" max="1" step="0.01" value="${operationalTuning.weight.em}" />
+                </div>
+                <div>
+                    <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Peso Juros (${formatNumber(operationalTuning.weight.yields, 2)})</div>
+                    <input id="op-w-yields" type="range" min="0" max="1" step="0.01" value="${operationalTuning.weight.yields}" />
+                </div>
+            </div>
+        </div>
+        <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">
+            ${items.length ? items.map(makePlan).join('') : `<div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);opacity:.88;">Sem dados de WDO/WIN em Opções & Gamma (Resumo).</div>`}
+        </div>
+        ${(() => {
+            const now = new Date();
+            const hr = now.getHours();
+            if (hr >= 9) return '';
+            const assets = data && Array.isArray(data.assets) ? data.assets : [];
+            const rows = assets.map(a => {
+                const last = getLastPoint(data, a.symbol);
+                return { symbol: a.symbol, name: a.name, last, isAdr: isBrazilAdr({ symbol: a.symbol, name: a.name }) };
+            }).filter(r => r.isAdr && r.last && typeof r.last.changePct === 'number' && Number.isFinite(r.last.changePct));
+            if (!rows.length) return '';
+            const ups = rows.filter(r => r.last.changePct > 0);
+            const downs = rows.filter(r => r.last.changePct < 0);
+            const avg = rows.length ? rows.reduce((s, r) => s + r.last.changePct, 0) / rows.length : 0;
+            const bias = avg > operationalTuning.threshold.export ? 'ALTISTA' : avg < -operationalTuning.threshold.export ? 'BAIXISTA' : 'NEUTRO';
+            const top = rows.slice().sort((a, b) => Math.abs(b.last.changePct) - Math.abs(a.last.changePct)).slice(0, 6);
+            const toneColor = avg > 0 ? 'rgba(0,255,160,.95)' : avg < 0 ? 'rgba(255,60,80,.95)' : 'rgba(255,210,74,.95)';
+            const deg = Math.round(Math.max(-1, Math.min(1, avg / 0.6)) * 60);
+            const gauge = `
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:110px;height:60px;border:1px solid rgba(255,255,255,.18);border-radius:110px 110px 0 0;background:rgba(0,0,0,.22);position:relative;overflow:hidden;box-shadow:${avg > 0 ? '0 0 18px rgba(0,255,160,.35)' : avg < 0 ? '0 0 18px rgba(255,60,80,.35)' : '0 0 18px rgba(255,210,74,.28)'};">
+                        <div style="position:absolute;left:8px;right:8px;bottom:8px;height:12px;border-radius:999px;background:linear-gradient(90deg, rgba(255,60,80,.85) 0%, rgba(255,210,74,.85) 50%, rgba(0,255,160,.85) 100%);opacity:.85;"></div>
+                        <div style="position:absolute;left:50%;bottom:8px;width:3px;height:46px;background:${toneColor};transform-origin:bottom center;transform:translateX(-50%) rotate(${deg}deg);box-shadow:0 0 14px rgba(255,255,255,.22);border-radius:3px;"></div>
+                    </div>
+                    <div style="font-family:'Share Tech Mono',monospace;font-weight:900;letter-spacing:.6px;">ADR pré • ${bias} • ${formatPercent(avg, 2)}</div>
+                </div>
+            `;
+            const list = top.map(r => {
+                const pct = r.last.changePct;
+                const c = pct > 0 ? 'rgba(0,255,160,.95)' : pct < 0 ? 'rgba(255,60,80,.95)' : 'rgba(255,210,74,.95)';
+                return `
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border:1px solid rgba(255,255,255,.10);border-radius:9px;background:rgba(0,0,0,.16);">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <div style="width:8px;height:8px;border-radius:999px;background:${c};"></div>
+                            <div style="font-weight:700;letter-spacing:.5px;opacity:.92;">${escapeHtml(r.name || r.symbol)}</div>
+                        </div>
+                        <div style="font-family:'Share Tech Mono',monospace;">${formatPercent(pct, 2)}</div>
+                    </div>
+                `;
+            }).join('');
+            return `
+                <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                        <div style="font-weight:900;letter-spacing:1px;opacity:.95;">ADR BR (Extended Hours) • até 09:00</div>
+                        <div style="opacity:.86;font-size:12px;">${ups.length} ↑ • ${downs.length} ↓ • ${rows.length} total</div>
+                    </div>
+                    <div style="margin-top:8px;">${gauge}</div>
+                    <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;">${list}</div>
+                </div>
+            `;
+        })()}
+        <div style="margin-top:12px;border-top:1px solid rgba(255,255,255,.10);padding-top:12px;">
+            <div style="font-weight:900;letter-spacing:1px;opacity:.95;margin-bottom:6px;">Fatores considerados</div>
+            <table class="data-table" style="width:100%;border-collapse:collapse;table-layout:auto;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left;padding:8px;border-bottom:1px solid rgba(255,255,255,.15);">Fator</th>
+                        <th style="text-align:left;padding:8px;border-bottom:1px solid rgba(255,255,255,.15);">Valor</th>
+                        <th style="text-align:left;padding:8px;border-bottom:1px solid rgba(255,255,255,.15);">Impacto WDO</th>
+                        <th style="text-align:left;padding:8px;border-bottom:1px solid rgba(255,255,255,.15);">Impacto WIN</th>
+                        <th style="text-align:left;padding:8px;border-bottom:1px solid rgba(255,255,255,.15);">Peso</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${(() => {
+                        const mk = (tone, txt) => toneBadgeHtmlFromTone(tone, 0, txt, { maxAbs: 1 });
+                        const mkPct = v => (typeof v === 'number' ? formatPercent(v, 2) : '—');
+                        const mkNum = v => (typeof v === 'number' ? formatNumber(v, 2) : '—');
+                        const dirTone = d => d > 0 ? 'positive' : d < 0 ? 'negative' : 'neutral';
+                        const rows = [];
+                        rows.push(`
+                            <tr>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">Flow (Regime)</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', regime ? regime.label : '—')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWdo.score), macroWdo.bias === 'buy' ? 'Compra' : macroWdo.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWin.score), macroWin.bias === 'buy' ? 'Compra' : macroWin.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', String(operationalTuning.weight.flow))}</td>
+                            </tr>
+                        `);
+                        rows.push(`
+                            <tr>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">Notícias (tilt)</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">WDO ${mkNum(newsTilt.wdo.score)} • WIN ${mkNum(newsTilt.win.score)}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(newsTilt.wdo.score), newsTilt.wdo.score > 0.22 ? 'Compra' : newsTilt.wdo.score < -0.22 ? 'Venda' : 'Neutro')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(newsTilt.win.score), newsTilt.win.score > 0.22 ? 'Compra' : newsTilt.win.score < -0.22 ? 'Venda' : 'Neutro')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', '0.4')}</td>
+                            </tr>
+                        `);
+                        rows.push(`
+                            <tr>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">DXY</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mkPct(macro ? macro.dxyPct : null)}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWdo.score), macroWdo.bias === 'buy' ? 'Compra' : macroWdo.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWin.score), macroWin.bias === 'buy' ? 'Compra' : macroWin.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', String(operationalTuning.weight.dxy))}</td>
+                            </tr>
+                        `);
+                        rows.push(`
+                            <tr>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">Export Basket</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mkPct(macro ? macro.exportScore : null)}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWdo.score), macroWdo.bias === 'sell' ? 'Venda' : macroWdo.bias === 'buy' ? 'Compra' : 'Neutro')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWin.score), macroWin.bias === 'buy' ? 'Compra' : macroWin.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', String(operationalTuning.weight.export))}</td>
+                            </tr>
+                        `);
+                        rows.push(`
+                            <tr>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">EM Basket (USD/EM)</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mkPct(macro && macro.em ? macro.em.pct : null)}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWdo.score), macroWdo.bias === 'buy' ? 'Compra' : macroWdo.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWin.score), macroWin.bias === 'buy' ? 'Compra' : macroWin.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', String(operationalTuning.weight.em))}</td>
+                            </tr>
+                        `);
+                        rows.push(`
+                            <tr>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">Juros (US10Y/BR10Y)</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">US ${mkPct(macro && macro.yields ? macro.yields.us10yPct : null)} • BR ${mkPct(macro && macro.yields ? macro.yields.br10yPct : null)}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWdo.score), macroWdo.bias === 'buy' ? 'Compra' : macroWdo.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWin.score), macroWin.bias === 'buy' ? 'Compra' : macroWin.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', String(operationalTuning.weight.yields))}</td>
+                            </tr>
+                        `);
+                        return rows.join('');
+                    })()}
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top:12px;border-top:1px solid rgba(255,255,255,.10);padding-top:12px;opacity:.92;line-height:1.45;">
+            <div style="font-weight:900;letter-spacing:1px;opacity:.95;margin-bottom:6px;">Checklist (30s)</div>
+            <div>1) Se convicção <b>BAIXA</b>: reduzir tamanho e operar só no nível (sem “chase”).</div>
+            <div>2) Use <b>Gamma Flip</b> como pivô: acima favorece compra / abaixo favorece venda (com filtro do regime).</div>
+            <div>3) Use <b>Walls</b> e <b>Range</b> como alvos/stop técnicos do dia.</div>
+        </div>
+    `;
+
+    try {
+        const toggle = document.getElementById('opTuningToggle');
+        const panel = document.getElementById('opTuningPanel');
+        const persist = () => {
+            try {
+                localStorage.setItem('mercado_operational_tuning_v1', JSON.stringify(operationalTuning));
+            } catch {
+            }
+        };
+        if (toggle && panel) {
+            toggle.addEventListener('click', () => {
+                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            });
+        }
+        const bindRange = (id, group, key) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('input', () => {
+                const v = Number(el.value);
+                if (!Number.isFinite(v)) return;
+                operationalTuning[group][key] = v;
+                persist();
+                renderOperationalBriefing();
+            });
+        };
+        bindRange('op-th-dxy', 'threshold', 'dxy');
+        bindRange('op-th-em', 'threshold', 'em');
+        bindRange('op-th-export', 'threshold', 'export');
+        bindRange('op-th-yields', 'threshold', 'yields');
+        bindRange('op-w-flow', 'weight', 'flow');
+        bindRange('op-w-dxy', 'weight', 'dxy');
+        bindRange('op-w-export', 'weight', 'export');
+        bindRange('op-w-em', 'weight', 'em');
+        bindRange('op-w-yields', 'weight', 'yields');
+    } catch {
+    }
+
+    try {
+        const key = 'mercado_operational_log_v1';
+        const nowMs = Date.now();
+        const next = {
+            tMs: nowMs,
+            regime: regime ? regime.label : null,
+            wdo: { bias: resolved.wdo.bias || (macroWdo.bias || 'neutral'), score: finalScoreFor('WDO') },
+            win: { bias: resolved.win.bias || (macroWin.bias || 'neutral'), score: finalScoreFor('WIN') },
+            inputs: {
+                news: { wdo: newsTilt.wdo.score, win: newsTilt.win.score },
+                dxy: macro ? macro.dxyPct : null,
+                export: macro ? macro.exportScore : null,
+                em: macro && macro.em ? macro.em.pct : null,
+                us10y: macro && macro.yields ? macro.yields.us10yPct : null,
+                br10y: macro && macro.yields ? macro.yields.br10yPct : null,
+            },
+        };
+        const prev = (() => {
+            try {
+                const raw = localStorage.getItem(key);
+                const arr = raw ? JSON.parse(raw) : [];
+                return Array.isArray(arr) ? arr : [];
+            } catch {
+                return [];
+            }
+        })();
+        prev.push(next);
+        const trimmed = prev.slice(-64);
+        localStorage.setItem(key, JSON.stringify(trimmed));
+    } catch {
+    }
+}
+
 function findAssetSymbol(data, matcher) {
     const assets = data && data.assets ? data.assets : [];
     for (const a of assets) {
@@ -3949,6 +4599,8 @@ function assetAliasMatchers(key) {
     if (k === 'CSI300') return [/^\.(CSI300)\b/i];
 
     if (k === 'USD_BRL') return [/^USD\/BRL\b/i];
+
+    if (k === 'TIPS_ETF') return [/^TIP$/i, /\biShares TIPS\b/i];
 
     return [];
 }
