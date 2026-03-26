@@ -2925,12 +2925,45 @@ function renderAgendaMatrix() {
         return aa.localeCompare(bb) || String(a.event || '').localeCompare(String(b.event || ''));
     });
 
+    const normalizeAgendaText = s => {
+        let out = String(s || '');
+        try {
+            out = out.normalize('NFD');
+        } catch {
+        }
+        return out
+            .toLowerCase()
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\uFFFD/g, 'o');
+    };
+
+    const isMustInclude = item => {
+        const ev = normalizeAgendaText(item && item.event ? item.event : '');
+        if (!ev) return false;
+        return /\b(estoques?\s+de\s+petroleo\s+bruto|crude\s+oil\s+inventories)\b/.test(ev);
+    };
+
+    const pickWithMustInclude = (list, limit) => {
+        const sorted = sortItems(list);
+        const head = sorted.slice(0, Math.max(0, limit || 0));
+        const must = sorted.filter(isMustInclude);
+        const byId = new Set(head.map(x => String(x && x.id ? x.id : '')));
+        for (const m of must) {
+            const id = String(m && m.id ? m.id : '');
+            if (!id) continue;
+            if (byId.has(id)) continue;
+            byId.add(id);
+            head.push(m);
+        }
+        return head;
+    };
+
     const autoByCountry = byCountryKey(autoAll);
     const autoItems = []
-        .concat(sortItems(autoByCountry.BR).slice(0, 14))
-        .concat(sortItems(autoByCountry.EUA).slice(0, 14))
-        .concat(sortItems(autoByCountry['CHINA/HK']).slice(0, 14))
-        .concat(sortItems(autoByCountry.OUTRO).slice(0, 10));
+        .concat(pickWithMustInclude(autoByCountry.BR, 14))
+        .concat(pickWithMustInclude(autoByCountry.EUA, 14))
+        .concat(pickWithMustInclude(autoByCountry['CHINA/HK'], 14))
+        .concat(pickWithMustInclude(autoByCountry.OUTRO, 10));
 
     const allItems = autoItems;
     const viewKey = String(view || 'agenda').toLowerCase();
