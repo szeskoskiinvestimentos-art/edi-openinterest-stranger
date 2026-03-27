@@ -1,4 +1,4 @@
-// NTSL Indicator - Edi OpenInterest Levels - 27/03/2026 10:07
+// NTSL Indicator - Edi OpenInterest Levels - 27/03/2026 12:03
 // Gerado Automaticamente
 
 const
@@ -28,28 +28,28 @@ input
   ExibirMelhoresPontos(true);
   ModeloFlip(7);
   spot(0);
-  // 1 = Classic (5291.46)
-  // 2 = Spline (5289.96)
-  // 3 = HVL (5278.74)
-  // 4 = HVL Log (5266.84)
-  // 5 = Sigma Kernel (5266.43)
-  // 6 = PVOP (5291.46)
-  // 7 = HVL Gaussian (5302.17)
+  // 1 = Classic (5300.43)
+  // 2 = Spline (5300.30)
+  // 3 = HVL (5289.34)
+  // 4 = HVL Log (5287.26)
+  // 5 = Sigma Kernel (5288.44)
+  // 6 = PVOP (5300.43)
+  // 7 = HVL Gaussian (5314.08)
 
 var
   GammaVal: Float;
 
 begin
   // Inicializa GammaVal com o primeiro disponivel por seguranca
-  GammaVal := 5291.46;
+  GammaVal := 5300.43;
 
-  if (ModeloFlip = 1) then GammaVal := 5291.46;
-  if (ModeloFlip = 2) then GammaVal := 5289.96;
-  if (ModeloFlip = 3) then GammaVal := 5278.74;
-  if (ModeloFlip = 4) then GammaVal := 5266.84;
-  if (ModeloFlip = 5) then GammaVal := 5266.43;
-  if (ModeloFlip = 6) then GammaVal := 5291.46;
-  if (ModeloFlip = 7) then GammaVal := 5302.17;
+  if (ModeloFlip = 1) then GammaVal := 5300.43;
+  if (ModeloFlip = 2) then GammaVal := 5300.30;
+  if (ModeloFlip = 3) then GammaVal := 5289.34;
+  if (ModeloFlip = 4) then GammaVal := 5287.26;
+  if (ModeloFlip = 5) then GammaVal := 5288.44;
+  if (ModeloFlip = 6) then GammaVal := 5300.43;
+  if (ModeloFlip = 7) then GammaVal := 5314.08;
 
   // --- Linhas Principais (Com Intercalação de Texto) ---
   if (ExibirWalls) then
@@ -115,8 +115,8 @@ begin
   if (ExibirFlips) then begin
     if (GammaVal > 0) then
       HorizontalLineCustom(GammaVal, clGammaFlip, 2, psDash, "Edi_GammaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    if (5210.63 > 0) then
-      HorizontalLineCustom(5210.63, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    if (5210.31 > 0) then
+      HorizontalLineCustom(5210.31, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
   end;
 
   // Edi_Wall (Midpoints) - Grid Completo
@@ -216,13 +216,13 @@ begin
 
   if (ExibirMelhoresPontos) then
   begin
-    HorizontalLineCustom(5261.11, clRed, 1, psDash, "Edi_Wall_Venda", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    HorizontalLineCustom(5255.90, clLime, 1, psDash, "Edi_Wall_Compra", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    HorizontalLineCustom(5271.03, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    HorizontalLineCustom(5246.00, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    HorizontalLineCustom(5296.83, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    HorizontalLineCustom(5220.45, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    HorizontalLineCustom(5421.38, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    HorizontalLineCustom(5100.51, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(5248.60, clRed, 1, psDash, "Edi_Wall_Venda", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(5243.40, clLime, 1, psDash, "Edi_Wall_Compra", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(5258.50, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(5233.53, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(5284.23, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(5208.04, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(5408.49, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(5088.39, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
   end;
 end;
