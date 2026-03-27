@@ -6475,6 +6475,13 @@ function renderMarketPanorama(data) {
 }
 
 function renderAll(data) {
+    const safe = fn => {
+        try {
+            fn();
+        } catch {
+        }
+    };
+
     if (!data || !(data.assets || []).length) {
         setDataStatus('SEM DADOS • Rode "npm run market:update" e clique ↻ Dados', 'negative');
     } else {
@@ -6485,20 +6492,21 @@ function renderAll(data) {
     const lastUpdateLabel = document.getElementById('last-update-label');
     if (lastUpdateLabel) lastUpdateLabel.textContent = lastUpdate ? ` • ${lastUpdate}` : '';
 
-    renderOverview(data);
-    renderFavorites(data);
-    renderFlowSentinel(data);
-    renderCarryTradeMonitor(data);
-    renderIntel(data);
-    renderAllAssetsTable(data);
-    renderBrazilMarket(data);
-    renderCategory(data, 'commoditiesTable', 'commoditiesChart', ['commodities', 'energy', 'agriculture']);
-    renderCategory(data, 'metalsTable', 'metalsChart', ['metals']);
-    renderCategory(data, 'fxTable', 'fxChart', ['fx_g10', 'fx_emerging']);
-    renderCategory(data, 'emergingTable', 'emergingChart', ['emerging']);
-    renderMercosul(data);
-    renderAlerts(data);
-    renderMarketPanorama(data);
+    safe(() => renderOverview(data));
+    safe(() => renderOperationalBriefing());
+    safe(() => renderFavorites(data));
+    safe(() => renderFlowSentinel(data));
+    safe(() => renderCarryTradeMonitor(data));
+    safe(() => renderIntel(data));
+    safe(() => renderAllAssetsTable(data));
+    safe(() => renderBrazilMarket(data));
+    safe(() => renderCategory(data, 'commoditiesTable', 'commoditiesChart', ['commodities', 'energy', 'agriculture']));
+    safe(() => renderCategory(data, 'metalsTable', 'metalsChart', ['metals']));
+    safe(() => renderCategory(data, 'fxTable', 'fxChart', ['fx_g10', 'fx_emerging']));
+    safe(() => renderCategory(data, 'emergingTable', 'emergingChart', ['emerging']));
+    safe(() => renderMercosul(data));
+    safe(() => renderAlerts(data));
+    safe(() => renderMarketPanorama(data));
 }
 
 function loadScriptFresh(src) {
@@ -7013,6 +7021,7 @@ async function boot() {
     setupQuickNavDrawer();
     setupNavMorePanel();
     setupInvestingCalendarWidgetLazyLoad();
+    try { renderOperationalBriefing(); } catch { }
 
     let data = getData();
     if (!data) {
