@@ -987,7 +987,19 @@ function renderRegimeConviction(data) {
         .map(x => ({ ...x, val: x.raw === null ? null : x.sign * x.raw }));
 
     const betaPosScore = avg(betaPosItems.map(x => x.val));
-    const betaNegScore = avg(betaNegItems.map(x => x.val));
+    const betaNegScore = (() => {
+        const pairs = betaNegItems.filter(x => x.val !== null).map(x => ({ v: x.val, w: (typeof x.weight === 'number' ? x.weight : 1) }));
+        const wsum = pairs.reduce((a, b) => a + b.w, 0);
+        const s = pairs.reduce((a, b) => a + b.v * b.w, 0);
+        if (!wsum) return null;
+        let score = s / wsum;
+        const vixItem = betaNegItems.find(x => x.label === 'VIX');
+        const vhsiItem = betaNegItems.find(x => x.label === 'VHSI');
+        const vixUp = vixItem && typeof vixItem.raw === 'number' && vixItem.raw >= 1.5;
+        const vhsiUp = vhsiItem && typeof vhsiItem.raw === 'number' && vhsiItem.raw >= 1.5;
+        if (vixUp && vhsiUp) score += 0.2;
+        return score;
+    })();
     const betaDelta = (typeof betaPosScore === 'number' ? betaPosScore : 0) - (typeof betaNegScore === 'number' ? betaNegScore : 0);
 
     const wti = getChangePct(data, sentinelSymbols.wti);
@@ -3828,7 +3840,7 @@ function renderFinancialJuice(payload) {
         `;
     }).join('');
 
-    const body = items && items.length
+        const body = items && items.length
         ? `
             <div style="max-height:56vh;overflow:auto;overscroll-behavior:contain;padding:0 12px 12px;">
                 <div style="display:grid;gap:10px;">${rows}</div>
@@ -3946,7 +3958,7 @@ function renderWebNewsModule(payload) {
         }).join('');
 
         return `
-            <div style="max-height:56vh;overflow:auto;overscroll-behavior:contain;padding:0 12px 12px;">
+            <div style="padding:0 12px 12px;">
                 <div style="display:grid;gap:10px;">${rows}</div>
             </div>
         `;
@@ -4655,7 +4667,7 @@ function assetAliasMatchers(key) {
     if (k === 'WTI') return [/\bWTI\b/i];
     if (k === 'OIL') return [/\bBrent\b/i, /\bWTI\b/i];
 
-    if (k === 'IRON') return [/^TIOc1$/i, /^SM58Fc1$/i, /\bmin[eé]rio\b/i, /\biron ore\b/i];
+    if (k === 'IRON') return [/^TIOc1$/i, /^SM58Fc1$/i, /^9047$/i, /^3047$/i, /\bmin[eé]rio\b/i, /\biron ore\b/i];
     if (k === 'SOY') return [/^ZS$/i, /\bsoja\b/i, /\bsoy\b/i];
     if (k === 'COPPER') return [/^HG\b/i, /\bcopper\b/i, /\bcobre\b/i];
     if (k === 'BCI') return [/^BCI$/i, /\babrdn Bloomberg All Commodity Strategy\b/i];
@@ -4666,6 +4678,14 @@ function assetAliasMatchers(key) {
 
     if (k === 'FXI') return [/^FXI$/i];
     if (k === 'CSI300') return [/^\.(CSI300)\b/i];
+
+    if (k === 'JP10Y') return [/^JP10YT=RR$/i, /\bJapan\b.*\b10\b.*\bYear\b.*\bYield\b/i, /\bJGB\b.*\b10\b/i];
+    if (k === 'JP1Y') return [/^JP1YT=(RR|XX)$/i, /\bJapan\b.*\b1\b.*\bYear\b.*\bYield\b/i, /\bJap[aã]o\b.*\b1\b.*\bano\b/i];
+    if (k === 'JP5Y') return [/^JP5YT=(RR|XX)$/i, /\bJapan\b.*\b5\b.*\bYear\b.*\bYield\b/i, /\bJap[aã]o\b.*\b5\b.*\banos\b/i];
+    if (k === 'HK10Y') return [/^HK10YT=RR$/i, /\bHong\s*Kong\b.*\b10\b.*\bYear\b.*\bYield\b/i, /\bHong\s*Kong\b.*\b10\b.*\banos\b/i];
+    if (k === 'VHSI') return [/^VHSI(c\d+)?$/i, /\bHSI Volatility\b/i];
+    if (k === 'HSTECH') return [/^HSTECH$/i, /\bHang Seng TECH\b/i];
+    if (k === 'EWH') return [/^EWH$/i, /\biShares MSCI Hong Kong\b/i];
 
     if (k === 'USD_BRL') return [/^USD\/BRL\b/i];
 
@@ -4699,11 +4719,24 @@ function renderFlowSentinel(data) {
         usdchf: findAssetSymbol(data, /^USD\/CHF\b/i),
         usdsek: findAssetSymbol(data, /^USD\/SEK\b/i),
         dxy: findAliasSymbol(data, 'DXY'),
+        vix: findAliasSymbol(data, 'VIX') || findAssetSymbol(data, /^\.?VIX(9D)?$/i),
+        vhsi: findAliasSymbol(data, 'VHSI') || findAssetSymbol(data, /^VHSI(c\d+)?$/i),
+        jp1y: findAliasSymbol(data, 'JP1Y') || findAssetSymbol(data, /^JP1YT=(RR|XX)$/i),
+        jp10y: findAliasSymbol(data, 'JP10Y') || findAssetSymbol(data, /^JP10YT=RR$/i),
         brent: findAliasSymbol(data, 'BRENT'),
         wti: findAliasSymbol(data, 'WTI'),
     };
 
     const neutralThreshold = 0.12;
+
+    const sessionNow = () => {
+        const h = new Date().getUTCHours();
+        if (h >= 14 && h < 21) return 'us';
+        if (h >= 7 && h < 14) return 'eu';
+        return 'asia';
+    };
+    const sess = sessionNow();
+    const vhsiWeight = sess === 'asia' ? 1.0 : 0.8;
 
     const setDot = (id, state, blink) => {
         const el = document.getElementById(id);
@@ -4862,11 +4895,12 @@ function renderFlowSentinel(data) {
         `);
 
             const alerts = Array.isArray(pre.alerts) ? pre.alerts : [];
-            setHtml('fs-alerts', alerts.length
+            const merged = Array.from(new Set(alerts.map(x => String(x || '').trim()).filter(Boolean)));
+            setHtml('fs-alerts', merged.length
                 ? `
                 <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
                     <div style="font-weight:900;letter-spacing:1px;opacity:.95;margin-bottom:8px;">Alertas (divergência)</div>
-                    ${alerts.map(t => `<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);opacity:.92;line-height:1.35;">${escapeHtml(t)}</div>`).join('')}
+                    ${merged.map(t => `<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);opacity:.92;line-height:1.35;">${escapeHtml(t)}</div>`).join('')}
                 </div>
               `
                 : '');
@@ -4910,12 +4944,16 @@ function renderFlowSentinel(data) {
     ].map(x => ({ ...x, raw: getChangePct(data, x.symbol) }))
         .map(x => ({ ...x, val: x.raw === null ? null : x.sign * x.raw }));
 
-    const betaNegItems = [
-        { label: 'USD/JPY', symbol: symbols.usdjpy, sign: -1 },
-        { label: 'USD/CHF', symbol: symbols.usdchf, sign: -1 },
-        { label: 'USD/SEK', symbol: symbols.usdsek, sign: -1 },
-        { label: 'DXY', symbol: symbols.dxy, sign: +1 },
-    ].map(x => ({ ...x, raw: getChangePct(data, x.symbol) }))
+    const betaNegItemsRaw = [
+        { label: 'USD/JPY', symbol: symbols.usdjpy, sign: -1, weight: 1.0 },
+        { label: 'USD/CHF', symbol: symbols.usdchf, sign: -1, weight: 1.0 },
+        { label: 'USD/SEK', symbol: symbols.usdsek, sign: -1, weight: 1.0 },
+        { label: 'DXY', symbol: symbols.dxy, sign: +1, weight: 1.0 },
+        { label: 'VIX', symbol: symbols.vix, sign: +1, weight: 1.0 },
+        { label: 'VHSI', symbol: symbols.vhsi, sign: +1, weight: vhsiWeight },
+    ];
+    const betaNegItems = betaNegItemsRaw
+        .map(x => ({ ...x, raw: getChangePct(data, x.symbol) }))
         .map(x => ({ ...x, val: x.raw === null ? null : x.sign * x.raw }));
 
     const betaPosScore = avg(betaPosItems.map(x => x.val));
@@ -5117,6 +5155,14 @@ function renderFlowSentinel(data) {
 }
 
 function renderCarryTradeMonitor(data) {
+    const resolveJapan10yYield = () => {
+        const yieldSymbol =
+            findAssetSymbol(data, /^JP10YT=RR$/i)
+            || findAssetSymbol(data, /\bJapan\b(?!.*\b(CDS|Future|Futures)\b).*?\b10\b.*?\bYear\b.*?\bYield\b/i)
+            || findAssetSymbol(data, /\bJapan\b(?!.*\b(CDS|Future|Futures)\b).*?\b10\b.*?\bYear\b/i);
+        return yieldSymbol || null;
+    };
+
     const symbols = {
         audusd: findAssetSymbol(data, /^AUD\/USD\b/i),
         nzdusd: findAssetSymbol(data, /^NZD\/USD\b/i),
@@ -5126,6 +5172,14 @@ function renderCarryTradeMonitor(data) {
         br10y: findAssetSymbol(data, /^BR10YT=RR$/i),
         us10y: findAliasSymbol(data, 'US10Y'),
         us10br10: findAssetSymbol(data, /^US10BR10=RR$/i),
+        us10jp10: findAssetSymbol(data, /^US10JP10=RR$/i),
+        jp10y: resolveJapan10yYield(),
+        jp1y: findAliasSymbol(data, 'JP1Y') || findAssetSymbol(data, /^JP1YT=(RR|XX)$/i),
+        jp5y: findAliasSymbol(data, 'JP5Y') || findAssetSymbol(data, /^JP5YT=(RR|XX)$/i),
+        hk10y: findAliasSymbol(data, 'HK10Y'),
+        hsi: findAssetSymbol(data, /\bHang\s*Seng\b/i),
+        hstech: findAliasSymbol(data, 'HSTECH') || findAssetSymbol(data, /^HSTECH$/i),
+        ewh: findAliasSymbol(data, 'EWH'),
         audjpy: findAssetSymbol(data, /^AUD\/JPY\b/i),
         nzdjpy: findAssetSymbol(data, /^NZD\/JPY\b/i),
     };
@@ -5135,9 +5189,10 @@ function renderCarryTradeMonitor(data) {
         const p = getMostRecentPointWithPrice(data, symbol) || getLastPoint(data, symbol);
         if (!p) return null;
         const price = typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+        const change = typeof p.change === 'number' && Number.isFinite(p.change) ? p.change : null;
         const changePct = typeof p.changePct === 'number' && Number.isFinite(p.changePct) ? p.changePct : null;
         const t = p.t ? String(p.t) : '';
-        return { price, changePct, t };
+        return { price, change, changePct, t };
     };
 
     const audusd = lastOf(symbols.audusd);
@@ -5148,17 +5203,52 @@ function renderCarryTradeMonitor(data) {
     const br10y = lastOf(symbols.br10y);
     const us10y = lastOf(symbols.us10y);
     const us10br10 = lastOf(symbols.us10br10);
+    const us10jp10 = lastOf(symbols.us10jp10);
+    const jp10y = lastOf(symbols.jp10y);
+    const jp1y = lastOf(symbols.jp1y);
+    const jp5y = lastOf(symbols.jp5y);
     const audjpyDirect = lastOf(symbols.audjpy);
     const nzdjpyDirect = lastOf(symbols.nzdjpy);
+    const hk10y = lastOf(symbols.hk10y);
+    const hsi = lastOf(symbols.hsi);
+    const hstech = lastOf(symbols.hstech);
+    const ewh = lastOf(symbols.ewh);
 
     const pctOf = x => (x && typeof x.changePct === 'number' ? x.changePct : null);
     const priceOf = x => (x && typeof x.price === 'number' ? x.price : null);
+    const changeOf = x => (x && typeof x.change === 'number' ? x.change : null);
 
     const audusdPct = pctOf(audusd);
     const nzdusdPct = pctOf(nzdusd);
     const usdjpyPct = pctOf(usdjpy);
     const usdbrlPct = pctOf(usdbrl);
     const dxyPct = pctOf(dxy);
+    const jp10yLevel = priceOf(jp10y);
+    const jp10yDelta = changeOf(jp10y);
+    const jp10yBps = typeof jp10yDelta === 'number' && Number.isFinite(jp10yDelta) ? jp10yDelta * 100 : null;
+    const jp10yCarryV = typeof jp10yBps === 'number' && Number.isFinite(jp10yBps) ? -jp10yBps : null;
+    const usjpBps = priceOf(us10jp10);
+    const jp1yLevel = priceOf(jp1y);
+    const jp5yLevel = priceOf(jp5y);
+    const jp1yBps = (() => { const d = changeOf(jp1y); return typeof d === 'number' ? d * 100 : null; })();
+    const jp5yBps = (() => { const d = changeOf(jp5y); return typeof d === 'number' ? d * 100 : null; })();
+    const slope1_10_bps = typeof jp10yLevel === 'number' && typeof jp1yLevel === 'number' ? (jp10yLevel - jp1yLevel) * 100 : null;
+    const slope5_10_bps = typeof jp10yLevel === 'number' && typeof jp5yLevel === 'number' ? (jp10yLevel - jp5yLevel) * 100 : null;
+    const slope1_10_delta_bps = typeof jp10yBps === 'number' && typeof jp1yBps === 'number' ? (jp10yBps - jp1yBps) : null;
+    const slope5_10_delta_bps = typeof jp10yBps === 'number' && typeof jp5yBps === 'number' ? (jp10yBps - jp5yBps) : null;
+    const hk10yBps = (() => { const d = changeOf(hk10y); return typeof d === 'number' ? d * 100 : null; })();
+    const hsiPct = pctOf(hsi);
+    const hstechPct = pctOf(hstech);
+    const ewhPct = pctOf(ewh);
+    const hkBaseScore = avg([typeof hsiPct === 'number' ? hsiPct : null, typeof hstechPct === 'number' ? hstechPct : null, typeof ewhPct === 'number' ? ewhPct : null]
+        .map((v, i) => (i === 0 ? (typeof v === 'number' ? v * 0.5 : null) : i === 1 ? (typeof v === 'number' ? v * 0.3 : null) : (typeof v === 'number' ? v * 0.2 : null))));
+    const hkAdj = typeof hk10yBps === 'number' ? Math.max(-1, Math.min(1, (-hk10yBps) / 8)) : 0;
+    const hkScore = (typeof hkBaseScore === 'number' ? hkBaseScore : 0) + hkAdj * 0.2;
+    const hkScore10 = (() => {
+        const s = typeof hkScore === 'number' ? hkScore : 0;
+        const n = Math.max(0, Math.min(10, Math.round((s / 2) * 5 + 5)));
+        return n;
+    })();
 
     const audjpyPct =
         pctOf(audjpyDirect) !== null
@@ -5245,6 +5335,9 @@ function renderCarryTradeMonitor(data) {
     score += 1.2 * norm(-(premiumPct || 0), 0.8);
     score += 1.0 * norm(-(dxyPct || 0), 0.7);
     score += 1.2 * norm(-(usdbrlPct || 0), 0.7);
+    if (typeof jp10yCarryV === 'number' && Number.isFinite(jp10yCarryV)) {
+        score += 0.8 * norm(jp10yCarryV, 6);
+    }
 
     if (typeof nzdusdPct === 'number' && typeof audusdPct === 'number' && Math.abs(nzdusdPct) > Math.abs(audusdPct) + 0.4) {
         score += nzdusdPct < 0 ? -0.6 : +0.2;
@@ -5268,6 +5361,13 @@ function renderCarryTradeMonitor(data) {
     setMetric('carry-score', `${score10}/10`);
     setHtml('carry-score-detail', toneBadgeHtmlFromTone(scoreTone, score10 - 5, `${flowLabel}`, { maxAbs: 5 }));
 
+    const fmtSignedBp = bps => {
+        const v = typeof bps === 'number' && Number.isFinite(bps) ? bps : null;
+        if (v === null) return '—';
+        const sign = v > 0 ? '+' : v < 0 ? '−' : '';
+        return `${sign}${formatNumber(Math.abs(v), 0)}bp`;
+    };
+
     const rows = [
         { label: 'DXY', v: dxyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
         { label: 'USD/BRL', v: usdbrlPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
@@ -5276,6 +5376,8 @@ function renderCarryTradeMonitor(data) {
         { label: 'USD/JPY', v: usdjpyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
         { label: 'AUD/JPY*', v: audjpyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
         { label: 'NZD/JPY*', v: nzdjpyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'JP10Y (Δ bp)', v: jp10yCarryV, fmt: () => fmtSignedBp(jp10yBps), maxAbs: 35 },
+        { label: 'Spread US10–JP10 (bps)', v: usjpBps, fmt: x => formatNumber(x, 1), maxAbs: 800 },
         { label: 'Prêmio BR vs US (bps)', v: hasPremium ? premiumBps : null, fmt: x => formatNumber(x, 1), maxAbs: 1200 },
     ];
 
@@ -5298,7 +5400,59 @@ function renderCarryTradeMonitor(data) {
                 .join('')}
         </div>
     `;
-    setHtml('carry-components', listHtml);
+    const mkBp = v => (typeof v === 'number' && Number.isFinite(v) ? `${v > 0 ? '+' : v < 0 ? '−' : ''}${formatNumber(Math.abs(v), 0)}bp` : '—');
+    const japanCurveHtml = (jp1y || jp5y || jp10y) ? `
+        <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);margin-top:10px;">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px;">
+                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Curva Japão</div>
+                <button id="japanCurveMoreBtn" class="btn" style="padding:6px 10px;">Ver mais</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <div style="display:flex;justify-content:space-between;"><div>Δ JP1Y</div><div>${mkBp(jp1yBps)}</div></div>
+                <div style="display:flex;justify-content:space-between;"><div>Δ JP5Y</div><div>${mkBp(jp5yBps)}</div></div>
+                <div style="display:flex;justify-content:space-between;"><div>Δ JP10Y</div><div>${mkBp(jp10yBps)}</div></div>
+                <div style="display:flex;justify-content:space-between;"><div>Inclinação 1–10</div><div>${mkBp(slope1_10_bps)}</div></div>
+                <div style="display:flex;justify-content:space-between;"><div>Inclinação 5–10</div><div>${mkBp(slope5_10_bps)}</div></div>
+            </div>
+        </div>
+    ` : '';
+    const hkThermoHtml = (hsi || hstech || ewh || hk10y) ? `
+        <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);margin-top:10px;">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;">
+                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Termômetro HK</div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span>${hkScore10}/10</span>
+                    <span>${typeof hkScore === 'number' && Number.isFinite(hkScore) ? toneBadgeHtml(hkScore, formatPercent(hkScore, 2), { maxAbs: 5 }) : '—'}</span>
+                </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">
+                <div style="display:flex;justify-content:space-between;"><div>HSI</div><div>${typeof hsiPct === 'number' ? toneBadgeHtml(hsiPct, formatPercent(hsiPct, 2), { maxAbs: 5 }) : '—'}</div></div>
+                <div style="display:flex;justify-content:space-between;"><div>HSTECH</div><div>${typeof hstechPct === 'number' ? toneBadgeHtml(hstechPct, formatPercent(hstechPct, 2), { maxAbs: 5 }) : '—'}</div></div>
+                <div style="display:flex;justify-content:space-between;"><div>EWH</div><div>${typeof ewhPct === 'number' ? toneBadgeHtml(ewhPct, formatPercent(ewhPct, 2), { maxAbs: 5 }) : '—'}</div></div>
+                <div style="display:flex;justify-content:space-between;"><div>Δ HK10Y</div><div>${mkBp(hk10yBps)}</div></div>
+            </div>
+        </div>
+    ` : '';
+    setHtml('carry-components', `${listHtml}${japanCurveHtml}${hkThermoHtml}`);
+    const moreBtn = document.getElementById('japanCurveMoreBtn');
+    if (moreBtn) {
+        moreBtn.addEventListener('click', () => {
+            try {
+                localStorage.setItem('mercado_table_q:all', 'rates');
+                localStorage.setItem('mercado_table_mode:all', 'all');
+            } catch {
+            }
+            renderAllAssetsTable(data);
+            location.hash = '#all-assets';
+            const section = document.getElementById('all-assets');
+            if (section && typeof section.scrollIntoView === 'function') {
+                try {
+                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } catch {
+                }
+            }
+        });
+    }
 
     const historyKey = 'mercado_carry_history_v1';
     const maxHistory = 24;
@@ -5389,6 +5543,9 @@ function renderCarryTradeMonitor(data) {
     if (typeof usdjpyPct === 'number' && Math.abs(usdjpyPct) >= 0.8) alerts.push(`USD/JPY ${formatPercent(usdjpyPct, 2)}: funding mexendo forte.`);
     if (typeof nzdjpyPct === 'number' && Math.abs(nzdjpyPct) >= 1.0) alerts.push(`NZD/JPY (sintético) ${formatPercent(nzdjpyPct, 2)}: early warning possível.`);
     if (typeof premiumPct === 'number' && Math.abs(premiumPct) >= 0.6) alerts.push(`Prêmio BR vs US ${formatPercent(premiumPct, 2)}: compressão/abertura relevante.`);
+    if (typeof jp10yLevel === 'number' && Number.isFinite(jp10yLevel) && jp10yLevel > 0 && typeof jp10yBps === 'number' && Number.isFinite(jp10yBps) && jp10yBps >= 4) {
+        alerts.push(`JP10Y ${formatNumber(jp10yLevel, 2)}% com alta de ~${formatNumber(jp10yBps, 0)}bp: juros do Japão abrindo → risco de carry voltar para JPY (pressão em FX beta).`);
+    }
     if (carryStatus === 'Unwinding (severo)') alerts.push('Duplo unwinding: USD/JPY e AUD/USD caindo com força.');
     if (!hasPremium) alerts.push('Prêmio BR vs US não disponível (US10BR10 ou US10Y/BR10Y ausentes).');
 
@@ -5406,6 +5563,14 @@ function renderCarryIntel(data) {
     const el = document.getElementById('carryIntel');
     if (!el) return;
 
+    const resolveJapan10yYield = () => {
+        const yieldSymbol =
+            findAssetSymbol(data, /^JP10YT=RR$/i)
+            || findAssetSymbol(data, /\bJapan\b(?!.*\b(CDS|Future|Futures)\b).*?\b10\b.*?\bYear\b.*?\bYield\b/i)
+            || findAssetSymbol(data, /\bJapan\b(?!.*\b(CDS|Future|Futures)\b).*?\b10\b.*?\bYear\b/i);
+        return yieldSymbol || null;
+    };
+
     const symbols = {
         audusd: findAssetSymbol(data, /^AUD\/USD\b/i),
         nzdusd: findAssetSymbol(data, /^NZD\/USD\b/i),
@@ -5415,6 +5580,7 @@ function renderCarryIntel(data) {
         br10y: findAssetSymbol(data, /^BR10YT=RR$/i),
         us10y: findAssetSymbol(data, /^US10YT=RR$/i),
         us10br10: findAssetSymbol(data, /^US10BR10=RR$/i),
+        jp10y: resolveJapan10yYield(),
         audjpy: findAssetSymbol(data, /^AUD\/JPY\b/i),
         nzdjpy: findAssetSymbol(data, /^NZD\/JPY\b/i),
     };
@@ -5423,8 +5589,10 @@ function renderCarryIntel(data) {
         if (!symbol) return null;
         const p = getMostRecentPointWithPrice(data, symbol) || getLastPoint(data, symbol);
         if (!p) return null;
+        const price = typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+        const change = typeof p.change === 'number' && Number.isFinite(p.change) ? p.change : null;
         const changePct = typeof p.changePct === 'number' && Number.isFinite(p.changePct) ? p.changePct : null;
-        return { changePct };
+        return { price, change, changePct };
     };
 
     const audusd = lastOf(symbols.audusd);
@@ -5435,6 +5603,7 @@ function renderCarryIntel(data) {
     const br10y = lastOf(symbols.br10y);
     const us10y = lastOf(symbols.us10y);
     const us10br10 = lastOf(symbols.us10br10);
+    const jp10y = lastOf(symbols.jp10y);
     const audjpyDirect = lastOf(symbols.audjpy);
     const nzdjpyDirect = lastOf(symbols.nzdjpy);
 
@@ -5445,6 +5614,8 @@ function renderCarryIntel(data) {
     const usdjpyPct = pctOf(usdjpy);
     const usdbrlPct = pctOf(usdbrl);
     const dxyPct = pctOf(dxy);
+    const jp10yPct = pctOf(jp10y);
+    const jp10yBps = jp10y && typeof jp10y.change === 'number' && Number.isFinite(jp10y.change) ? jp10y.change * 100 : null;
 
     const audjpyPct =
         pctOf(audjpyDirect) !== null
@@ -5518,6 +5689,19 @@ function renderCarryIntel(data) {
         { label: 'AUD/USD (beta)', ...moveLabel(audusdPct, { strong: 0.8, medium: 0.3 }) },
         { label: 'DXY (USD global)', ...moveLabelInverted(dxyPct, { strong: 0.7, medium: 0.25 }) },
         { label: 'USD/BRL (risco BR)', ...moveLabelInverted(usdbrlPct, { strong: 0.7, medium: 0.25 }) },
+        {
+            label: 'JP10Y (juros Japão)',
+            ...(jp10yBps === null
+                ? (jp10yPct === null ? { txt: 'Sem dado', tone: 'neutral' } : moveLabelInverted(jp10yPct, { strong: 1.0, medium: 0.35 }))
+                : (() => {
+                    const bps = jp10yBps;
+                    if (bps >= 4) return { txt: 'Alta forte', tone: 'negative' };
+                    if (bps >= 1.5) return { txt: 'Alta', tone: 'negative' };
+                    if (bps <= -4) return { txt: 'Queda forte', tone: 'positive' };
+                    if (bps <= -1.5) return { txt: 'Queda', tone: 'positive' };
+                    return { txt: 'Estável', tone: 'neutral' };
+                })()),
+        },
         { label: 'Prêmio BR vs US (proxy)', ...(premiumPct === null ? { txt: hasPremium ? 'Disponível (sem var%)' : 'Indisponível', tone: hasPremium ? 'neutral' : 'negative' } : moveLabelInverted(premiumPct, { strong: 0.6, medium: 0.25 })) },
         { label: 'NZD/JPY (early warning)', ...moveLabel(nzdjpyPct, { strong: 1.0, medium: 0.4 }), note: pctOf(nzdjpyDirect) === null ? 'Sintético' : '' },
     ];
@@ -5585,8 +5769,11 @@ function renderGlobalTicker(data) {
         { short: 'DAX', fmt: 'price', matchers: [/\bDAX\b/i, /^\.(GDAXI)\b/i] },
         { short: 'NIKKEI', fmt: 'price', matchers: [/\bNikkei 225\b/i, /^JP225\b/i, /^\.(N225)\b/i] },
         { short: 'HSI', fmt: 'price', matchers: [/\bHang Seng\b/i, /\bHang Seng Futures\b/i] },
+        { short: 'HSTECH', fmt: 'price', matchers: [/^HSTECH$/i, /\bHang Seng TECH\b/i] },
+        { short: 'VHSI', fmt: 'price', matchers: [/^VHSI(c\d+)?$/i, /\bHSI Volatility\b/i] },
         { short: 'FTSE', fmt: 'price', matchers: [/\bFTSE 100\b/i, /^UK100\b/i] },
         { short: 'EEM', fmt: 'price', matchers: [/^EEM\b/i, /\bMSCI Emerging Markets\b/i] },
+        { short: 'EWH', fmt: 'price', matchers: [/^EWH\b/i, /\biShares MSCI Hong Kong\b/i] },
         { short: 'DOW', fmt: 'price', matchers: [/^\.(DJI)\b/i, /\bDow Jones\b/i, /^DIA\b/i] },
         { short: 'IBOV', fmt: 'price', matchers: [/^\.(BVSP)\b/i, /\bBovespa\b/i] },
         { short: 'DXY', fmt: 'price', matchers: [/^\.(DXY)\b/i, /^DX\b/i, /\bUS Dollar Index\b/i, /\bÍndice Dólar\b/i, /\bIndice Dolar\b/i] },
@@ -5752,10 +5939,10 @@ function renderBrazilExportBasket(data) {
     };
 
     const items = [
-        getItem({ key: 'iron', label: 'Minério', matchers: [/^TIOc1$|^SM58Fc1$/i], weight: 0.28 }),
+        getItem({ key: 'iron', label: 'Minério', matchers: [/^TIOc1$/i, /^SM58Fc1$/i, /^9047$/i, /^3047$/i], weight: 0.28 }),
         getItem({ key: 'soy', label: 'Soja', matchers: [/^ZS$/i], weight: 0.20 }),
         getItem({ key: 'oil', label: 'Petróleo', matchers: [/\bBrent\b/i, /\bWTI\b/i], weight: 0.18 }),
-        getItem({ key: 'lumber', label: 'Madeira serrada', matchers: [/^LBc1$/i, /^LBc\d+$/i, /\bMadeira Serrada\b/i, /\bLumber\b/i], weight: 0.02 }),
+        getItem({ key: 'lumber', label: 'Madeira serrada', matchers: [/^LBc1$/i, /^LBc\d+$/i, /^LXRc1$/i, /^LXRc\d+$/i, /\bMadeira Serrada\b/i, /\bLumber\b/i], weight: 0.02 }),
         getItem({ key: 'cattle', label: 'Boi', matchers: [/^BGIc1$/i, /^LCc1$/i, /^BBOI11\.SA$/i, /\bBoi Gordo\b/i, /\bLive Cattle\b/i, /^LE$/i], weight: 0.12 }),
         getItem({ key: 'hogs', label: 'Porco Magro', matchers: [/^LHc1$/i, /^LHc\d+$/i, /\bPorco Magro\b/i, /\bLean Hogs\b/i], weight: 0.03 }),
         getItem({ key: 'coffee', label: 'Café', matchers: [/^KC$/i], weight: 0.07 }),
