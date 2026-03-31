@@ -4064,15 +4064,53 @@ function renderOperationalBriefing() {
     const el = document.getElementById('operationalBriefing');
     if (!el) return;
 
-    const regime = operationalInputs.regime;
-    const options = operationalInputs.optionsGamma && operationalInputs.optionsGamma.ok === true ? operationalInputs.optionsGamma : null;
-    const web = operationalInputs.webNews && operationalInputs.webNews.ok === true ? operationalInputs.webNews : null;
+    const data = getData();
+    const rawRegime = operationalInputs.regime;
+    const rawOptions = operationalInputs.optionsGamma || null;
+    const rawWeb = operationalInputs.webNews || null;
+
+    const fallbackRegime = (() => {
+        if (!data) return null;
+        const flow = computeFlowScore(data);
+        const label = flow && typeof flow.label === 'string' ? flow.label : 'Neutro';
+        const score = flow && typeof flow.score === 'number' && Number.isFinite(flow.score) ? flow.score : 0;
+        const operational =
+            label === 'Risk-On'
+                ? { wdo: 'VENDA', win: 'COMPRA', hint: 'Risk-on tende a WDO↓ / WIN↑ (filtro, não gatilho).' }
+                : label === 'Risk-Off'
+                    ? { wdo: 'COMPRA', win: 'VENDA', hint: 'Risk-off tende a WDO↑ / WIN↓ (filtro, não gatilho).' }
+                    : { wdo: '—', win: '—', hint: 'Regime indefinido (filtro, não gatilho).' };
+        return { label, score, convictionLabel: '—', convictionScore: 0.55, operational, divergences: [], updatedAt: null };
+    })();
+
+    const regime = rawRegime || fallbackRegime;
+    const options = rawOptions && rawOptions.ok === true ? rawOptions : null;
+    const web = rawWeb && rawWeb.ok === true ? rawWeb : null;
 
     const fmt0 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 0) : '—');
     const fmt1 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 1) : '—');
 
     if (!regime && !options && !web) {
-        el.innerHTML = `<div style="padding:12px;opacity:.88;">Carregando sinais…</div>`;
+        const badge = (tone, text) => {
+            const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
+            return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
+        };
+        const st = x => (x ? (x.ok === true ? badge('positive', 'OK') : badge('negative', 'ERRO')) : badge('neutral', '—'));
+        el.innerHTML = `
+            <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Roteiro do momento</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        ${badge('neutral', 'Regime')} ${st(rawRegime)}
+                        ${badge('neutral', 'Opções')} ${st(rawOptions)}
+                        ${badge('neutral', 'News')} ${st(rawWeb)}
+                    </div>
+                </div>
+                <div style="margin-top:10px;opacity:.88;line-height:1.35;">
+                    Aguardando sinais suficientes para montar o roteiro completo.
+                </div>
+            </div>
+        `;
         return;
     }
 
