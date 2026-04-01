@@ -4467,18 +4467,27 @@ function renderOperationalBriefing() {
         ${(() => {
             const now = new Date();
             const hr = now.getHours();
-            if (hr >= 9) return '';
+            const min = now.getMinutes();
+            if (hr > 9 || (hr === 9 && min >= 1)) return '';
             const assets = data && Array.isArray(data.assets) ? data.assets : [];
+            const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
             const rows = assets.map(a => {
                 const last = getLastPoint(data, a.symbol);
-                return { symbol: a.symbol, name: a.name, last, isAdr: isBrazilAdr({ symbol: a.symbol, name: a.name }) };
-            }).filter(r => r.isAdr && r.last && typeof r.last.changePct === 'number' && Number.isFinite(r.last.changePct));
+                const asOfVal = last && (last.asOf || last.t) ? (last.asOf || last.t) : null;
+                const tMs = asOfVal ? Date.parse(asOfVal) : NaN;
+                const asOf = Number.isFinite(tMs) ? new Date(tMs) : null;
+                const extPct = last && typeof last.extendedChangePct === 'number' && Number.isFinite(last.extendedChangePct) ? last.extendedChangePct : null;
+                const regularPct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+                const asOfMin = asOf ? asOf.getHours() * 60 + asOf.getMinutes() : null;
+                const pct = extPct !== null ? extPct : asOf && sameDay(asOf, now) && typeof asOfMin === 'number' && asOfMin <= 9 * 60 ? regularPct : null;
+                return { symbol: a.symbol, name: a.name, last, pct, asOf, isAdr: isBrazilAdr({ symbol: a.symbol, name: a.name }) };
+            }).filter(r => r.isAdr && r.pct !== null && r.asOf && sameDay(r.asOf, now));
             if (!rows.length) return '';
-            const ups = rows.filter(r => r.last.changePct > 0);
-            const downs = rows.filter(r => r.last.changePct < 0);
-            const avg = rows.length ? rows.reduce((s, r) => s + r.last.changePct, 0) / rows.length : 0;
+            const ups = rows.filter(r => r.pct > 0);
+            const downs = rows.filter(r => r.pct < 0);
+            const avg = rows.length ? rows.reduce((s, r) => s + r.pct, 0) / rows.length : 0;
             const bias = avg > operationalTuning.threshold.export ? 'ALTISTA' : avg < -operationalTuning.threshold.export ? 'BAIXISTA' : 'NEUTRO';
-            const top = rows.slice().sort((a, b) => Math.abs(b.last.changePct) - Math.abs(a.last.changePct)).slice(0, 6);
+            const top = rows.slice().sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct)).slice(0, 6);
             const toneColor = avg > 0 ? 'rgba(0,255,160,.95)' : avg < 0 ? 'rgba(255,60,80,.95)' : 'rgba(255,210,74,.95)';
             const deg = Math.round(Math.max(-1, Math.min(1, avg / 0.6)) * 60);
             const gauge = `
@@ -4491,7 +4500,7 @@ function renderOperationalBriefing() {
                 </div>
             `;
             const list = top.map(r => {
-                const pct = r.last.changePct;
+                const pct = r.pct;
                 const c = pct > 0 ? 'rgba(0,255,160,.95)' : pct < 0 ? 'rgba(255,60,80,.95)' : 'rgba(255,210,74,.95)';
                 return `
                     <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border:1px solid rgba(255,255,255,.10);border-radius:9px;background:rgba(0,0,0,.16);">
