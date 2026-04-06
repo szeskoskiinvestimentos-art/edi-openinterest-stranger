@@ -2260,22 +2260,22 @@ function computeOperationalPulseNow(data) {
         usdbrl: findAliasSymbol(data, 'USD_BRL') || pick([/^USD\/BRL\b/i]),
         ibov: pick([/(^\.BVSP$|\bIBOV\b|\bIbovespa\b)/i]),
         ewz: pick([/^EWZ$/i]),
-        dxy: pick([/(^\.DXY$|\bDXY\b)/i]),
-        vix: pick([/^VIX$/i, /(^\.VIX$)/i]),
+        dxy: findAliasSymbol(data, 'DXY') || pick([/(^\.DXY$|\bDXY\b)/i]),
+        vix: findAliasSymbol(data, 'VIX') || pick([/^\.?VIX(9D)?$/i, /\bVIX9D\b/i, /^VIX$/i]),
         vxbr: pick([/(^\.VXBR$|\bVXBR\b)/i]),
         br10y: pick([/^BR10YT=RR$/i]),
         cds: pick([/^BRGV5YUSAC=R$/i, /^BRGV/i]),
-        spx: pick([/(^SPX$|^\.SPX$|^\^GSPC$|\bS&P\s*500\b)/i]),
-        us10y: pick([/^US10YT=RR$/i, /(^\^TNX$|\bUS\s*10Y\b|\bUST\s*10Y\b)/i]),
-        us2y: pick([/^US2YT=RR$/i, /(^\^IRX$|\bUS\s*2Y\b|\bUST\s*2Y\b)/i]),
-        hyg: pick([/^HYG$/i]),
-        tlt: pick([/^TLT$/i]),
-        eem: pick([/^EEM$/i, /^VWO$/i]),
-        brent: pick([/(^BRN$|^LCO|BZ=F|UKOIL|BRENT|Brent|BNO)/i]),
+        spx: findAliasSymbol(data, 'SPX') || pick([/(^SPX$|^\.SPX$|^\^GSPC$|\bS&P\s*500\b)/i]),
+        us10y: findAliasSymbol(data, 'US10Y') || pick([/^US10YT=RR$/i, /(^\^TNX$|\bUS\s*10Y\b|\bUST\s*10Y\b)/i]),
+        us2y: findAliasSymbol(data, 'US2Y') || pick([/^US2YT=RR$/i, /(^\^IRX$|\bUS\s*2Y\b|\bUST\s*2Y\b)/i]),
+        hyg: pick([/^HYG(\.\w+)?$/i, /\bhigh\s*yield\b/i, /\biboxx\b/i, /\balto\s*rendimento\b/i]),
+        tlt: pick([/^TLT(\.\w+)?$/i, /\bTLT\b/i, /\b20\+\s*Year\b.*\bTreasury\b/i, /\bTreasury\b.*\bBond\b/i, /\btreasuries\b/i]),
+        eem: pick([/^EEM$/i, /^VWO$/i, /\bMSCI\b.*\bEmerging\b.*\bMarkets\b/i, /\bmercados\s*emergentes\b/i]),
+        brent: pick([/^BNO$/i, /^LCO\b/i, /^LRBc1-LCOc1$/i, /\bBrent\b/i, /\bcrude\b.*\bbrent\b/i, /BRENT/i]),
         copper: pick([/(^HG$|HG=F|COPPER|\bcobre\b)/i]),
         gold: pick([/(^GC$|GC=F|GOLD|\bouro\b)/i]),
         iron: pick([/(^DCE_I0$|\bmin[eé]rio\s*de\s*ferro\b|iron\s*ore)/i]),
-        btc: pick([/(^BTC$|^BTCUSD$|BTC\/USD|XBT)/i]),
+        btc: pick([/(^BTC\/USD$|^BTCUSD$|BTC\/USD|XBT|bitcoin)/i]),
     };
 
     const get = s => (s ? getChangePct(data, s) : null);
@@ -2376,10 +2376,18 @@ function computeOperationalPulseNow(data) {
     const align = (aSym, bSym, th = 0.06) => {
         const a = get(aSym);
         const b = get(bSym);
+        if (!isNum(a) || !isNum(b)) return { ok: null, a, b, ad: 0, bd: 0, th, reason: 'missing' };
         const ad = signDir(a, th);
         const bd = signDir(b, th);
-        if (!ad || !bd) return null;
-        return ad === bd;
+        if (ad === 0 || bd === 0) return { ok: null, a, b, ad, bd, th, reason: 'weak' };
+        return { ok: ad === bd, a, b, ad, bd, th, reason: 'dir' };
+    };
+
+    const expectedKeys = driversCfg.map(x => x.key);
+    const missFor = side => {
+        const p = side === 'wdo' ? wdo : win;
+        const got = new Set((p.rows || []).map(r => String(r && r.key ? r.key : '')));
+        return expectedKeys.filter(k => !got.has(k));
     };
 
     return {
@@ -2391,6 +2399,11 @@ function computeOperationalPulseNow(data) {
             wdo_dxy: align(sym.wdo, sym.dxy),
             win_ibov: align(sym.win, sym.ibov),
             win_ewz: align(sym.win, sym.ewz),
+        },
+        coverage: {
+            expected: expectedKeys.length,
+            wdo: { observed: wdo.rows.length, missing: missFor('wdo') },
+            win: { observed: win.rows.length, missing: missFor('win') },
         },
     };
 }
@@ -3511,6 +3524,356 @@ function renderDataAudit(data) {
     `;
 }
 
+function renderAssetsCatalog(data) {
+    const el = document.getElementById('assetsCatalog');
+    if (!el) return;
+
+    const isNum = v => typeof v === 'number' && Number.isFinite(v);
+    const assets = Array.isArray(data && data.assets) ? data.assets : [];
+    const series = data && data.series ? data.series : {};
+    const generatedAt = data && data.meta && data.meta.generatedAt ? String(data.meta.generatedAt) : '';
+
+    const getBestPoint = sym => getMostRecentPointWithPrice(data, sym);
+    const getAnyPoint = sym => {
+        const xs = Array.isArray(series[sym]) ? series[sym] : [];
+        return xs.length ? xs[xs.length - 1] : null;
+    };
+
+    const categories = Array.from(new Set(assets.map(a => String(a && a.category ? a.category : '')).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b, 'pt-BR'),
+    );
+
+    const rowsAll = assets
+        .map(a => {
+            const symbol = String(a && a.symbol ? a.symbol : '');
+            const name = String(a && a.name ? a.name : '');
+            const category = String(a && a.category ? a.category : '');
+            const exchange = a && a.exchange ? String(a.exchange) : '';
+            const tags = Array.isArray(a && a.tags) ? a.tags.map(x => String(x)) : [];
+            const xs = Array.isArray(series[symbol]) ? series[symbol] : [];
+            const best = getBestPoint(symbol);
+            const any = getAnyPoint(symbol);
+            const lastT = best && best.t ? best.t : any && any.t ? any.t : null;
+            const lastPrice = best && isNum(best.price) ? best.price : null;
+            const lastChangePct = best && isNum(best.changePct) ? best.changePct : null;
+            const lastExtChangePct = best && isNum(best.extendedChangePct) ? best.extendedChangePct : null;
+            return {
+                symbol,
+                name,
+                category,
+                exchange,
+                tags,
+                points: xs.length,
+                lastT,
+                lastPrice,
+                lastChangePct,
+                lastExtChangePct,
+                hasSeries: xs.length > 0,
+                hasPrice: lastPrice !== null,
+            };
+        })
+        .sort((a, b) => a.symbol.localeCompare(b.symbol, 'en'));
+
+    const counts = {
+        assets: rowsAll.length,
+        withSeries: rowsAll.filter(r => r.hasSeries).length,
+        withPrice: rowsAll.filter(r => r.hasPrice).length,
+        noSeries: rowsAll.filter(r => !r.hasSeries).length,
+        noPrice: rowsAll.filter(r => r.hasSeries && !r.hasPrice).length,
+    };
+
+    const mkCategoryCounts = () => {
+        const map = new Map();
+        for (const r of rowsAll) {
+            const k = r.category || '—';
+            map.set(k, (map.get(k) || 0) + 1);
+        }
+        return Array.from(map.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 12)
+            .map(([k, v]) => badge('neutral', `${k}: ${v}`))
+            .join(' ');
+    };
+
+    const storageKey = 'edi_market_assets_catalog_v1';
+    const prev = (() => {
+        try {
+            const raw = localStorage.getItem(storageKey);
+            if (!raw) return null;
+            const obj = JSON.parse(raw);
+            if (!obj || typeof obj !== 'object') return null;
+            const syms = Array.isArray(obj.symbols) ? obj.symbols.map(x => String(x)) : [];
+            return { symbols: new Set(syms), at: obj.at ? String(obj.at) : '' };
+        } catch {
+            return null;
+        }
+    })();
+    const curSymbols = new Set(rowsAll.map(r => r.symbol));
+    const delta = (() => {
+        if (!prev) return { added: [], removed: [], at: '' };
+        const added = [];
+        const removed = [];
+        for (const s of curSymbols) if (!prev.symbols.has(s)) added.push(s);
+        for (const s of prev.symbols) if (!curSymbols.has(s)) removed.push(s);
+        return { added: added.sort(), removed: removed.sort(), at: prev.at };
+    })();
+    try {
+        localStorage.setItem(storageKey, JSON.stringify({ at: generatedAt || new Date().toISOString(), symbols: Array.from(curSymbols).sort() }));
+    } catch {
+    }
+
+    const pulseNow = typeof computeOperationalPulseNow === 'function' ? computeOperationalPulseNow(data) : null;
+    const mapping = pulseNow && pulseNow.sym ? pulseNow.sym : null;
+    const mappingRow = (label, key) => {
+        const val = mapping && mapping[key] ? String(mapping[key]) : '—';
+        return `<tr>
+            <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);font-weight:900;opacity:.92;">${escapeHtml(label)}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.9;">${escapeHtml(val)}</td>
+        </tr>`;
+    };
+
+    const render = () => {
+        const qEl = document.getElementById('assetsCatalogQuery');
+        const cEl = document.getElementById('assetsCatalogCategory');
+        const onlyEl = document.getElementById('assetsCatalogOnly');
+        const sortEl = document.getElementById('assetsCatalogSort');
+        const q = qEl ? String(qEl.value || '').trim().toLowerCase() : '';
+        const cat = cEl ? String(cEl.value || '') : '';
+        const only = onlyEl ? String(onlyEl.value || 'all') : 'all';
+        const sort = sortEl ? String(sortEl.value || 'symbol') : 'symbol';
+
+        let rows = rowsAll.slice();
+        if (cat) rows = rows.filter(r => r.category === cat);
+        if (only === 'no_price') rows = rows.filter(r => r.hasSeries && !r.hasPrice);
+        if (only === 'no_series') rows = rows.filter(r => !r.hasSeries);
+        if (q) {
+            rows = rows.filter(r => {
+                const hay = `${r.symbol} ${r.name} ${r.category} ${r.exchange} ${(r.tags || []).join(' ')}`.toLowerCase();
+                return hay.includes(q);
+            });
+        }
+
+        const ms = t => {
+            const x = t ? Date.parse(t) : NaN;
+            return Number.isFinite(x) ? x : -Infinity;
+        };
+        if (sort === 'last') rows.sort((a, b) => ms(b.lastT) - ms(a.lastT));
+        if (sort === 'pct') rows.sort((a, b) => (isNum(b.lastChangePct) ? b.lastChangePct : -Infinity) - (isNum(a.lastChangePct) ? a.lastChangePct : -Infinity));
+        if (sort === 'points') rows.sort((a, b) => b.points - a.points);
+        if (sort === 'symbol') rows.sort((a, b) => a.symbol.localeCompare(b.symbol, 'en'));
+
+        const tbody = rows
+            .slice(0, 240)
+            .map(r => {
+                const t = r.lastT ? formatDateTime(r.lastT) : '—';
+                const pct = isNum(r.lastChangePct) ? formatPercent(r.lastChangePct, 2) : '—';
+                const ext = isNum(r.lastExtChangePct) ? formatPercent(r.lastExtChangePct, 2) : '—';
+                const price = isNum(r.lastPrice) ? formatNumber(r.lastPrice, 6) : '—';
+                const seriesTxt = r.hasSeries ? escapeHtml(String(r.points)) : '—';
+                const tone = r.hasPrice ? 'neutral' : r.hasSeries ? 'negative' : 'negative';
+                const symCell = badge(tone, r.symbol);
+                return `<tr>
+                    <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);">${symCell}</td>
+                    <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);opacity:.92;">${escapeHtml(r.name || '')}</td>
+                    <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);opacity:.85;white-space:nowrap;">${escapeHtml(r.category || '—')}</td>
+                    <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.9;white-space:nowrap;">${escapeHtml(pct)}</td>
+                    <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.75;white-space:nowrap;">${escapeHtml(ext)}</td>
+                    <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.92;white-space:nowrap;">${escapeHtml(price)}</td>
+                    <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.85;">${seriesTxt}</td>
+                    <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;opacity:.88;white-space:nowrap;">${escapeHtml(t)}</td>
+                </tr>`;
+            })
+            .join('');
+
+        const out = document.getElementById('assetsCatalogTableBody');
+        if (out) out.innerHTML = tbody || '';
+        const meta = document.getElementById('assetsCatalogMeta');
+        if (meta) meta.innerHTML = `${badge('neutral', `Exibindo: ${rows.length}`)} ${badge('neutral', `Limite: ${Math.min(240, rows.length)}`)}`;
+    };
+
+    const onCopy = () => {
+        const qEl = document.getElementById('assetsCatalogQuery');
+        const cEl = document.getElementById('assetsCatalogCategory');
+        const onlyEl = document.getElementById('assetsCatalogOnly');
+        const q = qEl ? String(qEl.value || '').trim().toLowerCase() : '';
+        const cat = cEl ? String(cEl.value || '') : '';
+        const only = onlyEl ? String(onlyEl.value || 'all') : 'all';
+        let rows = rowsAll.slice();
+        if (cat) rows = rows.filter(r => r.category === cat);
+        if (only === 'no_price') rows = rows.filter(r => r.hasSeries && !r.hasPrice);
+        if (only === 'no_series') rows = rows.filter(r => !r.hasSeries);
+        if (q) {
+            rows = rows.filter(r => {
+                const hay = `${r.symbol} ${r.name} ${r.category} ${r.exchange} ${(r.tags || []).join(' ')}`.toLowerCase();
+                return hay.includes(q);
+            });
+        }
+        const text = rows.map(r => r.symbol).join('\n');
+        const fallback = () => {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.setAttribute('readonly', 'true');
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                return true;
+            } catch {
+                return false;
+            }
+        };
+        const ok = navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(text).then(() => true).catch(() => fallback()) : Promise.resolve(fallback());
+        ok.then(() => {
+            const btn = document.getElementById('assetsCatalogCopy');
+            if (!btn) return;
+            const prev = btn.textContent;
+            btn.textContent = 'Copiado';
+            setTimeout(() => {
+                btn.textContent = prev || 'Copiar símbolos';
+            }, 900);
+        });
+    };
+
+    el.innerHTML = `
+        <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Catálogo CSV (autoatualizável)</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    ${badge('neutral', `Ativos: ${counts.assets}`)}
+                    ${badge('neutral', `Com série: ${counts.withSeries}`)}
+                    ${badge('neutral', `Com preço: ${counts.withPrice}`)}
+                    ${counts.noSeries ? badge('negative', `Sem série: ${counts.noSeries}`) : badge('positive', 'Sem série: 0')}
+                    ${counts.noPrice ? badge('negative', `Sem preço: ${counts.noPrice}`) : badge('positive', 'Sem preço: 0')}
+                </div>
+            </div>
+
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;opacity:.95;line-height:1.45;">
+                ${mkCategoryCounts()}
+            </div>
+
+            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                <input id="assetsCatalogQuery" type="text" inputmode="search" autocomplete="off" placeholder="Buscar símbolo/nome/categoria..." style="flex:1;min-width:220px;background:#101010;color:#e0e0e0;border:1px solid rgba(255,255,255,.14);padding:8px 10px;border-radius:10px;font-weight:900;" />
+                <select id="assetsCatalogCategory" style="background:#101010;color:#e0e0e0;border:1px solid rgba(255,255,255,.14);padding:8px 10px;border-radius:10px;font-weight:900;">
+                    <option value="">Todas categorias</option>
+                    ${categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
+                </select>
+                <select id="assetsCatalogOnly" style="background:#101010;color:#e0e0e0;border:1px solid rgba(255,255,255,.14);padding:8px 10px;border-radius:10px;font-weight:900;">
+                    <option value="all">Tudo</option>
+                    <option value="no_price">Somente sem preço</option>
+                    <option value="no_series">Somente sem série</option>
+                </select>
+                <select id="assetsCatalogSort" style="background:#101010;color:#e0e0e0;border:1px solid rgba(255,255,255,.14);padding:8px 10px;border-radius:10px;font-weight:900;">
+                    <option value="symbol">Ordenar: símbolo</option>
+                    <option value="last">Ordenar: atualização</option>
+                    <option value="pct">Ordenar: variação</option>
+                    <option value="points">Ordenar: pontos</option>
+                </select>
+                <button id="assetsCatalogCopy" type="button" style="border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:8px 10px;background:#151515;color:#e0e0e0;font-weight:900;letter-spacing:.4px;cursor:pointer;">Copiar símbolos</button>
+            </div>
+
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <div id="assetsCatalogMeta"></div>
+                ${delta.added.length ? badge('positive', `Novos: ${delta.added.length}`) : badge('neutral', 'Novos: 0')}
+                ${delta.removed.length ? badge('negative', `Removidos: ${delta.removed.length}`) : badge('neutral', 'Removidos: 0')}
+                ${delta.at ? badge('neutral', `Última base: ${formatDateTime(delta.at)}`) : badge('neutral', 'Última base: —')}
+            </div>
+
+            ${(delta.added.length || delta.removed.length) ? `
+                <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">
+                    <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(0,0,0,.16);">
+                        <div style="font-weight:900;letter-spacing:.6px;opacity:.9;margin-bottom:6px;">Novos</div>
+                        <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.9;line-height:1.5;white-space:pre-wrap;">${escapeHtml(delta.added.slice(0, 24).join('  ') || '—')}${delta.added.length > 24 ? `<span style="opacity:.75;"> …</span>` : ''}</div>
+                    </div>
+                    <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(0,0,0,.16);">
+                        <div style="font-weight:900;letter-spacing:.6px;opacity:.9;margin-bottom:6px;">Removidos</div>
+                        <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.9;line-height:1.5;white-space:pre-wrap;">${escapeHtml(delta.removed.slice(0, 24).join('  ') || '—')}${delta.removed.length > 24 ? `<span style="opacity:.75;"> …</span>` : ''}</div>
+                    </div>
+                </div>
+            ` : ''}
+
+            <div style="margin-top:12px;border:1px solid rgba(255,255,255,.10);border-radius:12px;overflow:hidden;">
+                <div style="overflow:auto;max-height:520px;">
+                    <table style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr>
+                                <th style="position:sticky;top:0;background:rgba(10,10,10,.98);backdrop-filter:blur(6px);padding:9px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.6px;opacity:.85;">Símbolo</th>
+                                <th style="position:sticky;top:0;background:rgba(10,10,10,.98);backdrop-filter:blur(6px);padding:9px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.6px;opacity:.85;">Nome</th>
+                                <th style="position:sticky;top:0;background:rgba(10,10,10,.98);backdrop-filter:blur(6px);padding:9px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.6px;opacity:.85;">Cat</th>
+                                <th style="position:sticky;top:0;background:rgba(10,10,10,.98);backdrop-filter:blur(6px);padding:9px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.6px;opacity:.85;">Δ%</th>
+                                <th style="position:sticky;top:0;background:rgba(10,10,10,.98);backdrop-filter:blur(6px);padding:9px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.6px;opacity:.65;">Ext%</th>
+                                <th style="position:sticky;top:0;background:rgba(10,10,10,.98);backdrop-filter:blur(6px);padding:9px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.6px;opacity:.85;">Preço</th>
+                                <th style="position:sticky;top:0;background:rgba(10,10,10,.98);backdrop-filter:blur(6px);padding:9px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.6px;opacity:.85;">Pts</th>
+                                <th style="position:sticky;top:0;background:rgba(10,10,10,.98);backdrop-filter:blur(6px);padding:9px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.6px;opacity:.85;">Último</th>
+                            </tr>
+                        </thead>
+                        <tbody id="assetsCatalogTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(0,0,0,.16);">
+                    <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:8px;">Mapeamento (Resumo Operacional)</div>
+                    <div style="overflow:auto;max-height:240px;border:1px solid rgba(255,255,255,.08);border-radius:10px;">
+                        <table style="width:100%;border-collapse:collapse;">
+                            <tbody>
+                                ${mappingRow('WDO', 'wdo')}
+                                ${mappingRow('WIN', 'win')}
+                                ${mappingRow('USD/BRL', 'usdbrl')}
+                                ${mappingRow('IBOV', 'ibov')}
+                                ${mappingRow('EWZ', 'ewz')}
+                                ${mappingRow('DXY', 'dxy')}
+                                ${mappingRow('VIX', 'vix')}
+                                ${mappingRow('VXBR', 'vxbr')}
+                                ${mappingRow('BR10Y', 'br10y')}
+                                ${mappingRow('CDS', 'cds')}
+                                ${mappingRow('SPX', 'spx')}
+                                ${mappingRow('US10Y', 'us10y')}
+                                ${mappingRow('US2Y', 'us2y')}
+                                ${mappingRow('HYG', 'hyg')}
+                                ${mappingRow('TLT', 'tlt')}
+                                ${mappingRow('EEM/VWO', 'eem')}
+                                ${mappingRow('Brent', 'brent')}
+                                ${mappingRow('Cobre', 'copper')}
+                                ${mappingRow('Ouro', 'gold')}
+                                ${mappingRow('Minério', 'iron')}
+                                ${mappingRow('BTC', 'btc')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(0,0,0,.16);">
+                    <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:8px;">Carimbo</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        ${badge('neutral', `Gerado: ${generatedAt ? formatDateTime(generatedAt) : '—'}`)}
+                        ${badge('neutral', `Fonte: ${data && data.meta && data.meta.source ? String(data.meta.source) : '—'}`)}
+                        ${badge('neutral', `Intervalo: ${data && data.meta && data.meta.intervalMinutes ? String(data.meta.intervalMinutes) : '—'}m`)}
+                        ${badge('neutral', `Retenção: ${data && data.meta && data.meta.retentionDays ? String(data.meta.retentionDays) : '—'}d`)}
+                    </div>
+                    <div style="margin-top:10px;opacity:.86;line-height:1.45;">
+                        Use este bloco como “base de dados” do CSV: ele lista tudo que existe, indica se tem série/preço e mostra o que entrou/saiu desde a última vez que você abriu o dashboard.
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const bind = (id, evt, fn) => {
+        const x = document.getElementById(id);
+        if (!x) return;
+        x.addEventListener(evt, fn);
+    };
+    bind('assetsCatalogQuery', 'input', render);
+    bind('assetsCatalogCategory', 'change', render);
+    bind('assetsCatalogOnly', 'change', render);
+    bind('assetsCatalogSort', 'change', render);
+    bind('assetsCatalogCopy', 'click', onCopy);
+    render();
+}
+
 function renderSectorHeatmap(data) {
     const el = document.getElementById('sectorHeatmap');
     if (!el) return;
@@ -3652,6 +4015,7 @@ function renderIntel(data) {
     renderBrazilFixedIncomeFlow(data);
     renderAgendaMatrix();
     renderDataAudit(data);
+    renderAssetsCatalog(data);
     renderSectorHeatmap(data);
 }
 
@@ -4678,8 +5042,12 @@ function renderOperationalBriefing() {
             const br = p.breadth || { pos: 0, neg: 0, zero: 0 };
 
             const alignBadge = (ok, label) => {
-                if (ok === null) return badge('neutral', `${label}: —`);
-                return badge(ok ? 'positive' : 'negative', `${label}: ${ok ? 'OK' : 'DIVERGE'}`);
+                const fmt = v => (typeof v === 'number' && Number.isFinite(v) ? formatPercent(v, 2) : '—');
+                if (!ok || typeof ok !== 'object') return badge('neutral', `${label}: —`);
+                if (ok.reason === 'missing') return badge('neutral', `${label}: —`);
+                if (ok.reason === 'weak') return badge('neutral', `${label}: FRACO (${fmt(ok.a)} / ${fmt(ok.b)})`);
+                if (ok.ok === null) return badge('neutral', `${label}: —`);
+                return badge(ok.ok ? 'positive' : 'negative', `${label}: ${ok.ok ? 'OK' : 'DIVERGE'} (${fmt(ok.a)} / ${fmt(ok.b)})`);
             };
 
             const a1 =
@@ -4690,6 +5058,15 @@ function renderOperationalBriefing() {
                 side === 'wdo'
                     ? alignBadge(pulseNow.align ? pulseNow.align.wdo_dxy : null, 'WDO×DXY')
                     : alignBadge(pulseNow.align ? pulseNow.align.win_ewz : null, 'WIN×EWZ');
+
+            const missing = (() => {
+                const cov = pulseNow.coverage && pulseNow.coverage[side] ? pulseNow.coverage[side] : null;
+                const list = cov && Array.isArray(cov.missing) ? cov.missing : [];
+                if (!list.length) return badge('positive', 'Drivers: completos');
+                const head = list.slice(0, 6).join(', ');
+                const tail = list.length > 6 ? `… +${list.length - 6}` : '';
+                return badge('neutral', `Faltando: ${head}${tail ? ` ${tail}` : ''}`);
+            })();
 
             const topNews = (() => {
                 const items = web && Array.isArray(web.items) ? web.items.slice(0, 18) : [];
@@ -4725,6 +5102,9 @@ function renderOperationalBriefing() {
                     <div style="margin-top:8px;opacity:.88;font-size:12px;line-height:1.35;">
                         PnL (sintético): +${formatNumber(pnl.posSum, 2)} / ${formatNumber(pnl.negSum, 2)} • net ${formatNumber(pnl.net, 2)}
                         • Largura: ${String(br.pos)}↑ ${String(br.neg)}↓ ${String(br.zero)}≈
+                    </div>
+                    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        ${missing}
                     </div>
                     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                         ${a1} ${a2}
@@ -5093,7 +5473,7 @@ function assetAliasMatchers(key) {
     if (k === 'US30Y') return [/^US30YT=RR$/i, /^USc1=$/i, /\bUnited States 30-Year\b/i, /\bEUA\b\s+a\s+30\s+anos\b/i, /^US30Y\b/i];
 
     if (k === 'DXY') return [/^\.DXY$/i, /\bDXY\b/i, /US Dollar Index/i, /Indice Dolar/i];
-    if (k === 'VIX') return [/^\.VIX$/i, /\bVIX\b/i, /Volatilidade/i];
+    if (k === 'VIX') return [/^\.?VIX(9D)?$/i, /\bVIX9D\b/i, /\bVIX\b/i, /Volatilidade/i];
 
     if (k === 'BRENT') return [/\bBrent\b/i];
     if (k === 'WTI') return [/\bWTI\b/i];
