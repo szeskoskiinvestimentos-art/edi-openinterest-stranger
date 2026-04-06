@@ -2266,6 +2266,16 @@ function computeOperationalPulseNow(data) {
         br10y: pick([/^BR10YT=RR$/i]),
         cds: pick([/^BRGV5YUSAC=R$/i, /^BRGV/i]),
         spx: pick([/(^SPX$|^\.SPX$|^\^GSPC$|\bS&P\s*500\b)/i]),
+        us10y: pick([/^US10YT=RR$/i, /(^\^TNX$|\bUS\s*10Y\b|\bUST\s*10Y\b)/i]),
+        us2y: pick([/^US2YT=RR$/i, /(^\^IRX$|\bUS\s*2Y\b|\bUST\s*2Y\b)/i]),
+        hyg: pick([/^HYG$/i]),
+        tlt: pick([/^TLT$/i]),
+        eem: pick([/^EEM$/i, /^VWO$/i]),
+        brent: pick([/(^BRN$|^LCO|BZ=F|UKOIL|BRENT|Brent|BNO)/i]),
+        copper: pick([/(^HG$|HG=F|COPPER|\bcobre\b)/i]),
+        gold: pick([/(^GC$|GC=F|GOLD|\bouro\b)/i]),
+        iron: pick([/(^DCE_I0$|\bmin[eé]rio\s*de\s*ferro\b|iron\s*ore)/i]),
+        btc: pick([/(^BTC$|^BTCUSD$|BTC\/USD|XBT)/i]),
     };
 
     const get = s => (s ? getChangePct(data, s) : null);
@@ -2279,6 +2289,16 @@ function computeOperationalPulseNow(data) {
         cds: { label: 'CDS BR 5Y', pct: get(sym.cds) },
         ewz: { label: 'EWZ', pct: get(sym.ewz) },
         spx: { label: 'SPX', pct: get(sym.spx) },
+        us10y: { label: 'US10Y', pct: get(sym.us10y) },
+        us2y: { label: 'US2Y', pct: get(sym.us2y) },
+        hyg: { label: 'HYG (crédito)', pct: get(sym.hyg) },
+        tlt: { label: 'TLT (duration)', pct: get(sym.tlt) },
+        eem: { label: 'EEM/VWO (EM)', pct: get(sym.eem) },
+        brent: { label: 'Brent', pct: get(sym.brent) },
+        copper: { label: 'Cobre', pct: get(sym.copper) },
+        gold: { label: 'Ouro', pct: get(sym.gold) },
+        iron: { label: 'Minério', pct: get(sym.iron) },
+        btc: { label: 'BTC', pct: get(sym.btc) },
         ibov: { label: 'IBOV', pct: get(sym.ibov) },
         wdo: { label: 'WDO', pct: get(sym.wdo) },
         win: { label: 'WIN', pct: get(sym.win) },
@@ -2293,6 +2313,15 @@ function computeOperationalPulseNow(data) {
         { key: 'cds', weight: 0.55, capAbs: 0.6, wdoSign: +1, winSign: -1 },
         { key: 'ewz', weight: 0.65, capAbs: 1.2, wdoSign: -1, winSign: +1 },
         { key: 'spx', weight: 0.45, capAbs: 1.1, wdoSign: -1, winSign: +1 },
+        { key: 'hyg', weight: 0.35, capAbs: 1.2, wdoSign: -1, winSign: +1 },
+        { key: 'us10y', weight: 0.4, capAbs: 0.6, wdoSign: +1, winSign: -1 },
+        { key: 'us2y', weight: 0.25, capAbs: 0.6, wdoSign: +1, winSign: -1 },
+        { key: 'eem', weight: 0.25, capAbs: 1.2, wdoSign: -1, winSign: +1 },
+        { key: 'copper', weight: 0.25, capAbs: 1.8, wdoSign: -1, winSign: +1 },
+        { key: 'iron', weight: 0.2, capAbs: 2.2, wdoSign: -1, winSign: +1 },
+        { key: 'brent', weight: 0.2, capAbs: 2.2, wdoSign: -1, winSign: +1 },
+        { key: 'gold', weight: 0.15, capAbs: 1.6, wdoSign: +1, winSign: -1 },
+        { key: 'btc', weight: 0.1, capAbs: 4.0, wdoSign: -1, winSign: +1 },
     ];
 
     const buildSide = side => {
@@ -4689,6 +4718,9 @@ function renderOperationalBriefing() {
                             ${badge(biasTone(p.bias), biasLabel(sym, p.bias))}
                             ${badge('neutral', `Drivers net`)} ${netBadge}
                         </div>
+                    </div>
+                    <div style="margin-top:6px;opacity:.78;font-size:12px;">
+                        Cobertura: ${escapeHtml(String((p.rows || []).length))} drivers ativos
                     </div>
                     <div style="margin-top:8px;opacity:.88;font-size:12px;line-height:1.35;">
                         PnL (sintético): +${formatNumber(pnl.posSum, 2)} / ${formatNumber(pnl.negSum, 2)} • net ${formatNumber(pnl.net, 2)}
