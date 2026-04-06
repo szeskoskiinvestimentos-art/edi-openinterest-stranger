@@ -2147,6 +2147,225 @@ function renderRatesBuckets(data) {
     `;
 }
 
+function computeBrazilCdsHedgeSignal(data) {
+    const symCds = findAssetSymbol(data, /^BRGV5YUSAC=R$/i)
+        || findAssetSymbol(data, /^BRGV/i)
+        || findAssetSymbol(data, /\bBrazil\b.*\bCDS\b|\bCDS\b.*\bBrazil\b/i);
+    const symFx = findAliasSymbol(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i);
+    const symEq = findAssetSymbol(data, /^EWZ$/i)
+        || findAssetSymbol(data, /(^\.BVSP$|\bIbovespa\b)/i)
+        || findAssetSymbol(data, /\bBOVA11(?:\.SA)?\b/i);
+
+    const cds = getChangePct(data, symCds);
+    const fx = getChangePct(data, symFx);
+    const eq = getChangePct(data, symEq);
+
+    const hasAny = [cds, fx, eq].some(v => typeof v === 'number' && Number.isFinite(v));
+    if (!hasAny) return null;
+
+    const th = { cds: 0.20, fx: 0.12, eq: 0.25 };
+    const dir = (v, t) => (typeof v === 'number' && Number.isFinite(v) ? (v > t ? 1 : v < -t ? -1 : 0) : null);
+
+    const cdsDir = dir(cds, th.cds);
+    const fxDir = dir(fx, th.fx);
+    const eqDir = dir(eq, th.eq);
+
+    const fmt = v => (typeof v === 'number' && Number.isFinite(v) ? formatPercent(v, 2) : '—');
+
+    const toneFor = mode => {
+        if (mode === 'risk_off_classic') return 'negative';
+        if (mode === 'relief_risk_on') return 'positive';
+        if (mode === 'hedge_on_risk_on') return 'neutral';
+        if (mode === 'protection_isolated') return 'neutral';
+        return 'neutral';
+    };
+
+    const mkMode = () => {
+        if (cdsDir === 1 && fxDir === 1 && eqDir === -1) return 'risk_off_classic';
+        if (cdsDir === 1 && fxDir === -1 && eqDir === 1) return 'hedge_on_risk_on';
+        if (cdsDir === -1 && fxDir === -1 && eqDir === 1) return 'relief_risk_on';
+        if (cdsDir === 1) return 'protection_isolated';
+        if (cdsDir === -1) return 'relief_isolated';
+        return 'neutral';
+    };
+
+    const mode = mkMode();
+
+    const expected = (() => {
+        if (mode === 'risk_off_classic') return { cds: 1, fx: 1, eq: -1 };
+        if (mode === 'hedge_on_risk_on') return { cds: 1, fx: -1, eq: 1 };
+        if (mode === 'relief_risk_on') return { cds: -1, fx: -1, eq: 1 };
+        if (mode === 'protection_isolated') return { cds: 1, fx: null, eq: null };
+        if (mode === 'relief_isolated') return { cds: -1, fx: null, eq: null };
+        return { cds: null, fx: null, eq: null };
+    })();
+
+    const matchCount = (() => {
+        const pairs = [
+            { got: cdsDir, exp: expected.cds },
+            { got: fxDir, exp: expected.fx },
+            { got: eqDir, exp: expected.eq },
+        ];
+        const eligible = pairs.filter(p => typeof p.exp === 'number' && typeof p.got === 'number');
+        if (!eligible.length) return { match: 0, total: 0 };
+        const match = eligible.filter(p => p.got === p.exp).length;
+        return { match, total: eligible.length };
+    })();
+
+    const magnitudeScore = (() => {
+        const parts = [
+            typeof cds === 'number' ? Math.min(1, Math.abs(cds) / 0.6) : null,
+            typeof fx === 'number' ? Math.min(1, Math.abs(fx) / 0.35) : null,
+            typeof eq === 'number' ? Math.min(1, Math.abs(eq) / 1.2) : null,
+        ].filter(x => typeof x === 'number' && Number.isFinite(x));
+        return parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : 0.0;
+    })();
+
+    const confidence = (() => {
+        if (!matchCount.total) return Math.max(0.2, Math.min(0.65, magnitudeScore));
+        const alignment = matchCount.match / matchCount.total;
+        return Math.max(0, Math.min(1, (0.62 * alignment) + (0.38 * magnitudeScore)));
+    })();
+
+    const label = (() => {
+        if (mode === 'hedge_on_risk_on') return 'Hedge-on (CDS↑ com Brasil comprado)';
+        if (mode === 'risk_off_classic') return 'Risk-off clássico (CDS↑ + BRL↓ + bolsa↓)';
+        if (mode === 'relief_risk_on') return 'Alívio (CDS↓ + BRL↑ + bolsa↑)';
+        if (mode === 'protection_isolated') return 'Proteção (CDS↑ sem confirmação)';
+        if (mode === 'relief_isolated') return 'Alívio (CDS↓ sem confirmação)';
+        return 'Neutro/ruído';
+    })();
+
+    const detail = `CDS ${fmt(cds)} • USD/BRL ${fmt(fx)} • BR (EWZ/IBOV) ${fmt(eq)}`;
+
+    return {
+        mode,
+        tone: toneFor(mode),
+        label,
+        detail,
+        confidence,
+        drivers: { cds, fx, eq, sym: { cds: symCds, fx: symFx, eq: symEq } },
+    };
+}
+
+function computeOperationalPulseNow(data) {
+    const isNum = v => typeof v === 'number' && Number.isFinite(v);
+    const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+    const signDir = (v, th) => (isNum(v) ? (v > th ? 1 : v < -th ? -1 : 0) : 0);
+
+    const pick = patterns => patterns.map(re => findAssetSymbol(data, re)).find(Boolean) || null;
+    const sym = {
+        wdo: pick([/(^WDO\b|WDOc\d\b|\bmini\s*d[oó]lar\b)/i]),
+        win: pick([/(^WIN\b|WINc\d\b|\bmini\s*(índice|indice)\b|\bmini\s*ibovespa\b)/i]),
+        usdbrl: findAliasSymbol(data, 'USD_BRL') || pick([/^USD\/BRL\b/i]),
+        ibov: pick([/(^\.BVSP$|\bIBOV\b|\bIbovespa\b)/i]),
+        ewz: pick([/^EWZ$/i]),
+        dxy: pick([/(^\.DXY$|\bDXY\b)/i]),
+        vix: pick([/^VIX$/i, /(^\.VIX$)/i]),
+        vxbr: pick([/(^\.VXBR$|\bVXBR\b)/i]),
+        br10y: pick([/^BR10YT=RR$/i]),
+        cds: pick([/^BRGV5YUSAC=R$/i, /^BRGV/i]),
+        spx: pick([/(^SPX$|^\.SPX$|^\^GSPC$|\bS&P\s*500\b)/i]),
+    };
+
+    const get = s => (s ? getChangePct(data, s) : null);
+
+    const drv = {
+        usdbrl: { label: 'USD/BRL', pct: get(sym.usdbrl) },
+        dxy: { label: 'DXY', pct: get(sym.dxy) },
+        vix: { label: 'VIX', pct: get(sym.vix) },
+        vxbr: { label: 'VXBR', pct: get(sym.vxbr) },
+        br10y: { label: 'BR10Y', pct: get(sym.br10y) },
+        cds: { label: 'CDS BR 5Y', pct: get(sym.cds) },
+        ewz: { label: 'EWZ', pct: get(sym.ewz) },
+        spx: { label: 'SPX', pct: get(sym.spx) },
+        ibov: { label: 'IBOV', pct: get(sym.ibov) },
+        wdo: { label: 'WDO', pct: get(sym.wdo) },
+        win: { label: 'WIN', pct: get(sym.win) },
+    };
+
+    const driversCfg = [
+        { key: 'usdbrl', weight: 1.0, capAbs: 0.6, wdoSign: +1, winSign: -1 },
+        { key: 'dxy', weight: 0.8, capAbs: 0.6, wdoSign: +1, winSign: -1 },
+        { key: 'vix', weight: 0.65, capAbs: 4.0, wdoSign: +1, winSign: -1 },
+        { key: 'vxbr', weight: 0.55, capAbs: 6.0, wdoSign: +1, winSign: -1 },
+        { key: 'br10y', weight: 0.55, capAbs: 0.45, wdoSign: +1, winSign: -1 },
+        { key: 'cds', weight: 0.55, capAbs: 0.6, wdoSign: +1, winSign: -1 },
+        { key: 'ewz', weight: 0.65, capAbs: 1.2, wdoSign: -1, winSign: +1 },
+        { key: 'spx', weight: 0.45, capAbs: 1.1, wdoSign: -1, winSign: +1 },
+    ];
+
+    const buildSide = side => {
+        const rows = [];
+        const breadth = { pos: 0, neg: 0, zero: 0 };
+        const contribution = { posSum: 0, negSum: 0, net: 0 };
+        const pnlLike = { posSum: 0, negSum: 0, net: 0 };
+
+        for (const cfg of driversCfg) {
+            const d = drv[cfg.key];
+            const pct = d ? d.pct : null;
+            if (!isNum(pct)) continue;
+            const sgn = side === 'wdo' ? cfg.wdoSign : cfg.winSign;
+            const signed = sgn * pct;
+            const capped = clamp(signed, -cfg.capAbs, cfg.capAbs);
+            const contrib = cfg.weight * (cfg.capAbs > 0 ? capped / cfg.capAbs : 0);
+            const pnl = cfg.weight * capped;
+            contribution.net += contrib;
+            pnlLike.net += pnl;
+            if (contrib > 0) {
+                breadth.pos += 1;
+                contribution.posSum += contrib;
+                pnlLike.posSum += pnl;
+            } else if (contrib < 0) {
+                breadth.neg += 1;
+                contribution.negSum += contrib;
+                pnlLike.negSum += pnl;
+            } else {
+                breadth.zero += 1;
+            }
+            rows.push({
+                key: cfg.key,
+                label: d.label,
+                symbol: sym[cfg.key] || null,
+                pct,
+                signed,
+                weight: cfg.weight,
+                capAbs: cfg.capAbs,
+                contrib,
+                pnl,
+            });
+        }
+
+        const net = clamp(contribution.net, -3, 3);
+        const bias = net > 0.25 ? 'buy' : net < -0.25 ? 'sell' : 'neutral';
+        return { bias, net, breadth, contribution, pnlLike, rows };
+    };
+
+    const wdo = buildSide('wdo');
+    const win = buildSide('win');
+
+    const align = (aSym, bSym, th = 0.06) => {
+        const a = get(aSym);
+        const b = get(bSym);
+        const ad = signDir(a, th);
+        const bd = signDir(b, th);
+        if (!ad || !bd) return null;
+        return ad === bd;
+    };
+
+    return {
+        sym,
+        market: { wdoPct: drv.wdo.pct, winPct: drv.win.pct },
+        pulse: { wdo, win },
+        align: {
+            wdo_usdbrl: align(sym.wdo, sym.usdbrl),
+            wdo_dxy: align(sym.wdo, sym.dxy),
+            win_ibov: align(sym.win, sym.ibov),
+            win_ewz: align(sym.win, sym.ewz),
+        },
+    };
+}
+
 function renderBrazilFixedIncomeFlow(data) {
     const el = document.getElementById('brazilFixedIncomeFlow');
     if (!el) return;
@@ -2411,12 +2630,17 @@ function renderBrazilFixedIncomeFlow(data) {
     const ewz = getChangePct(data, symEwz);
     const usdbbrl = getChangePct(data, symUsdbbrl);
     const cds = getChangePct(data, symBrCds);
+    const cdsSignal = computeBrazilCdsHedgeSignal(data);
 
     const flowBr = (() => {
+        const cdsAdj = (() => {
+            if (cdsSignal && cdsSignal.mode === 'hedge_on_risk_on') return null;
+            return typeof cds === 'number' && Number.isFinite(cds) ? -cds : null;
+        })();
         const parts = [
             typeof ewz === 'number' && Number.isFinite(ewz) ? ewz : null,
             typeof usdbbrl === 'number' && Number.isFinite(usdbbrl) ? -usdbbrl : null,
-            typeof cds === 'number' && Number.isFinite(cds) ? -cds : null,
+            cdsAdj,
         ].filter(x => typeof x === 'number' && Number.isFinite(x));
         const score = parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : null;
         if (!(typeof score === 'number' && Number.isFinite(score))) return { tone: 'neutral', label: 'n/d', detail: 'sem confirmação' };
@@ -2467,6 +2691,11 @@ function renderBrazilFixedIncomeFlow(data) {
                 <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
                     <div style="opacity:.85;font-weight:800;">Fluxo (BR • confirmação)</div>
                     <div style="font-weight:900;">${mk(flowBr.tone, `${flowBr.label} • ${flowBr.detail}`)}</div>
+                </div>
+                <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
+                    <div style="opacity:.85;font-weight:800;">CDS x Brasil (leitura)</div>
+                    <div style="font-weight:900;">${mk(cdsSignal ? cdsSignal.tone : 'neutral', cdsSignal ? cdsSignal.label : 'n/d')}</div>
+                    <div style="margin-top:6px;opacity:.85;font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(cdsSignal ? cdsSignal.detail : '—')}</div>
                 </div>
             </div>
             <div style="margin-top:10px;opacity:.82;font-size:12px;line-height:1.35;">
@@ -4393,6 +4622,7 @@ function renderOperationalBriefing() {
     };
 
     const items = options && options.items ? [options.items.WDO, options.items.WIN].filter(Boolean) : [];
+    const cdsSignal = computeBrazilCdsHedgeSignal(data);
 
     const regimeLine = regime
         ? `${String(regime.label || '—')} • convicção ${String(regime.convictionLabel || '—')} (${fmt0((regime.convictionScore || 0) * 100)}%)`
@@ -4403,8 +4633,85 @@ function renderOperationalBriefing() {
         : 'News tilt: —';
 
     const macroLine = macro
-        ? `Flow ${escapeHtml(String(macro.flow ? macro.flow.label : '—'))} • DXY ${typeof macro.dxyPct === 'number' ? formatPercent(macro.dxyPct, 2) : '—'} • Export ${typeof macro.exportScore === 'number' ? formatPercent(macro.exportScore, 2) : '—'} • EM ${typeof (macro.em && macro.em.pct) === 'number' ? formatPercent(macro.em.pct, 2) : '—'}`
+        ? `Flow ${escapeHtml(String(macro.flow ? macro.flow.label : '—'))} • DXY ${typeof macro.dxyPct === 'number' ? formatPercent(macro.dxyPct, 2) : '—'} • Export ${typeof macro.exportScore === 'number' ? formatPercent(macro.exportScore, 2) : '—'} • EM ${typeof (macro.em && macro.em.pct) === 'number' ? formatPercent(macro.em.pct, 2) : '—'}${cdsSignal ? ` • CDS ${typeof cdsSignal.drivers.cds === 'number' ? formatPercent(cdsSignal.drivers.cds, 2) : '—'} (${cdsSignal.mode === 'hedge_on_risk_on' ? 'Hedge-on' : cdsSignal.mode === 'risk_off_classic' ? 'Risk-off' : cdsSignal.mode === 'relief_risk_on' ? 'Alívio' : 'Leitura'})` : ''}`
         : 'Macro: —';
+
+    const pulseNow = data ? computeOperationalPulseNow(data) : null;
+    const pulseCard = (() => {
+        if (!pulseNow) return '';
+
+        const mkPulse = (sym, side) => {
+            const p = pulseNow.pulse && pulseNow.pulse[side] ? pulseNow.pulse[side] : null;
+            if (!p) return '';
+            const tone = p.net > 0.25 ? 'positive' : p.net < -0.25 ? 'negative' : 'neutral';
+            const netBadge = toneBadgeHtmlFromTone(tone, Math.abs(p.net), `${formatNumber(p.net, 2)}`, { maxAbs: 3 });
+            const pnl = p.pnlLike || { posSum: 0, negSum: 0, net: 0 };
+            const br = p.breadth || { pos: 0, neg: 0, zero: 0 };
+
+            const alignBadge = (ok, label) => {
+                if (ok === null) return badge('neutral', `${label}: —`);
+                return badge(ok ? 'positive' : 'negative', `${label}: ${ok ? 'OK' : 'DIVERGE'}`);
+            };
+
+            const a1 =
+                side === 'wdo'
+                    ? alignBadge(pulseNow.align ? pulseNow.align.wdo_usdbrl : null, 'WDO×USD/BRL')
+                    : alignBadge(pulseNow.align ? pulseNow.align.win_ibov : null, 'WIN×IBOV');
+            const a2 =
+                side === 'wdo'
+                    ? alignBadge(pulseNow.align ? pulseNow.align.wdo_dxy : null, 'WDO×DXY')
+                    : alignBadge(pulseNow.align ? pulseNow.align.win_ewz : null, 'WIN×EWZ');
+
+            const topNews = (() => {
+                const items = web && Array.isArray(web.items) ? web.items.slice(0, 18) : [];
+                const out = [];
+                for (const it of items) {
+                    const title = it && it.title ? String(it.title) : '';
+                    const url = it && it.url ? String(it.url) : '';
+                    const impact = it && it.impact ? it.impact : null;
+                    const sig = impact && impact[side] ? String(impact[side]) : '≈';
+                    if (!title || sig === '≈') continue;
+                    const safeUrl = url && /^https?:\/\//i.test(url) ? url : '';
+                    const a = safeUrl
+                        ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noreferrer" style="color:rgba(0,243,255,.92);text-decoration:none;">${escapeHtml(title)}</a>`
+                        : escapeHtml(title);
+                    out.push(`• ${a} <span style="opacity:.85;font-family:'Share Tech Mono',monospace;">(${escapeHtml(sig)})</span>`);
+                    if (out.length >= 2) break;
+                }
+                return out.length ? out.join('<br>') : '<span style="opacity:.78;">• —</span>';
+            })();
+
+            return `
+                <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <div style="font-weight:900;letter-spacing:1px;">Pulso ${escapeHtml(sym)}</div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                            ${badge(biasTone(p.bias), biasLabel(sym, p.bias))}
+                            ${badge('neutral', `Drivers net`)} ${netBadge}
+                        </div>
+                    </div>
+                    <div style="margin-top:8px;opacity:.88;font-size:12px;line-height:1.35;">
+                        PnL (sintético): +${formatNumber(pnl.posSum, 2)} / ${formatNumber(pnl.negSum, 2)} • net ${formatNumber(pnl.net, 2)}
+                        • Largura: ${String(br.pos)}↑ ${String(br.neg)}↓ ${String(br.zero)}≈
+                    </div>
+                    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        ${a1} ${a2}
+                    </div>
+                    <div style="margin-top:10px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px;opacity:.92;line-height:1.35;">
+                        <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:6px;">Notícias (impacto direto)</div>
+                        <div style="font-size:12px;">${topNews}</div>
+                    </div>
+                </div>
+            `;
+        };
+
+        return `
+            <div style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;">
+                ${mkPulse('WDO', 'wdo')}
+                ${mkPulse('WIN', 'win')}
+            </div>
+        `;
+    })();
 
     el.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
@@ -4461,6 +4768,7 @@ function renderOperationalBriefing() {
                 </div>
             </div>
         </div>
+        ${pulseCard}
         <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">
             ${items.length ? items.map(makePlan).join('') : `<div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);opacity:.88;">Sem dados de WDO/WIN em Opções & Gamma (Resumo).</div>`}
         </div>
@@ -4520,6 +4828,30 @@ function renderOperationalBriefing() {
                     </div>
                     <div style="margin-top:8px;">${gauge}</div>
                     <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;">${list}</div>
+                </div>
+            `;
+        })()}
+        ${(() => {
+            if (!cdsSignal) return '';
+            if (cdsSignal.mode === 'neutral') return '';
+            const tone = cdsSignal.tone;
+            const title = 'CDS Brasil: fluxo x hedge';
+            const op = cdsSignal.mode === 'hedge_on_risk_on'
+                ? 'Leitura: proteção subindo sem “desmontar Brasil” (possível compra de risco com hedge). Operacional: manter viés do regime, mas exigir confirmação e usar stops/hedge.'
+                : cdsSignal.mode === 'risk_off_classic'
+                    ? 'Leitura: proteção subindo com BRL enfraquecendo e bolsa caindo (risk-off clássico). Operacional: reduzir risco e priorizar proteção.'
+                    : cdsSignal.mode === 'relief_risk_on'
+                        ? 'Leitura: melhora de risco (CDS↓) com BRL fortalecendo e bolsa subindo. Operacional: favorece risco (desde que o regime confirme).'
+                        : 'Leitura: CDS sinaliza movimento sem confirmação completa. Operacional: tratar como cautela.';
+            return `
+                <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <div style="font-weight:900;letter-spacing:1px;opacity:.95;">${escapeHtml(title)}</div>
+                        <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${toneBadgeHtmlFromTone(tone, cdsSignal.confidence, `${formatNumber(cdsSignal.confidence * 100, 0)}%`, { maxAbs: 1 })}</div>
+                    </div>
+                    <div style="margin-top:8px;font-weight:900;">${toneBadgeHtmlFromTone(tone, 0, cdsSignal.label, { maxAbs: 1 })}</div>
+                    <div style="margin-top:8px;opacity:.86;font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(cdsSignal.detail)}</div>
+                    <div style="margin-top:8px;opacity:.92;line-height:1.35;">${escapeHtml(op)}</div>
                 </div>
             `;
         })()}
@@ -4594,6 +4926,27 @@ function renderOperationalBriefing() {
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWdo.score), macroWdo.bias === 'buy' ? 'Compra' : macroWdo.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWin.score), macroWin.bias === 'buy' ? 'Compra' : macroWin.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', String(operationalTuning.weight.yields))}</td>
+                            </tr>
+                        `);
+                        rows.push(`
+                            <tr>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">CDS Brasil (fluxo x hedge)</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mkPct(cdsSignal && cdsSignal.drivers ? cdsSignal.drivers.cds : null)} • ${mk(cdsSignal ? cdsSignal.tone : 'neutral', cdsSignal ? cdsSignal.label : 'n/d')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
+                                    if (!cdsSignal) return mk('neutral', 'Neutro');
+                                    if (cdsSignal.mode === 'risk_off_classic') return mk('positive', 'Compra');
+                                    if (cdsSignal.mode === 'relief_risk_on') return mk('negative', 'Venda');
+                                    if (cdsSignal.mode === 'hedge_on_risk_on') return mk('neutral', 'Venda');
+                                    return mk('neutral', 'Neutro');
+                                })()}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
+                                    if (!cdsSignal) return mk('neutral', 'Neutro');
+                                    if (cdsSignal.mode === 'risk_off_classic') return mk('negative', 'Venda');
+                                    if (cdsSignal.mode === 'relief_risk_on') return mk('positive', 'Compra');
+                                    if (cdsSignal.mode === 'hedge_on_risk_on') return mk('neutral', 'Compra');
+                                    return mk('neutral', 'Neutro');
+                                })()}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', 'informativo')}</td>
                             </tr>
                         `);
                         return rows.join('');
@@ -6341,6 +6694,242 @@ function renderMercosul(data) {
     }
 }
 
+function renderPetrobrasModule(data) {
+    const payload = window.PETROBRAS_MODULE_DATA;
+    const gaugeEl = document.getElementById('petrobrasGauge');
+    const tableEl = document.getElementById('petrobrasTable');
+    const newsEl = document.getElementById('petrobrasNews');
+    const missingEl = document.getElementById('petrobrasMissing');
+    if (!gaugeEl || !tableEl || !newsEl || !missingEl) return;
+
+    if (!payload || payload.ok !== true) {
+        gaugeEl.innerHTML = '<div style="opacity:.85;">Sem dados do módulo Petrobras.</div>';
+        tableEl.innerHTML = '';
+        newsEl.innerHTML = '';
+        missingEl.innerHTML = '';
+        return;
+    }
+
+    const score = payload.score && typeof payload.score.value === 'number' ? payload.score.value : 0;
+    const bias = payload.score && payload.score.bias ? String(payload.score.bias) : 'NEUTRO';
+    const confidence = payload.score && typeof payload.score.confidence === 'number' ? payload.score.confidence : 0;
+    const phaseLabel = payload.phase && payload.phase.nowLabel ? String(payload.phase.nowLabel) : '';
+    const metrics = payload.metrics && typeof payload.metrics === 'object' ? payload.metrics : null;
+    const pctPos = Math.max(0, Math.min(1, (score + 10) / 20));
+    const angle = -90 + 180 * pctPos;
+    const biasTone = bias === 'COMPRA' ? 'positive' : bias === 'VENDA' ? 'negative' : 'neutral';
+    const biasBadge = toneBadgeHtmlFromTone(biasTone, Math.abs(score), `${bias} • ${formatNumber(score, 2)}`, { maxAbs: 10 });
+    const confBadge = toneBadgeHtmlFromTone(confidence >= 0.75 ? 'positive' : confidence >= 0.45 ? 'neutral' : 'negative', Math.abs(confidence * 10), `Confiança ${formatNumber(confidence * 100, 0)}%`, { maxAbs: 10 });
+    const fmt2 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 2) : '—');
+    const fmt1 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 1) : '—');
+    const breadthLine = metrics && metrics.breadth
+        ? `Largura: ${String(metrics.breadth.pos || 0)}↑ • ${String(metrics.breadth.neg || 0)}↓ • ${String(metrics.breadth.zero || 0)}≈`
+        : '';
+    const contribLine = metrics && metrics.contribution
+        ? `Contrib: +${fmt2(metrics.contribution.posSum)} / ${fmt2(metrics.contribution.negSum)} • net ${fmt2(metrics.contribution.net)}`
+        : '';
+    const pnlLine = metrics && metrics.pnlLike
+        ? `PnL (sintético): +${fmt1(metrics.pnlLike.posSum)} / ${fmt1(metrics.pnlLike.negSum)} • net ${fmt1(metrics.pnlLike.net)}`
+        : '';
+
+    gaugeEl.innerHTML = `
+        <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Velocímetro Petrobras</div>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                    ${biasBadge}
+                    ${confBadge}
+                </div>
+            </div>
+            <div style="margin-top:8px;opacity:.85;">${escapeHtml(phaseLabel)}</div>
+            ${breadthLine || contribLine || pnlLine ? `<div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+                ${escapeHtml([breadthLine, contribLine, pnlLine].filter(Boolean).join(' • '))}
+            </div>` : ''}
+            <div style="margin-top:14px;position:relative;padding:18px 4px 8px 4px;">
+                <div style="height:14px;border-radius:999px;background:linear-gradient(90deg, rgba(255,60,80,.85), rgba(255,255,255,.18) 50%, rgba(0,255,160,.85));border:1px solid rgba(255,255,255,.10);"></div>
+                <div style="position:absolute;left:50%;top:25px;transform:translateX(-50%) rotate(${String(angle)}deg);transform-origin:0% 50%;height:0;">
+                    <div style="width:92px;height:2px;background:rgba(255,255,255,.92);box-shadow:0 0 10px rgba(0,243,255,.25);"></div>
+                    <div style="width:10px;height:10px;border-radius:999px;background:rgba(0,243,255,.95);position:absolute;left:-5px;top:-4px;"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-top:10px;font-family:'Share Tech Mono',monospace;letter-spacing:1px;opacity:.85;">
+                    <span>VENDA</span><span>NEUTRO</span><span>COMPRA</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const missing = Array.isArray(payload.missingCorrelated) ? payload.missingCorrelated : [];
+    if (!missing.length) {
+        missingEl.innerHTML = '';
+    } else {
+        const items = missing
+            .slice(0, 16)
+            .map(x => {
+                const label = x && x.label ? String(x.label) : 'Ativo'
+                const patterns = x && Array.isArray(x.patterns) ? x.patterns.map(p => String(p)).filter(Boolean).slice(0, 8) : []
+                return `<div style="padding:10px 12px;border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(0,0,0,.14);">
+                    <div style="font-weight:900;letter-spacing:.8px;opacity:.92;">${escapeHtml(label)}</div>
+                    <div style="margin-top:6px;opacity:.85;font-family:'Share Tech Mono',monospace;word-break:break-word;">${escapeHtml(patterns.join(', '))}</div>
+                </div>`
+            })
+            .join('')
+        missingEl.innerHTML = `
+            <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="font-weight:900;letter-spacing:1px;opacity:.95;margin-bottom:10px;">Ativos correlacionados faltando (para adicionar no Investing)</div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">${items}</div>
+            </div>
+        `
+    }
+
+    const topNews = payload.news && Array.isArray(payload.news.top) ? payload.news.top : [];
+    if (!topNews.length) {
+        newsEl.innerHTML = '<div style="opacity:.85;">Sem destaques de notícias para Petrobras agora.</div>';
+    } else {
+        const li = topNews
+            .map(n => {
+                const title = n && n.title ? String(n.title) : ''
+                const url = n && n.url ? String(n.url) : ''
+                const safeUrl = url && /^https?:\/\//i.test(url) ? url : ''
+                const a = safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noreferrer" style="color:rgba(0,243,255,.92);text-decoration:none;">${escapeHtml(title || safeUrl)}</a>` : escapeHtml(title || '—')
+                return `<li style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);">${a}</li>`
+            })
+            .join('')
+        newsEl.innerHTML = `
+            <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+                    <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Notícias (pré-mercado / drivers)</div>
+                    <div style="opacity:.85;font-family:'Share Tech Mono',monospace;">match: ${escapeHtml(String(payload.news.matched || 0))}</div>
+                </div>
+                <ul style="margin:10px 0 0 0;padding:0 0 0 18px;">${li}</ul>
+            </div>
+        `
+    }
+
+    const rows = Array.isArray(payload.rows) ? payload.rows : [];
+    const phaseKey = payload.phase && String(payload.phase.nowLabel || '').toLowerCase().includes('pré') ? 'pre' : 'regular'
+    const used = rows.filter(r => r && (r.phase === 'any' || r.phase === phaseKey))
+    const operableKeySet = { petr4: true, petr3: true }
+    const operables = used.filter(r => r && operableKeySet[String(r.key || '')])
+    const drivers = used.filter(r => r && !operableKeySet[String(r.key || '')])
+
+    const header = `
+        <tr>
+            <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);">Fator</th>
+            <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);min-width:120px;">Símbolo</th>
+            <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);min-width:120px;">Valor</th>
+            <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);min-width:90px;">Peso</th>
+            <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);min-width:90px;">Cap</th>
+            <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);min-width:120px;">Contrib</th>
+            <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);min-width:160px;">Atualização</th>
+            <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);">Nota</th>
+        </tr>
+    `
+
+    const body = drivers
+        .map(r => {
+            const sym = r && r.symbol ? String(r.symbol) : ''
+            const clickable = sym && data && data.series && Array.isArray(data.series[sym]) && data.series[sym].length
+            const v =
+                r && r.unit === '%'
+                    ? formatPercent(typeof r.value === 'number' ? r.value : null, 2)
+                    : formatNumber(typeof r.value === 'number' ? r.value : null, 2)
+            const contrib = formatNumber(typeof r.contribution === 'number' ? r.contribution : null, 3)
+            const weight = formatNumber(typeof r.weight === 'number' ? r.weight : null, 2)
+            const cap = formatNumber(typeof r.capAbs === 'number' ? r.capAbs : null, 2)
+            const asOf = r && r.asOf ? formatDateTime(r.asOf) : ''
+            const tone = typeof r.contribution === 'number' ? toneFromValue(r.contribution, { maxAbs: Math.max(0.01, Math.abs(r.weight || 1)) }) : { tone: 'tone--neu', a: 0.2 }
+            const rowStyle = clickable ? 'cursor:pointer;' : ''
+            return `
+                <tr data-petro-row="1" data-symbol="${escapeHtml(sym)}" style="${rowStyle}">
+                    <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);font-weight:900;letter-spacing:.4px;">${escapeHtml(String(r.label || ''))}</td>
+                    <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Share Tech Mono',monospace;opacity:.9;">${escapeHtml(sym || '—')}</td>
+                    <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(v)}</td>
+                    <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;opacity:.9;">${escapeHtml(weight)}</td>
+                    <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;opacity:.9;">${escapeHtml(cap)}</td>
+                    <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;">
+                        <span class="tone ${escapeHtml(tone.tone)}" style="--tone-a:${String(tone.a)};">${escapeHtml(contrib)}</span>
+                    </td>
+                    <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;opacity:.85;">${escapeHtml(asOf || '')}</td>
+                    <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);opacity:.85;">${escapeHtml(String(r.note || ''))}</td>
+                </tr>
+            `
+        })
+        .join('')
+
+    const operablesHtml = operables.length
+        ? (() => {
+            const opHeader = `
+                <tr>
+                    <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);">Ativo</th>
+                    <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);min-width:120px;">Símbolo</th>
+                    <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);min-width:120px;">Variação</th>
+                    <th style="text-align:right;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);min-width:160px;">Atualização</th>
+                    <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);">Nota</th>
+                </tr>
+            `
+            const opBody = operables
+                .map(r => {
+                    const sym = r && r.symbol ? String(r.symbol) : ''
+                    const clickable = sym && data && data.series && Array.isArray(data.series[sym]) && data.series[sym].length
+                    const v = formatPercent(typeof r.value === 'number' ? r.value : null, 2)
+                    const asOf = r && r.asOf ? formatDateTime(r.asOf) : ''
+                    const rowStyle = clickable ? 'cursor:pointer;' : ''
+                    return `
+                        <tr data-petro-row="1" data-symbol="${escapeHtml(sym)}" style="${rowStyle}">
+                            <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);font-weight:900;letter-spacing:.4px;">${escapeHtml(String(r.label || ''))}</td>
+                            <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Share Tech Mono',monospace;opacity:.9;">${escapeHtml(sym || '—')}</td>
+                            <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(v)}</td>
+                            <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;opacity:.85;">${escapeHtml(asOf || '')}</td>
+                            <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06);opacity:.85;">${escapeHtml(String(r.note || ''))}</td>
+                        </tr>
+                    `
+                })
+                .join('')
+            return `
+                <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);overflow:hidden;margin-bottom:12px;">
+                    <div style="padding:12px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+                        <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Ativos operáveis (não entram no score)</div>
+                        <div style="opacity:.8;">Clique para abrir o gráfico</div>
+                    </div>
+                    <div style="overflow:auto;">
+                        <table style="width:100%;border-collapse:collapse;min-width:860px;">
+                            <thead>${opHeader}</thead>
+                            <tbody>${opBody}</tbody>
+                        </table>
+                    </div>
+                </div>
+            `
+        })()
+        : ''
+
+    tableEl.innerHTML = `
+        ${operablesHtml}
+        <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);overflow:hidden;">
+            <div style="padding:12px 12px 0 12px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Tabela (drivers usados no score)</div>
+                <div style="opacity:.85;font-family:'Share Tech Mono',monospace;">gerado: ${escapeHtml(formatDateTime(payload.generatedAt || ''))}</div>
+            </div>
+            <div style="overflow:auto;">
+                <table style="width:100%;border-collapse:collapse;min-width:1100px;">
+                    <thead>${header}</thead>
+                    <tbody>${body || '<tr><td colspan="8" style="padding:12px;opacity:.85;">Sem linhas para esta fase.</td></tr>'}</tbody>
+                </table>
+            </div>
+        </div>
+    `
+
+    tableEl.querySelectorAll('tr[data-petro-row="1"]').forEach(tr => {
+        tr.addEventListener('click', () => {
+            const symbol = tr.getAttribute('data-symbol') || ''
+            if (!symbol || !data || !data.series || !Array.isArray(data.series[symbol]) || !data.series[symbol].length) return
+            const points = data.series[symbol] || []
+            window.MercadoCharts.renderLineChart('brazilChart', points, symbol)
+            const sec = document.getElementById('brazil-market')
+            if (sec && sec.scrollIntoView) sec.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        })
+    })
+}
+
 function renderMarketPanorama(data) {
     const el = document.getElementById('marketPanorama');
     if (!el) return;
@@ -6739,6 +7328,7 @@ function renderAll(data) {
     safe(() => renderCategory(data, 'fxTable', 'fxChart', ['fx_g10', 'fx_emerging']));
     safe(() => renderCategory(data, 'emergingTable', 'emergingChart', ['emerging']));
     safe(() => renderMercosul(data));
+    safe(() => renderPetrobrasModule(data));
     safe(() => renderAlerts(data));
     safe(() => renderMarketPanorama(data));
 }
