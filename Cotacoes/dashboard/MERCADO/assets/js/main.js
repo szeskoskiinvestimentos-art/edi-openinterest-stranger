@@ -1368,6 +1368,7 @@ function renderRegimeConviction(data) {
     } catch {
     }
     try { renderOperationalBriefing(); } catch { }
+    try { renderHk50OperationalBriefing(); } catch { }
 
     el.innerHTML = html;
 }
@@ -2148,11 +2149,16 @@ function renderRatesBuckets(data) {
 }
 
 function computeBrazilCdsHedgeSignal(data) {
-    const symCds = findAssetSymbol(data, /^BRGV5YUSAC=R$/i)
+    const symCds =
+        findAliasSymbolBest(data, 'CDS_BR5Y')
+        || findAssetSymbol(data, /^BRGV5YUSAC=R$/i)
         || findAssetSymbol(data, /^BRGV/i)
         || findAssetSymbol(data, /\bBrazil\b.*\bCDS\b|\bCDS\b.*\bBrazil\b/i);
-    const symFx = findAliasSymbol(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i);
-    const symEq = findAssetSymbol(data, /^EWZ$/i)
+    const symFx = findAliasSymbolBest(data, 'USD_BRL') || findAliasSymbol(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i);
+    const symEq =
+        findAliasSymbolBest(data, 'EWZ')
+        || findAssetSymbol(data, /^EWZ$/i)
+        || findAliasSymbolBest(data, 'IBOV')
         || findAssetSymbol(data, /(^\.BVSP$|\bIbovespa\b)/i)
         || findAssetSymbol(data, /\bBOVA11(?:\.SA)?\b/i);
 
@@ -2254,28 +2260,43 @@ function computeOperationalPulseNow(data) {
     const signDir = (v, th) => (isNum(v) ? (v > th ? 1 : v < -th ? -1 : 0) : 0);
 
     const pick = patterns => patterns.map(re => findAssetSymbol(data, re)).find(Boolean) || null;
+    const vix9d = pick([/^\.VIX9D$/i, /\bVIX9D\b/i, /\b9-Day Volatility\b/i]);
+    const vix30 = pick([/^VIX$/i, /^\.VIX$/i, /\bS&P\s*500\s*VIX\b/i]);
+    const vvix = pick([/^\.VVIX$/i, /\bVix Volatility\b/i, /\bVVIX\b/i]);
+    const vxn = pick([/^\.VXN$/i, /\bNASDAQ\s*100 Volatility\b/i]);
+    const vxeem = pick([/^\.VXEEM$/i, /\bEmerging Markets\b.*\bVol/i, /\bEEM\b.*\bVol/i]);
+    const vxewz = pick([/^\.VXEWZ$/i, /\bBrazil\b.*\bVol/i, /\bEWZ\b.*\bVol/i]);
+    const vxbr = pick([/(^\.VXBR$|\bVXBR\b)/i]);
+    const vixChosen = vix9d || vix30 || null;
+    const vixLabel = vixChosen ? (vixChosen === vix9d ? 'VIX9D' : 'VIX') : 'VIX';
     const sym = {
-        wdo: pick([/(^WDO\b|WDOc\d\b|\bmini\s*d[oó]lar\b)/i]),
-        win: pick([/(^WIN\b|WINc\d\b|\bmini\s*(índice|indice)\b|\bmini\s*ibovespa\b)/i]),
-        usdbrl: findAliasSymbol(data, 'USD_BRL') || pick([/^USD\/BRL\b/i]),
-        ibov: pick([/(^\.BVSP$|\bIBOV\b|\bIbovespa\b)/i]),
-        ewz: pick([/^EWZ$/i]),
-        dxy: findAliasSymbol(data, 'DXY') || pick([/(^\.DXY$|\bDXY\b)/i]),
-        vix: findAliasSymbol(data, 'VIX') || pick([/^\.?VIX(9D)?$/i, /\bVIX9D\b/i, /^VIX$/i]),
-        vxbr: pick([/(^\.VXBR$|\bVXBR\b)/i]),
-        br10y: pick([/^BR10YT=RR$/i]),
-        cds: pick([/^BRGV5YUSAC=R$/i, /^BRGV/i]),
-        spx: findAliasSymbol(data, 'SPX') || pick([/(^SPX$|^\.SPX$|^\^GSPC$|\bS&P\s*500\b)/i]),
-        us10y: findAliasSymbol(data, 'US10Y') || pick([/^US10YT=RR$/i, /(^\^TNX$|\bUS\s*10Y\b|\bUST\s*10Y\b)/i]),
-        us2y: findAliasSymbol(data, 'US2Y') || pick([/^US2YT=RR$/i, /(^\^IRX$|\bUS\s*2Y\b|\bUST\s*2Y\b)/i]),
-        hyg: pick([/^HYG(\.\w+)?$/i, /\bhigh\s*yield\b/i, /\biboxx\b/i, /\balto\s*rendimento\b/i]),
-        tlt: pick([/^TLT(\.\w+)?$/i, /\bTLT\b/i, /\b20\+\s*Year\b.*\bTreasury\b/i, /\bTreasury\b.*\bBond\b/i, /\btreasuries\b/i]),
-        eem: pick([/^EEM$/i, /^VWO$/i, /\bMSCI\b.*\bEmerging\b.*\bMarkets\b/i, /\bmercados\s*emergentes\b/i]),
-        brent: pick([/^BNO$/i, /^LCO\b/i, /^LRBc1-LCOc1$/i, /\bBrent\b/i, /\bcrude\b.*\bbrent\b/i, /BRENT/i]),
-        copper: pick([/(^HG$|HG=F|COPPER|\bcobre\b)/i]),
-        gold: pick([/(^GC$|GC=F|GOLD|\bouro\b)/i]),
-        iron: pick([/(^DCE_I0$|\bmin[eé]rio\s*de\s*ferro\b|iron\s*ore)/i]),
-        btc: pick([/(^BTC\/USD$|^BTCUSD$|BTC\/USD|XBT|bitcoin)/i]),
+        wdo: findAliasSymbolBest(data, 'WDO') || pick([/(^WDO\b|WDOc\d\b|\bmini\s*d[oó]lar\b)/i]),
+        win: findAliasSymbolBest(data, 'WIN') || pick([/(^WIN\b|WINc\d\b|\bmini\s*(índice|indice)\b|\bmini\s*ibovespa\b)/i]),
+        usdbrl: findAliasSymbolBest(data, 'USD_BRL') || findAliasSymbol(data, 'USD_BRL') || pick([/^USD\/BRL\b/i]),
+        ibov: findAliasSymbolBest(data, 'IBOV') || pick([/(^\.BVSP$|\bIBOV\b|\bIbovespa\b)/i]),
+        ewz: findAliasSymbolBest(data, 'EWZ') || pick([/^EWZ$/i]),
+        dxy: findAliasSymbolBest(data, 'DXY') || findAliasSymbol(data, 'DXY') || pick([/(^\.DXY$|\bDXY\b)/i]),
+        vix: vixChosen,
+        vix9d,
+        vix30,
+        vvix,
+        vxn,
+        vxeem,
+        vxewz,
+        vxbr,
+        br10y: findAliasSymbolBest(data, 'BR10Y') || pick([/^BR10YT=RR$/i]),
+        cds: findAliasSymbolBest(data, 'CDS_BR5Y') || pick([/^BRGV5YUSAC=R$/i, /^BRGV/i]),
+        spx: findAliasSymbolBest(data, 'SPX') || findAliasSymbol(data, 'SPX') || pick([/(^SPX$|^\.SPX$|^\^GSPC$|\bS&P\s*500\b)/i]),
+        us10y: findAliasSymbolBest(data, 'US10Y') || findAliasSymbol(data, 'US10Y') || pick([/^US10YT=RR$/i, /(^\^TNX$|\bUS\s*10Y\b|\bUST\s*10Y\b)/i]),
+        us2y: findAliasSymbolBest(data, 'US2Y') || findAliasSymbol(data, 'US2Y') || pick([/^US2YT=RR$/i, /(^\^IRX$|\bUS\s*2Y\b|\bUST\s*2Y\b)/i]),
+        hyg: findAliasSymbolBest(data, 'HYG') || pick([/^HYG(\.\w+)?$/i, /\bhigh\s*yield\b/i, /\biboxx\b/i, /\balto\s*rendimento\b/i]),
+        tlt: findAliasSymbolBest(data, 'TLT') || pick([/^TLT(\.\w+)?$/i, /\bTLT\b/i, /\b20\+\s*Year\b.*\bTreasury\b/i, /\bTreasury\b.*\bBond\b/i, /\btreasuries\b/i]),
+        eem: findAliasSymbolBest(data, 'EEM') || findAliasSymbolBest(data, 'VWO') || pick([/^EEM$/i, /^VWO$/i, /\bMSCI\b.*\bEmerging\b.*\bMarkets\b/i, /\bmercados\s*emergentes\b/i]),
+        brent: findAliasSymbolBest(data, 'BRENT') || pick([/^BNO$/i, /^LCO\b/i, /^LRBc1-LCOc1$/i, /\bBrent\b/i, /\bcrude\b.*\bbrent\b/i, /BRENT/i]),
+        copper: findAliasSymbolBest(data, 'COPPER') || pick([/(^HG$|HG=F|COPPER|\bcobre\b)/i]),
+        gold: findAliasSymbolBest(data, 'GOLD') || pick([/(^GC$|GC=F|GOLD|\bouro\b)/i]),
+        iron: findAliasSymbolBest(data, 'IRON') || pick([/(^DCE_I0$|\bmin[eé]rio\s*de\s*ferro\b|iron\s*ore)/i]),
+        btc: findAliasSymbolBest(data, 'BTC') || pick([/(^BTC\/USD$|^BTCUSD$|BTC\/USD|XBT|bitcoin)/i]),
     };
 
     const get = s => (s ? getChangePct(data, s) : null);
@@ -2283,7 +2304,13 @@ function computeOperationalPulseNow(data) {
     const drv = {
         usdbrl: { label: 'USD/BRL', pct: get(sym.usdbrl) },
         dxy: { label: 'DXY', pct: get(sym.dxy) },
-        vix: { label: 'VIX', pct: get(sym.vix) },
+        vix: { label: vixLabel, pct: get(sym.vix) },
+        vix9d: { label: 'VIX9D', pct: get(sym.vix9d) },
+        vix30: { label: 'VIX (clássico)', pct: get(sym.vix30) },
+        vvix: { label: 'VVIX', pct: get(sym.vvix) },
+        vxn: { label: 'VXN', pct: get(sym.vxn) },
+        vxeem: { label: 'VXEEM', pct: get(sym.vxeem) },
+        vxewz: { label: 'VXEWZ', pct: get(sym.vxewz) },
         vxbr: { label: 'VXBR', pct: get(sym.vxbr) },
         br10y: { label: 'BR10Y', pct: get(sym.br10y) },
         cds: { label: 'CDS BR 5Y', pct: get(sym.cds) },
@@ -2305,23 +2332,30 @@ function computeOperationalPulseNow(data) {
     };
 
     const driversCfg = [
-        { key: 'usdbrl', weight: 1.0, capAbs: 0.6, wdoSign: +1, winSign: -1 },
-        { key: 'dxy', weight: 0.8, capAbs: 0.6, wdoSign: +1, winSign: -1 },
-        { key: 'vix', weight: 0.65, capAbs: 4.0, wdoSign: +1, winSign: -1 },
-        { key: 'vxbr', weight: 0.55, capAbs: 6.0, wdoSign: +1, winSign: -1 },
-        { key: 'br10y', weight: 0.55, capAbs: 0.45, wdoSign: +1, winSign: -1 },
-        { key: 'cds', weight: 0.55, capAbs: 0.6, wdoSign: +1, winSign: -1 },
-        { key: 'ewz', weight: 0.65, capAbs: 1.2, wdoSign: -1, winSign: +1 },
-        { key: 'spx', weight: 0.45, capAbs: 1.1, wdoSign: -1, winSign: +1 },
-        { key: 'hyg', weight: 0.35, capAbs: 1.2, wdoSign: -1, winSign: +1 },
-        { key: 'us10y', weight: 0.4, capAbs: 0.6, wdoSign: +1, winSign: -1 },
-        { key: 'us2y', weight: 0.25, capAbs: 0.6, wdoSign: +1, winSign: -1 },
-        { key: 'eem', weight: 0.25, capAbs: 1.2, wdoSign: -1, winSign: +1 },
-        { key: 'copper', weight: 0.25, capAbs: 1.8, wdoSign: -1, winSign: +1 },
-        { key: 'iron', weight: 0.2, capAbs: 2.2, wdoSign: -1, winSign: +1 },
-        { key: 'brent', weight: 0.2, capAbs: 2.2, wdoSign: -1, winSign: +1 },
-        { key: 'gold', weight: 0.15, capAbs: 1.6, wdoSign: +1, winSign: -1 },
-        { key: 'btc', weight: 0.1, capAbs: 4.0, wdoSign: -1, winSign: +1 },
+        { key: 'usdbrl', group: 'driver', weight: 1.0, capAbs: 0.6, wdoSign: +1, winSign: -1 },
+        { key: 'dxy', group: 'driver', weight: 0.7, capAbs: 0.6, wdoSign: +1, winSign: -1 },
+        { key: 'vix9d', group: 'driver', weight: 0.45, capAbs: 4.0, wdoSign: +1, winSign: -1 },
+        { key: 'vxbr', group: 'driver', weight: 0.45, capAbs: 6.0, wdoSign: +1, winSign: -1 },
+        { key: 'vxewz', group: 'driver', weight: 0.25, capAbs: 6.0, wdoSign: +1, winSign: -1 },
+
+        { key: 'vix30', group: 'confirm', weight: 0.25, capAbs: 3.5, wdoSign: +1, winSign: -1 },
+        { key: 'vvix', group: 'confirm', weight: 0.15, capAbs: 5.0, wdoSign: +1, winSign: -1 },
+        { key: 'vxn', group: 'confirm', weight: 0.15, capAbs: 5.0, wdoSign: +1, winSign: -1 },
+        { key: 'vxeem', group: 'confirm', weight: 0.15, capAbs: 5.5, wdoSign: +1, winSign: -1 },
+        { key: 'cds', group: 'confirm', weight: 0.35, capAbs: 0.6, wdoSign: +1, winSign: -1 },
+        { key: 'br10y', group: 'confirm', weight: 0.3, capAbs: 0.45, wdoSign: +1, winSign: -1 },
+        { key: 'us10y', group: 'confirm', weight: 0.25, capAbs: 0.6, wdoSign: +1, winSign: -1 },
+        { key: 'spx', group: 'confirm', weight: 0.35, capAbs: 1.1, wdoSign: -1, winSign: +1 },
+        { key: 'ewz', group: 'confirm', weight: 0.4, capAbs: 1.2, wdoSign: -1, winSign: +1 },
+        { key: 'hyg', group: 'confirm', weight: 0.2, capAbs: 1.2, wdoSign: -1, winSign: +1 },
+
+        { key: 'us2y', group: 'context', weight: 0.15, capAbs: 0.6, wdoSign: +1, winSign: -1 },
+        { key: 'eem', group: 'context', weight: 0.15, capAbs: 1.2, wdoSign: -1, winSign: +1 },
+        { key: 'copper', group: 'context', weight: 0.15, capAbs: 1.8, wdoSign: -1, winSign: +1 },
+        { key: 'iron', group: 'context', weight: 0.12, capAbs: 2.2, wdoSign: -1, winSign: +1 },
+        { key: 'brent', group: 'context', weight: 0.12, capAbs: 2.2, wdoSign: -1, winSign: +1 },
+        { key: 'gold', group: 'context', weight: 0.1, capAbs: 1.6, wdoSign: +1, winSign: -1 },
+        { key: 'btc', group: 'context', weight: 0.05, capAbs: 4.0, wdoSign: -1, winSign: +1 },
     ];
 
     const buildSide = side => {
@@ -2329,6 +2363,11 @@ function computeOperationalPulseNow(data) {
         const breadth = { pos: 0, neg: 0, zero: 0 };
         const contribution = { posSum: 0, negSum: 0, net: 0 };
         const pnlLike = { posSum: 0, negSum: 0, net: 0 };
+        const groups = {
+            driver: { net: 0, pnl: 0, count: 0 },
+            confirm: { net: 0, pnl: 0, count: 0 },
+            context: { net: 0, pnl: 0, count: 0 },
+        };
 
         for (const cfg of driversCfg) {
             const d = drv[cfg.key];
@@ -2339,8 +2378,12 @@ function computeOperationalPulseNow(data) {
             const capped = clamp(signed, -cfg.capAbs, cfg.capAbs);
             const contrib = cfg.weight * (cfg.capAbs > 0 ? capped / cfg.capAbs : 0);
             const pnl = cfg.weight * capped;
+            const g = cfg.group === 'driver' || cfg.group === 'confirm' || cfg.group === 'context' ? cfg.group : 'context';
             contribution.net += contrib;
             pnlLike.net += pnl;
+            groups[g].net += contrib;
+            groups[g].pnl += pnl;
+            groups[g].count += 1;
             if (contrib > 0) {
                 breadth.pos += 1;
                 contribution.posSum += contrib;
@@ -2354,6 +2397,7 @@ function computeOperationalPulseNow(data) {
             }
             rows.push({
                 key: cfg.key,
+                group: g,
                 label: d.label,
                 symbol: sym[cfg.key] || null,
                 pct,
@@ -2367,7 +2411,7 @@ function computeOperationalPulseNow(data) {
 
         const net = clamp(contribution.net, -3, 3);
         const bias = net > 0.25 ? 'buy' : net < -0.25 ? 'sell' : 'neutral';
-        return { bias, net, breadth, contribution, pnlLike, rows };
+        return { bias, net, breadth, contribution, pnlLike, groups, rows };
     };
 
     const wdo = buildSide('wdo');
@@ -2406,6 +2450,547 @@ function computeOperationalPulseNow(data) {
             win: { observed: win.rows.length, missing: missFor('win') },
         },
     };
+}
+
+function computeHk50PulseNow(data, web) {
+    const isNum = v => typeof v === 'number' && Number.isFinite(v);
+    const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+    const pick = patterns => patterns.map(re => findAssetSymbol(data, re)).find(Boolean) || null;
+    const get = s => (s ? getChangePct(data, s) : null);
+    const getRatesMoveProxy = s => {
+        if (!s) return null;
+        const series = data && data.series && Array.isArray(data.series[s]) ? data.series[s] : [];
+        if (!series.length) return null;
+        const last = series[series.length - 1];
+        const lastPrice = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
+        if (last && typeof last.changePct === 'number' && Number.isFinite(last.changePct)) return last.changePct;
+        const prev = series.length > 1 ? series[series.length - 2] : null;
+        const prevPrice = prev && typeof prev.price === 'number' && Number.isFinite(prev.price) ? prev.price : null;
+        const deltaRaw = last && typeof last.change === 'number' && Number.isFinite(last.change)
+            ? last.change
+            : (lastPrice !== null && prevPrice !== null ? (lastPrice - prevPrice) : null);
+        if (deltaRaw === null || !Number.isFinite(deltaRaw)) return null;
+        const absPrice = lastPrice !== null ? Math.abs(lastPrice) : 0;
+        const deltaBp = absPrice > 20 ? deltaRaw : (deltaRaw * 100);
+        return deltaBp * 0.1;
+    };
+
+    const sym = {
+        hk50: findAliasSymbolBest(data, 'HK50') || pick([/\bHang\s*Seng\b/i]),
+        hstech: findAliasSymbolBest(data, 'HSTECH') || pick([/^\.(HSTECH)\b/i]),
+        hsfin: findAliasSymbolBest(data, 'HSI_FIN') || pick([/^\.(HSNF|HSHFI)\b/i, /\bHSI-?Finance\b/i, /\bHang\s*Seng\b.*\bFinance\b/i]),
+        hshares: pick([/^HCEI/i, /\bH-Shares\b/i, /\bH\s*Shares\b/i, /\bChina H-Shares\b/i]),
+        ewh: findAliasSymbolBest(data, 'EWH') || pick([/^EWH$/i]),
+        fxChina: findAliasSymbolBest(data, 'CHINA') || findAliasSymbolBest(data, 'FXI') || findAliasSymbolBest(data, 'MCHI') || findAliasSymbolBest(data, 'CSI300') || pick([/\bChina\b/i]),
+        cn50: findAliasSymbolBest(data, 'CN50') || pick([/^CHINA50$/i, /\bChina\s*A50\b/i]),
+        usdCnh: findAliasSymbolBest(data, 'USD_CNH') || pick([/^USD\/CNH\b/i]),
+        usdCny: findAliasSymbolBest(data, 'USD_CNY') || pick([/^USD\/CNY\b/i]),
+        usdHkd: findAliasSymbolBest(data, 'USD_HKD') || pick([/^USD\/HKD\b/i]),
+        audusd: pick([/^AUD\/USD\b/i]),
+        dxy: findAliasSymbolBest(data, 'DXY') || findAliasSymbol(data, 'DXY'),
+        spx: findAliasSymbolBest(data, 'SPX') || findAliasSymbol(data, 'SPX'),
+        ndx: findAliasSymbolBest(data, 'NDX') || pick([/(^\.NDX$|\bNasdaq 100\b)/i]),
+        us10y: findAliasSymbolBest(data, 'US10Y') || findAliasSymbol(data, 'US10Y'),
+        us2y: findAliasSymbolBest(data, 'US2Y') || findAliasSymbol(data, 'US2Y'),
+        hk10y: findAliasSymbolBest(data, 'HK10Y') || pick([/^HK10YT=RR$/i]),
+        hk1m: findAliasSymbolBest(data, 'HK1M') || pick([/^HK1MT=RR$/i, /\bHong\s*Kong\b.*\b1\b.*\bm[eê]s\b/i]),
+        hk3m: findAliasSymbolBest(data, 'HK3M') || pick([/^HK3MT=RR$/i, /\bHong\s*Kong\b.*\b3\b.*\bmeses\b/i]),
+        cn10y: findAliasSymbolBest(data, 'CN10Y') || pick([/^CN10YT=RR$/i]),
+        us10hk10: findAliasSymbolBest(data, 'SPREAD_HK10Y') || pick([
+            /^US10HK10=RR$/i,
+            /Spread.*Hong\s*Kong.*10.*(EUA|US|China|CHI).*10/i,
+            /Spread.*(EUA|US|China|CHI).*10.*Hong\s*Kong.*10/i,
+            /Spread.*EUA.*10A.*(HK|HKG|Hong\s*Kong).*10A/i,
+            /Spread.*(HK|HKG|Hong\s*Kong).*10A.*EUA.*10A/i,
+        ]),
+        cdsCn5y: findAliasSymbolBest(data, 'CDS_CN5Y') || pick([/^CNGV5YUSAC=R$/i, /^CNGV/i]),
+        vix9d: findAliasSymbolBest(data, 'VIX9D') || pick([/^\.VIX9D$/i]),
+        vix30: findAliasSymbolBest(data, 'VIX30') || pick([/^VIX$/i, /^\.VIX$/i]),
+        vvix: findAliasSymbolBest(data, 'VVIX') || pick([/^\.VVIX$/i]),
+        vhsi: findAliasSymbolBest(data, 'VHSI') || pick([/^\.VHSI$/i, /^VHSI(c\d+)?$/i]),
+        eem: findAliasSymbolBest(data, 'EEM') || findAliasSymbolBest(data, 'VWO'),
+        hyg: findAliasSymbolBest(data, 'HYG'),
+        tlt: findAliasSymbolBest(data, 'TLT'),
+        brent: findAliasSymbolBest(data, 'BRENT'),
+        copper: findAliasSymbolBest(data, 'COPPER'),
+        iron: findAliasSymbolBest(data, 'IRON'),
+        gold: findAliasSymbolBest(data, 'GOLD'),
+        btc: findAliasSymbolBest(data, 'BTC'),
+    };
+
+    const hkVol = sym.vhsi ? get(sym.vhsi) : null;
+    const vixPulso = sym.vix9d ? get(sym.vix9d) : null;
+    const vixRegime = sym.vix30 ? get(sym.vix30) : null;
+    const usdChina = isNum(get(sym.usdCnh)) ? get(sym.usdCnh) : get(sym.usdCny);
+    const usdHkd = get(sym.usdHkd);
+    const hk50Pct = get(sym.hk50);
+
+    const driversCfg = [
+        { key: 'hstech', group: 'driver', weight: 0.7, capAbs: 1.8, sign: +1 },
+        { key: 'hsfin', group: 'driver', weight: 0.45, capAbs: 1.8, sign: +1 },
+        { key: 'hshares', group: 'driver', weight: 0.35, capAbs: 1.8, sign: +1 },
+        { key: 'fxChina', group: 'driver', weight: 0.55, capAbs: 1.6, sign: +1 },
+        { key: 'cn50', group: 'driver', weight: 0.35, capAbs: 1.8, sign: +1 },
+        { key: 'usdChina', group: 'driver', weight: 0.55, capAbs: 0.6, sign: -1 },
+        { key: 'usdHkd', group: 'driver', weight: 0.2, capAbs: 0.35, sign: -1 },
+        { key: 'dxy', group: 'driver', weight: 0.45, capAbs: 0.6, sign: -1 },
+        { key: 'vhsi', group: 'driver', weight: 0.45, capAbs: 5.0, sign: -1 },
+
+        { key: 'spx', group: 'confirm', weight: 0.35, capAbs: 1.1, sign: +1 },
+        { key: 'ndx', group: 'confirm', weight: 0.25, capAbs: 1.3, sign: +1 },
+        { key: 'audusd', group: 'confirm', weight: 0.12, capAbs: 1.0, sign: +1 },
+        { key: 'vixPulso', group: 'confirm', weight: 0.25, capAbs: 4.0, sign: -1 },
+        { key: 'vixRegime', group: 'confirm', weight: 0.2, capAbs: 3.5, sign: -1 },
+        { key: 'vvix', group: 'confirm', weight: 0.15, capAbs: 5.0, sign: -1 },
+        { key: 'us10y', group: 'confirm', weight: 0.2, capAbs: 0.6, sign: -1 },
+        { key: 'hk10y', group: 'confirm', weight: 0.12, capAbs: 0.6, sign: -1 },
+        { key: 'hk1m', group: 'confirm', weight: 0.08, capAbs: 0.6, sign: -1 },
+        { key: 'hk3m', group: 'confirm', weight: 0.08, capAbs: 0.6, sign: -1 },
+        { key: 'cn10y', group: 'confirm', weight: 0.1, capAbs: 0.6, sign: -1 },
+        { key: 'us10hk10', group: 'confirm', weight: 0.12, capAbs: 0.6, sign: -1 },
+        { key: 'cdsCn5y', group: 'confirm', weight: 0.12, capAbs: 2.0, sign: -1 },
+        { key: 'hyg', group: 'confirm', weight: 0.15, capAbs: 1.2, sign: +1 },
+
+        { key: 'eem', group: 'context', weight: 0.12, capAbs: 1.2, sign: +1 },
+        { key: 'copper', group: 'context', weight: 0.16, capAbs: 1.8, sign: +1 },
+        { key: 'iron', group: 'context', weight: 0.12, capAbs: 2.2, sign: +1 },
+        { key: 'brent', group: 'context', weight: 0.08, capAbs: 2.2, sign: +1 },
+        { key: 'gold', group: 'context', weight: 0.08, capAbs: 1.6, sign: -1 },
+        { key: 'tlt', group: 'context', weight: 0.08, capAbs: 1.2, sign: -1 },
+        { key: 'us2y', group: 'context', weight: 0.08, capAbs: 0.6, sign: -1 },
+        { key: 'btc', group: 'context', weight: 0.05, capAbs: 4.0, sign: +1 },
+        { key: 'ewh', group: 'context', weight: 0.05, capAbs: 1.6, sign: +1 },
+    ];
+
+    const drv = {
+        hk50: { label: 'HK50', pct: hk50Pct, sym: sym.hk50 },
+        hstech: { label: 'HSTECH', pct: get(sym.hstech), sym: sym.hstech },
+        hsfin: { label: 'HSI Finance', pct: get(sym.hsfin), sym: sym.hsfin },
+        hshares: { label: 'H-Shares', pct: get(sym.hshares), sym: sym.hshares },
+        ewh: { label: 'EWH', pct: get(sym.ewh), sym: sym.ewh },
+        fxChina: { label: 'China (FXI/MCHI/CSI300)', pct: get(sym.fxChina), sym: sym.fxChina },
+        cn50: { label: 'CN50 (China A50)', pct: get(sym.cn50), sym: sym.cn50 },
+        usdChina: { label: 'USD/CNH (ou CNY)', pct: usdChina, sym: sym.usdCnh || sym.usdCny },
+        usdHkd: { label: 'USD/HKD', pct: usdHkd, sym: sym.usdHkd },
+        audusd: { label: 'AUD/USD (beta China)', pct: get(sym.audusd), sym: sym.audusd },
+        dxy: { label: 'DXY', pct: get(sym.dxy), sym: sym.dxy },
+        spx: { label: 'SPX', pct: get(sym.spx), sym: sym.spx },
+        ndx: { label: 'NDX', pct: get(sym.ndx), sym: sym.ndx },
+        us10y: { label: 'US10Y', pct: getRatesMoveProxy(sym.us10y), sym: sym.us10y },
+        us2y: { label: 'US2Y', pct: getRatesMoveProxy(sym.us2y), sym: sym.us2y },
+        hk10y: { label: 'HK10Y', pct: getRatesMoveProxy(sym.hk10y), sym: sym.hk10y },
+        hk1m: { label: 'HK 1M (liquidez)', pct: getRatesMoveProxy(sym.hk1m), sym: sym.hk1m },
+        hk3m: { label: 'HK 3M (liquidez)', pct: getRatesMoveProxy(sym.hk3m), sym: sym.hk3m },
+        cn10y: { label: 'CN10Y', pct: getRatesMoveProxy(sym.cn10y), sym: sym.cn10y },
+        us10hk10: {
+            label: 'Spread 10Y (HK vs US/China)',
+            pct: isNum(getRatesMoveProxy(sym.us10hk10))
+                ? getRatesMoveProxy(sym.us10hk10)
+                : (isNum(getRatesMoveProxy(sym.hk10y)) && isNum(getRatesMoveProxy(sym.cn10y)) ? (getRatesMoveProxy(sym.hk10y) - getRatesMoveProxy(sym.cn10y)) : null),
+            sym: sym.us10hk10 || null
+        },
+        cdsCn5y: { label: 'China CDS 5Y (USD)', pct: get(sym.cdsCn5y), sym: sym.cdsCn5y },
+        vixPulso: { label: 'VIX9D', pct: vixPulso, sym: sym.vix9d },
+        vixRegime: { label: 'VIX', pct: vixRegime, sym: sym.vix30 },
+        vvix: { label: 'VVIX', pct: get(sym.vvix), sym: sym.vvix },
+        vhsi: { label: 'VHSI', pct: hkVol, sym: sym.vhsi },
+        eem: { label: 'EEM/VWO', pct: get(sym.eem), sym: sym.eem },
+        hyg: { label: 'HYG', pct: get(sym.hyg), sym: sym.hyg },
+        tlt: { label: 'TLT', pct: get(sym.tlt), sym: sym.tlt },
+        brent: { label: 'Brent', pct: get(sym.brent), sym: sym.brent },
+        copper: { label: 'Cobre', pct: get(sym.copper), sym: sym.copper },
+        iron: { label: 'Minério', pct: get(sym.iron), sym: sym.iron },
+        gold: { label: 'Ouro', pct: get(sym.gold), sym: sym.gold },
+        btc: { label: 'BTC', pct: get(sym.btc), sym: sym.btc },
+    };
+
+    const rows = [];
+    const breadth = { pos: 0, neg: 0, zero: 0 };
+    const contribution = { posSum: 0, negSum: 0, net: 0 };
+    const pnlLike = { posSum: 0, negSum: 0, net: 0 };
+    const groups = {
+        driver: { net: 0, pnl: 0, count: 0 },
+        confirm: { net: 0, pnl: 0, count: 0 },
+        context: { net: 0, pnl: 0, count: 0 },
+    };
+
+    for (const cfg of driversCfg) {
+        const d = drv[cfg.key];
+        const pct = d ? d.pct : null;
+        if (!isNum(pct)) continue;
+        const signed = cfg.sign * pct;
+        const capped = clamp(signed, -cfg.capAbs, cfg.capAbs);
+        const contrib = cfg.weight * (cfg.capAbs > 0 ? capped / cfg.capAbs : 0);
+        const pnl = cfg.weight * capped;
+        const g = cfg.group === 'driver' || cfg.group === 'confirm' || cfg.group === 'context' ? cfg.group : 'context';
+        contribution.net += contrib;
+        pnlLike.net += pnl;
+        groups[g].net += contrib;
+        groups[g].pnl += pnl;
+        groups[g].count += 1;
+        if (contrib > 0) {
+            breadth.pos += 1;
+            contribution.posSum += contrib;
+            pnlLike.posSum += pnl;
+        } else if (contrib < 0) {
+            breadth.neg += 1;
+            contribution.negSum += contrib;
+            pnlLike.negSum += pnl;
+        } else {
+            breadth.zero += 1;
+        }
+        rows.push({
+            key: cfg.key,
+            group: g,
+            label: d.label,
+            symbol: d.sym || null,
+            pct,
+            signed,
+            weight: cfg.weight,
+            capAbs: cfg.capAbs,
+            contrib,
+            pnl,
+        });
+    }
+
+    const net = clamp(contribution.net, -3, 3);
+    const bias = net > 0.25 ? 'buy' : net < -0.25 ? 'sell' : 'neutral';
+
+    const expectedKeys = driversCfg.map(x => x.key);
+    const got = new Set(rows.map(r => String(r && r.key ? r.key : '')));
+    const missing = expectedKeys.filter(k => !got.has(k));
+    const keyLabels = (() => {
+        const m = {};
+        for (const k of expectedKeys) {
+            const d = drv[k];
+            m[k] = d && d.label ? String(d.label) : k;
+        }
+        return m;
+    })();
+    const missingDetails = (() => {
+        const m = {};
+        for (const k of missing) {
+            const d = drv[k];
+            const s = d && d.sym ? String(d.sym) : '';
+            if (!s) {
+                m[k] = 'sem símbolo';
+                continue;
+            }
+            const pts = data && data.series && Array.isArray(data.series[s]) ? data.series[s] : [];
+            if (!pts.length) {
+                m[k] = 'sem série';
+                continue;
+            }
+            const last = getLastPoint(data, s);
+            if (!last) {
+                m[k] = 'sem último ponto';
+                continue;
+            }
+            if (typeof last.changePct !== 'number') {
+                m[k] = pts.length < 2 ? 'apenas 1 ponto (sem var%)' : 'sem var% (changePct)';
+                continue;
+            }
+            m[k] = 'sem var%';
+        }
+        return m;
+    })();
+
+    const suggest = (() => {
+        const want = [
+            { label: 'HK50/HSI (Hang Seng)', key: 'HK50' },
+            { label: 'HSI Finance (setor financeiro)', key: 'HSI_FIN' },
+            { label: 'USD/HKD', key: 'USD_HKD' },
+            { label: 'USD/CNH', key: 'USD_CNH' },
+            { label: 'HSTECH', key: 'HSTECH' },
+            { label: 'VHSI (vol HK)', key: 'VHSI' },
+            { label: 'China A50 / CN50', key: 'CN50' },
+            { label: 'H-Shares (HCEI)', key: 'HSHARES' },
+            { label: 'HK10Y (yield)', key: 'HK10Y' },
+            { label: 'HK 1M (liquidez)', key: 'HK1M' },
+            { label: 'HK 3M (liquidez)', key: 'HK3M' },
+            { label: 'Spread HK10Y vs US/China 10Y', key: 'SPREAD_HK10Y' },
+            { label: 'China CDS 5Y (USD)', key: 'CDS_CN5Y' },
+            { label: 'China ETF (MCHI)', key: 'MCHI' },
+            { label: 'AUD/USD (beta China)', key: 'AUD/USD' },
+        ];
+        const out = [];
+        for (const w of want) {
+            const has =
+                w.key === 'HSHARES'
+                    ? sym.hshares
+                    : w.key === 'AUD/USD'
+                        ? sym.audusd
+                        : findAliasSymbolBest(data, w.key);
+            if (!has) out.push(w.label);
+        }
+        return out;
+    })();
+
+    const geoNews = (() => {
+        const items = web && Array.isArray(web.items) ? web.items : [];
+        const picks = [];
+        for (const it of items) {
+            const t = it && it.title ? String(it.title) : '';
+            if (!t) continue;
+            if (!/(Hong Kong|China|Taiwan|Beijing|tariff|sanction|chip|semiconductor|HSTECH|Hang Seng|H-Shares|HCEI|HK)/i.test(t)) continue;
+            picks.push(it);
+            if (picks.length >= 3) break;
+        }
+        return picks;
+    })();
+
+    return {
+        sym,
+        market: { hk50Pct },
+        pulse: { bias, net, breadth, contribution, pnlLike, groups, rows },
+        coverage: { expected: expectedKeys.length, observed: rows.length, missing, keyLabels, missingDetails },
+        missingAssetsSuggestion: suggest,
+        news: geoNews,
+    };
+}
+
+function renderHk50OperationalBriefing() {
+    const el = document.getElementById('hk50OperationalBriefing');
+    if (!el) return;
+
+    const data = getData();
+    const rawWeb = operationalInputs.webNews || null;
+    const web = rawWeb && rawWeb.ok === true ? rawWeb : null;
+    const hkNow = data ? computeHk50PulseNow(data, web) : null;
+
+    const badge = (tone, text) => {
+        const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
+        return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
+    };
+
+    if (!data || !hkNow) {
+        el.innerHTML = `
+            <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);opacity:.88;">
+                Sem dados suficientes para montar o HK50 agora.
+            </div>
+        `;
+        return;
+    }
+
+    const fmtP = v => (typeof v === 'number' && Number.isFinite(v) ? formatPercent(v, 2) : '—');
+    const fmt0 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 0) : '—');
+    const fmt2 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 2) : '—');
+
+    const p = hkNow.pulse || { bias: 'neutral', net: 0, groups: {}, rows: [] };
+    const tone = p.net > 0.25 ? 'positive' : p.net < -0.25 ? 'negative' : 'neutral';
+    const netBadge = toneBadgeHtmlFromTone(tone, Math.abs(p.net), `${formatNumber(p.net, 2)}`, { maxAbs: 3 });
+    const biasLabel = b => (b === 'buy' ? 'COMPRA' : b === 'sell' ? 'VENDA' : 'NEUTRO');
+    const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+    const gaugeHtml = (() => {
+        const maxAbs = 3;
+        const v = typeof p.net === 'number' && Number.isFinite(p.net) ? clamp(p.net, -maxAbs, maxAbs) : 0;
+        const cx = 50;
+        const cy = 50;
+        const r = 40;
+        const n3 = n => {
+            const x = typeof n === 'number' && Number.isFinite(n) ? n : 0;
+            return String(Math.round(x * 1000) / 1000);
+        };
+        const rp = deg => {
+            const rad = (deg * Math.PI) / 180;
+            return { x: cx + r * Math.cos(rad), y: cy - r * Math.sin(rad) };
+        };
+        const arc = (a0, a1, stroke) => {
+            const p0 = rp(a0);
+            const p1 = rp(a1);
+            return `<path d="M ${n3(p0.x)} ${n3(p0.y)} A ${String(r)} ${String(r)} 0 0 0 ${n3(p1.x)} ${n3(p1.y)}" stroke="${stroke}" stroke-width="6" fill="none" stroke-linecap="round" opacity=".9"></path>`;
+        };
+        const ang = 90 - (v / maxAbs) * 90;
+        const nRad = (ang * Math.PI) / 180;
+        const nx = cx + (r - 10) * Math.cos(nRad);
+        const ny = cy - (r - 10) * Math.sin(nRad);
+        const needle = `<line x1="${String(cx)}" y1="${String(cy)}" x2="${n3(nx)}" y2="${n3(ny)}" stroke="rgba(255,255,255,.92)" stroke-width="2.3" stroke-linecap="round"></line>
+            <circle cx="${String(cx)}" cy="${String(cy)}" r="3.2" fill="rgba(255,255,255,.92)"></circle>`;
+        return `<div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:92px;height:54px;display:flex;align-items:center;justify-content:center;">
+                <svg viewBox="0 0 100 60" width="92" height="54" aria-label="Velocímetro HK">
+                    ${arc(180, 120, 'rgba(255,80,80,.92)')}
+                    ${arc(120, 60, 'rgba(255,210,80,.92)')}
+                    ${arc(60, 0, 'rgba(80,255,170,.92)')}
+                    ${needle}
+                </svg>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;line-height:1.05;">
+                <div style="font-weight:900;letter-spacing:.6px;opacity:.9;">Velocímetro</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.9;">Net ${escapeHtml(formatNumber(p.net, 2))}</div>
+            </div>
+        </div>`;
+    })();
+
+    const spotOf = s => {
+        const pt = s ? (getMostRecentPointWithPrice(data, s) || getLastPoint(data, s)) : null;
+        const spot = pt && typeof pt.price === 'number' && Number.isFinite(pt.price) ? pt.price : null;
+        const t = pt && pt.t ? String(pt.t) : null;
+        return { spot, t };
+    };
+    const hkSpot = spotOf(hkNow.sym.hk50);
+    const hkLine = `${hkNow.sym.hk50 ? hkNow.sym.hk50 : '—'} • ${hkSpot.spot !== null ? fmt0(hkSpot.spot) : '—'} • ${fmtP(hkNow.market.hk50Pct)}`;
+    const asOf = hkSpot.t ? formatDateTime(hkSpot.t) : '—';
+
+    const groupTop = (groupKey, max = 7) => {
+        const xs = (p.rows || []).filter(r => r && r.group === groupKey);
+        xs.sort((a, b) => Math.abs(b.contrib || 0) - Math.abs(a.contrib || 0));
+        return xs.slice(0, max);
+    };
+
+    const lineItem = r => {
+        const pct = typeof r.pct === 'number' && Number.isFinite(r.pct) ? r.pct : null;
+        const contrib = typeof r.contrib === 'number' && Number.isFinite(r.contrib) ? r.contrib : 0;
+        const t = contrib > 0.02 ? 'positive' : contrib < -0.02 ? 'negative' : 'neutral';
+        const cBadge = toneBadgeHtmlFromTone(t, Math.abs(contrib), fmt2(contrib), { maxAbs: 1 });
+        const sym = r.symbol ? String(r.symbol) : '';
+        const head = sym ? `${r.label} (${sym})` : String(r.label || '');
+        return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px;border:1px solid rgba(255,255,255,.10);border-radius:10px;background:rgba(0,0,0,.16);">
+            <div style="opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:72%;">${escapeHtml(head)}</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+                <span style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.88;">${escapeHtml(fmtP(pct))}</span>
+                ${cBadge}
+            </div>
+        </div>`;
+    };
+
+    const g = p.groups || {};
+    const layersLine = (() => {
+        const d = g.driver || { net: 0, count: 0 };
+        const c = g.confirm || { net: 0, count: 0 };
+        const x = g.context || { net: 0, count: 0 };
+        return `Camadas: Driver ${fmt2(d.net)} (${String(d.count)}) • Conf ${fmt2(c.net)} (${String(c.count)}) • Contexto ${fmt2(x.net)} (${String(x.count)})`;
+    })();
+
+    const missing = hkNow.coverage && Array.isArray(hkNow.coverage.missing) ? hkNow.coverage.missing : [];
+    const missingPretty = (() => {
+        const keyLabels = hkNow.coverage && hkNow.coverage.keyLabels && typeof hkNow.coverage.keyLabels === 'object' ? hkNow.coverage.keyLabels : {};
+        const details = hkNow.coverage && hkNow.coverage.missingDetails && typeof hkNow.coverage.missingDetails === 'object' ? hkNow.coverage.missingDetails : {};
+        return missing.map(k => {
+            const label = keyLabels && keyLabels[k] ? String(keyLabels[k]) : String(k);
+            const det = details && details[k] ? String(details[k]) : '';
+            return det ? `${label} (${det})` : label;
+        });
+    })();
+    const missingLabel = missingPretty.length ? `Faltando (dados): ${missingPretty.slice(0, 10).join(', ')}${missingPretty.length > 10 ? `… +${missingPretty.length - 10}` : ''}` : 'Drivers: completos';
+    const missingBadge = badge(missing.length ? 'neutral' : 'positive', missingLabel);
+
+    const sugg = hkNow.missingAssetsSuggestion || [];
+    const suggestLine = sugg.length ? `Sugestões p/ carteira (Investing): ${sugg.join(' • ')}` : '';
+
+    const news = Array.isArray(hkNow.news) ? hkNow.news : [];
+    const newsHtml = (() => {
+        if (!news.length) return `<div style="opacity:.78;font-size:12px;">• —</div>`;
+        return news
+            .map(it => {
+                const title = it && it.title ? String(it.title) : '';
+                const url = it && it.url ? String(it.url) : '';
+                const safeUrl = url && /^https?:\/\//i.test(url) ? url : '';
+                const a = safeUrl
+                    ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noreferrer" style="color:rgba(0,243,255,.92);text-decoration:none;">${escapeHtml(title)}</a>`
+                    : escapeHtml(title);
+                return `• ${a}`;
+            })
+            .join('<br>');
+    })();
+
+    const ratesAndCreditHtml = (() => {
+        const ratesMoveProxy = s => {
+            const sym = s ? String(s) : '';
+            if (!sym) return null;
+            const series = data && data.series && Array.isArray(data.series[sym]) ? data.series[sym] : [];
+            if (!series.length) return null;
+            const last = series[series.length - 1];
+            const lastPrice = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
+            if (last && typeof last.changePct === 'number' && Number.isFinite(last.changePct)) return last.changePct;
+            const prev = series.length > 1 ? series[series.length - 2] : null;
+            const prevPrice = prev && typeof prev.price === 'number' && Number.isFinite(prev.price) ? prev.price : null;
+            const deltaRaw = last && typeof last.change === 'number' && Number.isFinite(last.change)
+                ? last.change
+                : (lastPrice !== null && prevPrice !== null ? (lastPrice - prevPrice) : null);
+            if (deltaRaw === null || !Number.isFinite(deltaRaw)) return null;
+            const absPrice = lastPrice !== null ? Math.abs(lastPrice) : 0;
+            const deltaBp = absPrice > 20 ? deltaRaw : (deltaRaw * 100);
+            return deltaBp * 0.1;
+        };
+        const mk = (label, s, { fmtSpot, maxAbs } = {}) => {
+            const sym = s ? String(s) : '';
+            const spot = spotOf(sym).spot;
+            const chg = sym ? ratesMoveProxy(sym) : null;
+            const spotTxt = typeof fmtSpot === 'function' ? fmtSpot(spot) : (spot !== null ? fmt2(spot) : '—');
+            const chgTxt = typeof chg === 'number' && Number.isFinite(chg) ? toneBadgeHtml(chg, formatNumber(chg, 2), { maxAbs: typeof maxAbs === 'number' ? maxAbs : 1 }) : '—';
+            return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px;border:1px solid rgba(255,255,255,.10);border-radius:10px;background:rgba(0,0,0,.16);">
+                <div style="opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%;">${escapeHtml(label)}${sym ? ` <span style="opacity:.72;">(${escapeHtml(sym)})</span>` : ''}</div>
+                <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap;">
+                    <span style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.88;">${escapeHtml(spotTxt)}</span>
+                    ${chgTxt}
+                </div>
+            </div>`;
+        };
+        const fmtRate = v => (typeof v === 'number' && Number.isFinite(v) ? `${formatNumber(v, 2)}%` : '—');
+        const s = hkNow && hkNow.sym ? hkNow.sym : {};
+        const items = [
+            mk('HK10Y', s.hk10y, { fmtSpot: fmtRate, maxAbs: 0.6 }),
+            mk('HK 1M', s.hk1m, { fmtSpot: fmtRate, maxAbs: 0.6 }),
+            mk('HK 3M', s.hk3m, { fmtSpot: fmtRate, maxAbs: 0.6 }),
+            mk('CN10Y', s.cn10y, { fmtSpot: fmtRate, maxAbs: 0.6 }),
+            mk('US10Y', s.us10y, { fmtSpot: fmtRate, maxAbs: 0.6 }),
+            mk('Spread 10Y (HK vs US/China)', s.us10hk10, { fmtSpot: fmtRate, maxAbs: 0.6 }),
+            mk('China CDS 5Y (USD)', s.cdsCn5y, { maxAbs: 2.0 }),
+        ];
+        return `<div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:.6px;opacity:.92;">Taxas & Crédito (HK/China)</div>
+                <div style="opacity:.72;font-size:12px;">spot + Δ (proxy)</div>
+            </div>
+            <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px;">
+                ${items.join('')}
+            </div>
+        </div>`;
+    })();
+
+    el.innerHTML = `
+        <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;">HK50 — Resumo Operacional</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    ${badge(p.bias === 'buy' ? 'positive' : p.bias === 'sell' ? 'negative' : 'neutral', `Viés: ${biasLabel(p.bias)}`)}
+                    ${badge('neutral', 'Drivers net')} ${netBadge}
+                    ${gaugeHtml}
+                </div>
+            </div>
+            <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+                ${escapeHtml(hkLine)} • asOf ${escapeHtml(asOf)} • ${escapeHtml(layersLine)}
+            </div>
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                ${missingBadge}
+            </div>
+            ${suggestLine ? `<div style="margin-top:8px;opacity:.82;font-size:12px;line-height:1.35;">${escapeHtml(suggestLine)}</div>` : ''}
+        </div>
+        ${ratesAndCreditHtml}
+
+        <div style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">
+            <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:8px;">Drivers (direto / China-HK)</div>
+                ${(groupTop('driver') || []).map(lineItem).join('') || `<div style="opacity:.80;">—</div>`}
+            </div>
+            <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:8px;">Confirmação (global risk)</div>
+                ${(groupTop('confirm') || []).map(lineItem).join('') || `<div style="opacity:.80;">—</div>`}
+            </div>
+            <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:8px;">Contexto (commodities / EM)</div>
+                ${(groupTop('context') || []).map(lineItem).join('') || `<div style="opacity:.80;">—</div>`}
+            </div>
+        </div>
+
+        <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+            <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:8px;">Notícias (geo / China-HK)</div>
+            <div style="opacity:.92;line-height:1.35;">${newsHtml}</div>
+        </div>
+    `;
 }
 
 function renderBrazilFixedIncomeFlow(data) {
@@ -3623,12 +4208,66 @@ function renderAssetsCatalog(data) {
     }
 
     const pulseNow = typeof computeOperationalPulseNow === 'function' ? computeOperationalPulseNow(data) : null;
-    const mapping = pulseNow && pulseNow.sym ? pulseNow.sym : null;
-    const mappingRow = (label, key) => {
+    const hkNow = typeof computeHk50PulseNow === 'function' ? computeHk50PulseNow(data, null) : null;
+    const mapping = (() => {
+        const a = pulseNow && pulseNow.sym ? pulseNow.sym : {};
+        const b = hkNow && hkNow.sym ? hkNow.sym : {};
+        const extras = {
+            usdCnh: b.usdCnh || findAliasSymbolBest(data, 'USD_CNH') || null,
+            usdCny: b.usdCny || findAliasSymbolBest(data, 'USD_CNY') || null,
+            usdHkd: findAliasSymbolBest(data, 'USD_HKD') || null,
+            hk50: b.hk50 || findAliasSymbolBest(data, 'HK50') || null,
+            hstech: b.hstech || findAliasSymbolBest(data, 'HSTECH') || null,
+            hsfin: b.hsfin || findAliasSymbolBest(data, 'HSI_FIN') || null,
+            ewh: b.ewh || findAliasSymbolBest(data, 'EWH') || null,
+            ndx: b.ndx || findAliasSymbolBest(data, 'NDX') || null,
+            vhsi: b.vhsi || findAliasSymbolBest(data, 'VHSI') || null,
+            hk1m: b.hk1m || findAliasSymbolBest(data, 'HK1M') || null,
+            hk3m: b.hk3m || findAliasSymbolBest(data, 'HK3M') || null,
+            us10hk10: b.us10hk10 || findAliasSymbolBest(data, 'SPREAD_HK10Y') || null,
+            mchi: findAliasSymbolBest(data, 'MCHI') || null,
+            audusd: findAssetSymbol(data, /^AUD\/USD\b/i) || null,
+            cdsCn5y: findAliasSymbolBest(data, 'CDS_CN5Y') || null,
+        };
+        return { ...a, ...b, ...extras };
+    })();
+    const bySymbol = (() => {
+        const m = new Map();
+        for (const r of rowsAll) m.set(r.symbol, r);
+        return m;
+    })();
+    const candidatesFor = aliasKey => {
+        const matchers = typeof assetAliasMatchers === 'function' ? assetAliasMatchers(aliasKey) : [];
+        const out = [];
+        const seen = new Set();
+        for (const re of matchers) {
+            if (!(re instanceof RegExp)) continue;
+            for (const r of rowsAll) {
+                const sym = String(r.symbol || '');
+                const name = String(r.name || '');
+                if (!sym || seen.has(sym)) continue;
+                if (re.test(sym) || re.test(name)) {
+                    out.push(sym);
+                    seen.add(sym);
+                    if (out.length >= 6) return out;
+                }
+            }
+        }
+        return out;
+    };
+    const mappingRow = (label, key, aliasKey) => {
         const val = mapping && mapping[key] ? String(mapping[key]) : '—';
+        const meta = val && val !== '—' ? bySymbol.get(val) : null;
+        const metaLine = meta ? `${String(meta.name || '—')} • ${String(meta.category || '—')} • ${String(meta.exchange || '—')}` : '';
+        const cands = aliasKey ? candidatesFor(aliasKey).filter(s => s !== val) : [];
+        const candLine = cands.length ? `candidatos: ${cands.slice(0, 4).join(', ')}${cands.length > 4 ? `… +${cands.length - 4}` : ''}` : '';
         return `<tr>
             <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);font-weight:900;opacity:.92;">${escapeHtml(label)}</td>
-            <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.9;">${escapeHtml(val)}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);">
+                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.9;">${escapeHtml(val)}</div>
+                ${metaLine ? `<div style="opacity:.72;font-size:12px;margin-top:2px;line-height:1.25;">${escapeHtml(metaLine)}</div>` : ''}
+                ${candLine ? `<div style="opacity:.72;font-size:12px;margin-top:2px;line-height:1.25;">${escapeHtml(candLine)}</div>` : ''}
+            </td>
         </tr>`;
     };
 
@@ -3820,27 +4459,48 @@ function renderAssetsCatalog(data) {
                     <div style="overflow:auto;max-height:240px;border:1px solid rgba(255,255,255,.08);border-radius:10px;">
                         <table style="width:100%;border-collapse:collapse;">
                             <tbody>
-                                ${mappingRow('WDO', 'wdo')}
-                                ${mappingRow('WIN', 'win')}
-                                ${mappingRow('USD/BRL', 'usdbrl')}
-                                ${mappingRow('IBOV', 'ibov')}
-                                ${mappingRow('EWZ', 'ewz')}
-                                ${mappingRow('DXY', 'dxy')}
-                                ${mappingRow('VIX', 'vix')}
-                                ${mappingRow('VXBR', 'vxbr')}
-                                ${mappingRow('BR10Y', 'br10y')}
-                                ${mappingRow('CDS', 'cds')}
-                                ${mappingRow('SPX', 'spx')}
-                                ${mappingRow('US10Y', 'us10y')}
-                                ${mappingRow('US2Y', 'us2y')}
-                                ${mappingRow('HYG', 'hyg')}
-                                ${mappingRow('TLT', 'tlt')}
-                                ${mappingRow('EEM/VWO', 'eem')}
-                                ${mappingRow('Brent', 'brent')}
-                                ${mappingRow('Cobre', 'copper')}
-                                ${mappingRow('Ouro', 'gold')}
-                                ${mappingRow('Minério', 'iron')}
-                                ${mappingRow('BTC', 'btc')}
+                                ${mappingRow('WDO', 'wdo', 'WDO')}
+                                ${mappingRow('WIN', 'win', 'WIN')}
+                                ${mappingRow('HK50 (Hang Seng)', 'hk50', 'HK50')}
+                                ${mappingRow('HSTECH', 'hstech', 'HSTECH')}
+                                ${mappingRow('HSI Finance', 'hsfin', 'HSI_FIN')}
+                                ${mappingRow('EWH (ETF HK)', 'ewh', 'EWH')}
+                                ${mappingRow('USD/BRL', 'usdbrl', 'USD_BRL')}
+                                ${mappingRow('USD/CNH', 'usdCnh', 'USD_CNH')}
+                                ${mappingRow('USD/CNY', 'usdCny', 'USD_CNY')}
+                                ${mappingRow('USD/HKD', 'usdHkd', 'USD_HKD')}
+                                ${mappingRow('AUD/USD', 'audusd', '')}
+                                ${mappingRow('IBOV', 'ibov', 'IBOV')}
+                                ${mappingRow('EWZ', 'ewz', 'EWZ')}
+                                ${mappingRow('DXY', 'dxy', 'DXY')}
+                                ${mappingRow('VIX (usado)', 'vix', 'VIX')}
+                                ${mappingRow('VIX9D', 'vix9d', 'VIX9D')}
+                                ${mappingRow('VIX (clássico)', 'vix30', 'VIX30')}
+                                ${mappingRow('VVIX', 'vvix', 'VVIX')}
+                                ${mappingRow('VXN', 'vxn', 'VXN')}
+                                ${mappingRow('VXEEM', 'vxeem', 'VXEEM')}
+                                ${mappingRow('VXEWZ', 'vxewz', 'VXEWZ')}
+                                ${mappingRow('VXBR', 'vxbr', 'VXBR')}
+                                ${mappingRow('VHSI (vol HK)', 'vhsi', 'VHSI')}
+                                ${mappingRow('BR10Y', 'br10y', 'BR10Y')}
+                                ${mappingRow('CDS', 'cds', 'CDS_BR5Y')}
+                                ${mappingRow('China CDS 5Y', 'cdsCn5y', 'CDS_CN5Y')}
+                                ${mappingRow('SPX', 'spx', 'SPX')}
+                                ${mappingRow('NDX', 'ndx', 'NDX')}
+                                ${mappingRow('US10Y', 'us10y', 'US10Y')}
+                                ${mappingRow('US2Y', 'us2y', 'US2Y')}
+                                ${mappingRow('HK 1M', 'hk1m', 'HK1M')}
+                                ${mappingRow('HK 3M', 'hk3m', 'HK3M')}
+                                ${mappingRow('Spread HK10Y vs US/China 10Y', 'us10hk10', 'SPREAD_HK10Y')}
+                                ${mappingRow('HYG', 'hyg', 'HYG')}
+                                ${mappingRow('TLT', 'tlt', 'TLT')}
+                                ${mappingRow('EEM/VWO', 'eem', 'EEM')}
+                                ${mappingRow('China ETF (MCHI)', 'mchi', 'MCHI')}
+                                ${mappingRow('Brent', 'brent', 'BRENT')}
+                                ${mappingRow('Cobre', 'copper', 'COPPER')}
+                                ${mappingRow('Ouro', 'gold', 'GOLD')}
+                                ${mappingRow('Minério', 'iron', 'IRON')}
+                                ${mappingRow('BTC', 'btc', 'BTC')}
                             </tbody>
                         </table>
                     </div>
@@ -4247,6 +4907,7 @@ function renderOptionsGammaSummary(payload) {
 
     operationalInputs.optionsGamma = payload;
     try { renderOperationalBriefing(); } catch { }
+    try { renderHk50OperationalBriefing(); } catch { }
 
     const fmt0 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 0) : '—');
     const fmt2 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 2) : '—');
@@ -4522,6 +5183,7 @@ function renderWebNewsModule(payload) {
 
     operationalInputs.webNews = payload;
     try { renderOperationalBriefing(); } catch { }
+    try { renderHk50OperationalBriefing(); } catch { }
 
     const sentiment = summary && summary.sentiment ? String(summary.sentiment) : 'Neutro';
     const conflicts = summary && Array.isArray(summary.conflicts) ? summary.conflicts : [];
@@ -5099,6 +5761,34 @@ function renderOperationalBriefing() {
                     <div style="margin-top:6px;opacity:.78;font-size:12px;">
                         Cobertura: ${escapeHtml(String((p.rows || []).length))} drivers ativos
                     </div>
+                    ${(() => {
+                        const g = p.groups || null;
+                        if (!g) return '';
+                        const fmt = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 2) : '—');
+                        const d = g.driver || { net: 0, count: 0 };
+                        const c = g.confirm || { net: 0, count: 0 };
+                        const x = g.context || { net: 0, count: 0 };
+                        return `<div style="margin-top:6px;opacity:.78;font-size:12px;">Camadas: Driver ${fmt(d.net)} (${String(d.count)}) • Conf ${fmt(c.net)} (${String(c.count)}) • Contexto ${fmt(x.net)} (${String(x.count)})</div>`;
+                    })()}
+                    ${(() => {
+                        const mk = (label, symbol) => {
+                            const pct = symbol ? getChangePct(data, symbol) : null;
+                            if (typeof pct !== 'number' || !Number.isFinite(pct)) return null;
+                            return `${label} ${formatPercent(pct, 2)}`;
+                        };
+                        const s = pulseNow.sym || {};
+                        const bits = [
+                            mk('VIX9D', s.vix9d),
+                            mk('VIX', s.vix30),
+                            mk('VVIX', s.vvix),
+                            mk('VXN', s.vxn),
+                            mk('VXEEM', s.vxeem),
+                            mk('VXEWZ', s.vxewz),
+                            mk('VXBR', s.vxbr),
+                        ].filter(Boolean);
+                        if (!bits.length) return '';
+                        return `<div style="margin-top:6px;opacity:.78;font-size:12px;">Vol: ${escapeHtml(bits.join(' • '))}</div>`;
+                    })()}
                     <div style="margin-top:8px;opacity:.88;font-size:12px;line-height:1.35;">
                         PnL (sintético): +${formatNumber(pnl.posSum, 2)} / ${formatNumber(pnl.negSum, 2)} • net ${formatNumber(pnl.net, 2)}
                         • Largura: ${String(br.pos)}↑ ${String(br.neg)}↓ ${String(br.zero)}≈
@@ -5397,6 +6087,7 @@ function renderOperationalBriefing() {
                 operationalTuning[group][key] = v;
                 persist();
                 renderOperationalBriefing();
+                renderHk50OperationalBriefing();
             });
         };
         bindRange('op-th-dxy', 'threshold', 'dxy');
@@ -5464,6 +6155,47 @@ function findAssetSymbolAny(data, matchers) {
     return null;
 }
 
+function findAssetSymbolBest(data, matchers, config) {
+    const assets = data && data.assets ? data.assets : [];
+    const list = Array.isArray(matchers) ? matchers : [];
+    const cfg = config && typeof config === 'object' ? config : {};
+    const expectedCategories = Array.isArray(cfg.expectedCategories) ? cfg.expectedCategories.map(x => String(x)) : [];
+    const expectedTags = Array.isArray(cfg.expectedTags) ? cfg.expectedTags.map(x => String(x)) : [];
+    const expectedExchanges = Array.isArray(cfg.expectedExchanges) ? cfg.expectedExchanges.map(x => String(x)) : [];
+    const preferSymbols = Array.isArray(cfg.preferSymbols) ? cfg.preferSymbols.filter(x => x instanceof RegExp) : [];
+    const avoidSymbols = Array.isArray(cfg.avoidSymbols) ? cfg.avoidSymbols.filter(x => x instanceof RegExp) : [];
+
+    const scoreAsset = a => {
+        const sym = String(a && a.symbol ? a.symbol : '');
+        const cat = String(a && a.category ? a.category : '');
+        const ex = String(a && a.exchange ? a.exchange : '');
+        const tags = Array.isArray(a && a.tags ? a.tags : []) ? a.tags.map(x => String(x)) : [];
+        let s = 1;
+        if (expectedCategories.length && expectedCategories.includes(cat)) s += 2;
+        if (expectedExchanges.length && expectedExchanges.includes(ex)) s += 1;
+        if (expectedTags.length) {
+            for (const t of expectedTags) if (tags.includes(t)) s += 0.6;
+        }
+        for (const re of preferSymbols) if (re.test(sym)) s += 3;
+        for (const re of avoidSymbols) if (re.test(sym)) s -= 3;
+        return s;
+    };
+
+    let best = null;
+    for (const m of list) {
+        if (!(m instanceof RegExp)) continue;
+        for (const a of assets) {
+            const sym = String(a && a.symbol ? a.symbol : '');
+            const name = String(a && a.name ? a.name : '');
+            if (!sym) continue;
+            if (!m.test(sym) && !m.test(name)) continue;
+            const sc = scoreAsset(a);
+            if (!best || sc > best.score) best = { sym, score: sc };
+        }
+    }
+    return best ? best.sym : null;
+}
+
 function assetAliasMatchers(key) {
     const k = String(key || '').toUpperCase().trim();
     if (!k) return [];
@@ -5471,43 +6203,132 @@ function assetAliasMatchers(key) {
     if (k === 'US2Y') return [/^US2YT=RR$/i, /^TUc1=$/i, /\bUnited States 2-Year\b/i, /\bEUA\b\s+a\s+2\s+anos\b/i, /^US2Y\b/i];
     if (k === 'US10Y') return [/^US10YT=RR$/i, /^TNc2=$/i, /\bUnited States 10-Year\b/i, /\bEUA\b\s+a\s+10\s+anos\b/i, /^US10Y\b/i];
     if (k === 'US30Y') return [/^US30YT=RR$/i, /^USc1=$/i, /\bUnited States 30-Year\b/i, /\bEUA\b\s+a\s+30\s+anos\b/i, /^US30Y\b/i];
+    if (k === 'SPREAD_HK10Y')
+        return [
+            /^(US10HK10|HK10US10|CN10HK10|HK10CN10|CH10HK10|HK10CH10)=RR$/i,
+            /\bSpread\b.*\bHong\s*Kong\b.*\b10\b.*\b(EUA|US|China|CHI)\b.*\b10\b/i,
+            /\bSpread\b.*\b(EUA|US|China|CHI)\b.*\b10\b.*\bHong\s*Kong\b.*\b10\b/i,
+            /\bSpread\b.*\bEUA\b.*\b10A\b.*\b(HK|HKG|Hong\s*Kong)\b.*\b10A\b/i,
+            /\bSpread\b.*\b(HK|HKG|Hong\s*Kong)\b.*\b10A\b.*\bEUA\b.*\b10A\b/i,
+        ];
 
     if (k === 'DXY') return [/^\.DXY$/i, /\bDXY\b/i, /US Dollar Index/i, /Indice Dolar/i];
     if (k === 'VIX') return [/^\.?VIX(9D)?$/i, /\bVIX9D\b/i, /\bVIX\b/i, /Volatilidade/i];
+    if (k === 'VIX9D') return [/^\.VIX9D$/i, /\bVIX9D\b/i, /\b9-Day Volatility\b/i];
+    if (k === 'VIX30') return [/^VIX$/i, /^\.VIX$/i, /\bS&P\s*500\s*VIX\b/i];
+    if (k === 'VVIX') return [/^\.VVIX$/i, /\bVVIX\b/i, /\bVix Volatility\b/i];
+    if (k === 'VXN') return [/^\.VXN$/i, /\bNASDAQ\s*100 Volatility\b/i];
+    if (k === 'VXEEM') return [/^\.VXEEM$/i, /\bEmerging Markets\b.*\bVol/i];
+    if (k === 'VXEWZ') return [/^\.VXEWZ$/i, /\bBrazil\b.*\bVol/i];
+    if (k === 'VXBR') return [/^\.VXBR$/i, /\bIbovespa VIX\b/i, /\bVXBR\b/i];
 
-    if (k === 'BRENT') return [/\bBrent\b/i];
-    if (k === 'WTI') return [/\bWTI\b/i];
-    if (k === 'OIL') return [/\bBrent\b/i, /\bWTI\b/i];
+    if (k === 'BRENT') return [/^BNO$/i, /^LCO\b/i, /^BRN$|^BRN=F$|^BZ=F$/i, /\bBrent\b/i];
+    if (k === 'WTI') return [/^USO$/i, /^CL$|^CL=F$|^WTI$/i, /\bWTI\b/i];
+    if (k === 'OIL') return [/^BNO$/i, /^LCO\b/i, /^USO$/i, /^CL$|^CL=F$|^BRN$|^BRN=F$|^BZ=F$/i, /\bBrent\b/i, /\bWTI\b/i];
 
     if (k === 'IRON') return [/^TIOc1$/i, /^SM58Fc1$/i, /^9047$/i, /^3047$/i, /\bmin[eé]rio\b/i, /\biron ore\b/i];
     if (k === 'SOY') return [/^ZS$/i, /\bsoja\b/i, /\bsoy\b/i];
     if (k === 'COPPER') return [/^HG\b/i, /\bcopper\b/i, /\bcobre\b/i];
     if (k === 'BCI') return [/^BCI$/i, /\babrdn Bloomberg All Commodity Strategy\b/i];
+    if (k === 'GOLD') return [/^GC\b/i, /^XAU(USD)?$/i, /\bgold\b/i, /\bouro\b/i];
+    if (k === 'BTC') return [/^BTC\/USD$/i, /^BTCUSD$/i, /\bBTC\b/i, /\bbitcoin\b/i, /\bXBT\b/i];
 
     if (k === 'SPX') return [/^\.SPX$/i, /\bS&P 500\b/i, /^SPY$/i, /^ES\b/i, /^ES[HMUZ]\d{2}$/i];
     if (k === 'NDX') return [/^\.NDX$/i, /\bNasdaq 100\b/i, /^QQQ$/i, /^NQ\b/i, /^NQ[HMUZ]\d{2}$/i];
-    if (k === 'CHINA') return [/^FXI$/i, /^\.(CSI300)\b/i, /China A50/i, /Shanghai Shenzhen CSI 300/i];
+    if (k === 'CHINA')
+        return [
+            /^FXI$/i,
+            /^MCHI(\.\w+)?$/i,
+            /^2838\.HK$/i,
+            /^\.(CSI300)\b/i,
+            /China A50/i,
+            /Shanghai Shenzhen CSI 300/i,
+            /Hang Seng FTSE China 50/i,
+            /\bMSCI\b.*\bChina\b/i,
+        ];
+    if (k === 'CN50') return [/^CHINA50$/i, /\bChina\s*A50\b/i, /\bCN50\b/i];
 
     if (k === 'FXI') return [/^FXI$/i];
+    if (k === 'MCHI') return [/^MCHI(\.\w+)?$/i, /\biShares\b.*\bMSCI\b.*\bChina\b/i, /\bMSCI\b.*\bChina\b/i];
     if (k === 'CSI300') return [/^\.(CSI300)\b/i];
 
     if (k === 'JP10Y') return [/^JP10YT=RR$/i, /\bJapan\b.*\b10\b.*\bYear\b.*\bYield\b/i, /\bJGB\b.*\b10\b/i];
     if (k === 'JP1Y') return [/^JP1YT=(RR|XX)$/i, /\bJapan\b.*\b1\b.*\bYear\b.*\bYield\b/i, /\bJap[aã]o\b.*\b1\b.*\bano\b/i];
     if (k === 'JP5Y') return [/^JP5YT=(RR|XX)$/i, /\bJapan\b.*\b5\b.*\bYear\b.*\bYield\b/i, /\bJap[aã]o\b.*\b5\b.*\banos\b/i];
+    if (k === 'CN10Y') return [/^CN10YT=RR$/i, /\bChina\b.*\b10\b.*\bYear\b.*\bYield\b/i, /\bChina\b.*\b10\b.*\banos\b/i];
     if (k === 'HK10Y') return [/^HK10YT=RR$/i, /\bHong\s*Kong\b.*\b10\b.*\bYear\b.*\bYield\b/i, /\bHong\s*Kong\b.*\b10\b.*\banos\b/i];
-    if (k === 'VHSI') return [/^VHSI(c\d+)?$/i, /\bHSI Volatility\b/i];
-    if (k === 'HSTECH') return [/^HSTECH$/i, /\bHang Seng TECH\b/i];
+    if (k === 'HK1M') return [/^HK1MT=RR$/i, /\bHong\s*Kong\b.*\b1\b.*\bMonth\b/i, /\bHong\s*Kong\b.*\b1\b.*\bm[eê]s\b/i];
+    if (k === 'HK3M') return [/^HK3MT=RR$/i, /\bHong\s*Kong\b.*\b3\b.*\bMonth\b/i, /\bHong\s*Kong\b.*\b3\b.*\bmeses\b/i];
+    if (k === 'VHSI') return [/^\.VHSI$/i, /^VHSI(c\d+)?$/i, /\bHSI Volatility\b/i];
+    if (k === 'HSTECH') return [/^HSTECH$/i, /^\.HSTECH$/i, /\bHang Seng TECH\b/i];
+    if (k === 'HSI_FIN') return [/^\.(HSNF|HSHFI)\b/i, /\bHSI-?Finance\b/i, /\bHang\s*Seng\b.*\bHFI\b/i, /\bHang\s*Seng\b.*\bFinance\b/i];
     if (k === 'EWH') return [/^EWH$/i, /\biShares MSCI Hong Kong\b/i];
+    if (k === 'HK50') return [/^HSIQ/i, /^HK50$/i, /^\.HSI/i, /^HSI$/i, /\bHang\s*Seng\b/i, /\bHK\s*50\b/i];
 
     if (k === 'USD_BRL') return [/^USD\/BRL\b/i];
+    if (k === 'USD_CNH') return [/^USD\/CNH\b/i, /\bUSD\/CNH\b/i, /\bYuan\b.*\boffshore\b/i, /\bchin[eê]s\b.*\boffshore\b/i];
+    if (k === 'USD_CNY') return [/^USD\/CNY\b/i, /\bUSD\/CNY\b/i, /\bYuan\b/i, /\bchin[eê]s\b/i];
+    if (k === 'USD_HKD') return [/^USD\/HKD\b/i, /\bUSD\/HKD\b/i, /\bHong\s*Kong\s*Dollar\b/i];
+    if (k === 'WDO') return [/(^WDO\b|WDOc\d\b|\bmini\s*d[oó]lar\b)/i];
+    if (k === 'WIN') return [/(^WIN\b|WINc\d\b|\bmini\s*(índice|indice)\b|\bmini\s*ibovespa\b)/i];
+    if (k === 'IBOV') return [/(^\.BVSP$|\bIBOV\b|\bIbovespa\b)/i, /^BOVA11(\b|$)/i];
+    if (k === 'EWZ') return [/^EWZ$/i, /\bBrazil\b.*\bETF\b/i];
+    if (k === 'HYG') return [/^HYG(\.\w+)?$/i, /\bhigh\s*yield\b/i, /\biBoxx\b/i, /\balto\s*rendimento\b/i];
+    if (k === 'TLT') return [/^TLT(\.\w+)?$/i, /\b20\+\s*Year\b.*\bTreasury\b/i, /\bTreasury\b.*\bBond\b/i];
+    if (k === 'EEM') return [/^EEM$/i, /\bMSCI\b.*\bEmerging\b.*\bMarkets\b/i, /\bmercados\s*emergentes\b/i];
+    if (k === 'VWO') return [/^VWO$/i, /\bFTSE\b.*\bEmerging\b.*\bMarkets\b/i];
+    if (k === 'CDS_BR5Y') return [/^BRGV5YUSAC=R$/i, /^BRGV/i, /\bCDS\b.*\bBR\b/i];
+    if (k === 'CDS_CN5Y') return [/^CNGV5YUSAC=R$/i, /^CNGV/i, /\bCDS\b.*\bChina\b.*\b5\b/i, /\bChina\b.*\bCDS\b.*\b5\b/i];
+    if (k === 'BR10Y') return [/^BR10YT=RR$/i, /\bBR\b.*\b10\b.*\bYear\b/i, /\bBrasil\b.*\b10\b.*\banos\b/i];
 
     if (k === 'TIPS_ETF') return [/^TIP$/i, /\biShares TIPS\b/i];
 
     return [];
 }
 
+function aliasResolutionConfig(key) {
+    const k = String(key || '').toUpperCase().trim();
+    if (!k) return {};
+    if (k === 'USD_BRL') return { expectedCategories: ['fx_emerging', 'fx'], expectedTags: ['risk_off'] };
+    if (k === 'USD_CNH' || k === 'USD_CNY' || k === 'USD_HKD') return { expectedCategories: ['fx_emerging', 'fx_g10', 'fx'], expectedExchanges: ['FX'] };
+    if (k === 'DXY') return { expectedCategories: ['fx_major', 'fx'], expectedTags: ['risk_off'] };
+    if (k === 'WDO') return { expectedCategories: ['fx_emerging'], preferSymbols: [/^WDOc1$/i] };
+    if (k === 'WIN') return { expectedCategories: ['equities'], preferSymbols: [/^WINc1$/i] };
+    if (k === 'IBOV') return { expectedCategories: ['equities'], preferSymbols: [/^\.BVSP$/i] };
+    if (k === 'VIX9D' || k === 'VIX30' || k === 'VIX' || k === 'VVIX' || k === 'VXN' || k === 'VXEEM' || k === 'VXEWZ' || k === 'VXBR')
+        return { expectedCategories: ['volatility'], expectedTags: ['risk_off'] };
+    if (k === 'VHSI') return { expectedCategories: ['volatility'], expectedTags: ['risk_off'], expectedExchanges: ['HK', 'HKEx', 'HKEX'] };
+    if (k === 'HK50')
+        return { expectedCategories: ['equities'], expectedTags: ['risk_on'], expectedExchanges: ['HK', 'HKEx', 'HKEX'], preferSymbols: [/^HSIQ/i, /^HK50$/i, /^\.HSI$/i, /^HSI$/i] };
+    if (k === 'HSI_FIN') return { expectedCategories: ['equities'], expectedTags: ['risk_on'], expectedExchanges: ['HK', 'HKEx', 'HKEX'] };
+    if (k === 'CN50') return { expectedCategories: ['emerging', 'equities'], expectedTags: ['risk_on'] };
+    if (k === 'MCHI') return { expectedCategories: ['emerging', 'equities'], expectedTags: ['risk_on'] };
+    if (k === 'SPX') return { expectedCategories: ['equities'], preferSymbols: [/^\.SPX$/i, /^\^GSPC$/i, /^SPY$/i] };
+    if (k === 'NDX') return { expectedCategories: ['equities'], preferSymbols: [/^\.NDX$/i, /^QQQ(\.\w+)?$/i] };
+    if (k === 'EWZ') return { expectedCategories: ['equities'], expectedTags: ['risk_on'] };
+    if (k === 'HYG') return { expectedCategories: ['credit'], expectedTags: ['risk_on'] };
+    if (k === 'TLT') return { expectedCategories: ['rates'], expectedTags: ['risk_off'] };
+    if (k === 'EEM' || k === 'VWO') return { expectedCategories: ['emerging'], expectedTags: ['risk_on'] };
+    if (k === 'BRENT' || k === 'WTI' || k === 'OIL') return { expectedCategories: ['energy'], expectedTags: ['oil'] };
+    if (k === 'GOLD') return { expectedCategories: ['metals'], expectedTags: ['risk_off'] };
+    if (k === 'COPPER' || k === 'IRON') return { expectedCategories: ['metals'], expectedTags: ['risk_on'] };
+    if (k === 'BTC') return { expectedCategories: ['crypto'], expectedTags: ['risk_on'] };
+    if (k === 'US2Y' || k === 'US10Y' || k === 'US30Y') return { expectedCategories: ['rates'], expectedTags: ['risk_off'] };
+    if (k === 'CN10Y') return { expectedCategories: ['rates'], expectedTags: ['rates'] };
+    if (k === 'SPREAD_HK10Y') return { expectedCategories: ['rates'], expectedTags: ['rates'] };
+    if (k === 'HK1M' || k === 'HK3M') return { expectedCategories: ['rates'], expectedTags: ['rates'], expectedExchanges: ['HK', 'HKEx', 'HKEX'] };
+    if (k === 'CDS_BR5Y') return { expectedCategories: ['credit'], expectedTags: ['risk_off'] };
+    if (k === 'CDS_CN5Y') return { expectedCategories: ['credit'], expectedTags: ['risk_off'] };
+    if (k === 'BR10Y') return { expectedCategories: ['rates'], expectedTags: ['risk_off'] };
+    return {};
+}
+
 function findAliasSymbol(data, key) {
     return findAssetSymbolAny(data, assetAliasMatchers(key));
+}
+
+function findAliasSymbolBest(data, key) {
+    return findAssetSymbolBest(data, assetAliasMatchers(key), aliasResolutionConfig(key));
 }
 
 function getChangePct(data, symbol) {
@@ -5530,13 +6351,13 @@ function renderFlowSentinel(data) {
         usdjpy: findAssetSymbol(data, /^USD\/JPY\b/i),
         usdchf: findAssetSymbol(data, /^USD\/CHF\b/i),
         usdsek: findAssetSymbol(data, /^USD\/SEK\b/i),
-        dxy: findAliasSymbol(data, 'DXY'),
-        vix: findAliasSymbol(data, 'VIX') || findAssetSymbol(data, /^\.?VIX(9D)?$/i),
+        dxy: findAliasSymbolBest(data, 'DXY') || findAliasSymbol(data, 'DXY'),
+        vix: findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX30') || findAliasSymbolBest(data, 'VIX') || findAliasSymbol(data, 'VIX') || findAssetSymbol(data, /^\.?VIX(9D)?$/i),
         vhsi: findAliasSymbol(data, 'VHSI') || findAssetSymbol(data, /^VHSI(c\d+)?$/i),
         jp1y: findAliasSymbol(data, 'JP1Y') || findAssetSymbol(data, /^JP1YT=(RR|XX)$/i),
         jp10y: findAliasSymbol(data, 'JP10Y') || findAssetSymbol(data, /^JP10YT=RR$/i),
-        brent: findAliasSymbol(data, 'BRENT'),
-        wti: findAliasSymbol(data, 'WTI'),
+        brent: findAliasSymbolBest(data, 'BRENT') || findAliasSymbol(data, 'BRENT'),
+        wti: findAliasSymbolBest(data, 'WTI') || findAliasSymbol(data, 'WTI'),
     };
 
     const neutralThreshold = 0.12;
@@ -7729,6 +8550,7 @@ function renderAll(data) {
 
     safe(() => renderOverview(data));
     safe(() => renderOperationalBriefing());
+    safe(() => renderHk50OperationalBriefing());
     safe(() => renderFavorites(data));
     safe(() => renderFlowSentinel(data));
     safe(() => renderCarryTradeMonitor(data));
@@ -8258,6 +9080,7 @@ async function boot() {
     setupNavMorePanel();
     setupInvestingCalendarWidgetLazyLoad();
     try { renderOperationalBriefing(); } catch { }
+    try { renderHk50OperationalBriefing(); } catch { }
 
     let data = getData();
     if (!data) {
