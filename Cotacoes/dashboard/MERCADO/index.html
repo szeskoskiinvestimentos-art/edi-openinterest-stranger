@@ -621,6 +621,11 @@
             padding:12px;
             display:none;
             z-index:110;
+            max-height:calc(100vh - 140px);
+            overflow:auto;
+            overscroll-behavior:contain;
+            scrollbar-gutter:stable;
+            -webkit-overflow-scrolling:touch;
         }
         .nav-more__panel.is-open{
             display:block;
@@ -714,58 +719,14 @@
         <div class="container nav-shell">
             <div class="nav-left">
                 <div class="nav-links" aria-label="Navegação superior">
-                    <a href="#overview" class="nav-link nav-chip active" data-nav="1">Visão Geral</a>
-                    <a href="#intel" class="nav-link nav-chip" data-nav="1">Intel</a>
-                    <a href="#panorama" class="nav-link nav-chip" data-nav="1">Panorama</a>
-                    <a href="#alerts" class="nav-link nav-chip" data-nav="1">Alertas</a>
+                    <div id="navPrimaryLinks" style="display:contents;"></div>
 
                     <div class="nav-more">
                         <button id="navMoreBtn" type="button" class="nav-more__btn" aria-haspopup="true" aria-expanded="false" aria-controls="navMorePanel">
                             Mais ▾
                         </button>
                         <div id="navMorePanel" class="nav-more__panel" role="menu" aria-label="Mais seções">
-                            <div class="nav-more__grid">
-                                <div class="nav-more__group">
-                                    <div class="nav-more__title">Principais</div>
-                                    <a href="#overview" class="nav-link nav-chip" data-nav="1" role="menuitem">Visão Geral</a>
-                                    <a href="#intel" class="nav-link nav-chip" data-nav="1" role="menuitem">Intel</a>
-                                    <a href="#flow-sentinel" class="nav-link nav-chip" data-nav="1" role="menuitem">Flow Sentinel</a>
-                                    <a href="#panorama" class="nav-link nav-chip" data-nav="1" role="menuitem">Panorama</a>
-                                    <a href="#alerts" class="nav-link nav-chip" data-nav="1" role="menuitem">Alertas</a>
-                                </div>
-                                <div class="nav-more__group">
-                                    <div class="nav-more__title">Mercados</div>
-                                    <a href="#brazil-market" class="nav-link nav-chip" data-nav="1" role="menuitem">Brasil</a>
-                                    <a href="#commodities" class="nav-link nav-chip" data-nav="1" role="menuitem">Commodities</a>
-                                    <a href="#metals" class="nav-link nav-chip" data-nav="1" role="menuitem">Metais</a>
-                                    <a href="#fx-carry" class="nav-link nav-chip" data-nav="1" role="menuitem">FX / Carry</a>
-                                    <a href="#emerging" class="nav-link nav-chip" data-nav="1" role="menuitem">Emergentes</a>
-                                    <a href="#mercosul" class="nav-link nav-chip" data-nav="1" role="menuitem">Mercosul</a>
-                                </div>
-                                <div class="nav-more__group">
-                                    <div class="nav-more__title">Ferramentas</div>
-                                    <a href="#my-assets" class="nav-link nav-chip" data-nav="1" role="menuitem">Meus Ativos</a>
-                                    <a href="#all-assets" class="nav-link nav-chip" data-nav="1" role="menuitem">Todos os Ativos</a>
-                                    <a href="#data-pack" class="nav-link nav-chip" data-nav="1" role="menuitem">Data Pack</a>
-                                    <a href="#dataAudit" class="nav-link nav-chip" data-nav="1" role="menuitem">Auditoria de Dados</a>
-                                </div>
-                                <div class="nav-more__group">
-                                    <div class="nav-more__title">Intel (blocos)</div>
-                                    <a href="#regimeConviction" class="nav-link nav-chip" data-nav="1" role="menuitem">Regime &amp; Convicção</a>
-                                    <a href="#chinaBrazil" class="nav-link nav-chip" data-nav="1" role="menuitem">China + Brasil</a>
-                                    <a href="#metalsZone" class="nav-link nav-chip" data-nav="1" role="menuitem">Zona de Metais</a>
-                                    <a href="#carryIntel" class="nav-link nav-chip" data-nav="1" role="menuitem">Carry Trade</a>
-                                    <a href="#ratesBuckets" class="nav-link nav-chip" data-nav="1" role="menuitem">Curva (Buckets)</a>
-                                    <a href="#brazilFixedIncomeFlow" class="nav-link nav-chip" data-nav="1" role="menuitem">Renda Fixa 🇧🇷</a>
-                                    <a href="#agendaMatrix" class="nav-link nav-chip" data-nav="1" role="menuitem">Agenda &amp; Matriz</a>
-                                </div>
-                                <div class="nav-more__group">
-                                    <div class="nav-more__title">Flow Sentinel (blocos)</div>
-                                    <a href="#fs-components" class="nav-link nav-chip" data-nav="1" role="menuitem">Componentes</a>
-                                    <a href="#fs-history" class="nav-link nav-chip" data-nav="1" role="menuitem">Histórico</a>
-                                    <a href="#fs-alerts" class="nav-link nav-chip" data-nav="1" role="menuitem">Alertas (FS)</a>
-                                </div>
-                            </div>
+                            <div id="navMoreGrid" class="nav-more__grid"></div>
                         </div>
                     </div>
                 </div>
@@ -846,7 +807,7 @@
                     </div>
                 </div>
 
-                <div class="split-layout split-layout--center-text" style="margin-top: 12px;">
+                <div id="operational-now" class="split-layout split-layout--center-text" style="margin-top: 12px;">
                     <div class="context-box">
                         <h3>🎯 Resumo Operacional (agora)</h3>
                         <p>Primeiro bloco do dia: transforma os sinais do painel em um roteiro curto (o que priorizar, quais níveis olhar e qual lado tende a ter melhor assimetria em <b>WIN</b> e <b>WDO</b>).</p>
@@ -856,7 +817,7 @@
                     </div>
                 </div>
 
-                <div class="split-layout split-layout--center-text" style="margin-top: 16px;">
+                <div id="petrobras" class="split-layout split-layout--center-text" style="margin-top: 16px;">
                     <div class="context-box">
                         <h3>⛽ Operacional Petrobras</h3>
                         <p>Velocímetro híbrido (tabela + pesos) calibrado para pré-mercado e abertura da B3 (10:00). Clique em um ativo na tabela para abrir o gráfico na seção <b>Mercado Brasileiro</b>.</p>

@@ -1368,6 +1368,7 @@ function renderRegimeConviction(data) {
     } catch {
     }
     try { renderOperationalBriefing(); } catch { }
+    try { renderBtcOperationalBriefing(); } catch { }
     try { renderHk50OperationalBriefing(); } catch { }
 
     el.innerHTML = html;
@@ -2748,6 +2749,544 @@ function computeHk50PulseNow(data, web) {
         missingAssetsSuggestion: suggest,
         news: geoNews,
     };
+}
+
+function computeBtcPulseNow(data, web) {
+    const isNum = v => typeof v === 'number' && Number.isFinite(v);
+    const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+    const pick = patterns => patterns.map(re => findAssetSymbol(data, re)).find(Boolean) || null;
+    const get = s => (s ? getChangePct(data, s) : null);
+    const getRatesMoveProxy = s => {
+        if (!s) return null;
+        const series = data && data.series && Array.isArray(data.series[s]) ? data.series[s] : [];
+        if (!series.length) return null;
+        const last = series[series.length - 1];
+        const lastPrice = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
+        if (last && typeof last.changePct === 'number' && Number.isFinite(last.changePct)) return last.changePct;
+        const prev = series.length > 1 ? series[series.length - 2] : null;
+        const prevPrice = prev && typeof prev.price === 'number' && Number.isFinite(prev.price) ? prev.price : null;
+        const deltaRaw = last && typeof last.change === 'number' && Number.isFinite(last.change)
+            ? last.change
+            : (lastPrice !== null && prevPrice !== null ? (lastPrice - prevPrice) : null);
+        if (deltaRaw === null || !Number.isFinite(deltaRaw)) return null;
+        const absPrice = lastPrice !== null ? Math.abs(lastPrice) : 0;
+        const deltaBp = absPrice > 20 ? deltaRaw : (deltaRaw * 100);
+        return deltaBp * 0.1;
+    };
+
+    const sym = {
+        btc: findAliasSymbolBest(data, 'BTC') || pick([/^BTC\/USD$/i, /\bbitcoin\b/i]),
+        eth: findAliasSymbolBest(data, 'ETH') || pick([/\bETH\/USD\b/i, /\bEthereum\b/i]),
+        sol: findAliasSymbolBest(data, 'SOL') || pick([/^SOL\/USD$/i, /\bSolana\b/i]),
+        doge: findAliasSymbolBest(data, 'DOGE') || pick([/^DOGE\/USD$/i, /\bDogecoin\b/i]),
+        spx: findAliasSymbolBest(data, 'SPX') || findAliasSymbol(data, 'SPX'),
+        ndx: findAliasSymbolBest(data, 'NDX') || findAliasSymbol(data, 'NDX'),
+        dxy: findAliasSymbolBest(data, 'DXY') || findAliasSymbol(data, 'DXY'),
+        vix: findAliasSymbolBest(data, 'VIX') || pick([/^\.?VIX(9D)?$/i]),
+        vvix: findAliasSymbolBest(data, 'VVIX') || pick([/^\.VVIX$/i]),
+        us2y: findAliasSymbolBest(data, 'US2Y') || findAliasSymbol(data, 'US2Y'),
+        us10y: findAliasSymbolBest(data, 'US10Y') || findAliasSymbol(data, 'US10Y'),
+        tlt: findAliasSymbolBest(data, 'TLT'),
+        hyg: findAliasSymbolBest(data, 'HYG'),
+        eem: findAliasSymbolBest(data, 'EEM') || findAliasSymbolBest(data, 'VWO'),
+        gold: findAliasSymbolBest(data, 'GOLD'),
+        copper: findAliasSymbolBest(data, 'COPPER'),
+        brent: findAliasSymbolBest(data, 'BRENT'),
+        wti: findAliasSymbolBest(data, 'WTI'),
+        usdjpy: pick([/^USD\/JPY\b/i]),
+        ibit: pick([/^IBIT(\.\w+)?$/i, /\bIBIT\b/i]),
+        fbtc: pick([/^FBTC(\.\w+)?$/i, /\bFBTC\b/i]),
+        arkb: pick([/^ARKB(\.\w+)?$/i, /\bARKB\b/i]),
+        bitb: pick([/^BITB(\.\w+)?$/i, /\bBITB\b/i]),
+        mstr: pick([/^MSTR(\.\w+)?$/i, /\bMicroStrategy\b/i]),
+        coin: pick([/^COIN(\.\w+)?$/i, /\bCoinbase\b/i]),
+        mara: pick([/^MARA(\.\w+)?$/i, /\bMarathon\b/i]),
+        riot: pick([/^RIOT(\.\w+)?$/i, /\bRiot\b/i]),
+    };
+
+    const computeNews = (() => {
+        const items = web && Array.isArray(web.items) ? web.items : [];
+        const confW = c => {
+            const s = String(c || '').toLowerCase();
+            if (s.includes('high') || s.includes('alta')) return 1.0;
+            if (s.includes('medium') || s.includes('média') || s.includes('media')) return 0.75;
+            if (s.includes('low') || s.includes('baixa')) return 0.55;
+            return 0.7;
+        };
+        const kwCrypto = s => /\bbitcoin\b|\bbtc\b|\bcrypt(o|os)\b|\bethereum\b|\beth\b|\bsolana\b|\bsol\b|\bspot\b.*\betf\b|\betf\b.*\bbitcoin\b|\bsec\b|\bstablecoin\b|\bdefi\b|\bminers?\b/i.test(s);
+        const kwMacroGeo = s => /\bfed\b|\bfomc\b|\brate\s*cut\b|\brate\s*hike\b|\byield(s)?\b|\binflation\b|\bcpi\b|\bjobs\b|\brecession\b|\bliquidity\b|\bdollar\b|\bdxy\b|\bsanction\b|\bwar\b|\biran\b|\bisrael\b|\brussia\b|\bchina\b|\btaiwan\b/i.test(s);
+        const pos = [
+            /\bapprove(d)?\b/i,
+            /\bapproval\b/i,
+            /\binflow(s)?\b/i,
+            /\brally\b/i,
+            /\bsurge\b/i,
+            /\bgain(s|ed)?\b/i,
+            /\brise(s|d)?\b/i,
+            /\bbull(ish)?\b/i,
+            /\brate\s*cut\b/i,
+            /\bsoft\s*landing\b/i,
+        ];
+        const neg = [
+            /\bhack\b/i,
+            /\bexploit\b/i,
+            /\bban\b/i,
+            /\bcrackdown\b/i,
+            /\blawsuit\b/i,
+            /\bcharged?\b/i,
+            /\bdefault\b/i,
+            /\bcollapse\b/i,
+            /\boutflow(s)?\b/i,
+            /\bsell[-\s]?off\b/i,
+            /\bplunge\b/i,
+            /\bcrash\b/i,
+            /\brate\s*hike\b/i,
+        ];
+        let matched = 0;
+        let score = 0;
+        const top = [];
+        for (const it of items.slice(0, 60)) {
+            const title = it && it.title ? String(it.title) : '';
+            if (!title) continue;
+            const ok = kwCrypto(title) || kwMacroGeo(title);
+            if (!ok) continue;
+            if (top.length < 4) top.push(it);
+            if (!kwCrypto(title)) continue;
+            matched++;
+            const w = confW(it && it.confidence);
+            let s = 0;
+            for (const re of pos) if (re.test(title)) s += 1;
+            for (const re of neg) if (re.test(title)) s -= 1;
+            score += w * clamp(s, -3, 3);
+        }
+        const denom = matched > 0 ? matched * 3 : 1;
+        const normalized = clamp(score / denom, -1, 1);
+        return { used: !!items.length, matched, score: normalized, top };
+    })();
+
+    const avgPctFor = syms => {
+        const used = [];
+        const vals = [];
+        for (const s of (syms || [])) {
+            const sym = s ? String(s) : '';
+            if (!sym) continue;
+            const v = get(sym);
+            if (!isNum(v)) continue;
+            used.push(sym);
+            vals.push(v);
+        }
+        if (!vals.length) return { pct: null, used };
+        const pct = vals.reduce((a, b) => a + b, 0) / vals.length;
+        return { pct, used };
+    };
+
+    const btcEtfBasket = avgPctFor([sym.ibit, sym.fbtc, sym.arkb, sym.bitb]);
+    const cryptoEqBasket = avgPctFor([sym.mstr, sym.coin, sym.mara, sym.riot]);
+
+    const driversCfg = [
+        { key: 'ndx', group: 'driver', weight: 0.75, capAbs: 1.4, sign: +1 },
+        { key: 'spx', group: 'driver', weight: 0.45, capAbs: 1.2, sign: +1 },
+        { key: 'dxy', group: 'driver', weight: 0.7, capAbs: 0.7, sign: -1 },
+        { key: 'vix', group: 'driver', weight: 0.55, capAbs: 4.0, sign: -1 },
+        { key: 'us2y', group: 'driver', weight: 0.35, capAbs: 0.7, sign: -1 },
+        { key: 'us10y', group: 'driver', weight: 0.25, capAbs: 0.7, sign: -1 },
+        { key: 'hyg', group: 'driver', weight: 0.35, capAbs: 1.3, sign: +1 },
+        { key: 'tlt', group: 'driver', weight: 0.2, capAbs: 1.2, sign: +1 },
+
+        { key: 'eth', group: 'confirm', weight: 0.6, capAbs: 4.0, sign: +1 },
+        { key: 'sol', group: 'confirm', weight: 0.35, capAbs: 6.0, sign: +1 },
+        { key: 'doge', group: 'confirm', weight: 0.15, capAbs: 9.0, sign: +1 },
+        { key: 'btcEtf', group: 'confirm', weight: 0.35, capAbs: 2.8, sign: +1 },
+        { key: 'cryptoEq', group: 'confirm', weight: 0.25, capAbs: 4.5, sign: +1 },
+
+        { key: 'eem', group: 'context', weight: 0.2, capAbs: 1.3, sign: +1 },
+        { key: 'copper', group: 'context', weight: 0.2, capAbs: 1.8, sign: +1 },
+        { key: 'brent', group: 'context', weight: 0.12, capAbs: 2.2, sign: +1 },
+        { key: 'gold', group: 'context', weight: 0.12, capAbs: 1.6, sign: +1 },
+        { key: 'usdjpy', group: 'context', weight: 0.12, capAbs: 1.2, sign: +1 },
+        { key: 'vvix', group: 'context', weight: 0.12, capAbs: 5.0, sign: -1 },
+        { key: 'news', group: 'context', weight: 0.45, capAbs: 1.0, sign: +1 },
+    ];
+
+    const drv = {
+        btc: { label: 'BTC/USD', pct: get(sym.btc), sym: sym.btc, unit: '%' },
+        eth: { label: 'ETH/USD', pct: get(sym.eth), sym: sym.eth, unit: '%' },
+        sol: { label: 'SOL/USD', pct: get(sym.sol), sym: sym.sol, unit: '%' },
+        doge: { label: 'DOGE/USD', pct: get(sym.doge), sym: sym.doge, unit: '%' },
+        btcEtf: {
+            label: `Spot ETFs BTC (${btcEtfBasket.used.join('/') || 'IBIT/FBTC/ARKB/BITB'})`,
+            pct: btcEtfBasket.pct,
+            sym: btcEtfBasket.used.length ? btcEtfBasket.used[0] : null,
+            unit: '%'
+        },
+        cryptoEq: {
+            label: `Ações cripto (${cryptoEqBasket.used.join('/') || 'MSTR/COIN/MARA/RIOT'})`,
+            pct: cryptoEqBasket.pct,
+            sym: cryptoEqBasket.used.length ? cryptoEqBasket.used[0] : null,
+            unit: '%'
+        },
+        spx: { label: 'SPX', pct: get(sym.spx), sym: sym.spx, unit: '%' },
+        ndx: { label: 'NDX', pct: get(sym.ndx), sym: sym.ndx, unit: '%' },
+        dxy: { label: 'DXY', pct: get(sym.dxy), sym: sym.dxy, unit: '%' },
+        vix: { label: 'VIX', pct: get(sym.vix), sym: sym.vix, unit: '%' },
+        vvix: { label: 'VVIX', pct: get(sym.vvix), sym: sym.vvix, unit: '%' },
+        us2y: { label: 'US2Y (proxy Δ)', pct: getRatesMoveProxy(sym.us2y), sym: sym.us2y, unit: '%' },
+        us10y: { label: 'US10Y (proxy Δ)', pct: getRatesMoveProxy(sym.us10y), sym: sym.us10y, unit: '%' },
+        tlt: { label: 'TLT', pct: get(sym.tlt), sym: sym.tlt, unit: '%' },
+        hyg: { label: 'HYG', pct: get(sym.hyg), sym: sym.hyg, unit: '%' },
+        eem: { label: 'EEM/VWO', pct: get(sym.eem), sym: sym.eem, unit: '%' },
+        gold: { label: 'Ouro', pct: get(sym.gold), sym: sym.gold, unit: '%' },
+        copper: { label: 'Cobre', pct: get(sym.copper), sym: sym.copper, unit: '%' },
+        brent: { label: 'Brent', pct: (get(sym.brent) ?? get(sym.wti)), sym: sym.brent || sym.wti, unit: '%' },
+        usdjpy: { label: 'USD/JPY', pct: get(sym.usdjpy), sym: sym.usdjpy, unit: '%' },
+        news: { label: 'Notícias (macro/cripto)', pct: computeNews.used ? computeNews.score : null, sym: null, unit: 'score' },
+    };
+
+    const rows = [];
+    const breadth = { pos: 0, neg: 0, zero: 0 };
+    const contribution = { posSum: 0, negSum: 0, net: 0 };
+    const pnlLike = { posSum: 0, negSum: 0, net: 0 };
+    const groups = {
+        driver: { net: 0, pnl: 0, count: 0 },
+        confirm: { net: 0, pnl: 0, count: 0 },
+        context: { net: 0, pnl: 0, count: 0 },
+    };
+
+    for (const cfg of driversCfg) {
+        const d = drv[cfg.key];
+        const pct = d ? d.pct : null;
+        if (!isNum(pct)) continue;
+        const signed = cfg.sign * pct;
+        const capped = clamp(signed, -cfg.capAbs, cfg.capAbs);
+        const contrib = cfg.weight * (cfg.capAbs > 0 ? capped / cfg.capAbs : 0);
+        const pnl = cfg.weight * capped;
+        const g = cfg.group === 'driver' || cfg.group === 'confirm' || cfg.group === 'context' ? cfg.group : 'context';
+        contribution.net += contrib;
+        pnlLike.net += pnl;
+        groups[g].net += contrib;
+        groups[g].pnl += pnl;
+        groups[g].count += 1;
+        if (contrib > 0) {
+            breadth.pos += 1;
+            contribution.posSum += contrib;
+            pnlLike.posSum += pnl;
+        } else if (contrib < 0) {
+            breadth.neg += 1;
+            contribution.negSum += contrib;
+            pnlLike.negSum += pnl;
+        } else {
+            breadth.zero += 1;
+        }
+        rows.push({
+            key: cfg.key,
+            group: g,
+            label: d.label,
+            symbol: d.sym || null,
+            pct,
+            unit: d.unit || '%',
+            signed,
+            weight: cfg.weight,
+            capAbs: cfg.capAbs,
+            contrib,
+            pnl,
+        });
+    }
+
+    const net = clamp(contribution.net, -3, 3);
+    let bias = net > 0.25 ? 'buy' : net < -0.25 ? 'sell' : 'neutral';
+    let nowLabel = 'AGORA';
+    const tapePct = drv.btc && isNum(drv.btc.pct) ? drv.btc.pct : null;
+    if (isNum(tapePct) && Math.abs(tapePct) >= 0.9) {
+        const tapeBias = tapePct > 0 ? 'buy' : 'sell';
+        if (bias === 'neutral' || bias === tapeBias) {
+            bias = tapeBias;
+            nowLabel = 'AGORA • TAPE';
+        } else {
+            nowLabel = 'AGORA • TAPE (diverg.)';
+        }
+    }
+
+    const expectedKeys = driversCfg.map(x => x.key);
+    const got = new Set(rows.map(r => String(r && r.key ? r.key : '')));
+    const missing = expectedKeys.filter(k => !got.has(k));
+    const keyLabels = (() => {
+        const m = {};
+        for (const k of expectedKeys) {
+            const d = drv[k];
+            m[k] = d && d.label ? String(d.label) : k;
+        }
+        return m;
+    })();
+    const missingDetails = (() => {
+        const m = {};
+        for (const k of missing) {
+            const d = drv[k];
+            const s = d && d.sym ? String(d.sym) : '';
+            if (!s) {
+                m[k] = 'sem símbolo';
+                continue;
+            }
+            const pts = data && data.series && Array.isArray(data.series[s]) ? data.series[s] : [];
+            if (!pts.length) {
+                m[k] = 'sem série';
+                continue;
+            }
+            const last = getLastPoint(data, s);
+            if (!last) {
+                m[k] = 'sem último ponto';
+                continue;
+            }
+            if (!isNum(last.changePct) && !isNum(last.extendedChangePct) && !isNum(last.change)) {
+                m[k] = 'sem variação';
+                continue;
+            }
+            m[k] = 'sem leitura';
+        }
+        return m;
+    })();
+
+    const suggest = (() => {
+        const assets = data && Array.isArray(data.assets) ? data.assets : [];
+        const hasAny = matchers => {
+            for (const a of assets) {
+                const sym = String(a && a.symbol ? a.symbol : '');
+                const name = String(a && a.name ? a.name : '');
+                for (const re of matchers) if (re.test(sym) || re.test(name)) return true;
+            }
+            return false;
+        };
+        const wants = [
+            { label: 'BTC/USD', matchers: [/^BTC\/USD$/i, /\bbitcoin\b/i] },
+            { label: 'ETH/USD', matchers: [/\bETH\/USD\b/i, /\bEthereum\b/i] },
+            { label: 'SOL/USD', matchers: [/^SOL\/USD$/i, /\bSolana\b/i] },
+            { label: 'IBIT', matchers: [/^IBIT(\.\w+)?$/i, /\bIBIT\b/i] },
+            { label: 'FBTC', matchers: [/^FBTC(\.\w+)?$/i, /\bFBTC\b/i] },
+            { label: 'ARKB', matchers: [/^ARKB(\.\w+)?$/i, /\bARKB\b/i] },
+            { label: 'BITB', matchers: [/^BITB(\.\w+)?$/i, /\bBITB\b/i] },
+            { label: 'MSTR', matchers: [/^MSTR(\.\w+)?$/i, /\bMicroStrategy\b/i] },
+            { label: 'COIN', matchers: [/^COIN(\.\w+)?$/i, /\bCoinbase\b/i] },
+            { label: 'MARA', matchers: [/^MARA(\.\w+)?$/i, /\bMarathon\b/i] },
+            { label: 'RIOT', matchers: [/^RIOT(\.\w+)?$/i, /\bRiot\b/i] },
+            { label: 'VIX', matchers: [/^\.?VIX(9D)?$/i, /\bVIX\b/i] },
+            { label: 'DXY', matchers: [/^DX$|^\.DXY$/i, /\bDXY\b/i] },
+            { label: 'US10Y', matchers: [/^US10YT=RR$/i, /^USGV10YUSAB=R$/i, /^TNc\d=\$?$/i, /\bUS10Y\b/i, /\bUnited States 10-Year\b/i] },
+            { label: 'US2Y', matchers: [/^US2YT=RR$/i, /^TUc\d=\$?$/i, /\bUS2Y\b/i, /\bUnited States 2-Year\b/i] },
+            { label: 'TLT', matchers: [/^TLT(\.\w+)?$/i] },
+            { label: 'HYG', matchers: [/^HYG(\.\w+)?$/i] },
+            { label: 'SPY (proxy SPX)', matchers: [/^SPY$/i, /^\.SPX$/i, /\bS&P 500\b/i] },
+            { label: 'QQQ (proxy NDX)', matchers: [/^QQQ$/i, /^\.NDX$/i, /\bNasdaq 100\b/i] },
+            { label: 'Ouro (GC/XAU)', matchers: [/^GC\b/i, /^XAU(USD)?$/i, /\bouro\b/i, /\bgold\b/i] },
+            { label: 'Cobre (HG)', matchers: [/^HG\b/i, /\bcobre\b/i, /\bcopper\b/i] },
+            { label: 'Brent (BZ=F/LCO/BNO)', matchers: [/^BNO$/i, /^LCO\b/i, /^BRN$|^BRN=F$|^BZ=F$/i, /\bBrent\b/i] },
+            { label: 'USD/JPY', matchers: [/^USD\/JPY\b/i] },
+        ];
+        const out = [];
+        for (const w of wants) {
+            if (!hasAny(w.matchers)) out.push(w.label);
+        }
+        return out;
+    })();
+
+    return {
+        sym,
+        phase: { nowLabel },
+        market: { btcPct: drv.btc ? drv.btc.pct : null },
+        pulse: { bias, net, breadth, contribution, pnlLike, groups, rows },
+        coverage: { expected: expectedKeys.length, observed: rows.length, missing, keyLabels, missingDetails },
+        missingAssetsSuggestion: suggest,
+        news: computeNews.top || [],
+        newsMeta: { used: computeNews.used, matched: computeNews.matched, score: computeNews.score },
+    };
+}
+
+function renderBtcOperationalBriefing() {
+    const el = document.getElementById('btcOperationalBriefing');
+    if (!el) return;
+
+    const data = getData();
+    const rawWeb = operationalInputs.webNews || null;
+    const web = rawWeb && rawWeb.ok === true ? rawWeb : null;
+    const btcNow = data ? computeBtcPulseNow(data, web) : null;
+
+    const badge = (tone, text) => {
+        const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
+        return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
+    };
+
+    if (!data || !btcNow) {
+        el.innerHTML = `
+            <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);opacity:.88;">
+                Sem dados suficientes para montar o BTC agora.
+            </div>
+        `;
+        return;
+    }
+
+    const fmtP = v => (typeof v === 'number' && Number.isFinite(v) ? formatPercent(v, 2) : '—');
+    const fmt0 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 0) : '—');
+    const fmt2 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 2) : '—');
+
+    const p = btcNow.pulse || { bias: 'neutral', net: 0, groups: {}, rows: [] };
+    const tone = p.net > 0.25 ? 'positive' : p.net < -0.25 ? 'negative' : 'neutral';
+    const netBadge = toneBadgeHtmlFromTone(tone, Math.abs(p.net), `${formatNumber(p.net, 2)}`, { maxAbs: 3 });
+    const biasLabel = b => (b === 'buy' ? 'COMPRA' : b === 'sell' ? 'VENDA' : 'NEUTRO');
+    const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+    const gaugeHtml = (() => {
+        const maxAbs = 3;
+        const v = typeof p.net === 'number' && Number.isFinite(p.net) ? clamp(p.net, -maxAbs, maxAbs) : 0;
+        const cx = 50;
+        const cy = 50;
+        const r = 40;
+        const n3 = n => {
+            const x = typeof n === 'number' && Number.isFinite(n) ? n : 0;
+            return String(Math.round(x * 1000) / 1000);
+        };
+        const rp = deg => {
+            const rad = (deg * Math.PI) / 180;
+            return { x: cx + r * Math.cos(rad), y: cy - r * Math.sin(rad) };
+        };
+        const arc = (a0, a1, stroke) => {
+            const p0 = rp(a0);
+            const p1 = rp(a1);
+            return `<path d="M ${n3(p0.x)} ${n3(p0.y)} A ${String(r)} ${String(r)} 0 0 0 ${n3(p1.x)} ${n3(p1.y)}" stroke="${stroke}" stroke-width="6" fill="none" stroke-linecap="round" opacity=".9"></path>`;
+        };
+        const ang = 90 - (v / maxAbs) * 90;
+        const nRad = (ang * Math.PI) / 180;
+        const nx = cx + (r - 10) * Math.cos(nRad);
+        const ny = cy - (r - 10) * Math.sin(nRad);
+        const needle = `<line x1="${String(cx)}" y1="${String(cy)}" x2="${n3(nx)}" y2="${n3(ny)}" stroke="rgba(255,255,255,.92)" stroke-width="2.3" stroke-linecap="round"></line>
+            <circle cx="${String(cx)}" cy="${String(cy)}" r="3.2" fill="rgba(255,255,255,.92)"></circle>`;
+        return `<div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:92px;height:54px;display:flex;align-items:center;justify-content:center;">
+                <svg viewBox="0 0 100 60" width="92" height="54" aria-label="Velocímetro BTC">
+                    ${arc(180, 120, 'rgba(255,80,80,.92)')}
+                    ${arc(120, 60, 'rgba(255,210,80,.92)')}
+                    ${arc(60, 0, 'rgba(80,255,170,.92)')}
+                    ${needle}
+                </svg>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;line-height:1.05;">
+                <div style="font-weight:900;letter-spacing:.6px;opacity:.9;">Velocímetro</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.9;">Net ${escapeHtml(formatNumber(p.net, 2))}</div>
+            </div>
+        </div>`;
+    })();
+
+    const spotOf = s => {
+        const pt = s ? (getMostRecentPointWithPrice(data, s) || getLastPoint(data, s)) : null;
+        const spot = pt && typeof pt.price === 'number' && Number.isFinite(pt.price) ? pt.price : null;
+        const t = pt && pt.t ? String(pt.t) : null;
+        return { spot, t };
+    };
+    const btcSpot = spotOf(btcNow.sym.btc);
+    const btcLine = `${btcNow.sym.btc ? btcNow.sym.btc : '—'} • ${btcSpot.spot !== null ? `$${fmt0(btcSpot.spot)}` : '—'} • ${fmtP(btcNow.market.btcPct)}`;
+    const asOf = btcSpot.t ? formatDateTime(btcSpot.t) : '—';
+
+    const groupTop = (groupKey, max = 7) => {
+        const xs = (p.rows || []).filter(r => r && r.group === groupKey);
+        xs.sort((a, b) => Math.abs(b.contrib || 0) - Math.abs(a.contrib || 0));
+        return xs.slice(0, max);
+    };
+
+    const lineItem = r => {
+        const v = typeof r.pct === 'number' && Number.isFinite(r.pct) ? r.pct : null;
+        const contrib = typeof r.contrib === 'number' && Number.isFinite(r.contrib) ? r.contrib : 0;
+        const t = contrib > 0.02 ? 'positive' : contrib < -0.02 ? 'negative' : 'neutral';
+        const cBadge = toneBadgeHtmlFromTone(t, Math.abs(contrib), fmt2(contrib), { maxAbs: 1 });
+        const sym = r.symbol ? String(r.symbol) : '';
+        const head = sym ? `${r.label} (${sym})` : String(r.label || '');
+        const vTxt = r.unit === 'score' ? fmt2(v) : fmtP(v);
+        return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px;border:1px solid rgba(255,255,255,.10);border-radius:10px;background:rgba(0,0,0,.16);">
+            <div style="opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:72%;">${escapeHtml(head)}</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+                <span style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.88;">${escapeHtml(vTxt)}</span>
+                ${cBadge}
+            </div>
+        </div>`;
+    };
+
+    const g = p.groups || {};
+    const layersLine = (() => {
+        const d = g.driver || { net: 0, count: 0 };
+        const c = g.confirm || { net: 0, count: 0 };
+        const x = g.context || { net: 0, count: 0 };
+        return `Camadas: Driver ${fmt2(d.net)} (${String(d.count)}) • Conf ${fmt2(c.net)} (${String(c.count)}) • Contexto ${fmt2(x.net)} (${String(x.count)})`;
+    })();
+
+    const missing = btcNow.coverage && Array.isArray(btcNow.coverage.missing) ? btcNow.coverage.missing : [];
+    const missingPretty = (() => {
+        const keyLabels = btcNow.coverage && btcNow.coverage.keyLabels && typeof btcNow.coverage.keyLabels === 'object' ? btcNow.coverage.keyLabels : {};
+        const details = btcNow.coverage && btcNow.coverage.missingDetails && typeof btcNow.coverage.missingDetails === 'object' ? btcNow.coverage.missingDetails : {};
+        return missing.map(k => {
+            const label = keyLabels && keyLabels[k] ? String(keyLabels[k]) : String(k);
+            const det = details && details[k] ? String(details[k]) : '';
+            return det ? `${label} (${det})` : label;
+        });
+    })();
+    const missingLabel = missingPretty.length ? `Faltando (dados): ${missingPretty.slice(0, 10).join(', ')}${missingPretty.length > 10 ? `… +${missingPretty.length - 10}` : ''}` : 'Drivers: completos';
+    const missingBadge = badge(missing.length ? 'neutral' : 'positive', missingLabel);
+
+    const sugg = btcNow.missingAssetsSuggestion || [];
+    const suggestLine = sugg.length ? `Sugestões p/ carteira (Investing): ${sugg.join(' • ')}` : '';
+
+    const news = Array.isArray(btcNow.news) ? btcNow.news : [];
+    const newsHtml = (() => {
+        if (!news.length) return `<div style="opacity:.78;font-size:12px;">• —</div>`;
+        return news
+            .map(it => {
+                const title = it && it.title ? String(it.title) : '';
+                const url = it && it.url ? String(it.url) : '';
+                const safeUrl = url && /^https?:\/\//i.test(url) ? url : '';
+                const a = safeUrl
+                    ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noreferrer" style="color:rgba(0,243,255,.92);text-decoration:none;">${escapeHtml(title)}</a>`
+                    : escapeHtml(title);
+                return `• ${a}`;
+            })
+            .join('<br>');
+    })();
+
+    el.innerHTML = `
+        <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;">BTC — Resumo Operacional</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    ${badge(p.bias === 'buy' ? 'positive' : p.bias === 'sell' ? 'negative' : 'neutral', `Viés: ${biasLabel(p.bias)}`)}
+                    ${badge('neutral', `Drivers net (${escapeHtml(btcNow.phase.nowLabel || 'AGORA')})`)} ${netBadge}
+                    ${gaugeHtml}
+                </div>
+            </div>
+            <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+                ${escapeHtml(btcLine)} • asOf ${escapeHtml(asOf)} • ${escapeHtml(layersLine)}
+            </div>
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                ${missingBadge}
+            </div>
+            ${suggestLine ? `<div style="margin-top:8px;opacity:.82;font-size:12px;line-height:1.35;">${escapeHtml(suggestLine)}</div>` : ''}
+        </div>
+
+        <div style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">
+            <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:8px;">Drivers (macro/liquidez)</div>
+                ${(groupTop('driver') || []).map(lineItem).join('') || `<div style="opacity:.80;">—</div>`}
+            </div>
+            <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:8px;">Confirmação (cripto)</div>
+                ${(groupTop('confirm') || []).map(lineItem).join('') || `<div style="opacity:.80;">—</div>`}
+            </div>
+            <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+                    <div style="font-weight:900;letter-spacing:.6px;opacity:.92;">Contexto (commodities/geo/news)</div>
+                    <div style="opacity:.72;font-size:12px;">news score ${escapeHtml(fmt2(btcNow.newsMeta && typeof btcNow.newsMeta.score === 'number' ? btcNow.newsMeta.score : 0))}</div>
+                </div>
+                ${(groupTop('context') || []).map(lineItem).join('') || `<div style="opacity:.80;">—</div>`}
+                <div style="margin-top:10px;border-top:1px solid rgba(255,255,255,.10);padding-top:10px;">
+                    <div style="opacity:.86;font-size:12px;font-weight:900;letter-spacing:.6px;margin-bottom:6px;">Notícias (recorte)</div>
+                    <div style="opacity:.84;font-size:12px;line-height:1.35;">${newsHtml}</div>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 function renderHk50OperationalBriefing() {
@@ -4907,6 +5446,7 @@ function renderOptionsGammaSummary(payload) {
 
     operationalInputs.optionsGamma = payload;
     try { renderOperationalBriefing(); } catch { }
+    try { renderBtcOperationalBriefing(); } catch { }
     try { renderHk50OperationalBriefing(); } catch { }
 
     const fmt0 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 0) : '—');
@@ -5183,6 +5723,7 @@ function renderWebNewsModule(payload) {
 
     operationalInputs.webNews = payload;
     try { renderOperationalBriefing(); } catch { }
+    try { renderBtcOperationalBriefing(); } catch { }
     try { renderHk50OperationalBriefing(); } catch { }
 
     const sentiment = summary && summary.sentiment ? String(summary.sentiment) : 'Neutro';
@@ -6087,6 +6628,7 @@ function renderOperationalBriefing() {
                 operationalTuning[group][key] = v;
                 persist();
                 renderOperationalBriefing();
+                renderBtcOperationalBriefing();
                 renderHk50OperationalBriefing();
             });
         };
@@ -6200,8 +6742,8 @@ function assetAliasMatchers(key) {
     const k = String(key || '').toUpperCase().trim();
     if (!k) return [];
 
-    if (k === 'US2Y') return [/^US2YT=RR$/i, /^TUc1=$/i, /\bUnited States 2-Year\b/i, /\bEUA\b\s+a\s+2\s+anos\b/i, /^US2Y\b/i];
-    if (k === 'US10Y') return [/^US10YT=RR$/i, /^TNc2=$/i, /\bUnited States 10-Year\b/i, /\bEUA\b\s+a\s+10\s+anos\b/i, /^US10Y\b/i];
+    if (k === 'US2Y') return [/^US2YT=RR$/i, /^TUc\d=\$?$/i, /\bUnited States 2-Year\b/i, /\bEUA\b\s+a\s+2\s+anos\b/i, /^US2Y\b/i];
+    if (k === 'US10Y') return [/^US10YT=RR$/i, /^TNc\d=\$?$/i, /\bUnited States 10-Year\b/i, /\bEUA\b\s+a\s+10\s+anos\b/i, /^US10Y\b/i];
     if (k === 'US30Y') return [/^US30YT=RR$/i, /^USc1=$/i, /\bUnited States 30-Year\b/i, /\bEUA\b\s+a\s+30\s+anos\b/i, /^US30Y\b/i];
     if (k === 'SPREAD_HK10Y')
         return [
@@ -6232,6 +6774,9 @@ function assetAliasMatchers(key) {
     if (k === 'BCI') return [/^BCI$/i, /\babrdn Bloomberg All Commodity Strategy\b/i];
     if (k === 'GOLD') return [/^GC\b/i, /^XAU(USD)?$/i, /\bgold\b/i, /\bouro\b/i];
     if (k === 'BTC') return [/^BTC\/USD$/i, /^BTCUSD$/i, /\bBTC\b/i, /\bbitcoin\b/i, /\bXBT\b/i];
+    if (k === 'ETH') return [/^ETH\/USD\b/i, /\bETH\/USD\b/i, /\bETH\b/i, /\bEthereum\b/i];
+    if (k === 'SOL') return [/^SOL\/USD$/i, /\bSOL\b/i, /\bSolana\b/i];
+    if (k === 'DOGE') return [/^DOGE\/USD$/i, /\bDOGE\b/i, /\bDogecoin\b/i];
 
     if (k === 'SPX') return [/^\.SPX$/i, /\bS&P 500\b/i, /^SPY$/i, /^ES\b/i, /^ES[HMUZ]\d{2}$/i];
     if (k === 'NDX') return [/^\.NDX$/i, /\bNasdaq 100\b/i, /^QQQ$/i, /^NQ\b/i, /^NQ[HMUZ]\d{2}$/i];
@@ -6312,7 +6857,7 @@ function aliasResolutionConfig(key) {
     if (k === 'BRENT' || k === 'WTI' || k === 'OIL') return { expectedCategories: ['energy'], expectedTags: ['oil'] };
     if (k === 'GOLD') return { expectedCategories: ['metals'], expectedTags: ['risk_off'] };
     if (k === 'COPPER' || k === 'IRON') return { expectedCategories: ['metals'], expectedTags: ['risk_on'] };
-    if (k === 'BTC') return { expectedCategories: ['crypto'], expectedTags: ['risk_on'] };
+    if (k === 'BTC' || k === 'ETH' || k === 'SOL' || k === 'DOGE') return { expectedCategories: ['crypto'], expectedTags: ['risk_on'] };
     if (k === 'US2Y' || k === 'US10Y' || k === 'US30Y') return { expectedCategories: ['rates'], expectedTags: ['risk_off'] };
     if (k === 'CN10Y') return { expectedCategories: ['rates'], expectedTags: ['rates'] };
     if (k === 'SPREAD_HK10Y') return { expectedCategories: ['rates'], expectedTags: ['rates'] };
@@ -7949,7 +8494,10 @@ function renderPetrobrasModule(data) {
     const phaseLabel = payload.phase && payload.phase.nowLabel ? String(payload.phase.nowLabel) : '';
     const metrics = payload.metrics && typeof payload.metrics === 'object' ? payload.metrics : null;
     const pctPos = Math.max(0, Math.min(1, (score + 10) / 20));
-    const angle = -90 + 180 * pctPos;
+    const neutralCutAbs = 1.6;
+    const leftPct = `${String(pctPos * 100)}%`;
+    const cutNegPct = `${String(Math.max(0, Math.min(1, (-neutralCutAbs + 10) / 20)) * 100)}%`;
+    const cutPosPct = `${String(Math.max(0, Math.min(1, (neutralCutAbs + 10) / 20)) * 100)}%`;
     const biasTone = bias === 'COMPRA' ? 'positive' : bias === 'VENDA' ? 'negative' : 'neutral';
     const biasBadge = toneBadgeHtmlFromTone(biasTone, Math.abs(score), `${bias} • ${formatNumber(score, 2)}`, { maxAbs: 10 });
     const confBadge = toneBadgeHtmlFromTone(confidence >= 0.75 ? 'positive' : confidence >= 0.45 ? 'neutral' : 'negative', Math.abs(confidence * 10), `Confiança ${formatNumber(confidence * 100, 0)}%`, { maxAbs: 10 });
@@ -7978,14 +8526,18 @@ function renderPetrobrasModule(data) {
             ${breadthLine || contribLine || pnlLine ? `<div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
                 ${escapeHtml([breadthLine, contribLine, pnlLine].filter(Boolean).join(' • '))}
             </div>` : ''}
+            <div style="margin-top:8px;opacity:.82;font-size:12px;line-height:1.35;">
+                ${escapeHtml(`Escala: -10 a +10 • Zona neutra: -${formatNumber(neutralCutAbs, 1)} a +${formatNumber(neutralCutAbs, 1)} • Posição: ${formatNumber(pctPos * 100, 0)}%`)}
+            </div>
             <div style="margin-top:14px;position:relative;padding:18px 4px 8px 4px;">
-                <div style="height:14px;border-radius:999px;background:linear-gradient(90deg, rgba(255,60,80,.85), rgba(255,255,255,.18) 50%, rgba(0,255,160,.85));border:1px solid rgba(255,255,255,.10);"></div>
-                <div style="position:absolute;left:50%;top:25px;transform:translateX(-50%) rotate(${String(angle)}deg);transform-origin:0% 50%;height:0;">
-                    <div style="width:92px;height:2px;background:rgba(255,255,255,.92);box-shadow:0 0 10px rgba(0,243,255,.25);"></div>
-                    <div style="width:10px;height:10px;border-radius:999px;background:rgba(0,243,255,.95);position:absolute;left:-5px;top:-4px;"></div>
+                <div style="height:14px;border-radius:999px;background:linear-gradient(90deg, rgba(255,60,80,.85), rgba(255,255,255,.18) 50%, rgba(0,255,160,.85));border:1px solid rgba(255,255,255,.10);position:relative;">
+                    <div style="position:absolute;left:${escapeHtml(cutNegPct)};top:-1px;transform:translateX(-50%);width:2px;height:16px;background:rgba(255,255,255,.45);"></div>
+                    <div style="position:absolute;left:${escapeHtml(cutPosPct)};top:-1px;transform:translateX(-50%);width:2px;height:16px;background:rgba(255,255,255,.45);"></div>
+                    <div style="position:absolute;left:${escapeHtml(leftPct)};top:-2px;transform:translateX(-50%);width:2px;height:18px;background:rgba(0,243,255,.90);box-shadow:0 0 10px rgba(0,243,255,.20);border-radius:2px;"></div>
                 </div>
+                <div style="position:absolute;left:${escapeHtml(leftPct)};top:30px;transform:translateX(-50%);width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid rgba(0,243,255,.95);filter:drop-shadow(0 0 6px rgba(0,243,255,.25));"></div>
                 <div style="display:flex;justify-content:space-between;margin-top:10px;font-family:'Share Tech Mono',monospace;letter-spacing:1px;opacity:.85;">
-                    <span>VENDA</span><span>NEUTRO</span><span>COMPRA</span>
+                    <span>-10 (VENDA)</span><span>0 (NEUTRO)</span><span>+10 (COMPRA)</span>
                 </div>
             </div>
         </div>
@@ -8550,6 +9102,7 @@ function renderAll(data) {
 
     safe(() => renderOverview(data));
     safe(() => renderOperationalBriefing());
+    safe(() => renderBtcOperationalBriefing());
     safe(() => renderHk50OperationalBriefing());
     safe(() => renderFavorites(data));
     safe(() => renderFlowSentinel(data));
@@ -8723,6 +9276,125 @@ function setupNav() {
     });
 }
 
+const NAVIGATION_DEFINITION = {
+    top: [
+        { href: '#overview', label: 'Agora' },
+        { href: '#flow-sentinel', label: 'Flow' },
+        { href: '#intel', label: 'Intel' },
+        { href: '#brazil-market', label: 'Brasil' },
+        { href: '#petrobras', label: 'Petrobras' },
+        { href: '#my-assets', label: 'Ativos' },
+        { href: '#alerts', label: 'Alertas' },
+    ],
+    groups: [
+        {
+            title: 'Operacional',
+            items: [
+                { href: '#overview', label: 'Visão Geral' },
+                { href: '#operational-now', label: 'Resumo (agora)' },
+                { href: '#petrobras', label: 'Petrobras' },
+                { href: '#btcOperationalBriefing', label: 'BTC' },
+                { href: '#hk50OperationalBriefing', label: 'HK50' },
+                { href: '#topMovers', label: 'Top Movers' },
+                { href: '#panorama', label: 'Panorama' },
+            ],
+        },
+        {
+            title: 'Macro & Fluxo',
+            items: [
+                { href: '#flow-sentinel', label: 'Flow Sentinel' },
+                { href: '#intel', label: 'Intel' },
+                { href: '#regimeConviction', label: 'Regime & Convicção' },
+                { href: '#chinaBrazil', label: 'China + Brasil' },
+                { href: '#fx-carry', label: 'FX / Carry' },
+                { href: '#carryIntel', label: 'Carry Trade' },
+                { href: '#ratesBuckets', label: 'Curva (Buckets)' },
+                { href: '#brazilFixedIncomeFlow', label: 'Renda Fixa 🇧🇷' },
+                { href: '#agendaMatrix', label: 'Agenda & Matriz' },
+            ],
+        },
+        {
+            title: 'Mercados',
+            items: [
+                { href: '#brazil-market', label: 'Brasil' },
+                { href: '#commodities', label: 'Commodities' },
+                { href: '#metals', label: 'Metais' },
+                { href: '#emerging', label: 'Emergentes' },
+                { href: '#mercosul', label: 'Mercosul' },
+            ],
+        },
+        {
+            title: 'Ferramentas',
+            items: [
+                { href: '#my-assets', label: 'Meus Ativos' },
+                { href: '#all-assets', label: 'Todos os Ativos' },
+                { href: '#data-pack', label: 'Data Pack' },
+                { href: '#dataAudit', label: 'Auditoria de Dados' },
+                { href: '#alerts', label: 'Alertas' },
+            ],
+        },
+        {
+            title: 'Flow Sentinel (blocos)',
+            items: [
+                { href: '#fs-components', label: 'Componentes' },
+                { href: '#fs-history', label: 'Histórico' },
+                { href: '#fs-alerts', label: 'Alertas (FS)' },
+            ],
+        },
+    ],
+};
+
+function getNavigationItemsFlat() {
+    const all = [];
+    for (const it of NAVIGATION_DEFINITION.top) all.push({ ...it, source: 'top' });
+    for (const g of NAVIGATION_DEFINITION.groups) for (const it of g.items) all.push({ ...it, source: 'more' });
+    return all;
+}
+
+function filterNavigationItemsByExistingTargets(items) {
+    const byHref = new Map();
+    for (const it of items) {
+        const href = String(it && it.href ? it.href : '').trim();
+        if (!href.startsWith('#')) continue;
+        const label = String(it && it.label ? it.label : '').trim();
+        if (!label) continue;
+        const id = href.slice(1);
+        if (!id) continue;
+        const target = document.getElementById(id);
+        if (!target) continue;
+        const prev = byHref.get(href);
+        if (!prev || label.length > prev.label.length) byHref.set(href, { href, label });
+    }
+    return Array.from(byHref.values());
+}
+
+function renderNavigationFromDefinition() {
+    const primary = document.getElementById('navPrimaryLinks');
+    const grid = document.getElementById('navMoreGrid');
+    if (!primary || !grid) return;
+
+    const topItems = filterNavigationItemsByExistingTargets(NAVIGATION_DEFINITION.top);
+    primary.innerHTML = topItems
+        .map((x, i) => {
+            const active = i === 0 ? ' active' : '';
+            return `<a href="${escapeHtml(x.href)}" class="nav-link nav-chip${active}" data-nav="1" data-nav-top="1">${escapeHtml(x.label)}</a>`;
+        })
+        .join('');
+
+    const groupsHtml = NAVIGATION_DEFINITION.groups
+        .map(g => {
+            const items = filterNavigationItemsByExistingTargets(g.items);
+            if (!items.length) return '';
+            const itemsHtml = items
+                .map(x => `<a href="${escapeHtml(x.href)}" class="nav-link nav-chip" data-nav="1" role="menuitem">${escapeHtml(x.label)}</a>`)
+                .join('');
+            return `<div class="nav-more__group"><div class="nav-more__title">${escapeHtml(g.title)}</div>${itemsHtml}</div>`;
+        })
+        .join('');
+
+    grid.innerHTML = groupsHtml;
+}
+
 function setupAssetSwitchNav() {
     const sel = document.getElementById('assetSelect');
     if (!sel) return;
@@ -8754,19 +9426,15 @@ function setupQuickNavDrawer() {
     const list = document.getElementById('quickNavList');
     const search = document.getElementById('quickNavSearch');
     const quickSearchBtn = document.getElementById('quickSearchBtn');
-    const sourceLinks = Array.from(document.querySelectorAll('.nav a.nav-link'))
-        .filter(a => a && a.getAttribute && String(a.getAttribute('href') || '').startsWith('#'));
+    const sourceItems = filterNavigationItemsByExistingTargets(getNavigationItemsFlat());
 
-    if (!btn || !overlay || !drawer || !closeBtn || !list || !search || !sourceLinks.length) return;
+    if (!btn || !overlay || !drawer || !closeBtn || !list || !search || !sourceItems.length) return;
 
     const normalize = s => String(s || '').toLowerCase().trim();
 
     function render(q) {
         const query = normalize(q);
-        const items = sourceLinks
-            .map(a => ({ href: a.getAttribute('href') || '', label: (a.textContent || '').trim() }))
-            .filter(x => x.href && x.href.startsWith('#') && x.label)
-            .filter(x => (!query ? true : normalize(x.label).includes(query)));
+        const items = sourceItems.filter(x => (!query ? true : normalize(x.label).includes(query)));
 
         list.innerHTML = items
             .map(x => {
@@ -8815,8 +9483,8 @@ function setupQuickNavDrawer() {
         setOpen(false);
     });
 
-    const targets = sourceLinks
-        .map(a => (a.getAttribute('href') || '').trim())
+    const targets = sourceItems
+        .map(x => x.href)
         .filter(h => h.startsWith('#'))
         .map(h => document.getElementById(h.slice(1)))
         .filter(Boolean);
@@ -8829,8 +9497,9 @@ function setupQuickNavDrawer() {
             else l.classList.remove('is-active');
         }
 
-        const top = Array.from(document.querySelectorAll('.nav a.nav-link.nav-chip'));
-        for (const a of top) {
+        const top = Array.from(document.querySelectorAll('.nav a.nav-link.nav-chip[data-nav-top="1"]'));
+        const tops = top.length ? top : Array.from(document.querySelectorAll('.nav a.nav-link.nav-chip'));
+        for (const a of tops) {
             const href = String(a.getAttribute('href') || '');
             const match = href === `#${id}`;
             if (match) a.classList.add('active');
@@ -9074,12 +9743,14 @@ function scheduleAdaptSplitLayouts() {
 window.addEventListener('resize', scheduleAdaptSplitLayouts);
 
 async function boot() {
+    renderNavigationFromDefinition();
     setupNav();
     setupAssetSwitchNav();
     setupQuickNavDrawer();
     setupNavMorePanel();
     setupInvestingCalendarWidgetLazyLoad();
     try { renderOperationalBriefing(); } catch { }
+    try { renderBtcOperationalBriefing(); } catch { }
     try { renderHk50OperationalBriefing(); } catch { }
 
     let data = getData();
