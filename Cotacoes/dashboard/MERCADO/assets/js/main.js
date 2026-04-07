@@ -6337,9 +6337,82 @@ function renderOperationalBriefing() {
         ? `News tilt (0–1): WDO ${fmt1(newsTilt.wdo.score)} • WIN ${fmt1(newsTilt.win.score)}`
         : 'News tilt: —';
 
-    const macroLine = macro
-        ? `Flow ${escapeHtml(String(macro.flow ? macro.flow.label : '—'))} • Estrang 5d ${foreignFlow && foreignFlow.derived && foreignFlow.derived.foreigners ? formatBrlCompact(foreignFlow.derived.foreigners.cum5, 2) : '—'} • DXY ${typeof macro.dxyPct === 'number' ? formatPercent(macro.dxyPct, 2) : '—'} • Export ${typeof macro.exportScore === 'number' ? formatPercent(macro.exportScore, 2) : '—'} • EM ${typeof (macro.em && macro.em.pct) === 'number' ? formatPercent(macro.em.pct, 2) : '—'}${cdsSignal ? ` • CDS ${typeof cdsSignal.drivers.cds === 'number' ? formatPercent(cdsSignal.drivers.cds, 2) : '—'} (${cdsSignal.mode === 'hedge_on_risk_on' ? 'Hedge-on' : cdsSignal.mode === 'risk_off_classic' ? 'Risk-off' : cdsSignal.mode === 'relief_risk_on' ? 'Alívio' : 'Leitura'})` : ''}`
-        : 'Macro: —';
+    const macroLine = (() => {
+        const ymdToBr = ymd => {
+            const s = String(ymd || '');
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return '—';
+            return `${s.slice(8, 10)}/${s.slice(5, 7)}`;
+        };
+
+        const foreignPart = (() => {
+            if (!foreignFlow || !foreignFlow.derived || !foreignFlow.derived.foreigners) return 'Fluxo estrangeiro: —';
+            const cum5 = foreignFlow.derived.foreigners.cum5;
+            const last = foreignFlow.latest && typeof foreignFlow.latest.foreigners === 'number' ? foreignFlow.latest.foreigners : null;
+            const lastDate = foreignFlow.latest && foreignFlow.latest.date ? ymdToBr(foreignFlow.latest.date) : '—';
+            const t = typeof operationalTuning.threshold.foreignFlow === 'number' ? operationalTuning.threshold.foreignFlow : 0.25;
+            const score = foreignFlow.signal && typeof foreignFlow.signal.score === 'number' && Number.isFinite(foreignFlow.signal.score) ? foreignFlow.signal.score : 0;
+            const abs = Math.abs(score);
+            const dir = score > t ? 'ENTRANDO' : score < -t ? 'SAINDO' : 'NEUTRO';
+            const strength = abs >= Math.max(0.5, t * 2) ? 'FORTE' : abs >= t ? 'DIRECIONAL' : 'NEUTRO';
+            const diverge =
+                typeof last === 'number'
+                    ? Math.sign(last) !== 0 && Math.sign(cum5) !== 0 && Math.sign(last) !== Math.sign(cum5)
+                    : false;
+            const alert = dir === 'NEUTRO'
+                ? null
+                : `${strength} ${dir}${diverge ? ' • divergência no último dia' : ''}`;
+
+            const hypothesis = (() => {
+                if (!data) return null;
+                if (dir === 'NEUTRO') return null;
+                const symUsd = findAliasSymbolBest(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i);
+                const symIbov = findAliasSymbolBest(data, 'IBOV') || findAssetSymbol(data, /(^\.BVSP$|\bIbovespa\b|\bIBOV\b)/i);
+                const symBr10y = findAssetSymbol(data, /^BR10YT=RR$/i) || findAssetSymbol(data, /\bBR10Y\b/i);
+                const usd = symUsd ? getChangePct(data, symUsd) : null;
+                const ibov = symIbov ? getChangePct(data, symIbov) : null;
+                const br10y = symBr10y ? getChangePct(data, symBr10y) : null;
+
+                const hasUsd = typeof usd === 'number' && Number.isFinite(usd);
+                const hasIbov = typeof ibov === 'number' && Number.isFinite(ibov);
+                const hasBr10y = typeof br10y === 'number' && Number.isFinite(br10y);
+
+                const brlStronger = hasUsd && usd < -0.25;
+                const brlWeaker = hasUsd && usd > 0.25;
+                const eqUp = hasIbov && ibov > 0.25;
+                const eqDown = hasIbov && ibov < -0.25;
+                const yieldsDown = hasBr10y && br10y < -0.12;
+                const yieldsUp = hasBr10y && br10y > 0.12;
+
+                let label = null;
+                if (dir === 'ENTRANDO') {
+                    if (brlStronger && yieldsDown && !eqUp) label = 'Hipótese: entrada via juros/títulos (carry)';
+                    else if (brlStronger && eqUp) label = 'Hipótese: entrada via ações/índice (risk-on local)';
+                    else if (brlWeaker) label = 'Hipótese: fluxo com hedge (derivativos) ou compra de USD';
+                    else label = 'Hipótese: entrada para caixa/espera (ainda sem confirmação em preço)';
+                } else if (dir === 'SAINDO') {
+                    if (brlWeaker && eqDown) label = 'Hipótese: saída de risco (equities) + pressão em FX';
+                    else if (yieldsUp && brlWeaker) label = 'Hipótese: desmonte de carry/juros + FX';
+                    else label = 'Hipótese: saída parcial (sem confirmação clara em preço)';
+                }
+
+                const confirms = [brlStronger || brlWeaker, eqUp || eqDown, yieldsDown || yieldsUp].filter(Boolean).length;
+                const available = [hasUsd, hasIbov, hasBr10y].filter(Boolean).length;
+                const conf = available >= 2 ? (confirms >= 2 ? 'alta' : confirms === 1 ? 'média' : 'baixa') : 'baixa';
+                return label ? `${label} • confiança ${conf}` : null;
+            })();
+
+            const bits = [
+                `Fluxo estrangeiro (5 dias) ${formatBrlCompact(cum5, 2)}`,
+                `Último dia (${lastDate}) ${formatBrlCompact(last, 2)}`,
+                alert ? `ALERTA: ${alert}` : null,
+                hypothesis,
+            ].filter(Boolean);
+            return bits.join(' • ');
+        })();
+
+        if (!macro) return foreignPart;
+        return `Flow ${String(macro.flow ? macro.flow.label : '—')} • ${foreignPart} • DXY ${typeof macro.dxyPct === 'number' ? formatPercent(macro.dxyPct, 2) : '—'} • Export ${typeof macro.exportScore === 'number' ? formatPercent(macro.exportScore, 2) : '—'} • EM ${typeof (macro.em && macro.em.pct) === 'number' ? formatPercent(macro.em.pct, 2) : '—'}${cdsSignal ? ` • CDS ${typeof cdsSignal.drivers.cds === 'number' ? formatPercent(cdsSignal.drivers.cds, 2) : '—'} (${cdsSignal.mode === 'hedge_on_risk_on' ? 'Hedge-on' : cdsSignal.mode === 'risk_off_classic' ? 'Risk-off' : cdsSignal.mode === 'relief_risk_on' ? 'Alívio' : 'Leitura'})` : ''}`;
+    })();
 
     const pulseNow = data ? computeOperationalPulseNow(data) : null;
     const pulseCard = (() => {
