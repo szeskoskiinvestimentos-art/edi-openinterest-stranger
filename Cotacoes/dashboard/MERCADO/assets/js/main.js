@@ -6104,6 +6104,13 @@ function renderOperationalBriefing() {
             const b = macro.flow.label === 'Risk-On' ? (symbol === 'WDO' ? -1 : +1) : (symbol === 'WDO' ? +1 : -1);
             push(b, operationalTuning.weight.flow);
         }
+        if (foreignFlow && foreignFlow.signal && typeof foreignFlow.signal.score === 'number' && Number.isFinite(foreignFlow.signal.score)) {
+            const t = typeof operationalTuning.threshold.foreignFlow === 'number' ? operationalTuning.threshold.foreignFlow : 0.25;
+            const dir = foreignFlow.signal.score > t ? +1 : foreignFlow.signal.score < -t ? -1 : 0;
+            const b = symbol === 'WDO' ? -dir : +dir;
+            const wFlow = typeof operationalTuning.weight.foreignFlow === 'number' ? operationalTuning.weight.foreignFlow : 0.22;
+            push(b, wFlow);
+        }
         if (typeof macro.dxyPct === 'number' && Number.isFinite(macro.dxyPct)) {
             const dir = macro.dxyPct > operationalTuning.threshold.dxy ? +1 : macro.dxyPct < -operationalTuning.threshold.dxy ? -1 : 0;
             const b = symbol === 'WDO' ? dir : -dir;
@@ -6331,7 +6338,7 @@ function renderOperationalBriefing() {
         : 'News tilt: —';
 
     const macroLine = macro
-        ? `Flow ${escapeHtml(String(macro.flow ? macro.flow.label : '—'))} • DXY ${typeof macro.dxyPct === 'number' ? formatPercent(macro.dxyPct, 2) : '—'} • Export ${typeof macro.exportScore === 'number' ? formatPercent(macro.exportScore, 2) : '—'} • EM ${typeof (macro.em && macro.em.pct) === 'number' ? formatPercent(macro.em.pct, 2) : '—'}${cdsSignal ? ` • CDS ${typeof cdsSignal.drivers.cds === 'number' ? formatPercent(cdsSignal.drivers.cds, 2) : '—'} (${cdsSignal.mode === 'hedge_on_risk_on' ? 'Hedge-on' : cdsSignal.mode === 'risk_off_classic' ? 'Risk-off' : cdsSignal.mode === 'relief_risk_on' ? 'Alívio' : 'Leitura'})` : ''}`
+        ? `Flow ${escapeHtml(String(macro.flow ? macro.flow.label : '—'))} • Estrang 5d ${foreignFlow && foreignFlow.derived && foreignFlow.derived.foreigners ? formatBrlCompact(foreignFlow.derived.foreigners.cum5, 2) : '—'} • DXY ${typeof macro.dxyPct === 'number' ? formatPercent(macro.dxyPct, 2) : '—'} • Export ${typeof macro.exportScore === 'number' ? formatPercent(macro.exportScore, 2) : '—'} • EM ${typeof (macro.em && macro.em.pct) === 'number' ? formatPercent(macro.em.pct, 2) : '—'}${cdsSignal ? ` • CDS ${typeof cdsSignal.drivers.cds === 'number' ? formatPercent(cdsSignal.drivers.cds, 2) : '—'} (${cdsSignal.mode === 'hedge_on_risk_on' ? 'Hedge-on' : cdsSignal.mode === 'risk_off_classic' ? 'Risk-off' : cdsSignal.mode === 'relief_risk_on' ? 'Alívio' : 'Leitura'})` : ''}`
         : 'Macro: —';
 
     const pulseNow = data ? computeOperationalPulseNow(data) : null;
@@ -9348,6 +9355,7 @@ async function triggerUpdaterAndReload() {
         void loadOptionsGammaSummary();
         void loadFinancialJuice();
         void loadWebNewsModule();
+        void loadForeignFlow();
         const sum = formatUpdaterSummary(lastPayload);
         if (sum && sum.text) {
             setDataStatus(sum.text, sum.tone || 'neutral');
@@ -9872,6 +9880,7 @@ async function boot() {
     void loadOptionsGammaSummary();
     void loadFinancialJuice();
     void loadWebNewsModule();
+    void loadForeignFlow();
 
     const reloadBtn = document.getElementById('reloadDataBtn');
     if (reloadBtn) {
@@ -9888,6 +9897,7 @@ async function boot() {
                 void loadOptionsGammaSummary();
                 void loadFinancialJuice();
                 void loadWebNewsModule();
+                void loadForeignFlow();
             } catch (e) {
             }
         };
@@ -9915,6 +9925,7 @@ async function boot() {
             void loadOptionsGammaSummary();
             void loadFinancialJuice();
             void loadWebNewsModule();
+            void loadForeignFlow();
             if (source) {
                 setDataStatus('AUTO • Dados atualizados', 'positive');
                 setTimeout(() => setDataStatus('', 'neutral'), 1500);
