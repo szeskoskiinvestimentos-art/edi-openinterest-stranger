@@ -9,6 +9,17 @@ function formatPercent(val, digits = 2) {
     return `${sign}${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: digits }).format(val)}%`;
 }
 
+function formatBrlCompact(val, digits = 2) {
+    if (val === null || val === undefined || !Number.isFinite(val)) return '—';
+    const abs = Math.abs(val);
+    const sign = val > 0 ? '+' : val < 0 ? '−' : '';
+    const fmt = (n, d) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: d }).format(n);
+    if (abs >= 1e9) return `${sign}${fmt(abs / 1e9, digits)} bi`;
+    if (abs >= 1e6) return `${sign}${fmt(abs / 1e6, digits)} mi`;
+    if (abs >= 1e3) return `${sign}${fmt(abs / 1e3, digits)} mil`;
+    return `${sign}${fmt(abs, 0)}`;
+}
+
 function toneIntensity(valAbs, maxAbs = 5) {
     const abs = typeof valAbs === 'number' && Number.isFinite(valAbs) ? Math.abs(valAbs) : 0;
     const denom = typeof maxAbs === 'number' && Number.isFinite(maxAbs) && maxAbs > 0 ? maxAbs : 5;
@@ -3963,16 +3974,11 @@ function saveAgenda(items) {
 let agendaAutoCache = null;
 let agendaAutoLoading = false;
 
-let operationalInputs = {
-    regime: null,
-    optionsGamma: null,
-    webNews: null,
-    macro: null,
-};
+let operationalInputs = { regime: null, optionsGamma: null, webNews: null, foreignFlow: null, macro: null };
 
 const operationalTuning = {
-    threshold: { dxy: 0.12, em: 0.12, export: 0.25, yields: 0.12 },
-    weight: { flow: 0.5, dxy: 0.4, export: 0.3, em: 0.4, yields: 0.25 },
+    threshold: { dxy: 0.12, em: 0.12, export: 0.25, yields: 0.12, foreignFlow: 0.25 },
+    weight: { flow: 0.5, dxy: 0.4, export: 0.3, em: 0.4, yields: 0.25, foreignFlow: 0.22 },
 };
 
 function loadOperationalTuning() {
@@ -5885,6 +5891,99 @@ async function loadWebNewsModule() {
     }
 }
 
+async function loadForeignFlow() {
+    try {
+        const local = (() => {
+            try {
+                return window.FOREIGN_FLOW_DATA || null;
+            } catch {
+                return null;
+            }
+        })();
+        if (local) {
+            operationalInputs.foreignFlow = local;
+            try {
+                renderOperationalBriefing();
+            } catch {
+            }
+            try {
+                renderBtcOperationalBriefing();
+            } catch {
+            }
+            try {
+                renderHk50OperationalBriefing();
+            } catch {
+            }
+            return true;
+        }
+    } catch {
+    }
+
+    try {
+        await loadScriptFresh('assets/data/foreign_flow.js');
+        const local = (() => {
+            try {
+                return window.FOREIGN_FLOW_DATA || null;
+            } catch {
+                return null;
+            }
+        })();
+        if (local) {
+            operationalInputs.foreignFlow = local;
+            try {
+                renderOperationalBriefing();
+            } catch {
+            }
+            try {
+                renderBtcOperationalBriefing();
+            } catch {
+            }
+            try {
+                renderHk50OperationalBriefing();
+            } catch {
+            }
+            return true;
+        }
+    } catch {
+    }
+
+    try {
+        const fromFile = await fetchJsonWithTimeout(`assets/data/foreign_flow.json?ts=${Date.now()}`, 1600);
+        if (fromFile) {
+            operationalInputs.foreignFlow = fromFile;
+            try {
+                renderOperationalBriefing();
+            } catch {
+            }
+            try {
+                renderBtcOperationalBriefing();
+            } catch {
+            }
+            try {
+                renderHk50OperationalBriefing();
+            } catch {
+            }
+            return true;
+        }
+    } catch {
+    }
+
+    operationalInputs.foreignFlow = { ok: false, message: 'Fluxo estrangeiro indisponível (assets/data/foreign_flow.json/js)' };
+    try {
+        renderOperationalBriefing();
+    } catch {
+    }
+    try {
+        renderBtcOperationalBriefing();
+    } catch {
+    }
+    try {
+        renderHk50OperationalBriefing();
+    } catch {
+    }
+    return false;
+}
+
 function renderOperationalBriefing() {
     const el = document.getElementById('operationalBriefing');
     if (!el) return;
@@ -5893,6 +5992,8 @@ function renderOperationalBriefing() {
     const rawRegime = operationalInputs.regime;
     const rawOptions = operationalInputs.optionsGamma || null;
     const rawWeb = operationalInputs.webNews || null;
+    const rawForeign = operationalInputs.foreignFlow || null;
+ 
 
     const fallbackRegime = (() => {
         if (!data) return null;
@@ -5911,6 +6012,7 @@ function renderOperationalBriefing() {
     const regime = rawRegime || fallbackRegime;
     const options = rawOptions && rawOptions.ok === true ? rawOptions : null;
     const web = rawWeb && rawWeb.ok === true ? rawWeb : null;
+    const foreignFlow = rawForeign && rawForeign.ok === true ? rawForeign : null;
 
     const fmt0 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 0) : '—');
     const fmt1 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 1) : '—');
@@ -9758,6 +9860,7 @@ async function boot() {
         try {
             await loadScriptFresh('assets/data/market_quotes.js');
             await loadScriptFresh('assets/data/economic_calendar.js');
+            await loadScriptFresh('assets/data/foreign_flow.js');
             agendaAutoCache = null;
             data = getData();
         } catch {

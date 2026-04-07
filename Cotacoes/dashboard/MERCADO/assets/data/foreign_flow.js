@@ -1,0 +1,1 @@
+window.FOREIGN_FLOW_DATA={"ok":false,"generatedAt":"2026-04-07T11:34:53.836Z","provider":"dadosdemercado_investors","message":"Token ausente (DADOS_DE_MERCADO_API_TOKEN)"};
