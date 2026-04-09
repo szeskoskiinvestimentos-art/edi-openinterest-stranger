@@ -52,7 +52,7 @@ def auto_push_dashboard_v1():
             if retriable:
                 remote = os.getenv("GIT_REMOTE", "origin")
                 cur_branch = run_git(["rev-parse", "--abbrev-ref", "HEAD"], capture=True, check=True).stdout.strip() or "main"
-                run_git(["pull", "--rebase", remote, cur_branch], check=True)
+                run_git(["pull", "--no-rebase", "--no-edit", "-X", "ours", remote, cur_branch], check=True)
                 run_git(["push"], check=True)
             else:
                 raise subprocess.CalledProcessError(push.returncode, ["git", "push"], output=push.stdout, stderr=push.stderr)
