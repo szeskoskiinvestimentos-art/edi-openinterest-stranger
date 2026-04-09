@@ -620,22 +620,72 @@ class StrangerThingsCharts {
     }
 
     createEwzOptionsOiChart(data) {
-        const utils = window.ChartDataUtils;
-        if (!utils?.renderEwzOptionsOiChart) return;
-        utils.renderEwzOptionsOiChart({
-            marketData: data,
-            payload: window.yahooEwzOptionsData,
-            canvas: document.getElementById('ewzOptionsOiChart'),
-            select: document.getElementById('ewzOptionsExpirySelect'),
-            minOiEl: document.getElementById('ewzOptionsMinOi'),
-            meansAllEl: document.getElementById('ewzOptionsMeansAll'),
-            charts: this.charts,
-            chartKey: 'ewzOptionsOi',
-            chartOptions: this.chartOptions,
-            formatStrikeLabel: (n) => this.formatNumberBr(n, 0),
-            formatMeanValue: (n) => this.formatNumberBr(n, 0),
-            formatYTick: (n) => this.formatNumberBr(n, 0)
-        });
+        const canvas = document.getElementById('ewzOptionsOiChart');
+        const select = document.getElementById('ewzOptionsExpirySelect');
+        const minOiEl = document.getElementById('ewzOptionsMinOi');
+        const meansAllEl = document.getElementById('ewzOptionsMeansAll');
+
+        const setMsg = (msg) => {
+            if (meansAllEl) meansAllEl.innerText = String(msg || '');
+        };
+
+        const tryRender = (payload) => {
+            const utils = window.ChartDataUtils;
+            if (!utils?.renderEwzOptionsOiChart) {
+                setMsg('Utilitário chart_data_utils.js não carregou. Módulo EWZ desabilitado.');
+                return false;
+            }
+            if (!payload || typeof payload !== 'object') {
+                setMsg('Dados EWZ (yahoo_ewz_options.js) não carregados. Rode o serviço e recarregue a página.');
+                return false;
+            }
+            utils.renderEwzOptionsOiChart({
+                marketData: data,
+                payload,
+                canvas,
+                select,
+                minOiEl,
+                meansAllEl,
+                charts: this.charts,
+                chartKey: 'ewzOptionsOi',
+                chartOptions: this.chartOptions,
+                formatStrikeLabel: (n) => this.formatNumberBr(n, 0),
+                formatMeanValue: (n) => this.formatNumberBr(n, 0),
+                formatYTick: (n) => this.formatNumberBr(n, 0)
+            });
+            return true;
+        };
+
+        const payload = window.yahooEwzOptionsData;
+        if (payload && typeof payload === 'object') {
+            tryRender(payload);
+            return;
+        }
+
+        if (location.protocol === 'file:') {
+            setMsg('Dados EWZ não encontrados. Rode o serviço para gerar yahoo_ewz_options.js e recarregue.');
+            return;
+        }
+
+        if (typeof fetch !== 'function') {
+            setMsg('Dados EWZ não encontrados (fetch indisponível). Rode o serviço e recarregue.');
+            return;
+        }
+
+        setMsg('Carregando dados EWZ...');
+        fetch('assets/data/yahoo_ewz_options.json')
+            .then((r) => (r && r.ok ? r.json() : null))
+            .then((obj) => {
+                if (!obj || typeof obj !== 'object') {
+                    setMsg('Dados EWZ não encontrados em assets/data/yahoo_ewz_options.json.');
+                    return;
+                }
+                window.yahooEwzOptionsData = obj;
+                tryRender(obj);
+            })
+            .catch(() => {
+                setMsg('Falha ao carregar dados EWZ. Verifique se yahoo_ewz_options.json existe e recarregue.');
+            });
     }
 
     // NOVOS GRÁFICOS

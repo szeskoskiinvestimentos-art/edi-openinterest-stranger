@@ -689,8 +689,37 @@ class StrangerThingsCharts {
 
         const legacy = data && data.fed_watch;
         if (!Array.isArray(legacy) || legacy.length === 0) {
-            container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            if (this._fedWatchRatesFetchAttempted) {
+                container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+                if (insightEl) insightEl.textContent = '';
+                return;
+            }
+
+            this._fedWatchRatesFetchAttempted = true;
+            container.innerHTML = '<div class="loading-text">Carregando...</div>';
             if (insightEl) insightEl.textContent = '';
+
+            const suffix = (window && window._cacheSuffix) ? String(window._cacheSuffix) : '';
+            const url = `assets/data/fed_rates.json${suffix}`;
+            try {
+                fetch(url, { cache: 'no-store' })
+                    .then((r) => (r && r.ok ? r.json() : null))
+                    .then((payload) => {
+                        if (payload && Array.isArray(payload.meetings) && payload.meetings.length > 0) {
+                            if (data && typeof data === 'object') {
+                                data.fed_watch_rates = payload;
+                            }
+                            this.createFedWatchTable(data || { fed_watch_rates: payload });
+                            return;
+                        }
+                        container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+                    })
+                    .catch(() => {
+                        container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+                    });
+            } catch {
+                container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
+            }
             return;
         }
 
@@ -1477,6 +1506,35 @@ class StrangerThingsCharts {
     createMostActivesTable(data) {
         const container = document.getElementById('most-actives-container');
         if (!container) return;
+        if (!data || !data.most_actives) {
+            const rows = data && Array.isArray(data.detailed_data) ? data.detailed_data : null;
+            if (rows && rows.length > 0) {
+                const norm = rows
+                    .map((r) => {
+                        const strike = r?.strike ?? r?.Strike ?? null;
+                        const oi = Number(r?.oi ?? r?.open_interest ?? r?.openInterest ?? 0) || 0;
+                        const volume = Number(r?.volume ?? 0) || 0;
+                        const iv = Number(r?.iv ?? r?.IV ?? 0) || 0;
+                        const delta = Number(r?.delta ?? 0);
+                        const type = Number.isFinite(delta) && delta < 0 ? 'PUT' : 'CALL';
+                        return {
+                            strike,
+                            type,
+                            oi,
+                            volume,
+                            iv
+                        };
+                    })
+                    .filter((r) => r.strike !== null && (r.oi > 0 || r.volume > 0 || r.iv > 0));
+
+                if (norm.length > 0) {
+                    const top_oi = norm.slice().sort((a, b) => (b.oi || 0) - (a.oi || 0));
+                    const top_vol = norm.slice().sort((a, b) => (b.volume || 0) - (a.volume || 0));
+                    data.most_actives = { top_oi, top_vol, source: 'detailed_data' };
+                }
+            }
+        }
+
         if (!data || !data.most_actives) {
             container.innerHTML = '<div class="loading-text">Dados indisponíveis</div>';
             return;

@@ -748,7 +748,9 @@ function computeCategoryAverages(data, categoryGroups) {
 
 function computeFlowScore(data) {
     const pctOf = (matcherOrAlias, { invert = false } = {}) => {
-        const sym = typeof matcherOrAlias === 'string' ? findAliasSymbol(data, matcherOrAlias) : findAssetSymbol(data, matcherOrAlias);
+        const sym = typeof matcherOrAlias === 'string'
+            ? (findAliasSymbolBest(data, matcherOrAlias) || findAliasSymbol(data, matcherOrAlias))
+            : findAssetSymbol(data, matcherOrAlias);
         if (!sym) return null;
         const last = getLastPoint(data, sym);
         const v = last && typeof last.changePct === 'number' ? last.changePct : null;
@@ -762,14 +764,27 @@ function computeFlowScore(data) {
         return Math.max(-m, Math.min(m, x));
     };
 
+    const ibovPct = pctOf('IBOV');
+    const ibrxPct = pctOf('IBRX');
+    const br20Pct = pctOf('BR20');
+    const ifncPct = pctOf('IFNC') ?? pctOf(/^XLF$/i);
+    const imatPct = pctOf('IMAT') ?? pctOf(/^XLB$/i);
+    const usdbRLInv = pctOf(/^USD\/BRL\b/i, { invert: true });
+
     const parts = [
         { k: 'SPX', w: 0.18, v: pctOf('SPX') },
         { k: 'NQ', w: 0.12, v: pctOf('NDX') },
         { k: 'EEM', w: 0.10, v: pctOf(/^EEM$/i) },
-        { k: 'EWZ', w: 0.08, v: pctOf(/^EWZ$/i) },
+        { k: 'EWZ', w: 0.08, v: pctOf('EWZ') },
+        { k: 'IBOV', w: 0.08, v: ibovPct ?? null },
+        { k: 'IBRX', w: 0.06, v: ibrxPct ?? null },
+        { k: 'BR20', w: 0.05, v: br20Pct ?? null },
+        { k: 'IFNC', w: 0.05, v: ifncPct ?? null },
+        { k: 'IMAT', w: 0.05, v: imatPct ?? null },
         { k: 'CHINA', w: 0.06, v: pctOf('CHINA') },
         { k: 'VIX', w: 0.09, v: pctOf('VIX', { invert: true }) },
         { k: 'DXY', w: 0.08, v: pctOf('DXY', { invert: true }) },
+        { k: 'USD/BRL', w: 0.07, v: usdbRLInv ?? null },
         { k: 'US10Y', w: 0.06, v: pctOf('US10Y', { invert: true }) },
         { k: 'CDS BR', w: 0.05, v: pctOf(/(^BRGV5YUSAC=R$|\bCDS\b.*\bBrasil\b|\bBrasil\b.*\bCDS\b)/i, { invert: true }) },
         { k: 'Brent/WTI', w: 0.08, v: pctOf('OIL') },
@@ -1342,7 +1357,7 @@ function renderRegimeConviction(data) {
         updatedAt: (data && data.meta && data.meta.generatedAt) ? String(data.meta.generatedAt) : null,
     };
     try {
-        const aliasSym = k => findAliasSymbol(data, k);
+        const aliasSym = k => findAliasSymbolBest(data, k) || findAliasSymbol(data, k);
         const pctOfAlias = k => {
             const s = aliasSym(k);
             return s ? getChangePct(data, s) : null;
@@ -6367,19 +6382,29 @@ function renderOperationalBriefing() {
                 if (dir === 'NEUTRO') return null;
                 const symUsd = findAliasSymbolBest(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i);
                 const symIbov = findAliasSymbolBest(data, 'IBOV') || findAssetSymbol(data, /(^\.BVSP$|\bIbovespa\b|\bIBOV\b)/i);
+                const symEwz = findAliasSymbolBest(data, 'EWZ') || findAssetSymbol(data, /^EWZ$/i);
                 const symBr10y = findAssetSymbol(data, /^BR10YT=RR$/i) || findAssetSymbol(data, /\bBR10Y\b/i);
                 const usd = symUsd ? getChangePct(data, symUsd) : null;
                 const ibov = symIbov ? getChangePct(data, symIbov) : null;
+                const ewz = symEwz ? getChangePct(data, symEwz) : null;
                 const br10y = symBr10y ? getChangePct(data, symBr10y) : null;
 
                 const hasUsd = typeof usd === 'number' && Number.isFinite(usd);
                 const hasIbov = typeof ibov === 'number' && Number.isFinite(ibov);
+                const hasEwz = typeof ewz === 'number' && Number.isFinite(ewz);
                 const hasBr10y = typeof br10y === 'number' && Number.isFinite(br10y);
+                const eq = (() => {
+                    const xs = [];
+                    if (hasIbov) xs.push(ibov);
+                    if (hasEwz) xs.push(ewz);
+                    return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+                })();
+                const hasEq = typeof eq === 'number' && Number.isFinite(eq);
 
                 const brlStronger = hasUsd && usd < -0.25;
                 const brlWeaker = hasUsd && usd > 0.25;
-                const eqUp = hasIbov && ibov > 0.25;
-                const eqDown = hasIbov && ibov < -0.25;
+                const eqUp = hasEq && eq > 0.25;
+                const eqDown = hasEq && eq < -0.25;
                 const yieldsDown = hasBr10y && br10y < -0.12;
                 const yieldsUp = hasBr10y && br10y > 0.12;
 
@@ -6396,7 +6421,7 @@ function renderOperationalBriefing() {
                 }
 
                 const confirms = [brlStronger || brlWeaker, eqUp || eqDown, yieldsDown || yieldsUp].filter(Boolean).length;
-                const available = [hasUsd, hasIbov, hasBr10y].filter(Boolean).length;
+                const available = [hasUsd, hasEq, hasBr10y].filter(Boolean).length;
                 const conf = available >= 2 ? (confirms >= 2 ? 'alta' : confirms === 1 ? 'média' : 'baixa') : 'baixa';
                 return label ? `${label} • confiança ${conf}` : null;
             })();
@@ -6411,7 +6436,61 @@ function renderOperationalBriefing() {
         })();
 
         if (!macro) return foreignPart;
-        return `Flow ${String(macro.flow ? macro.flow.label : '—')} • ${foreignPart} • DXY ${typeof macro.dxyPct === 'number' ? formatPercent(macro.dxyPct, 2) : '—'} • Export ${typeof macro.exportScore === 'number' ? formatPercent(macro.exportScore, 2) : '—'} • EM ${typeof (macro.em && macro.em.pct) === 'number' ? formatPercent(macro.em.pct, 2) : '—'}${cdsSignal ? ` • CDS ${typeof cdsSignal.drivers.cds === 'number' ? formatPercent(cdsSignal.drivers.cds, 2) : '—'} (${cdsSignal.mode === 'hedge_on_risk_on' ? 'Hedge-on' : cdsSignal.mode === 'risk_off_classic' ? 'Risk-off' : cdsSignal.mode === 'relief_risk_on' ? 'Alívio' : 'Leitura'})` : ''}`;
+        const extras = (() => {
+            if (!data) return '';
+            const parts = [];
+            const y = macro && macro.yields ? macro.yields : null;
+            if (y && typeof y.us10yPct === 'number' && Number.isFinite(y.us10yPct)) parts.push(`Juros US10Y ${formatPercent(y.us10yPct, 2)}`);
+            if (y && typeof y.br10yPct === 'number' && Number.isFinite(y.br10yPct)) parts.push(`Juros BR10Y ${formatPercent(y.br10yPct, 2)}`);
+            const symSpx = findAliasSymbolBest(data, 'SPX') || findAliasSymbol(data, 'SPX');
+            const spxPct = symSpx ? getChangePct(data, symSpx) : null;
+            if (typeof spxPct === 'number' && Number.isFinite(spxPct)) {
+                const isFut = /^ES[HMUZ]\d{2}$/i.test(String(symSpx || ''));
+                parts.push(`S&P500${isFut ? ' (fut)' : ''} ${formatPercent(spxPct, 2)}`);
+            }
+            const symNdx = findAliasSymbolBest(data, 'NDX') || findAliasSymbol(data, 'NDX');
+            const ndxPct = symNdx ? getChangePct(data, symNdx) : null;
+            if (typeof ndxPct === 'number' && Number.isFinite(ndxPct)) {
+                const isFut = /^NQ[HMUZ]\d{2}$/i.test(String(symNdx || ''));
+                parts.push(`Nasdaq100${isFut ? ' (fut)' : ''} ${formatPercent(ndxPct, 2)}`);
+            }
+            const symIbov = findAliasSymbolBest(data, 'WIN') || findAliasSymbolBest(data, 'IBOV') || findAliasSymbol(data, 'IBOV');
+            const ibovPct = symIbov ? getChangePct(data, symIbov) : null;
+            if (typeof ibovPct === 'number' && Number.isFinite(ibovPct)) {
+                const isFut = /^WINc\d$/i.test(String(symIbov || ''));
+                parts.push(`Ibovespa${isFut ? ' (fut)' : ''} ${formatPercent(ibovPct, 2)}`);
+            }
+            const symBr20 = findAliasSymbolBest(data, 'BR20') || findAliasSymbol(data, 'BR20');
+            const br20Pct = symBr20 ? getChangePct(data, symBr20) : null;
+            if (typeof br20Pct === 'number' && Number.isFinite(br20Pct)) {
+                parts.push(`BR20 ${formatPercent(br20Pct, 2)}`);
+            }
+            const symUsdBrl = findAliasSymbolBest(data, 'WDO') || findAliasSymbol(data, 'USD_BRL');
+            const usdbrlPct = symUsdBrl ? getChangePct(data, symUsdBrl) : null;
+            if (typeof usdbrlPct === 'number' && Number.isFinite(usdbrlPct)) {
+                const isFut = /^WDOc\d$/i.test(String(symUsdBrl || ''));
+                parts.push(`USD/BRL${isFut ? ' (fut)' : ''} ${formatPercent(usdbrlPct, 2)}`);
+            }
+            const symEwz = findAliasSymbolBest(data, 'EWZ') || findAliasSymbol(data, 'EWZ') || findAssetSymbol(data, /^EWZS(\.\w+)?$/i);
+            const ewzPct = symEwz ? getChangePct(data, symEwz) : null;
+            if (typeof ewzPct === 'number' && Number.isFinite(ewzPct)) {
+                const isSmall = /^EWZS(\.\w+)?$/i.test(String(symEwz || ''));
+                parts.push(`Brasil${isSmall ? ' (small caps)' : ''} ${formatPercent(ewzPct, 2)}`);
+            }
+            const symVix =
+                findAliasSymbolBest(data, 'VIX9D') ||
+                findAliasSymbolBest(data, 'VIX30') ||
+                findAliasSymbolBest(data, 'VIX') ||
+                findAliasSymbol(data, 'VIX') ||
+                findAssetSymbol(data, /^\.?VIX(9D)?$/i);
+            const vixPct = symVix ? getChangePct(data, symVix) : null;
+            if (typeof vixPct === 'number' && Number.isFinite(vixPct)) {
+                const label = String(symVix).toUpperCase().includes('VIX9D') ? 'VIX9D' : 'VIX';
+                parts.push(`Vol ${label} ${formatPercent(vixPct, 2)}`);
+            }
+            return parts.length ? ` • ${parts.join(' • ')}` : '';
+        })();
+        return `Flow ${String(macro.flow ? macro.flow.label : '—')} • ${foreignPart} • DXY ${typeof macro.dxyPct === 'number' ? formatPercent(macro.dxyPct, 2) : '—'} • Export ${typeof macro.exportScore === 'number' ? formatPercent(macro.exportScore, 2) : '—'} • EM ${typeof (macro.em && macro.em.pct) === 'number' ? formatPercent(macro.em.pct, 2) : '—'}${extras}${cdsSignal ? ` • CDS ${typeof cdsSignal.drivers.cds === 'number' ? formatPercent(cdsSignal.drivers.cds, 2) : '—'} (${cdsSignal.mode === 'hedge_on_risk_on' ? 'Hedge-on' : cdsSignal.mode === 'risk_off_classic' ? 'Risk-off' : cdsSignal.mode === 'relief_risk_on' ? 'Alívio' : 'Leitura'})` : ''}`;
     })();
 
     const pulseNow = data ? computeOperationalPulseNow(data) : null;
@@ -6862,9 +6941,19 @@ function renderOperationalBriefing() {
 function findAssetSymbol(data, matcher) {
     const assets = data && data.assets ? data.assets : [];
     for (const a of assets) {
-        const sym = String(a && a.symbol ? a.symbol : '');
+        const symRaw = String(a && a.symbol ? a.symbol : '');
+        const sym = symRaw.trim();
+        const symCore = sym.split(' - ')[0] ? sym.split(' - ')[0].trim() : sym;
         const name = String(a && a.name ? a.name : '');
-        if (matcher.test(sym) || matcher.test(name)) return sym;
+        if (matcher.test(sym) || matcher.test(symCore) || matcher.test(name)) return symRaw;
+    }
+    const series = data && data.series && typeof data.series === 'object' ? data.series : null;
+    if (series) {
+        for (const symRaw of Object.keys(series)) {
+            const sym = String(symRaw || '').trim();
+            const symCore = sym.split(' - ')[0] ? sym.split(' - ')[0].trim() : sym;
+            if (matcher.test(sym) || matcher.test(symCore)) return symRaw;
+        }
     }
     return null;
 }
@@ -6909,12 +6998,36 @@ function findAssetSymbolBest(data, matchers, config) {
     for (const m of list) {
         if (!(m instanceof RegExp)) continue;
         for (const a of assets) {
-            const sym = String(a && a.symbol ? a.symbol : '');
+            const symRaw = String(a && a.symbol ? a.symbol : '');
+            const sym = symRaw.trim();
+            const symCore = sym.split(' - ')[0] ? sym.split(' - ')[0].trim() : sym;
             const name = String(a && a.name ? a.name : '');
             if (!sym) continue;
-            if (!m.test(sym) && !m.test(name)) continue;
+            if (!m.test(sym) && !m.test(symCore) && !m.test(name)) continue;
             const sc = scoreAsset(a);
-            if (!best || sc > best.score) best = { sym, score: sc };
+            if (!best || sc > best.score) best = { sym: symRaw, score: sc };
+        }
+    }
+    if (!best) {
+        const series = data && data.series && typeof data.series === 'object' ? data.series : null;
+        if (series) {
+            const scoreSymbol = sym => {
+                let s = 1;
+                for (const re of preferSymbols) if (re.test(sym)) s += 3;
+                for (const re of avoidSymbols) if (re.test(sym)) s -= 3;
+                return s;
+            };
+            for (const m of list) {
+                if (!(m instanceof RegExp)) continue;
+                for (const symRaw of Object.keys(series)) {
+                    const sym = String(symRaw || '').trim();
+                    const symCore = sym.split(' - ')[0] ? sym.split(' - ')[0].trim() : sym;
+                    if (!sym) continue;
+                    if (!m.test(sym) && !m.test(symCore)) continue;
+                    const sc = scoreSymbol(sym);
+                    if (!best || sc > best.score) best = { sym: symRaw, score: sc };
+                }
+            }
         }
     }
     return best ? best.sym : null;
@@ -6925,7 +7038,18 @@ function assetAliasMatchers(key) {
     if (!k) return [];
 
     if (k === 'US2Y') return [/^US2YT=RR$/i, /^TUc\d=\$?$/i, /\bUnited States 2-Year\b/i, /\bEUA\b\s+a\s+2\s+anos\b/i, /^US2Y\b/i];
-    if (k === 'US10Y') return [/^US10YT=RR$/i, /^TNc\d=\$?$/i, /\bUnited States 10-Year\b/i, /\bEUA\b\s+a\s+10\s+anos\b/i, /^US10Y\b/i];
+    if (k === 'US10Y')
+        return [
+            /^US10YT=RR$/i,
+            /^US10YT=X$/i,
+            /^\.TNX$/i,
+            /^\^TNX$/i,
+            /^TNc\d=\$?$/i,
+            /\bUnited States\b.*\b10\b.*\bYear\b/i,
+            /\b10\s*Year\s*Treasury\s*Yield\b/i,
+            /\bEUA\b\s+a\s+10\s+anos\b/i,
+            /^US10Y\b/i,
+        ];
     if (k === 'US30Y') return [/^US30YT=RR$/i, /^USc1=$/i, /\bUnited States 30-Year\b/i, /\bEUA\b\s+a\s+30\s+anos\b/i, /^US30Y\b/i];
     if (k === 'SPREAD_HK10Y')
         return [
@@ -6960,8 +7084,33 @@ function assetAliasMatchers(key) {
     if (k === 'SOL') return [/^SOL\/USD$/i, /\bSOL\b/i, /\bSolana\b/i];
     if (k === 'DOGE') return [/^DOGE\/USD$/i, /\bDOGE\b/i, /\bDogecoin\b/i];
 
-    if (k === 'SPX') return [/^\.SPX$/i, /\bS&P 500\b/i, /^SPY$/i, /^ES\b/i, /^ES[HMUZ]\d{2}$/i];
-    if (k === 'NDX') return [/^\.NDX$/i, /\bNasdaq 100\b/i, /^QQQ$/i, /^NQ\b/i, /^NQ[HMUZ]\d{2}$/i];
+    if (k === 'SPX')
+        return [
+            /^SPX$/i,
+            /^\.SPX$/i,
+            /^\^GSPC$/i,
+            /\bSPX\b/i,
+            /\bS&P\s*500\b(?![\s\S]*\bVIX\b)(?![\s\S]*Volatil)/i,
+            /\bUS\s*500\b/i,
+            /^SPY(\b|$)/i,
+            /^IVV(\b|$)/i,
+            /^VOO(\b|$)/i,
+            /^ES\b/i,
+            /^ES[HMUZ]\d{2}$/i,
+            /\bS&P\s*500\b.*\bFuturos\b/i,
+        ];
+    if (k === 'NDX')
+        return [
+            /^NDX$/i,
+            /^\.NDX$/i,
+            /\bNASDAQ\s*100\b(?![\s\S]*Volatil)/i,
+            /\bNasdaq\s*100\b(?![\s\S]*Volatil)/i,
+            /\bNDX\b/i,
+            /^QQQ(\b|$)/i,
+            /\bQQQ\b/i,
+            /^NQ\b/i,
+            /^NQ[HMUZ]\d{2}$/i,
+        ];
     if (k === 'CHINA')
         return [
             /^FXI$/i,
@@ -6999,7 +7148,11 @@ function assetAliasMatchers(key) {
     if (k === 'WDO') return [/(^WDO\b|WDOc\d\b|\bmini\s*d[oó]lar\b)/i];
     if (k === 'WIN') return [/(^WIN\b|WINc\d\b|\bmini\s*(índice|indice)\b|\bmini\s*ibovespa\b)/i];
     if (k === 'IBOV') return [/(^\.BVSP$|\bIBOV\b|\bIbovespa\b)/i, /^BOVA11(\b|$)/i];
-    if (k === 'EWZ') return [/^EWZ$/i, /\bBrazil\b.*\bETF\b/i];
+    if (k === 'IBRX') return [/^\.IBRX$/i, /\bIBRX\b/i, /\bIBrX\b/i, /\bÍndice\s*Brasil\s*100\b/i, /\bIndice\s*Brasil\s*100\b/i];
+    if (k === 'BR20') return [/^\.BR20(T)?$/i, /\bBR\s*20\b/i, /\bBR-?20\b/i, /\bBrasil\s*20\b/i];
+    if (k === 'IFNC') return [/^IFNC(\.SA)?$/i, /\bÍndice\s*Financeiro\b/i, /\bIndice\s*Financeiro\b/i, /\bFinanceiro\b/i];
+    if (k === 'IMAT') return [/^IMAT(\.SA)?$/i, /\bÍndice\s*Materiais\b/i, /\bIndice\s*Materiais\b/i, /\bMateriais\s*(Básicos|Basicos)\b/i];
+    if (k === 'EWZ') return [/^EWZ$/i, /^EWZS(\.\w+)?$/i, /\bBrazil\b.*\bSmall\b.*\bCap\b.*\bETF\b/i, /\bBrazil\b.*\bETF\b/i];
     if (k === 'HYG') return [/^HYG(\.\w+)?$/i, /\bhigh\s*yield\b/i, /\biBoxx\b/i, /\balto\s*rendimento\b/i];
     if (k === 'TLT') return [/^TLT(\.\w+)?$/i, /\b20\+\s*Year\b.*\bTreasury\b/i, /\bTreasury\b.*\bBond\b/i];
     if (k === 'EEM') return [/^EEM$/i, /\bMSCI\b.*\bEmerging\b.*\bMarkets\b/i, /\bmercados\s*emergentes\b/i];
@@ -7022,6 +7175,10 @@ function aliasResolutionConfig(key) {
     if (k === 'WDO') return { expectedCategories: ['fx_emerging'], preferSymbols: [/^WDOc1$/i] };
     if (k === 'WIN') return { expectedCategories: ['equities'], preferSymbols: [/^WINc1$/i] };
     if (k === 'IBOV') return { expectedCategories: ['equities'], preferSymbols: [/^\.BVSP$/i] };
+    if (k === 'IBRX') return { expectedCategories: ['equities'], preferSymbols: [/^\.IBRX$/i] };
+    if (k === 'BR20') return { expectedCategories: ['equities'], preferSymbols: [/^\.BR20$/i, /^\.BR20T$/i] };
+    if (k === 'IFNC') return { expectedCategories: ['equities'], preferSymbols: [/^IFNC(\.SA)?$/i] };
+    if (k === 'IMAT') return { expectedCategories: ['equities'], preferSymbols: [/^IMAT(\.SA)?$/i] };
     if (k === 'VIX9D' || k === 'VIX30' || k === 'VIX' || k === 'VVIX' || k === 'VXN' || k === 'VXEEM' || k === 'VXEWZ' || k === 'VXBR')
         return { expectedCategories: ['volatility'], expectedTags: ['risk_off'] };
     if (k === 'VHSI') return { expectedCategories: ['volatility'], expectedTags: ['risk_off'], expectedExchanges: ['HK', 'HKEx', 'HKEX'] };
@@ -7030,8 +7187,20 @@ function aliasResolutionConfig(key) {
     if (k === 'HSI_FIN') return { expectedCategories: ['equities'], expectedTags: ['risk_on'], expectedExchanges: ['HK', 'HKEx', 'HKEX'] };
     if (k === 'CN50') return { expectedCategories: ['emerging', 'equities'], expectedTags: ['risk_on'] };
     if (k === 'MCHI') return { expectedCategories: ['emerging', 'equities'], expectedTags: ['risk_on'] };
-    if (k === 'SPX') return { expectedCategories: ['equities'], preferSymbols: [/^\.SPX$/i, /^\^GSPC$/i, /^SPY$/i] };
-    if (k === 'NDX') return { expectedCategories: ['equities'], preferSymbols: [/^\.NDX$/i, /^QQQ(\.\w+)?$/i] };
+    if (k === 'SPX')
+        return {
+            expectedCategories: ['equities'],
+            expectedTags: ['risk_on'],
+            preferSymbols: [/^ES[HMUZ]\d{2}$/i, /^ES[HMUZ]\d/i, /^\.SPX$/i, /^\^GSPC$/i, /^SPY(\b|$)/i, /^IVV(\b|$)/i, /^VOO(\b|$)/i],
+            avoidSymbols: [/^VIX(\b|$)/i, /^\.VIX/i, /^\.VIX9D$/i],
+        };
+    if (k === 'NDX')
+        return {
+            expectedCategories: ['equities'],
+            expectedTags: ['risk_on'],
+            preferSymbols: [/^NQ[HMUZ]\d{2}$/i, /^NQ[HMUZ]\d/i, /^\.NDX$/i, /^QQQ(\.\w+)?$/i],
+            avoidSymbols: [/^\.VXN$/i],
+        };
     if (k === 'EWZ') return { expectedCategories: ['equities'], expectedTags: ['risk_on'] };
     if (k === 'HYG') return { expectedCategories: ['credit'], expectedTags: ['risk_on'] };
     if (k === 'TLT') return { expectedCategories: ['rates'], expectedTags: ['risk_off'] };
@@ -7040,7 +7209,13 @@ function aliasResolutionConfig(key) {
     if (k === 'GOLD') return { expectedCategories: ['metals'], expectedTags: ['risk_off'] };
     if (k === 'COPPER' || k === 'IRON') return { expectedCategories: ['metals'], expectedTags: ['risk_on'] };
     if (k === 'BTC' || k === 'ETH' || k === 'SOL' || k === 'DOGE') return { expectedCategories: ['crypto'], expectedTags: ['risk_on'] };
-    if (k === 'US2Y' || k === 'US10Y' || k === 'US30Y') return { expectedCategories: ['rates'], expectedTags: ['risk_off'] };
+    if (k === 'US2Y' || k === 'US30Y') return { expectedCategories: ['rates'], expectedTags: ['risk_off'] };
+    if (k === 'US10Y')
+        return {
+            expectedCategories: ['rates'],
+            expectedTags: ['risk_off'],
+            preferSymbols: [/^US10YT=X$/i, /^US10YT=RR$/i, /^\.TNX$/i, /^\^TNX$/i, /^TNc\d=\$?$/i],
+        };
     if (k === 'CN10Y') return { expectedCategories: ['rates'], expectedTags: ['rates'] };
     if (k === 'SPREAD_HK10Y') return { expectedCategories: ['rates'], expectedTags: ['rates'] };
     if (k === 'HK1M' || k === 'HK3M') return { expectedCategories: ['rates'], expectedTags: ['rates'], expectedExchanges: ['HK', 'HKEx', 'HKEX'] };
