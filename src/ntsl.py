@@ -71,6 +71,8 @@ def generate_ntsl_script(metrics, calc):
 
     # Recuperando Strikes para Grid
     strikes = np.sort(calc.strikes_ref) * sf
+    window_low = float(spot - 10000.0)
+    window_high = float(spot + 10000.0)
     
     # Expected Moves (1 Dia / Intraday)
     moves = metrics.get('expected_moves', [])
@@ -233,6 +235,7 @@ def generate_ntsl_script(metrics, calc):
         "  MostrarPLUS(false);",
         "  MostrarPLUS2(false);",
         "  ExibirMelhoresPontos(true);",
+        "  MostrarTodosPontos(false);",
         "  ModeloFlip(7);",
         "  spot(0);",
 
@@ -250,11 +253,15 @@ def generate_ntsl_script(metrics, calc):
         "  // --- Linhas Principais (Com Intercalação de Texto) ---"
     ]
 
-    # Gera o código para as linhas principais processadas
     for line in main_lines:
         date_param = line.get('date_param', '0')
-        script.append(f"  if ({line['cond']}) then")
-        script.append(f"    HorizontalLineCustom({line['price']:.2f}, {line['color']}, {line['width']}, {line['style']}, \"{line['text']}\", TamanhoFonte, {line['align']}, {date_param}, 0);")
+        price = float(line['price'])
+        cond = line['cond']
+        script.append(f"  if ({cond} and MostrarTodosPontos) then")
+        script.append(f"    HorizontalLineCustom({price:.2f}, {line['color']}, {line['width']}, {line['style']}, \"{line['text']}\", TamanhoFonte, {line['align']}, {date_param}, 0);")
+        if window_low <= price <= window_high:
+            script.append(f"  if ({cond} and (not MostrarTodosPontos)) then")
+            script.append(f"    HorizontalLineCustom({price:.2f}, {line['color']}, {line['width']}, {line['style']}, \"{line['text']}\", TamanhoFonte, {line['align']}, {date_param}, 0);")
 
     # Adiciona Flips (Separado pois é dinâmico)
     script.append("")
@@ -273,41 +280,41 @@ def generate_ntsl_script(metrics, calc):
     script.append("  // Edi_Wall (Midpoints) - Grid Completo")
     script.append("  if (ExibirEdiWall) then begin")
     
-    # Loop pelos midwalls (pontos médios entre strikes)
     if len(strikes) > 1:
         midwalls = (strikes[:-1] + strikes[1:]) / 2.0
         for mw in midwalls:
-            script.append(f"    HorizontalLineCustom({mw:.2f}, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);")
+            price = float(mw)
+            script.append(f"    if (MostrarTodosPontos) then HorizontalLineCustom({price:.2f}, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);")
+            if window_low <= price <= window_high:
+                script.append(f"    if (not MostrarTodosPontos) then HorizontalLineCustom({price:.2f}, clEdiWall, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);")
     script.append("  end;")
 
     script.append("")
     script.append("  if (MostrarPLUS) then begin")
     if len(strikes) > 1:
-        window_low = spot - 10000.0
-        window_high = spot + 10000.0
         for i in range(len(strikes)-1):
             lower = strikes[i]
             upper = strikes[i+1]
             dist = upper - lower
             for p in [0.382, 0.618]:
-                lvl = lower + p * dist
+                lvl = float(lower + p * dist)
+                script.append(f"    if (MostrarTodosPontos) then HorizontalLineCustom({lvl:.2f}, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);")
                 if window_low <= lvl <= window_high:
-                    script.append(f"    HorizontalLineCustom({lvl:.2f}, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);")
+                    script.append(f"    if (not MostrarTodosPontos) then HorizontalLineCustom({lvl:.2f}, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);")
     script.append("  end;")
 
     script.append("")
     script.append("  if (MostrarPLUS2) then begin")
     if len(strikes) > 1:
-        window_low = spot - 10000.0
-        window_high = spot + 10000.0
         for i in range(len(strikes)-1):
             lower = strikes[i]
             upper = strikes[i+1]
             dist = upper - lower
             for p in [0.236, 0.764]:
-                lvl = lower + p * dist
+                lvl = float(lower + p * dist)
+                script.append(f"    if (MostrarTodosPontos) then HorizontalLineCustom({lvl:.2f}, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);")
                 if window_low <= lvl <= window_high:
-                    script.append(f"    HorizontalLineCustom({lvl:.2f}, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);")
+                    script.append(f"    if (not MostrarTodosPontos) then HorizontalLineCustom({lvl:.2f}, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);")
     script.append("  end;")
 
     if borboleta_levels:

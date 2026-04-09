@@ -38,8 +38,11 @@ def export_to_pdf(html_path, output_path):
         # Gera o PDF
         # format='A4' ou 'Letter'
         # print_background=True para manter cores de fundo (tema dark)
+        pdf_path = abs_output_path
+        if os.name == "nt":
+            pdf_path = abs_output_path.replace(os.sep, "/")
         page.pdf(
-            path=abs_output_path,
+            path=pdf_path,
             format='A4',
             print_background=True,
             landscape=True, # Dashboard costuma ser melhor em paisagem

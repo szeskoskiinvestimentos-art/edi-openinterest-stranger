@@ -1,5 +1,11 @@
 import plotly.graph_objects as go
+import json
+import os
 import numpy as np
+import pandas as pd
+from datetime import datetime
+from scipy.stats import norm
+from plotly.subplots import make_subplots
 from src import config as settings
 from src.utils_fmt import format_number_br, parse_and_scale_walls
 
@@ -98,67 +104,276 @@ def create_detailed_table(calc, metrics):
     
     fig = go.Figure(data=[go.Table(
         header=dict(values=['Item','Valor','Descrição'], fill_color='#2c3e50', align='left', font=dict(color='white', size=12)),
-        cells=dict(values=[items, values, descs], fill_color='black', align='left', font=dict(color='white', size=12), height=25),
-        columnwidth=[200, 300, 400]
+        cells=dict(values=[items, values, descs], fill_color='#1c1c1c', align='left', font=dict(color='lightgrey', size=11), height=25),
+        columnwidth=[200, 150, 400]
     )])
     
-    fig.update_layout(title='Edi - Tabela Detalhada (Figura 3)', template='plotly_dark', margin=dict(t=40, l=10, r=10, b=10), height=650)
+    fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=500, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
     return fig
 
 def create_model_comparison_table(calc):
     """
-    Cria tabela comparativa entre os modelos de Gamma Flip e Delta Flip.
+    Tabela comparativa de modelos (se implementado).
+    """
+    sf = getattr(settings, "DISPLAY_SCALE_FACTOR", 1.0)
+    try:
+        spot = float(getattr(calc, "spot", 0.0)) * float(sf)
+    except Exception:
+        spot = 0.0
+
+    flip_map = getattr(calc, "flip_variations", {}) or {}
+    flip_keys_order = ["Classic", "Spline", "HVL", "HVL Log", "Sigma Kernel", "PVOP", "HVL Gaussian"]
+
+    rows = []
+
+    def add_row(modelo, val):
+        try:
+            v = float(val) * float(sf)
+        except Exception:
+            return
+        if not np.isfinite(v):
+            return
+        rows.append(
+            {
+                "Modelo": str(modelo),
+                "Nível": format_number_br(v, 0),
+                "Dist. Spot": format_number_br(abs(v - spot), 0),
+            }
+        )
+
+    add_row("Gamma Flip (main)", getattr(calc, "gamma_flip", None))
+    add_row("Gamma Flip HVL", getattr(calc, "gamma_flip_hvl", None))
+    add_row("Zero Gamma (interp)", getattr(calc, "zero_gamma_level", None))
+
+    delta_profile = getattr(calc, "delta_flip_profile", {}) or {}
+    add_row("Delta Flip (perfil)", delta_profile.get("flip_value"))
+
+    for k in flip_keys_order:
+        add_row(f"Gamma Flip ({k})", flip_map.get(k))
+
+    if not rows:
+        rows = [{"Modelo": "-", "Nível": "Dados indisponíveis", "Dist. Spot": "-"}]
+
+    fig = go.Figure(
+        data=[
+            go.Table(
+                header=dict(
+                    values=["Modelo", "Nível", "Dist. Spot"],
+                    fill_color="#2c3e50",
+                    align="left",
+                    font=dict(color="white", size=12),
+                ),
+                cells=dict(
+                    values=[
+                        [r["Modelo"] for r in rows],
+                        [r["Nível"] for r in rows],
+                        [r["Dist. Spot"] for r in rows],
+                    ],
+                    fill_color="#1c1c1c",
+                    align="left",
+                    font=dict(color="lightgrey", size=11),
+                    height=28,
+                ),
+            )
+        ]
+    )
+    fig.update_layout(
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=420,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
+    return fig
+
+def create_fed_rates_table(options_df=None, spot=None, expiry=None):
+    project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    candidates = [
+        os.path.join(project_dir, "data_input", "fed_rates.json"),
+        os.path.join(
+            os.path.dirname(project_dir),
+            "Edi_OpenInterest - PY - Stranger - WDO",
+            "data_input",
+            "fed_rates.json",
+        ),
+    ]
+
+    data = {}
+    for p in candidates:
+        if not os.path.isfile(p):
+            continue
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f) or {}
+            break
+        except Exception:
+            data = {}
+
+    if isinstance(data, dict):
+        src = str(data.get("source") or "").strip().lower()
+        if src and ("simulated" in src or "mock" in src or "demo" in src):
+            data = {}
+
+    meetings = data.get("meetings") if isinstance(data, dict) else None
+    meetings = meetings if isinstance(meetings, list) else []
+
+    rows = []
+    for m in meetings:
+        if not isinstance(m, dict):
+            continue
+        probs = m.get("probs") if isinstance(m.get("probs"), dict) else {}
+        probs_txt = (
+            " | ".join([f"{k}: {format_number_br(v, 1)}%" for k, v in probs.items()])
+            if probs
+            else "-"
+        )
+        rows.append(
+            [
+                str(m.get("date") or "-"),
+                str(m.get("days_remaining") if m.get("days_remaining") is not None else "-"),
+                str(m.get("current_rate") or "-"),
+                probs_txt,
+            ]
+        )
+
+    if not rows:
+        rows = [["-", "-", "-", "Dados indisponíveis"]]
+
+    fig = go.Figure(
+        data=[
+            go.Table(
+                header=dict(
+                    values=["Reunião", "Dias", "Faixa Atual", "Probabilidades"],
+                    fill_color="#2c3e50",
+                    align="center",
+                    font=dict(color="white", size=12),
+                ),
+                cells=dict(
+                    values=list(zip(*rows)),
+                    fill_color="#1c1c1c",
+                    align="center",
+                    font=dict(color="lightgrey", size=11),
+                    height=30,
+                ),
+            )
+        ]
+    )
+    fig.update_layout(
+        margin=dict(l=0, r=0, t=40, b=0),
+        height=300,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        title=dict(text="FedWatch (Juros EUA)", x=0.5, font=dict(color="white")),
+    )
+    return fig
+
+def create_fedwatch_table(options_df, spot, expiry):
+    """
+    Cria tabela estilo FedWatch com probabilidades baseadas na volatilidade implícita.
     """
     sf = getattr(settings, 'DISPLAY_SCALE_FACTOR', 1.0)
-    flips = calc.flip_variations
-    spot = calc.spot * sf
     
-    models = []
-    values = []
-    dists = []
-    
-    # Ordem de preferência
-    keys = ['Classic', 'Spline', 'HVL', 'HVL Log', 'Sigma Kernel', 'PVOP']
-    
-    # Descrições dos modelos
-    descriptions_map = {
-        'Classic': 'Interpolação linear simples entre strikes positivos/negativos',
-        'Spline': 'Suavização por spline univariada (mais estável)',
-        'HVL': 'Ponderado por volatilidade histórica local (High Vol)',
-        'HVL Log': 'Variação logarítmica do modelo HVL',
-        'Sigma Kernel': 'Kernel gaussiano baseado no desvio padrão (sigma)',
-        'PVOP': 'Ponderado pelo valor presente de um ponto (PVOP)',
-        'Delta Flip': 'Ponto onde o Delta Agregado cruza zero (neutralidade)'
-    }
-
-    descs = []
-    
-    for name in keys:
-        if name in flips:
-            val_raw = flips[name]
-            if val_raw:
-                val = val_raw * sf
-                models.append(name)
-                values.append(format_number_br(val, 0))
-                dists.append(format_number_br(val - spot, 0, prefix="+" if val >= spot else ""))
-                descs.append(descriptions_map.get(name, ''))
+    rows = []
+    if 'Expiry' in options_df.columns:
+        exp_groups = options_df.groupby('Expiry')
+        for exp_date, group in exp_groups:
+            if pd.isnull(exp_date): continue
             
-    # Adicionar Delta Flip
-    df_profile = calc.delta_flip_profile
-    if df_profile and df_profile.get('flip_value'):
-        d_val_raw = df_profile['flip_value']
-        d_val = d_val_raw * sf
-        models.append('Delta Flip')
-        values.append(format_number_br(d_val, 0))
-        dists.append(format_number_br(d_val - spot, 0, prefix="+" if d_val >= spot else ""))
-        descs.append(descriptions_map.get('Delta Flip', ''))
-
-        
+            T_exp = (pd.to_datetime(exp_date) - pd.to_datetime(datetime.now())).days / 365.0
+            if T_exp < 0: T_exp = 0.001
+            
+            group = group.copy()
+            group['dist'] = abs(group['StrikeK'] - spot)
+            
+            atm_iv = settings.IV_ANNUAL
+            if 'IV' in group.columns and not group.empty:
+                try:
+                    atm_iv_val = group.sort_values('dist')['IV'].iloc[0]
+                    if atm_iv_val > 5.0: atm_iv_val /= 100.0
+                    atm_iv = atm_iv_val
+                except: pass
+            
+            sigma = atm_iv * np.sqrt(T_exp)
+            current_spot_scaled = spot * sf
+            
+            probs = []
+            for sd in [1, 2, 3]:
+                upper = current_spot_scaled * np.exp(sd * sigma)
+                lower = current_spot_scaled * np.exp(-sd * sigma)
+                probs.append(f"{format_number_br(lower, 0)} - {format_number_br(upper, 0)}")
+            
+            rows.append([
+                str(exp_date.date()),
+                int(T_exp * 365),
+                f"{format_number_br(atm_iv*100, 2)}%",
+                probs[0],
+                probs[1],
+                probs[2]
+            ])
+            
     fig = go.Figure(data=[go.Table(
-        header=dict(values=['Modelo', 'Valor (Flip)', 'Distância do Spot', 'Descrição'], fill_color='#8e44ad', align='left', font=dict(color='white', size=12)),
-        cells=dict(values=[models, values, dists, descs], fill_color='black', align='left', font=dict(color='white', size=12), height=30),
-        columnwidth=[150, 100, 120, 400]
+        header=dict(values=['Vencimento', 'Dias', 'IV ATM', '68% (1σ)', '95% (2σ)', '99% (3σ)'],
+                    fill_color='#2c3e50', align='center', font=dict(color='white', size=12)),
+        cells=dict(values=list(zip(*rows)) if rows else [],
+                   fill_color='#1c1c1c', align='center', font=dict(color='lightgrey', size=11),
+                   height=30)
     )])
+    fig.update_layout(margin=dict(l=0, r=0, t=40, b=0), height=300, 
+                      paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                      title=dict(text='FedWatch Tool (Probabilidades Implícitas)', x=0.5, font=dict(color='white')))
+    return fig
+
+def create_most_actives_table(options_df):
+    """
+    Cria tabela de Most Actives (Top OI e Top Volume).
+    """
+    sf = getattr(settings, 'DISPLAY_SCALE_FACTOR', 1.0)
+
+    def fmt_iv(iv_val):
+        if iv_val is None:
+            return '-'
+        if bool(pd.isna(iv_val)):
+            return '-'
+        try:
+            return f"{format_number_br(float(iv_val), 1)}%"
+        except Exception:
+            return '-'
     
-    fig.update_layout(title='Edi - Comparativo de Modelos Flip & Delta', template='plotly_dark', margin=dict(t=40, l=10, r=10, b=10), height=400)
+    top_oi = options_df.sort_values('Open Int', ascending=False).head(10)
+    
+    if 'Volume' in options_df.columns:
+        top_vol = options_df.sort_values('Volume', ascending=False).head(10)
+    else:
+        top_vol = pd.DataFrame()
+        
+    fig = make_subplots(
+        rows=1, cols=2,
+        specs=[[{"type": "table"}, {"type": "table"}]],
+        subplot_titles=("🔥 Top Open Interest", "🌊 Top Volume")
+    )
+    
+    fig.add_trace(go.Table(
+        header=dict(values=['Strike', 'Tipo', 'OI', 'IV'], fill_color='#2c3e50', font=dict(color='white')),
+        cells=dict(values=[
+            [format_number_br(r['StrikeK'] * sf, 2) for _, r in top_oi.iterrows()],
+            [r['OptionType'] for _, r in top_oi.iterrows()],
+            [format_number_br(r['Open Int'], 0) for _, r in top_oi.iterrows()],
+            [fmt_iv(r.get('IV')) for _, r in top_oi.iterrows()]
+        ], fill_color='#1c1c1c', font=dict(color='lightgrey'))
+    ), row=1, col=1)
+    
+    if not top_vol.empty:
+        fig.add_trace(go.Table(
+            header=dict(values=['Strike', 'Tipo', 'Vol', 'IV'], fill_color='#2c3e50', font=dict(color='white')),
+            cells=dict(values=[
+                [format_number_br(r['StrikeK'] * sf, 2) for _, r in top_vol.iterrows()],
+                [r['OptionType'] for _, r in top_vol.iterrows()],
+                [format_number_br(r['Volume'], 0) for _, r in top_vol.iterrows()],
+                [fmt_iv(r.get('IV')) for _, r in top_vol.iterrows()]
+            ], fill_color='#1c1c1c', font=dict(color='lightgrey'))
+        ), row=1, col=2)
+        
+    fig.update_layout(margin=dict(l=0, r=0, t=50, b=0), height=400,
+                      paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                      title=dict(text='Most Actives', x=0.5, font=dict(color='white')))
+                      
     return fig

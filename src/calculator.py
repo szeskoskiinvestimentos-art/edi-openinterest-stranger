@@ -7,6 +7,7 @@ from src import config as settings
 import datetime as dt
 import logging
 from src.greeks import GreeksEngine
+from typing import Any, Optional, TypedDict, cast
 
 # Configure logger
 logging.basicConfig(
@@ -14,6 +15,30 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+class SummaryMetrics(TypedDict):
+    spot: float
+    delta_agregado: float
+    gamma_flip: Optional[float]
+    gamma_flip_hvl: Optional[float]
+    zero_gamma_level: Optional[float]
+    max_pain: Optional[float]
+    call_wall: float
+    put_wall: float
+    effective_call_wall: float
+    effective_put_wall: float
+    regime: str
+    dealer_pressure: float
+    dpi_arr: Any
+    range_low: float
+    range_high: float
+    walls_call_txt: str
+    walls_put_txt: str
+    iv_daily: float
+    dataref: Any
+    vol_analysis: Any
+    pinning_risk: Any
+    expected_moves: Any
 
 class OptionsCalculator:
     def __init__(self, options_df, spot, expiry_date, risk_free=settings.RISK_FREE, iv_annual=settings.IV_ANNUAL):
@@ -42,8 +67,8 @@ class OptionsCalculator:
         # Cálculo do Tempo (T) - Referência
         # Se for vencimento hoje (0DTE), usa fração do dia (0.1 dia = ~2h de risco final) para capturar Gamma explosivo
         bdays = int(np.busday_count(self.dataref, self.expiry_date)) if self.expiry_date else 1
-        is_0dte_friday = bool(self.expiry_date) and (self.dataref == self.expiry_date) and (self.expiry_date.weekday() == 4)
-        if is_0dte_friday:
+        is_0dte = bool(self.expiry_date) and (self.dataref == self.expiry_date)
+        if getattr(settings, 'USE_ODTE_MODE', False) and is_0dte:
             self.T = settings.MIN_T_EXPIRY
         else:
             self.T = (1.0/252.0) if bdays <= 0 else (bdays/252.0)
@@ -54,6 +79,18 @@ class OptionsCalculator:
         
         self.oi_call_ref = np.array([self.oi_call.get(k, 0.0) for k in self.strikes_ref], dtype=float)
         self.oi_put_ref  = np.array([self.oi_put.get(k, 0.0)  for k in self.strikes_ref], dtype=float)
+
+        # Volume Agregado por Strike (Se disponível)
+        if 'Volume' in self.options_df.columns:
+            self.vol_call = self.options_df.loc[self.options_df['OptionType']=='CALL'].groupby('StrikeK')['Volume'].sum()
+            self.vol_put  = self.options_df.loc[self.options_df['OptionType']=='PUT'].groupby('StrikeK')['Volume'].sum()
+        else:
+            self.vol_call = pd.Series(dtype=float)
+            self.vol_put = pd.Series(dtype=float)
+            
+        self.vol_call_ref = np.array([self.vol_call.get(k, 0.0) for k in self.strikes_ref], dtype=float)
+        self.vol_put_ref  = np.array([self.vol_put.get(k, 0.0)  for k in self.strikes_ref], dtype=float)
+
         
         # IV por Strike
         # Tenta usar a coluna 'IV' ou 'Implied Volatility' se existir no dataframe
@@ -64,18 +101,111 @@ class OptionsCalculator:
                 iv_col = col
                 break
         
+        fallback_iv = float(self.iv_annual) if np.isfinite(self.iv_annual) and self.iv_annual > 0 else float(getattr(settings, 'HVL_ANNUAL', 0.12))
+
         if iv_col:
             # Agrupa por Strike e pega a média da IV (caso haja múltiplos vencimentos, idealmente filtraria)
             # Aqui pegamos a média geral por strike para a referência
-            iv_series = self.options_df.groupby('StrikeK')[iv_col].mean()
-            # Reindexa para garantir alinhamento com self.strikes_ref e preenche falhas
-            self.iv_strike_ref = iv_series.reindex(self.strikes_ref).interpolate(method='linear').fillna(self.iv_annual).values
-            # Se os valores estiverem em porcentagem (ex: 15.5), converte para decimal (0.155)
-            if np.nanmean(self.iv_strike_ref) > 5.0: # Heurística: se média > 5, provável que seja %
-                self.iv_strike_ref /= 100.0
+            iv_raw_series = self.options_df[iv_col].copy()
+            if not np.issubdtype(iv_raw_series.dtype, np.number):
+                iv_raw_series = iv_raw_series.astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
+            iv_num = pd.Series(pd.to_numeric(iv_raw_series, errors='coerce'))
+            iv_num = iv_num.astype(float)
+            iv_num.loc[iv_num <= 0] = np.nan
+
+            if int(iv_num.notna().sum()) == 0 and ("Last" in self.options_df.columns):
+                df_iv = self.options_df[["StrikeK", "OptionType", "Expiry", "Last"]].copy()
+                last_numeric = pd.to_numeric(df_iv["Last"], errors="coerce")
+                df_iv["Last"] = pd.Series(last_numeric, index=df_iv.index, dtype="float64")
+                df_iv.loc[df_iv["Last"] <= 0, "Last"] = np.nan
+
+                expiry_min = None
+                try:
+                    expiry_min = pd.to_datetime(df_iv["Expiry"], errors="coerce").dropna().min()
+                except Exception:
+                    expiry_min = None
+                if expiry_min is not None and pd.notnull(expiry_min):
+                    df_iv = df_iv[pd.to_datetime(df_iv["Expiry"], errors="coerce") == expiry_min]
+
+                dataref_dt = pd.to_datetime(self.dataref)
+
+                def _implied_vol_bisect(price, S, K, T, r, typ):
+                    if not (np.isfinite(price) and np.isfinite(S) and np.isfinite(K) and np.isfinite(T) and np.isfinite(r)):
+                        return None
+                    if price <= 0 or S <= 0 or K <= 0 or T <= 0:
+                        return None
+                    intrinsic = max(0.0, S - K) if typ == "C" else max(0.0, K - S)
+                    if price < intrinsic:
+                        return None
+
+                    lo = 1e-6
+                    hi = 5.0
+                    p_hi = float(GreeksEngine.bs_price(S, K, T, r, hi, typ))
+                    if not np.isfinite(p_hi) or p_hi < price:
+                        return None
+
+                    for _ in range(60):
+                        mid = 0.5 * (lo + hi)
+                        p_mid = float(GreeksEngine.bs_price(S, K, T, r, mid, typ))
+                        if not np.isfinite(p_mid):
+                            hi = mid
+                            continue
+                        if p_mid > price:
+                            hi = mid
+                        else:
+                            lo = mid
+                    return 0.5 * (lo + hi)
+
+                rows = []
+                for _, row in df_iv.iterrows():
+                    k = row.get("StrikeK")
+                    last = row.get("Last")
+                    if not (np.isfinite(k) and np.isfinite(last)):
+                        continue
+                    opt = str(row.get("OptionType") or "").strip().upper()
+                    if opt not in ("CALL", "PUT", "C", "P"):
+                        continue
+                    typ = "C" if opt in ("CALL", "C") else "P"
+                    is_otm = (typ == "C" and float(k) >= self.spot) or (typ == "P" and float(k) <= self.spot)
+                    if not is_otm:
+                        continue
+
+                    expiry_dt = pd.to_datetime(row.get("Expiry"), errors="coerce")
+                    if pd.isnull(expiry_dt):
+                        T_row = float(self.T)
+                    else:
+                        bdays = int(np.busday_count(dataref_dt.date(), expiry_dt.date()))
+                        T_row = float(max(bdays, 1) / 252.0)
+
+                    iv = _implied_vol_bisect(float(last), float(self.spot), float(k), max(T_row, float(settings.EPSILON)), float(self.risk_free), typ)
+                    if iv is None or not np.isfinite(iv) or iv <= 0:
+                        continue
+                    rows.append((float(k), float(iv)))
+
+                if rows:
+                    tmp = pd.DataFrame(rows, columns=pd.Index(["StrikeK", "_iv_calc"]))
+                    iv_series = tmp.groupby("StrikeK")["_iv_calc"].median()
+                    iv_ref = iv_series.reindex(self.strikes_ref)
+                    iv_ref = iv_ref.interpolate(method="linear", limit_direction="both").fillna(fallback_iv)
+                    self.iv_strike_ref = np.clip(iv_ref.to_numpy(dtype=float), 1e-6, 5.0)
+                else:
+                    self.iv_strike_ref = np.full_like(self.strikes_ref, fallback_iv, dtype=float)
+            else:
+                tmp_iv = pd.DataFrame({'StrikeK': self.options_df['StrikeK'].values, '_iv': iv_num.values})
+                iv_series = tmp_iv.groupby('StrikeK')['_iv'].mean()
+                iv_ref = iv_series.reindex(self.strikes_ref)
+                iv_ref_values = iv_ref.to_numpy(dtype=float)
+                finite = np.isfinite(iv_ref_values)
+                median_val = float(np.nanmedian(iv_ref_values[finite])) if finite.any() else float('nan')
+                if np.isfinite(median_val) and median_val > 5.0:
+                    iv_ref_values = iv_ref_values / 100.0
+                    iv_ref = pd.Series(iv_ref_values, index=iv_ref.index)
+
+                iv_ref = iv_ref.interpolate(method='linear', limit_direction='both').fillna(fallback_iv)
+                self.iv_strike_ref = np.clip(iv_ref.to_numpy(dtype=float), 1e-6, 5.0)
         else:
             # Fallback para valor constante
-            self.iv_strike_ref = np.full_like(self.strikes_ref, self.iv_annual, dtype=float)
+            self.iv_strike_ref = np.full_like(self.strikes_ref, fallback_iv, dtype=float)
         
         # Inicialização de atributos calculados posteriormente
         self.gamma_flip = None
@@ -138,8 +268,8 @@ class OptionsCalculator:
                 # Usa dataref (data base do cálculo)
                 dataref_dt = pd.to_datetime(self.dataref)
                 bdays = int(np.busday_count(dataref_dt.date(), expiry_dt.date()))
-                is_0dte_friday = (dataref_dt.date() == expiry_dt.date()) and (expiry_dt.weekday() == 4)
-                T_exp = settings.MIN_T_EXPIRY if is_0dte_friday else ((1.0/252.0) if bdays <= 0 else (bdays/252.0))
+                is_0dte = (dataref_dt.date() == expiry_dt.date())
+                T_exp = settings.MIN_T_EXPIRY if (getattr(settings, 'USE_ODTE_MODE', False) and is_0dte) else ((1.0/252.0) if bdays <= 0 else (bdays/252.0))
                 
                 # Filtra e processa dados deste vencimento
                 df_exp = self.options_df[self.options_df['Expiry'] == expiry]
@@ -232,7 +362,8 @@ class OptionsCalculator:
         # Standard: Dealer Long Gamma from Short Calls/Puts? 
         # Usually GEX = Gamma * OI * 100 * Spot * 0.01 (change for 1% move)
         # Here keeping original scaling: Gamma * OI * ContractMult * Spot * 0.01
-        factor = settings.CONTRACT_MULT * S * 0.01
+        scale_S = settings.DISPLAY_SCALE_FACTOR if getattr(settings, 'EXPOSURE_INDEX_SCALE_ENABLED', True) else 1.0
+        factor = settings.CONTRACT_MULT * (S * scale_S) * 0.01
         
         gex_call = gC * oi_call * factor
         gex_put  = gP * oi_put * factor
@@ -313,19 +444,19 @@ class OptionsCalculator:
         self.gamma_flip_hvl = self._calculate_hvl_flip()
             
         # Zero Gamma Level (Interpolado)
-        self.zero_gamma_level = self.gamma_flip # Fallback
+        self.zero_gamma_level = self.gamma_flip
         try:
             idx_cross = np.where(np.diff(np.sign(self.gex_cum_signed)))[0]
             if len(idx_cross) > 0:
-                i = idx_cross[0]
-                y1, y2 = self.gex_cum_signed[i], self.gex_cum_signed[i+1]
-                x1, x2 = self.strikes_ref[i], self.strikes_ref[i+1]
+                i = int(idx_cross[int(np.argmin(np.abs(self.strikes_ref[idx_cross] - float(self.spot))))])
+                y1, y2 = float(self.gex_cum_signed[i]), float(self.gex_cum_signed[i + 1])
+                x1, x2 = float(self.strikes_ref[i]), float(self.strikes_ref[i + 1])
                 if y2 != y1:
-                    self.zero_gamma_level = x1 - y1 * (x2 - x1) / (y2 - y1)
+                    self.zero_gamma_level = float(x1 - y1 * (x2 - x1) / (y2 - y1))
                 else:
-                    self.zero_gamma_level = x1
-        except:
-            pass
+                    self.zero_gamma_level = float(x1)
+        except Exception:
+            self.zero_gamma_level = self.gamma_flip
             
         # Max Pain
         self.max_pain = self.calculate_max_pain()
@@ -413,31 +544,36 @@ class OptionsCalculator:
     def calculate_effective_walls(self):
         """Calcula Effective Walls (Média Ponderada dos Top Strikes)."""
         try:
-            # Effective Put Wall: Weighted Avg of Top 2 OI Puts
-            # Note: We use OI for stability, as GEX fluctuates more.
-            # But the user mentioned "Put Wall" context which is usually OI or GEX. 
-            # Standard Put Wall is OI based usually, but here we used GEX for 'put_wall' attribute above.
-            # Let's align with the "discovery" logic which used OI for the weighted average that matched the target.
-            
-            # Get Top 2 OI Puts
-            top_puts_idx = np.argsort(self.oi_put_ref)[-2:] # Top 2
-            top_puts_oi = self.oi_put_ref[top_puts_idx]
-            top_puts_k = self.strikes_ref[top_puts_idx]
-            
-            if np.sum(top_puts_oi) > 0:
-                self.effective_put_wall = np.average(top_puts_k, weights=top_puts_oi)
-            else:
-                self.effective_put_wall = self.put_wall
-                
-            # Effective Call Wall: Weighted Avg of Top 2 OI Calls
-            top_calls_idx = np.argsort(self.oi_call_ref)[-2:] # Top 2
-            top_calls_oi = self.oi_call_ref[top_calls_idx]
-            top_calls_k = self.strikes_ref[top_calls_idx]
-            
-            if np.sum(top_calls_oi) > 0:
-                self.effective_call_wall = np.average(top_calls_k, weights=top_calls_oi)
-            else:
-                self.effective_call_wall = self.call_wall
+            strikes = np.asarray(self.strikes_ref, dtype=float)
+            oi_put = np.asarray(self.oi_put_ref, dtype=float)
+            oi_call = np.asarray(self.oi_call_ref, dtype=float)
+            spot = float(self.spot)
+            lower_bound = spot * 0.70
+            upper_bound = spot * 1.30
+            window_mask = (strikes >= lower_bound) & (strikes <= upper_bound)
+
+            def pick_effective_wall(oi_arr, mask):
+                idx = np.where(mask & np.isfinite(oi_arr) & (oi_arr > 0.0))[0]
+                if idx.size == 0:
+                    return None
+                if idx.size == 1:
+                    return float(strikes[int(idx[0])])
+                top2 = idx[np.argsort(oi_arr[idx])[-2:]]
+                w = oi_arr[top2]
+                ws = float(np.sum(w))
+                if not np.isfinite(ws) or ws <= 0.0:
+                    return None
+                return float(np.average(strikes[top2], weights=w))
+
+            put_eff = pick_effective_wall(oi_put, window_mask & (strikes <= spot))
+            if put_eff is None:
+                put_eff = pick_effective_wall(oi_put, strikes <= spot)
+            self.effective_put_wall = put_eff if put_eff is not None else self.put_wall
+
+            call_eff = pick_effective_wall(oi_call, window_mask & (strikes >= spot))
+            if call_eff is None:
+                call_eff = pick_effective_wall(oi_call, strikes >= spot)
+            self.effective_call_wall = call_eff if call_eff is not None else self.call_wall
                 
         except Exception as e:
             # logger.warning(f"Error calculating effective walls: {e}")
@@ -453,9 +589,6 @@ class OptionsCalculator:
         sg = np.sign(y_arr)
         idx = np.where(np.diff(sg) != 0)[0]
         
-        # DEBUG
-        print(f"DEBUG: Spot={target_x}, Crossings={len(idx)}")
-        
         # 1. Tenta encontrar um cruzamento real de zero (Zero Gamma)
         if len(idx) > 0:
             if target_x is not None:
@@ -467,9 +600,6 @@ class OptionsCalculator:
                 # Validação de Distância: Se o cruzamento estiver muito longe (>40%), ignora
                 # O usuário reclamou de valores irrelevantes (ex: 7).
                 closest_x = x_arr[i] # Aproximação
-                
-                # DEBUG
-                print(f"DEBUG: Closest Crossing={closest_x}, Dist={abs(closest_x - target_x)}, Limit={target_x * 0.40}")
 
                 if abs(closest_x - target_x) > (target_x * 0.40):
                     pass # Cai para o fallback local
@@ -492,16 +622,12 @@ class OptionsCalculator:
             lower_bound = target_x * 0.70
             upper_bound = target_x * 1.30
             mask = (x_arr >= lower_bound) & (x_arr <= upper_bound)
-            
-            # DEBUG
-            print(f"DEBUG: Fallback Range [{lower_bound}, {upper_bound}], Strikes in range: {np.sum(mask)}")
 
             if np.any(mask):
                 local_x = x_arr[mask]
                 local_y = y_arr[mask]
                 # Retorna o strike com menor gamma absoluto na região (o "mais próximo de zero" localmente)
                 best_local = float(local_x[np.argmin(np.abs(local_y))])
-                print(f"DEBUG: Best Local={best_local}")
                 return best_local
 
         # 3. Último caso: Retorna o mínimo global (pode ser o 7 indesejado, mas é o matemático)
@@ -636,17 +762,51 @@ class OptionsCalculator:
 
     def calculate_gamma_flip_cone(self):
         """Calcula Gamma Flip variando o Sigma Factor (Cone de Incerteza)."""
+        if not getattr(settings, 'USE_HVL_FLIP', True):
+            self.gamma_flip_cone = {'alphas': [], 'flips': []}
+            return
+
         alphas = np.linspace(settings.CONE_ALPHA_MIN, settings.CONE_ALPHA_MAX, settings.CONE_ALPHA_STEPS)
-        flips = []
+        flips: list[float | None] = []
         
         # Salva estado original
         original_sigma_factor = float(settings.SIGMA_FACTOR)
         
         try:
+            strikes = np.array(self.strikes_ref, dtype=float)
+            if strikes.size == 0:
+                self.gamma_flip_cone = {'alphas': list(alphas), 'flips': []}
+                return
+
+            spot = float(self.spot)
+            hvl_daily = float(settings.HVL_ANNUAL) / np.sqrt(252)
+            step = float(np.median(np.diff(strikes))) if strikes.size > 1 else 25.0
+
             for alpha in alphas:
                 settings.SIGMA_FACTOR = alpha
-                flip = self._calculate_hvl_flip()
-                flips.append(flip if flip else 0.0)
+                sigma_factor = float(settings.SIGMA_FACTOR)
+                sigma_pts = float(sigma_factor) * max(step * 2.0, spot * hvl_daily)
+                w = np.exp(-((strikes - spot) ** 2) / (2.0 * (sigma_pts ** 2)))
+                gex_cum = np.cumsum(self.gex_flip_base * w)
+                sg = np.sign(gex_cum)
+                idx = np.where(np.diff(sg) != 0)[0]
+                if len(idx) == 0:
+                    flips.append(None)
+                    continue
+
+                distances = np.abs(strikes[idx] - spot)
+                i = int(idx[int(np.argmin(distances))])
+                closest_x = float(strikes[i])
+                if abs(closest_x - spot) > (spot * 0.40):
+                    flips.append(None)
+                    continue
+
+                y1, y2 = float(gex_cum[i]), float(gex_cum[i + 1])
+                x1, x2 = float(strikes[i]), float(strikes[i + 1])
+                if y2 == y1:
+                    flips.append(x1)
+                    continue
+                flips.append(float(x1 - y1 * (x2 - x1) / (y2 - y1)))
         finally:
             settings.SIGMA_FACTOR = original_sigma_factor
             
@@ -657,67 +817,121 @@ class OptionsCalculator:
         
     def calculate_flow_sentiment(self):
         """Analisa variação de preço e volume para determinar fluxo Bull/Bear."""
-        bull_vols = []
-        bear_vols = []
+        def _to_float(v):
+            if v is None or (isinstance(v, float) and np.isnan(v)):
+                return None
+            try:
+                if isinstance(v, str):
+                    v = v.strip().replace('%', '').replace('.', '').replace(',', '.')
+                x = float(v)
+                return x if np.isfinite(x) else None
+            except Exception:
+                return None
+
+        bull_vols: list[float] = []
+        bear_vols: list[float] = []
         strikes = self.strikes_ref
-        
-        # Ensure StrikeK is float in df
+
         df = self.options_df.copy()
         df['StrikeK'] = pd.to_numeric(df['StrikeK'], errors='coerce')
-        
+
+        change_candidates = ['Change', 'Chg', 'Net Chg', 'NetChg', 'Change %', '% Change', 'Pct Change']
+        bid_candidates = ['Bid', 'bid']
+        ask_candidates = ['Ask', 'ask']
+        last_candidates = ['Last', 'last', 'Price', 'Close']
+        vol_candidates = ['Volume', 'Vol', 'VOL']
+
+        chg_col = next((c for c in change_candidates if c in df.columns), None)
+        bid_col = next((c for c in bid_candidates if c in df.columns), None)
+        ask_col = next((c for c in ask_candidates if c in df.columns), None)
+        last_col = next((c for c in last_candidates if c in df.columns), None)
+        vol_col = next((c for c in vol_candidates if c in df.columns), None)
+
         for k in strikes:
-            # Filter options for this strike
-            # Using simple equality with tolerance
             df_k = df[np.isclose(df['StrikeK'], k, atol=1e-5)]
-            
+
             v_bull = 0.0
             v_bear = 0.0
-            
+
             for _, row in df_k.iterrows():
-                tipo = str(row['OptionType']).strip().upper()
-                # Handle possible column names for Change/Volume
-                chg = float(row.get('Change', 0.0)) if pd.notnull(row.get('Change', 0.0)) else 0.0
-                vol = float(row.get('Volume', 0.0)) if pd.notnull(row.get('Volume', 0.0)) else 0.0
-                
-                # Normalize types
-                if tipo in ['C', 'CALL', 'COMPRA']: tipo = 'CALL'
-                if tipo in ['P', 'PUT', 'VENDA']: tipo = 'PUT'
-                
-                if vol > 0:
-                    if tipo == 'CALL':
-                        if chg > 0: v_bull += vol
-                        elif chg < 0: v_bear += vol
-                    elif tipo == 'PUT':
-                        if chg > 0: v_bear += vol
-                        elif chg < 0: v_bull += vol
-            
+                tipo = str(row.get('OptionType', '')).strip().upper()
+                if tipo in ['C', 'CALL', 'COMPRA']:
+                    tipo = 'CALL'
+                elif tipo in ['P', 'PUT', 'VENDA']:
+                    tipo = 'PUT'
+                else:
+                    continue
+
+                vol = _to_float(row.get(vol_col)) if vol_col else None
+                if not vol or vol <= 0:
+                    continue
+
+                bucket = None
+                if chg_col:
+                    chg = _to_float(row.get(chg_col))
+                    if chg is not None and chg != 0:
+                        if tipo == 'CALL':
+                            bucket = 'BULL' if chg > 0 else 'BEAR'
+                        else:
+                            bucket = 'BEAR' if chg > 0 else 'BULL'
+
+                if bucket is None and bid_col and ask_col and last_col:
+                    bid = _to_float(row.get(bid_col))
+                    ask = _to_float(row.get(ask_col))
+                    last = _to_float(row.get(last_col))
+                    if bid is not None and ask is not None and last is not None and bid > 0 and ask > 0 and last > 0:
+                        mid = (bid + ask) / 2.0
+                        if tipo == 'CALL':
+                            bucket = 'BULL' if last >= mid else 'BEAR'
+                        else:
+                            bucket = 'BEAR' if last >= mid else 'BULL'
+
+                if bucket is None:
+                    bucket = 'BULL' if tipo == 'CALL' else 'BEAR'
+
+                if bucket == 'BULL':
+                    v_bull += vol
+                else:
+                    v_bear += vol
+
             bull_vols.append(v_bull)
-            bear_vols.append(-v_bear) # Negative for plotting
-            
+            bear_vols.append(-v_bear)
+
         self.flow_sentiment = {
-            'bull': np.array(bull_vols),
-            'bear': np.array(bear_vols)
+            'bull': np.array(bull_vols, dtype=float),
+            'bear': np.array(bear_vols, dtype=float)
         }
 
 
     def calculate_max_pain(self):
+        strikes = np.asarray(self.strikes_ref, dtype=float)
+        oi_call = np.asarray(self.oi_call_ref, dtype=float)
+        oi_put = np.asarray(self.oi_put_ref, dtype=float)
+        spot = float(self.spot)
+        lower_bound = spot * 0.70
+        upper_bound = spot * 1.30
+        mask = (strikes >= lower_bound) & (strikes <= upper_bound)
+        if np.any(mask):
+            strikes_f = strikes[mask]
+            oi_call_f = oi_call[mask]
+            oi_put_f = oi_put[mask]
+        else:
+            strikes_f = strikes
+            oi_call_f = oi_call
+            oi_put_f = oi_put
+
         loss = []
-        for k_exp in self.strikes_ref:
-            # Assume settlement at k_exp
-            # Call holders gain max(0, k_exp - K)
-            # Put holders gain max(0, K - k_exp)
-            # This is the payout FROM sellers TO buyers.
-            # Max Pain is where this payout is MINIMIZED (Sellers keep most premium).
-            val_calls = np.maximum(0, k_exp - self.strikes_ref) * self.oi_call_ref
-            val_puts = np.maximum(0, self.strikes_ref - k_exp) * self.oi_put_ref
+        for k_exp in strikes_f:
+            val_calls = np.maximum(0, k_exp - strikes_f) * oi_call_f
+            val_puts = np.maximum(0, strikes_f - k_exp) * oi_put_f
             loss.append(np.sum(val_calls + val_puts))
-            
-        loss = np.array(loss)
+
+        loss = np.asarray(loss, dtype=float)
         self.max_pain_profile = {
-            'strikes': self.strikes_ref,
+            'strikes': strikes_f,
             'loss': loss
         }
-        return self.strikes_ref[np.argmin(loss)]
+        return float(strikes_f[int(np.argmin(loss))])
 
     def calculate_expected_moves(self):
         """Calcula movimentos esperados baseados na IV ATM."""
@@ -727,7 +941,9 @@ class OptionsCalculator:
             try:
                 env_iv = getattr(settings, 'EWZ_ATM_IV_PCT', None)
                 if env_iv is not None:
-                    iv_atm = float(env_iv) / 100.0
+                    env_iv_f = float(env_iv)
+                    if np.isfinite(env_iv_f) and env_iv_f > 0:
+                        iv_atm = env_iv_f / 100.0
             except (ValueError, TypeError):
                 pass
             
@@ -735,24 +951,45 @@ class OptionsCalculator:
             if iv_atm is None:
                 if self.iv_strike_ref is not None and len(self.iv_strike_ref) > 0:
                     idx_atm = int(np.argmin(np.abs(self.strikes_ref - self.spot)))
-                    iv_atm = self.iv_strike_ref[idx_atm]
+                    iv_atm = float(self.iv_strike_ref[idx_atm])
+                    if not np.isfinite(iv_atm) or iv_atm <= 0:
+                        finite = np.isfinite(self.iv_strike_ref) & (self.iv_strike_ref > 0)
+                        if np.any(finite):
+                            iv_atm = float(np.nanmedian(self.iv_strike_ref[finite]))
+                        else:
+                            iv_atm = float(self.iv_annual) if np.isfinite(self.iv_annual) and self.iv_annual > 0 else float(getattr(settings, 'HVL_ANNUAL', 0.12))
                 else:
-                    iv_atm = self.iv_annual
+                    iv_atm = float(self.iv_annual) if np.isfinite(self.iv_annual) and self.iv_annual > 0 else float(getattr(settings, 'HVL_ANNUAL', 0.12))
 
             # Movimentos para hoje (1 dia/0DTE), 1 semana, e Expiração
             # Se for 0DTE, o movimento "1 Dia" é na verdade "Intraday Restante"
             is_0dte = bool(self.expiry_date) and (self.dataref == self.expiry_date) and (self.expiry_date.weekday() == 4)
-            
-            t_days = [1, 5, self.T * 252]
-            labels = ['1 Dia' if not is_0dte else 'Intraday (0DTE)', '1 Semana', 'Expiração']
+            expiry_days = int(max(round(float(self.T) * 252.0), 1))
+
+            horizons_days: list[int] = []
+            horizons_labels: list[str] = []
+            if expiry_days == 1:
+                horizons_days = [1]
+                horizons_labels = ['Expiração']
+            else:
+                horizons_days.append(1)
+                horizons_labels.append('Intraday (0DTE)' if is_0dte else '1 Dia')
+                if expiry_days >= 5:
+                    horizons_days.append(5)
+                    horizons_labels.append('1 Semana')
+                if expiry_days in horizons_days:
+                    horizons_labels[horizons_days.index(expiry_days)] = 'Expiração'
+                else:
+                    horizons_days.append(expiry_days)
+                    horizons_labels.append('Expiração')
             
             moves = []
-            for t, lbl in zip(t_days, labels):
-                t_year = max(t, 0.5) / 252.0 # Garante mínimo de meio dia de vol para não zerar
+            for t, lbl in zip(horizons_days, horizons_labels):
+                t_year = max(float(t), 0.5) / 252.0
                 sigma_move = self.spot * iv_atm * np.sqrt(t_year)
                 moves.append({
                     'label': lbl,
-                    'days': t,
+                    'days': int(t),
                     'move': sigma_move,
                     'upper': self.spot + sigma_move,
                     'lower': self.spot - sigma_move
@@ -773,7 +1010,11 @@ class OptionsCalculator:
             
             try:
                 env_hv = getattr(settings, 'EWZ_HV_PCT', None)
-                hv = (float(env_hv) / 100.0) if env_hv is not None else settings.HVL_ANNUAL
+                if env_hv is not None:
+                    env_hv_f = float(env_hv)
+                    hv = (env_hv_f / 100.0) if np.isfinite(env_hv_f) and env_hv_f > 0 else settings.HVL_ANNUAL
+                else:
+                    hv = settings.HVL_ANNUAL
             except (ValueError, TypeError):
                 hv = settings.HVL_ANNUAL
 
@@ -802,7 +1043,10 @@ class OptionsCalculator:
                 'vrp': vrp,
                 'iv_rank': iv_rank,
                 'regime': regime_vol,
-                'rank_desc': rank_desc
+                'rank_desc': rank_desc,
+                'source_url': (getattr(settings, 'EWZ_IV_CONTEXT_SOURCE_URL', None) or None),
+                'captured_at_utc': (getattr(settings, 'EWZ_IV_CONTEXT_CAPTURED_AT_UTC', None) or None),
+                'capture_method': (getattr(settings, 'EWZ_IV_CONTEXT_METHOD', None) or None),
             }
         except Exception as e:
             logger.error(f"Erro em calculate_volatility_analysis: {e}")
@@ -907,46 +1151,53 @@ class OptionsCalculator:
         target_spot: Preço do ativo subjacente simulado (ex: bater na Call Wall).
         target_days_from_now: Dias úteis a partir de hoje (0 = hoje, 1 = amanhã).
         """
-        # Ajuste do Tempo (T)
-        # Reduz T proporcionalmente aos dias passados (aproximação linear)
         days_to_expiry = self.T / settings.DT_DAILY
-        new_T = max(settings.MIN_T_EXPIRY, (days_to_expiry - target_days_from_now) * settings.DT_DAILY) # Mínimo 1 dia
-        
-        # Strikes de Interesse: Call Wall, Put Wall, Gamma Flip, Spot Atual
-        raw_strikes = []
-        if self.call_wall is not None: raw_strikes.append(self.call_wall)
-        if self.put_wall is not None: raw_strikes.append(self.put_wall)
-        if self.gamma_flip is not None: raw_strikes.append(self.gamma_flip)
-        else: raw_strikes.append(self.spot)
-        raw_strikes.append(self.spot) # Always add spot
+        new_T = max(settings.MIN_T_EXPIRY, (days_to_expiry - target_days_from_now) * settings.DT_DAILY)
 
-        valid_strikes = []
-        for k in raw_strikes:
+        strikes_arr = np.asarray(self.strikes_ref, dtype=float)
+        if strikes_arr.size == 0:
+            return []
+
+        order = np.argsort(strikes_arr)
+        strikes_sorted = strikes_arr[order]
+        iv_sorted = None
+        try:
+            iv_arr = np.asarray(self.iv_strike_ref, dtype=float)
+            if iv_arr.size == strikes_arr.size:
+                iv_sorted = iv_arr[order]
+        except Exception:
+            iv_sorted = None
+
+        refs = [self.call_wall, self.put_wall, self.gamma_flip, self.spot]
+        ref_vals: list[float] = []
+        for v in refs:
             try:
-                val = float(k)
-                if not np.isnan(val):
-                    valid_strikes.append(val)
-            except (ValueError, TypeError):
+                fv = float(v)
+                if not np.isnan(fv):
+                    ref_vals.append(fv)
+            except (TypeError, ValueError):
                 continue
-        
-        key_strikes = sorted(list(set(valid_strikes)))
-        
-        simulation_results = []
-        
-        for k in key_strikes:
-            if k is None or np.isnan(k): continue
-            
-            # Preço Call e Put no Spot Atual (Hoje)
-            call_now = float(GreeksEngine.bs_price(self.spot, k, self.T, self.risk_free, self.iv_annual, 'C'))
-            put_now  = float(GreeksEngine.bs_price(self.spot, k, self.T, self.risk_free, self.iv_annual, 'P'))
-            
-            # Preço Call e Put no Cenário (Alvo)
-            call_sim = float(GreeksEngine.bs_price(target_spot, k, new_T, self.risk_free, self.iv_annual, 'C'))
-            put_sim  = float(GreeksEngine.bs_price(target_spot, k, new_T, self.risk_free, self.iv_annual, 'P'))
-            
-            # Delta Estimado (Grosso modo, variação preço / variação spot)
-            # Ou usar o Delta Black Scholes no ponto simulado
-            
+
+        idx_set: set[int] = set()
+        for rv in ref_vals:
+            i0 = int(np.argmin(np.abs(strikes_sorted - rv)))
+            for j in range(i0 - 2, i0 + 3):
+                if 0 <= j < int(strikes_sorted.size):
+                    idx_set.add(j)
+
+        idxs = sorted(idx_set)
+        key_strikes = [float(strikes_sorted[i]) for i in idxs]
+
+        simulation_results: list[dict] = []
+        for i, k in zip(idxs, key_strikes):
+            sigma_k = float(iv_sorted[i]) if iv_sorted is not None and not np.isnan(float(iv_sorted[i])) else float(self.iv_annual)
+
+            call_now = float(GreeksEngine.bs_price(self.spot, k, self.T, self.risk_free, sigma_k, 'C'))
+            put_now = float(GreeksEngine.bs_price(self.spot, k, self.T, self.risk_free, sigma_k, 'P'))
+
+            call_sim = float(GreeksEngine.bs_price(target_spot, k, new_T, self.risk_free, sigma_k, 'C'))
+            put_sim = float(GreeksEngine.bs_price(target_spot, k, new_T, self.risk_free, sigma_k, 'P'))
+
             simulation_results.append({
                 'Strike': k,
                 'Call_Now': call_now,
@@ -956,11 +1207,11 @@ class OptionsCalculator:
                 'Put_Sim': put_sim,
                 'Put_Chg': (put_sim - put_now) / put_now * 100 if put_now > 0.01 else 0.0
             })
-            
+
         return simulation_results
 
 
-    def get_summary_metrics(self):
+    def get_summary_metrics(self) -> SummaryMetrics:
         """Retorna um dicionário com métricas resumidas para o dashboard."""
         delta_agregado = float(np.nansum(self.dexp_tot))
         regime = 'Gamma Positivo' if (self.gamma_flip and self.spot >= self.gamma_flip) else 'Gamma Negativo'
@@ -968,8 +1219,18 @@ class OptionsCalculator:
         # Dealer Pressure (Simplificado)
         # Requer normalização dos arrays
         def _norm(a):
-            m = float(np.nanmax(np.abs(a))) if np.nanmax(np.abs(a))>0 else 1.0
-            return a/m
+            abs_arr = np.abs(np.asarray(a, dtype=float))
+            method = str(getattr(settings, "DPI_NORM_METHOD", "maxabs") or "maxabs").strip().lower()
+            if method == "percentile":
+                p = float(getattr(settings, "DPI_NORM_PERCENTILE", 95.0) or 95.0)
+                if not np.isfinite(p) or p <= 0.0 or p > 100.0:
+                    p = 95.0
+                m = float(np.nanpercentile(abs_arr, p))
+            else:
+                m = float(np.nanmax(abs_arr))
+            if not np.isfinite(m) or m <= 0.0:
+                m = 1.0
+            return np.asarray(a, dtype=float) / m
             
         dpi_arr = (settings.DPI_WEIGHTS['delta']*_norm(self.dexp_tot) + 
                    settings.DPI_WEIGHTS['gamma']*_norm(self.gex_tot) + 
@@ -992,7 +1253,7 @@ class OptionsCalculator:
         walls_call_txt = ' | '.join([f"{float(self.strikes_ref[i]):.4f}({self.oi_call_ref[i]:,.0f})" for i in reversed(idx_call)])
         walls_put_txt  = ' | '.join([f"{float(self.strikes_ref[i]):.4f}({self.oi_put_ref[i]:,.0f})" for i in reversed(idx_put)])
 
-        return {
+        return cast(SummaryMetrics, {
             'spot': self.spot,
             'delta_agregado': delta_agregado,
             'gamma_flip': self.gamma_flip,
@@ -1001,6 +1262,8 @@ class OptionsCalculator:
             'max_pain': self.max_pain,
             'call_wall': self.call_wall,
             'put_wall': self.put_wall,
+            'effective_call_wall': getattr(self, 'effective_call_wall', self.call_wall),
+            'effective_put_wall': getattr(self, 'effective_put_wall', self.put_wall),
             'regime': regime,
             'dealer_pressure': dealer_pressure_spot,
             'dpi_arr': dpi_arr,
@@ -1013,4 +1276,4 @@ class OptionsCalculator:
             'vol_analysis': getattr(self, 'vol_analysis', {}),
             'pinning_risk': getattr(self, 'pinning_risk', None),
             'expected_moves': getattr(self, 'expected_moves', [])
-        }
+        })

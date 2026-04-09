@@ -1,11 +1,12 @@
 import os
+import re
 import subprocess
 from datetime import datetime
 import plotly.io as pio
 from src.data_loader import load_data
 from src.calculator import OptionsCalculator
 from src.charts import create_dashboard_figure, create_analysis_figure, create_summary_table, create_exploded_charts, create_volatility_panel
-from src.tables import create_detailed_table, create_model_comparison_table
+from src.tables import create_detailed_table, create_model_comparison_table, create_fed_rates_table, create_most_actives_table
 from src.ntsl import generate_ntsl_script
 from src import config as settings
 from src.utils_fmt import format_number_br
@@ -16,23 +17,45 @@ def auto_push_dashboard_v1():
         print("Envio automático para Git desabilitado (ENABLE_AUTO_GIT_PUSH=False).")
         return
     try:
+        repo_dir = os.path.dirname(os.path.abspath(__file__))
+        def run_git(args, check=True, capture=False):
+            return subprocess.run(
+                ["git", *args],
+                cwd=repo_dir,
+                check=check,
+                capture_output=capture,
+                text=True,
+            )
+        def is_ignored(path: str) -> bool:
+            try:
+                res = run_git(["check-ignore", "-q", path], check=False, capture=False)
+                return res.returncode == 0
+            except Exception:
+                return False
+
         print("\n=== Enviando dashboard V1 para o Git ===")
-        subprocess.run(["git", "add", "dashboard_v1"], check=True)
-        subprocess.run(["git", "add", "dashboard_v3.html"], check=False)
-        subprocess.run(["git", "add", "Script_ProfitChart_NTSL.txt"], check=False)
-        status = subprocess.run(
-            ["git", "status", "--porcelain"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        if not is_ignored("dashboard_v1"):
+            run_git(["add", "dashboard_v1"], check=True)
+        run_git(["add", "dashboard_v3.html"], check=False)
+        run_git(["add", "Script_ProfitChart_NTSL.txt"], check=False)
+        status = run_git(["status", "--porcelain"], capture=True, check=True)
         if not status.stdout.strip():
             print("Nenhuma alteração para enviar ao Git.")
             return
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
         message = f"Atualiza dashboards após execução do main.py ({timestamp})"
-        subprocess.run(["git", "commit", "-m", message], check=True)
-        subprocess.run(["git", "push"], check=True)
+        run_git(["commit", "-m", message], check=True)
+        push = run_git(["push"], check=False, capture=True)
+        if push.returncode != 0:
+            out = (push.stderr or push.stdout or "").strip()
+            retriable = bool(re.search(r"non-fast-forward|fetch first|rejected", out, flags=re.IGNORECASE))
+            if retriable:
+                remote = os.getenv("GIT_REMOTE", "origin")
+                cur_branch = run_git(["rev-parse", "--abbrev-ref", "HEAD"], capture=True, check=True).stdout.strip() or "main"
+                run_git(["pull", "--rebase", remote, cur_branch], check=True)
+                run_git(["push"], check=True)
+            else:
+                raise subprocess.CalledProcessError(push.returncode, ["git", "push"], output=push.stdout, stderr=push.stderr)
         print("Envio para o Git concluído com sucesso.")
     except FileNotFoundError:
         print("AVISO: Git não encontrado no sistema. Pulei a etapa de envio automático.")
@@ -48,18 +71,13 @@ def main():
     try:
         # 1. Carregar Dados
         print("Carregando dados CSV...")
-        # Assume que os CSVs estão no diretório atual ou subdiretórios
-        # Verifica se há CSVs na raiz, senão tenta 'Histórico barchart'
-        target_dir = 'data_input'
-        
-        if os.path.exists(target_dir) and any(f.endswith('.csv') for f in os.listdir(target_dir)):
-             print(f"Utilizando diretório de dados: {target_dir}")
-        else:
-            target_dir = '.'
-            has_csv_root = any(f.endswith('.csv') for f in os.listdir('.') if os.path.isfile(f))
-            if not has_csv_root and os.path.exists('Histórico barchart'):
-                target_dir = 'Histórico barchart'
-                print(f"Redirecionando busca para: {target_dir}")
+        project_root = os.path.abspath(os.path.join(os.getcwd(), '..'))
+        env_dir = getattr(settings, 'CSV_INDICE_DIR', '') or ''
+        default_dir = os.path.join(project_root, 'CSV_Indice')
+        target_dir = env_dir if env_dir else default_dir
+        if not (os.path.exists(target_dir) and any(f.endswith('.csv') for f in os.listdir(target_dir))):
+            print("ERRO CRÍTICO: Nenhum CSV encontrado em CSV_Indice configurado.")
+            return
     
         options_df, spot, expiry = load_data(directory=target_dir, use_csv_spot=settings.USE_CSV_SPOT, spot_override=settings.SPOT)
         
@@ -69,8 +87,12 @@ def main():
             try:
                 # Tenta converter string para data
                 manual_expiry = datetime.strptime(manual_exp_date_str, "%Y-%m-%d").date()
-                print(f"  > Substituindo vencimento detectado ({expiry}) pelo manual: {manual_expiry}")
-                expiry = manual_expiry
+                today = datetime.now().date()
+                if manual_expiry < today:
+                    print(f"  > AVISO: Data manual ({manual_expiry}) está no passado. Ignorando override; usando detectada: {expiry}")
+                else:
+                    print(f"  > Substituindo vencimento detectado ({expiry}) pelo manual: {manual_expiry}")
+                    expiry = manual_expiry
             except ValueError:
                 print(f"  > AVISO: Data manual inválida no config ({manual_exp_date_str}). Usando detectada: {expiry}")
 
@@ -119,6 +141,10 @@ def main():
             fig_detailed = create_detailed_table(calc, metrics)
             fig_models = create_model_comparison_table(calc)
             
+            # Ferramentas de Mercado (FedWatch, Most Actives)
+            fig_fedwatch = create_fed_rates_table(options_df, spot, expiry)
+            fig_most_actives = create_most_actives_table(options_df)
+            
             # Gráfico Analítico (Análise Detalhada)
             fig_analysis = create_analysis_figure(calc, metrics)
             
@@ -150,6 +176,8 @@ def main():
             html_detailed = pio.to_html(fig_detailed, include_plotlyjs=False, full_html=False)
             html_models = pio.to_html(fig_models, include_plotlyjs=False, full_html=False)
             html_analysis = pio.to_html(fig_analysis, include_plotlyjs=False, full_html=False)
+            html_fedwatch = pio.to_html(fig_fedwatch, include_plotlyjs=False, full_html=False)
+            html_most_actives = pio.to_html(fig_most_actives, include_plotlyjs=False, full_html=False)
             html_vol = pio.to_html(fig_vol, include_plotlyjs=False, full_html=False)
             
             # Fator de Escala
@@ -201,6 +229,8 @@ def main():
                 '<li><a href="#section_1">1. Resumo Executivo</a></li>',
                 '<li><a href="#section_sim">1.1 Simulação de Valor Justo (Fair Value)</a></li>',
                 '<li><a href="#section_vol">1.2 Análise de Volatilidade (VRP, IV Rank)</a></li>',
+                '<li><a href="#section_fed">1.3 FedWatch (Juros EUA)</a></li>',
+                '<li><a href="#section_actives">1.4 Most Actives (OI & Vol)</a></li>',
                 '<li><a href="#section_2">2. Tabela Detalhada (Fig 3)</a></li>',
                 '<li><a href="#section_3">3. Comparativo de Modelos Flip/Delta</a></li>',
                 '<li><a href="#section_4">4. Análise Detalhada de Estrutura</a></li>',
@@ -303,12 +333,22 @@ def main():
                     </div>
                     
                     <div id="section_vol" class="section">
-                        <h2>1.2 Análise de Volatilidade (VRP, IV Rank)</h2>
-                        <p>Métricas de volatilidade consolidadas para decisão: IV ATM, HV, VRP, IV Rank e regime sugerido.</p>
-                        {html_vol}
-                    </div>
-                    
-                    <div id="section_2" class="section page-break">
+                    <h2>1.2 Análise de Volatilidade (VRP, IV Rank)</h2>
+                    <p>Métricas de volatilidade consolidadas para decisão: IV ATM, HV, VRP, IV Rank e regime sugerido.</p>
+                    {html_vol}
+                </div>
+                
+                <div id="section_fed" class="section">
+                    <h2>1.3 FedWatch (Juros EUA)</h2>
+                    {html_fedwatch}
+                </div>
+                
+                <div id="section_actives" class="section">
+                    <h2>1.4 Most Actives (OI & Vol)</h2>
+                    {html_most_actives}
+                </div>
+                
+                <div id="section_2" class="section page-break">
                         <h2>2. Tabela Detalhada (Fig 3)</h2>
                         {html_detailed}
                     </div>

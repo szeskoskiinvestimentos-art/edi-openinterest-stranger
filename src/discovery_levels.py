@@ -37,9 +37,13 @@ def discovery():
     
     # 1. Carregar Dados
     try:
-        target_dir = '.'
-        if not any(f.endswith('.csv') for f in os.listdir('.')) and os.path.exists('Histórico barchart'):
-            target_dir = 'Histórico barchart'
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+        env_dir = getattr(config, 'CSV_INDICE_DIR', '') or ''
+        default_dir = os.path.join(project_root, '..', 'CSV_Indice')
+        target_dir = env_dir if env_dir else default_dir
+        if not (os.path.exists(target_dir) and any(f.endswith('.csv') for f in os.listdir(target_dir))):
+            print("ERRO: Nenhum CSV encontrado em CSV_Indice configurado.")
+            return
         
         df_options, spot_price, expiry = load_data(directory=target_dir, use_csv_spot=config.USE_CSV_SPOT, spot_override=config.SPOT)
         print(f"Dados carregados. Spot: {spot_price}, Expiry: {expiry}")

@@ -27,6 +27,9 @@ MANUAL_EXPIRATION_LABEL  = "2026-02-13 (0 DTE)"  # Data e Dias para Vencimento (
 MANUAL_ATM_IV_PCT        = 33.93                 # Volatilidade Implícita ATM (%)
 MANUAL_HV_PCT            = 25.90                 # Volatilidade Histórica (%)
 MANUAL_IV_RANK_PCT       = 27.01                 # IV Rank (%)
+MANUAL_IV_CONTEXT_SOURCE_URL = ""
+MANUAL_IV_CONTEXT_CAPTURED_AT_UTC = ""
+MANUAL_IV_CONTEXT_METHOD = ""
 
 # --- 3. Parâmetros de Mercado (Taxas & Spot) ---
 MANUAL_SPOT_PRICE        = 38.06     # Preço Spot Atual do EWZ (Se 0, tenta ler do CSV)
@@ -80,9 +83,11 @@ def _compute_display_scale() -> float:
 
 DISPLAY_SCALE_FACTOR = _compute_display_scale()
 
+# 1b. Compatibilidade de escala das exposições (Gamma/Delta)
+EXPOSURE_INDEX_SCALE_ENABLED = os.getenv("EXPOSURE_INDEX_SCALE_ENABLED", "True").lower() == "true"
+
 # 2. Inputs de Mercado
 SPOT = get_val(MANUAL_SPOT_PRICE, "SPOT", 0.0)
-IV_ANNUAL = get_val(None, "IV_ANNUAL", 0.2568) # Mantém lógica original se não especificado
 RISK_FREE = get_val(MANUAL_RISK_FREE_RATE, "RISK_FREE", 0.05)
 DATAREF = dt.date.today()
 
@@ -91,18 +96,36 @@ EWZ_EXPIRATION_LABEL = get_val(MANUAL_EXPIRATION_LABEL, "EWZ_EXPIRATION", "", ca
 EWZ_ATM_IV_PCT = get_val(MANUAL_ATM_IV_PCT, "EWZ_ATM_IV_PCT", 0.0)
 EWZ_HV_PCT = get_val(MANUAL_HV_PCT, "EWZ_HV_PCT", 0.0)
 EWZ_IV_RANK_PCT = get_val(MANUAL_IV_RANK_PCT, "EWZ_IV_RANK_PCT", 0.0)
+EWZ_IV_CONTEXT_SOURCE_URL = get_val(MANUAL_IV_CONTEXT_SOURCE_URL, "EWZ_IV_CONTEXT_SOURCE_URL", "", cast=str)
+EWZ_IV_CONTEXT_CAPTURED_AT_UTC = get_val(MANUAL_IV_CONTEXT_CAPTURED_AT_UTC, "EWZ_IV_CONTEXT_CAPTURED_AT_UTC", "", cast=str)
+EWZ_IV_CONTEXT_METHOD = get_val(MANUAL_IV_CONTEXT_METHOD, "EWZ_IV_CONTEXT_METHOD", "", cast=str)
 
 # ==========================================
 # PARÂMETROS TÉCNICOS (AVANÇADO)
 # ==========================================
 CONTRACT_MULT = int(os.getenv("CONTRACT_MULT", 50000))
-HVL_ANNUAL = float(os.getenv("HVL_ANNUAL", 0.1265))
+
+# IV e HV em formato decimal, derivadas dos percentuais quando disponíveis.
+_iv_pct_env = os.getenv("IV_ANNUAL", "")
+if _iv_pct_env:
+    IV_ANNUAL = float(_iv_pct_env)
+else:
+    IV_ANNUAL = (EWZ_ATM_IV_PCT / 100.0) if EWZ_ATM_IV_PCT else 0.2568
+
+_hvl_env = os.getenv("HVL_ANNUAL", "")
+if _hvl_env:
+    HVL_ANNUAL = float(_hvl_env)
+else:
+    HVL_ANNUAL = (EWZ_HV_PCT / 100.0) if EWZ_HV_PCT else 0.1265
+
 SIGMA_FACTOR = float(os.getenv("SIGMA_FACTOR", 1.0))
 
 # Flags
 USE_IMPLIED_VOL = os.getenv("USE_IMPLIED_VOL", "False").lower() == "true"
 USE_CSV_SPOT = os.getenv("USE_CSV_SPOT", "False").lower() == "true"
 USE_HVL_FLIP = os.getenv("USE_HVL_FLIP", "True").lower() == "true"
+USE_ODTE_MODE = os.getenv("USE_ODTE_MODE", "False").lower() == "true"
+CSV_INDICE_DIR = os.getenv("CSV_INDICE_DIR", "")
 
 ATM_BAND_STEPS = 0.5
 
@@ -114,6 +137,9 @@ IPCA_PCT = get_val(MANUAL_IPCA_PCT, "IPCA_PCT", 4.5)
 
 DPI_WEIGHTS = {'delta': 0.25, 'gamma': 0.25, 'charm': 0.25, 'vanna': 0.25}
 DPI_WINDOW_STRIKES = 2
+
+DPI_NORM_METHOD = os.getenv("DPI_NORM_METHOD", "maxabs").strip().lower()
+DPI_NORM_PERCENTILE = float(os.getenv("DPI_NORM_PERCENTILE", 95.0))
 
 # Controle de Exportação
 ENABLE_V1_EXPORTS = True

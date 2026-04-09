@@ -122,6 +122,7 @@ def load_data(directory='.', use_csv_spot=False, spot_override=None):
     csv_files = collect_csv_files(directory)
     parts, spot_auto = [], None
     expiry = None
+    expiries_found = []
     
     if not csv_files:
         print("Nenhum arquivo CSV encontrado.")
@@ -167,9 +168,8 @@ def load_data(directory='.', use_csv_spot=False, spot_override=None):
                 d['Expiry'] = pd.NaT
                 
             parts.append(d)
-            # Mantém expiry global apenas como referência (ex: para título)
-            if expiry is None:
-                expiry = current_expiry
+            if current_expiry:
+                expiries_found.append(current_expiry)
                 
         if s and not spot_auto:
             spot_auto = s
@@ -179,6 +179,11 @@ def load_data(directory='.', use_csv_spot=False, spot_override=None):
         return pd.DataFrame(columns=empty_cols), spot_override, None
         
     options = pd.concat(parts, ignore_index=True)
+
+    if expiries_found:
+        today = dt.date.today()
+        future_or_today = [e for e in expiries_found if e >= today]
+        expiry = min(future_or_today) if future_or_today else min(expiries_found)
     
     # Determina o Spot final
     final_spot = spot_override

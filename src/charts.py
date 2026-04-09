@@ -676,11 +676,11 @@ def create_exploded_charts(calc, metrics):
         flips_cone = calc.gamma_flip_cone.get('flips', [])
         
         if len(alphas) > 0:
-            fig23.add_trace(go.Scatter(x=alphas, y=flips_cone, mode='lines+markers', name='Flip vs Mix (OI↔VOL)', 
+            fig23.add_trace(go.Scatter(x=alphas, y=flips_cone, mode='lines+markers', name='Flip vs σ (sensibilidade)', 
                                        line=dict(color='#34d399', width=3)))
             
             layout_cone = common_layout.copy()
-            layout_cone['xaxis_title'] = 'Mistura α (0=OI, 1=VOL)'
+            layout_cone['xaxis_title'] = 'Fator σ (SIGMA_FACTOR)'
             layout_cone['yaxis_title'] = 'Gamma Flip (Strike)'
             if 'xaxis' in layout_cone: del layout_cone['xaxis'] # Auto range para X
             
