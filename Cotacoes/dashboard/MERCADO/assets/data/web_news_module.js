@@ -1,1 +1,1 @@
-window.WEB_NEWS_MODULE_DATA={"ok":true,"generatedAt":"2026-04-10T01:17:37.951Z","provider":"web_news_module","windowHours":24,"sources":[],"summary":{"globalTop":[],"brasilTop":[],"commoditiesTop":[],"sentiment":"Neutro","bullish":[],"bearish":[],"conflicts":[],"thesis":null},"items":[]};
+window.WEB_NEWS_MODULE_DATA={"ok":true,"generatedAt":"2026-04-10T01:36:59.144Z","provider":"web_news_module","windowHours":24,"sources":[],"summary":{"globalTop":[],"brasilTop":[],"commoditiesTop":[],"sentiment":"Neutro","bullish":[],"bearish":[],"conflicts":[],"thesis":null},"items":[]};
