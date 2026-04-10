@@ -1387,7 +1387,11 @@ function renderRegimeConviction(data) {
             betaDelta,
             dxyPct,
             oilPct: typeof oilScore === 'number' ? oilScore : null,
-            em: { state: emGateState, pct: typeof emBasketPct === 'number' ? emBasketPct : null },
+            em: {
+                state: emGateState,
+                pct: typeof emBasketPct === 'number' ? emBasketPct : null,
+                corrUsdBrlEmBasket: { corr: corrBrlEmBasket.corr, n: corrBrlEmBasket.n },
+            },
             exportScore,
             yields: { us10yPct, br10yPct, tipsEtfPct },
         };
@@ -2485,6 +2489,63 @@ function computeHk50PulseNow(data, web) {
 
     const pick = patterns => patterns.map(re => findAssetSymbol(data, re)).find(Boolean) || null;
     const get = s => (s ? getChangePct(data, s) : null);
+    const buildReturnSeries = (symbol, maxPoints) => {
+        if (!symbol) return [];
+        const pts = (data && data.series && data.series[symbol]) ? data.series[symbol] : [];
+        const priced = Array.isArray(pts)
+            ? pts
+                .map(p => {
+                    const tMs = p && p.t ? Date.parse(p.t) : NaN;
+                    const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                    return Number.isFinite(tMs) && typeof price === 'number' ? { tMs, price } : null;
+                })
+                .filter(Boolean)
+            : [];
+        if (priced.length < 3) return [];
+        const n = Math.max(24, Math.floor(Number(maxPoints) || 120));
+        const slice = priced.slice(Math.max(0, priced.length - n));
+        const out = [];
+        for (let i = 1; i < slice.length; i++) {
+            const prev = slice[i - 1];
+            const cur = slice[i];
+            if (!prev || !cur) continue;
+            if (!(prev.price > 0) || !(cur.price > 0)) continue;
+            const r = Math.log(cur.price / prev.price);
+            if (!Number.isFinite(r)) continue;
+            out.push({ tMs: cur.tMs, r });
+        }
+        return out;
+    };
+    const correlationAligned = (a, b) => {
+        const mapB = new Map(b.map(x => [x.tMs, x.r]));
+        const xs = [];
+        const ys = [];
+        for (const x of a) {
+            if (!x || !Number.isFinite(x.tMs) || !Number.isFinite(x.r)) continue;
+            const y = mapB.get(x.tMs);
+            if (typeof y !== 'number' || !Number.isFinite(y)) continue;
+            xs.push(x.r);
+            ys.push(y);
+        }
+        const n = xs.length;
+        if (n < 20) return { corr: null, n };
+        const mx = xs.reduce((s, v) => s + v, 0) / n;
+        const my = ys.reduce((s, v) => s + v, 0) / n;
+        let cov = 0;
+        let vx = 0;
+        let vy = 0;
+        for (let i = 0; i < n; i++) {
+            const dx = xs[i] - mx;
+            const dy = ys[i] - my;
+            cov += dx * dy;
+            vx += dx * dx;
+            vy += dy * dy;
+        }
+        const denom = Math.sqrt(vx * vy);
+        if (!(denom > 0) || !Number.isFinite(denom)) return { corr: null, n };
+        const c = cov / denom;
+        return { corr: Number.isFinite(c) ? Math.max(-1, Math.min(1, c)) : null, n };
+    };
     const getRatesMoveProxy = s => {
         if (!s) return null;
         const series = data && data.series && Array.isArray(data.series[s]) ? data.series[s] : [];
@@ -2767,6 +2828,34 @@ function computeHk50PulseNow(data, web) {
         return picks;
     })();
 
+    const flowCorr = (() => {
+        const windowPoints = 160;
+        const baseSymbol = sym.hk50 || null;
+        const base = baseSymbol ? buildReturnSeries(baseSymbol, windowPoints) : [];
+
+        const corrPair = (label, aSym, bSym) => {
+            if (!aSym || !bSym) return { label, corr: null, n: 0 };
+            const a = buildReturnSeries(aSym, windowPoints);
+            const b = buildReturnSeries(bSym, windowPoints);
+            const out = correlationAligned(a, b);
+            return { label, corr: out.corr, n: out.n };
+        };
+
+        const cnhSym = sym.usdCnh || sym.usdCny || null;
+        const items = [
+            corrPair('HK50 × USD/CNH', baseSymbol, cnhSym),
+            corrPair('HK50 × DXY', baseSymbol, sym.dxy),
+            corrPair('HK50 × SPX', baseSymbol, sym.spx),
+            corrPair('HK50 × China (FXI/MCHI/CSI300)', baseSymbol, sym.fxChina),
+            corrPair('HK50 × Cobre', baseSymbol, sym.copper),
+            corrPair('HK50 × Minério', baseSymbol, sym.iron),
+            corrPair('USD/CNH × Cobre', cnhSym, sym.copper),
+            corrPair('USD/CNH × Minério', cnhSym, sym.iron),
+        ];
+
+        return { baseSymbol, windowPoints, items };
+    })();
+
     return {
         sym,
         market: { hk50Pct },
@@ -2774,6 +2863,7 @@ function computeHk50PulseNow(data, web) {
         coverage: { expected: expectedKeys.length, observed: rows.length, missing, keyLabels, missingDetails },
         missingAssetsSuggestion: suggest,
         news: geoNews,
+        flowCorr,
     };
 }
 
@@ -2805,21 +2895,28 @@ function computeBtcPulseNow(data, web) {
         eth: findAliasSymbolBest(data, 'ETH') || pick([/\bETH\/USD\b/i, /\bEthereum\b/i]),
         sol: findAliasSymbolBest(data, 'SOL') || pick([/^SOL\/USD$/i, /\bSolana\b/i]),
         doge: findAliasSymbolBest(data, 'DOGE') || pick([/^DOGE\/USD$/i, /\bDogecoin\b/i]),
-        spx: findAliasSymbolBest(data, 'SPX') || findAliasSymbol(data, 'SPX'),
-        ndx: findAliasSymbolBest(data, 'NDX') || findAliasSymbol(data, 'NDX'),
-        dxy: findAliasSymbolBest(data, 'DXY') || findAliasSymbol(data, 'DXY'),
+        spx: findAliasSymbolBest(data, 'SPX') || pick([/^\.SPX$/i, /^SPX$/i, /^SPY(\.\w+)?$/i, /\bS&P 500\b/i]),
+        ndx: findAliasSymbolBest(data, 'NDX') || pick([/^\.NDX$/i, /^NDX$/i, /^QQQ(\.\w+)?$/i, /\bNasdaq 100\b/i]),
+        dxy: findAliasSymbolBest(data, 'DXY') || pick([/^\.DXY$/i, /^DXY$/i, /^DX=F$/i, /^DXc\d$/i, /\bUS\s*Dollar\s*Index\b/i]),
         vix: findAliasSymbolBest(data, 'VIX') || pick([/^\.?VIX(9D)?$/i]),
         vvix: findAliasSymbolBest(data, 'VVIX') || pick([/^\.VVIX$/i]),
-        us2y: findAliasSymbolBest(data, 'US2Y') || findAliasSymbol(data, 'US2Y'),
-        us10y: findAliasSymbolBest(data, 'US10Y') || findAliasSymbol(data, 'US10Y'),
+        us2y: findAliasSymbolBest(data, 'US2Y') || pick([/^US2YT=RR$/i, /^TUc\d=\$?$/i, /\bUS2Y\b/i, /\bUnited States 2-Year\b/i]),
+        us10y: findAliasSymbolBest(data, 'US10Y') || pick([/^US10YT=RR$/i, /^USGV10YUSAB=R$/i, /^TNc\d=\$?$/i, /^TYc\d=\$?$/i, /\bUS10Y\b/i, /\bUnited States 10-Year\b/i]),
         tlt: findAliasSymbolBest(data, 'TLT'),
         hyg: findAliasSymbolBest(data, 'HYG'),
-        eem: findAliasSymbolBest(data, 'EEM') || findAliasSymbolBest(data, 'VWO'),
-        gold: findAliasSymbolBest(data, 'GOLD'),
-        copper: findAliasSymbolBest(data, 'COPPER'),
-        brent: findAliasSymbolBest(data, 'BRENT'),
-        wti: findAliasSymbolBest(data, 'WTI'),
+        eem: findAliasSymbolBest(data, 'EEM') || findAliasSymbolBest(data, 'VWO') || pick([/^EEM(\.\w+)?$/i, /^VWO(\.\w+)?$/i]),
+        gold: findAliasSymbolBest(data, 'GOLD') || pick([/^GC=F$/i, /^GCc\d$/i, /^XAU(USD)?$/i, /^GLD(\.\w+)?$/i, /\bGold\b/i]),
+        copper: findAliasSymbolBest(data, 'COPPER') || pick([/^HG=F$/i, /^HGc\d$/i, /^CPER(\.\w+)?$/i, /\bCopper\b/i]),
+        brent: findAliasSymbolBest(data, 'BRENT') || pick([/^BZ=F$/i, /^LCOc\d$/i, /^BRNc\d$/i, /^BNO(\.\w+)?$/i, /\bBrent\b/i]),
+        wti: findAliasSymbolBest(data, 'WTI') || pick([/^CL=F$/i, /^CLc\d$/i, /^USO(\.\w+)?$/i, /\bWTI\b/i]),
         usdjpy: pick([/^USD\/JPY\b/i]),
+        usdcnh: findAliasSymbolBest(data, 'USD_CNH') || pick([/^USD\/CNH\b/i]),
+        usdhkd: findAliasSymbolBest(data, 'USD_HKD') || pick([/^USD\/HKD\b/i]),
+        usdmxn: pick([/^USD\/MXN\b/i, /\bUSDMXN\b/i]),
+        usdzar: pick([/^USD\/ZAR\b/i, /\bUSDZAR\b/i]),
+        usdclp: pick([/^USD\/CLP\b/i, /\bUSDCLP\b/i]),
+        usdtry: pick([/^USD\/TRY\b/i, /\bUSDTRY\b/i]),
+        iron: findAliasSymbolBest(data, 'IRON') || pick([/^TIOc1$/i, /\biron\s*ore\b/i]),
         ibit: pick([/^IBIT(\.\w+)?$/i, /\bIBIT\b/i]),
         fbtc: pick([/^FBTC(\.\w+)?$/i, /\bFBTC\b/i]),
         arkb: pick([/^ARKB(\.\w+)?$/i, /\bARKB\b/i]),
@@ -2908,6 +3005,7 @@ function computeBtcPulseNow(data, web) {
 
     const btcEtfBasket = avgPctFor([sym.ibit, sym.fbtc, sym.arkb, sym.bitb]);
     const cryptoEqBasket = avgPctFor([sym.mstr, sym.coin, sym.mara, sym.riot]);
+    const emFxBasket = avgPctFor([sym.usdmxn, sym.usdzar, sym.usdclp, sym.usdtry]);
 
     const driversCfg = [
         { key: 'ndx', group: 'driver', weight: 0.75, capAbs: 1.4, sign: +1 },
@@ -2931,6 +3029,10 @@ function computeBtcPulseNow(data, web) {
         { key: 'gold', group: 'context', weight: 0.12, capAbs: 1.6, sign: +1 },
         { key: 'usdjpy', group: 'context', weight: 0.12, capAbs: 1.2, sign: +1 },
         { key: 'vvix', group: 'context', weight: 0.12, capAbs: 5.0, sign: -1 },
+        { key: 'emFx', group: 'context', weight: 0.25, capAbs: 0.8, sign: -1 },
+        { key: 'cnh', group: 'context', weight: 0.12, capAbs: 0.6, sign: -1 },
+        { key: 'hkd', group: 'context', weight: 0.08, capAbs: 0.4, sign: -1 },
+        { key: 'iron', group: 'context', weight: 0.12, capAbs: 2.2, sign: +1 },
         { key: 'news', group: 'context', weight: 0.45, capAbs: 1.0, sign: +1 },
     ];
 
@@ -2965,6 +3067,10 @@ function computeBtcPulseNow(data, web) {
         copper: { label: 'Cobre', pct: get(sym.copper), sym: sym.copper, unit: '%' },
         brent: { label: 'Brent', pct: (get(sym.brent) ?? get(sym.wti)), sym: sym.brent || sym.wti, unit: '%' },
         usdjpy: { label: 'USD/JPY', pct: get(sym.usdjpy), sym: sym.usdjpy, unit: '%' },
+        emFx: { label: `FX EM (${[sym.usdmxn, sym.usdzar, sym.usdclp, sym.usdtry].filter(Boolean).join('/') || 'USD/MXN/ZAR/CLP/TRY'})`, pct: emFxBasket.pct, sym: sym.usdmxn || sym.usdzar || sym.usdclp || sym.usdtry, unit: '%' },
+        cnh: { label: 'USD/CNH', pct: get(sym.usdcnh), sym: sym.usdcnh, unit: '%' },
+        hkd: { label: 'USD/HKD', pct: get(sym.usdhkd), sym: sym.usdhkd, unit: '%' },
+        iron: { label: 'Minério (SGX/DCE)', pct: get(sym.iron), sym: sym.iron, unit: '%' },
         news: { label: 'Notícias (macro/cripto)', pct: computeNews.used ? computeNews.score : null, sym: null, unit: 'score' },
     };
 
@@ -3085,6 +3191,13 @@ function computeBtcPulseNow(data, web) {
             { label: 'BTC/USD', matchers: [/^BTC\/USD$/i, /\bbitcoin\b/i] },
             { label: 'ETH/USD', matchers: [/\bETH\/USD\b/i, /\bEthereum\b/i] },
             { label: 'SOL/USD', matchers: [/^SOL\/USD$/i, /\bSolana\b/i] },
+            { label: 'USD/MXN', matchers: [/^USD\/MXN\b/i, /\bUSDMXN\b/i] },
+            { label: 'USD/ZAR', matchers: [/^USD\/ZAR\b/i, /\bUSDZAR\b/i] },
+            { label: 'USD/CLP', matchers: [/^USD\/CLP\b/i, /\bUSDCLP\b/i] },
+            { label: 'USD/TRY', matchers: [/^USD\/TRY\b/i, /\bUSDTRY\b/i] },
+            { label: 'USD/CNH', matchers: [/^USD\/CNH\b/i] },
+            { label: 'USD/HKD', matchers: [/^USD\/HKD\b/i] },
+            { label: 'Minério (TIOc1)', matchers: [/^TIOc1$/i, /\biron\s*ore\b/i] },
             { label: 'IBIT', matchers: [/^IBIT(\.\w+)?$/i, /\bIBIT\b/i] },
             { label: 'FBTC', matchers: [/^FBTC(\.\w+)?$/i, /\bFBTC\b/i] },
             { label: 'ARKB', matchers: [/^ARKB(\.\w+)?$/i, /\bARKB\b/i] },
@@ -3238,6 +3351,16 @@ function renderBtcOperationalBriefing() {
         const c = g.confirm || { net: 0, count: 0 };
         const x = g.context || { net: 0, count: 0 };
         return `Camadas: Driver ${fmt2(d.net)} (${String(d.count)}) • Conf ${fmt2(c.net)} (${String(c.count)}) • Contexto ${fmt2(x.net)} (${String(x.count)})`;
+    })();
+
+    const corrLine = (() => {
+        const fc = hkNow.flowCorr || null;
+        const items = fc && Array.isArray(fc.items) ? fc.items : [];
+        const parts = items
+            .filter(x => x && typeof x.corr === 'number' && Number.isFinite(x.corr) && typeof x.n === 'number' && Number.isFinite(x.n) && x.n >= 20)
+            .slice(0, 5)
+            .map(x => `${String(x.label || 'Corr')} ${fmt2(x.corr)} (n=${String(Math.floor(x.n))})`);
+        return parts.length ? `Corr (fluxo): ${parts.join(' • ')}` : '';
     })();
 
     const missing = btcNow.coverage && Array.isArray(btcNow.coverage.missing) ? btcNow.coverage.missing : [];
@@ -3529,6 +3652,7 @@ function renderHk50OperationalBriefing() {
             <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
                 ${escapeHtml(hkLine)} • asOf ${escapeHtml(asOf)} • ${escapeHtml(layersLine)}
             </div>
+            ${corrLine ? `<div style="margin-top:6px;opacity:.82;font-size:12px;line-height:1.35;">${escapeHtml(corrLine)}</div>` : ''}
             <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                 ${missingBadge}
             </div>
@@ -6436,6 +6560,12 @@ function renderOperationalBriefing() {
         })();
 
         if (!macro) return foreignPart;
+        const corrPart = (() => {
+            const c = macro.em && macro.em.corrUsdBrlEmBasket ? macro.em.corrUsdBrlEmBasket : null;
+            if (!c || typeof c.corr !== 'number' || !Number.isFinite(c.corr)) return null;
+            const n = typeof c.n === 'number' && Number.isFinite(c.n) && c.n > 0 ? Math.floor(c.n) : 0;
+            return `Corr BRL×EM ${formatNumber(c.corr, 2)}${n ? ` (n=${String(n)})` : ''}`;
+        })();
         const extras = (() => {
             if (!data) return '';
             const parts = [];
@@ -6490,7 +6620,7 @@ function renderOperationalBriefing() {
             }
             return parts.length ? ` • ${parts.join(' • ')}` : '';
         })();
-        return `Flow ${String(macro.flow ? macro.flow.label : '—')} • ${foreignPart} • DXY ${typeof macro.dxyPct === 'number' ? formatPercent(macro.dxyPct, 2) : '—'} • Export ${typeof macro.exportScore === 'number' ? formatPercent(macro.exportScore, 2) : '—'} • EM ${typeof (macro.em && macro.em.pct) === 'number' ? formatPercent(macro.em.pct, 2) : '—'}${extras}${cdsSignal ? ` • CDS ${typeof cdsSignal.drivers.cds === 'number' ? formatPercent(cdsSignal.drivers.cds, 2) : '—'} (${cdsSignal.mode === 'hedge_on_risk_on' ? 'Hedge-on' : cdsSignal.mode === 'risk_off_classic' ? 'Risk-off' : cdsSignal.mode === 'relief_risk_on' ? 'Alívio' : 'Leitura'})` : ''}`;
+        return `Flow ${String(macro.flow ? macro.flow.label : '—')} • ${foreignPart} • DXY ${typeof macro.dxyPct === 'number' ? formatPercent(macro.dxyPct, 2) : '—'} • Export ${typeof macro.exportScore === 'number' ? formatPercent(macro.exportScore, 2) : '—'} • EM ${typeof (macro.em && macro.em.pct) === 'number' ? formatPercent(macro.em.pct, 2) : '—'}${corrPart ? ` • ${corrPart}` : ''}${extras}${cdsSignal ? ` • CDS ${typeof cdsSignal.drivers.cds === 'number' ? formatPercent(cdsSignal.drivers.cds, 2) : '—'} (${cdsSignal.mode === 'hedge_on_risk_on' ? 'Hedge-on' : cdsSignal.mode === 'risk_off_classic' ? 'Risk-off' : cdsSignal.mode === 'relief_risk_on' ? 'Alívio' : 'Leitura'})` : ''}`;
     })();
 
     const pulseNow = data ? computeOperationalPulseNow(data) : null;
@@ -8869,6 +8999,15 @@ function renderPetrobrasModule(data) {
     const pnlLine = metrics && metrics.pnlLike
         ? `PnL (sintético): +${fmt1(metrics.pnlLike.posSum)} / ${fmt1(metrics.pnlLike.negSum)} • net ${fmt1(metrics.pnlLike.net)}`
         : '';
+    const corrLine = (() => {
+        const fc = metrics && metrics.flowCorr ? metrics.flowCorr : null;
+        const items = fc && Array.isArray(fc.items) ? fc.items : [];
+        const parts = items
+            .filter(x => x && typeof x.corr === 'number' && Number.isFinite(x.corr) && typeof x.n === 'number' && Number.isFinite(x.n) && x.n >= 20)
+            .slice(0, 4)
+            .map(x => `${String(x.label || 'Corr')} ${fmt2(x.corr)} (n=${String(Math.floor(x.n))})`);
+        return parts.length ? `Corr (fluxo): ${parts.join(' • ')}` : '';
+    })();
 
     gaugeEl.innerHTML = `
         <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
@@ -8880,8 +9019,8 @@ function renderPetrobrasModule(data) {
                 </div>
             </div>
             <div style="margin-top:8px;opacity:.85;">${escapeHtml(phaseLabel)}</div>
-            ${breadthLine || contribLine || pnlLine ? `<div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
-                ${escapeHtml([breadthLine, contribLine, pnlLine].filter(Boolean).join(' • '))}
+            ${breadthLine || contribLine || pnlLine || corrLine ? `<div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+                ${escapeHtml([breadthLine, contribLine, pnlLine, corrLine].filter(Boolean).join(' • '))}
             </div>` : ''}
             <div style="margin-top:8px;opacity:.82;font-size:12px;line-height:1.35;">
                 ${escapeHtml(`Escala: -10 a +10 • Zona neutra: -${formatNumber(neutralCutAbs, 1)} a +${formatNumber(neutralCutAbs, 1)} • Posição: ${formatNumber(pctPos * 100, 0)}%`)}
