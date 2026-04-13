@@ -6414,6 +6414,11 @@ function renderOperationalBriefing() {
         win: combined.win.conflict ? macroWin : combined.win,
     };
 
+    const finalBias = {
+        WDO: { bias: combined.wdo.conflict ? macroWdo.bias : combined.wdo.bias, source: combined.wdo.conflict ? 'MACRO' : 'REGIME+NEWS' },
+        WIN: { bias: combined.win.conflict ? macroWin.bias : combined.win.bias, source: combined.win.conflict ? 'MACRO' : 'REGIME+NEWS' },
+    };
+
     const confidence = (() => {
         const base = regime && typeof regime.convictionScore === 'number' && Number.isFinite(regime.convictionScore)
             ? regime.convictionScore
@@ -6503,7 +6508,8 @@ function renderOperationalBriefing() {
         const near = width > 0 ? width * 0.12 : 0;
         const isNear = (a, b) => typeof a === 'number' && typeof b === 'number' && near > 0 ? Math.abs(a - b) <= near : false;
 
-        const bias = sym === 'WDO' ? combined.wdo.bias : sym === 'WIN' ? combined.win.bias : 'neutral';
+        const fb = sym === 'WDO' ? finalBias.WDO : sym === 'WIN' ? finalBias.WIN : { bias: 'neutral', source: '—' };
+        const bias = fb.bias;
 
         const gate = (() => {
             if (bias === 'buy') {
@@ -6566,6 +6572,7 @@ function renderOperationalBriefing() {
                     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                         ${badge(biasTone(bias), biasLabel(sym, bias))}
                         ${badge(gammaTone, gammaLabel)}
+                        ${badge('neutral', `Fonte: ${fb.source}`)}
                     </div>
                     <div style="margin-top:8px;width:100%;">${gaugeHtml(sym, finalScoreFor(sym))}</div>
                 </div>
@@ -6906,6 +6913,10 @@ function renderOperationalBriefing() {
                     <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Threshold Juros (${formatNumber(operationalTuning.threshold.yields, 2)})</div>
                     <input id="op-th-yields" type="range" min="0" max="0.5" step="0.01" value="${operationalTuning.threshold.yields}" />
                 </div>
+                <div>
+                    <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Threshold ZQ slope (${formatNumber(operationalTuning.threshold.zqSlope, 2)}%)</div>
+                    <input id="op-th-zq" type="range" min="0" max="0.5" step="0.01" value="${operationalTuning.threshold.zqSlope}" />
+                </div>
             </div>
             <div style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;">
                 <div>
@@ -6927,6 +6938,10 @@ function renderOperationalBriefing() {
                 <div>
                     <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Peso Juros (${formatNumber(operationalTuning.weight.yields, 2)})</div>
                     <input id="op-w-yields" type="range" min="0" max="1" step="0.01" value="${operationalTuning.weight.yields}" />
+                </div>
+                <div>
+                    <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Peso ZQ (${formatNumber(operationalTuning.weight.zq, 2)})</div>
+                    <input id="op-w-zq" type="range" min="0" max="1" step="0.01" value="${operationalTuning.weight.zq}" />
                 </div>
             </div>
         </div>
@@ -7155,11 +7170,13 @@ function renderOperationalBriefing() {
         bindRange('op-th-em', 'threshold', 'em');
         bindRange('op-th-export', 'threshold', 'export');
         bindRange('op-th-yields', 'threshold', 'yields');
+        bindRange('op-th-zq', 'threshold', 'zqSlope');
         bindRange('op-w-flow', 'weight', 'flow');
         bindRange('op-w-dxy', 'weight', 'dxy');
         bindRange('op-w-export', 'weight', 'export');
         bindRange('op-w-em', 'weight', 'em');
         bindRange('op-w-yields', 'weight', 'yields');
+        bindRange('op-w-zq', 'weight', 'zq');
     } catch {
     }
 
@@ -7178,6 +7195,7 @@ function renderOperationalBriefing() {
                 em: macro && macro.em ? macro.em.pct : null,
                 us10y: macro && macro.yields ? macro.yields.us10yPct : null,
                 br10y: macro && macro.yields ? macro.yields.br10yPct : null,
+                zqSlope: macro && macro.zq ? macro.zq.slopePct : null,
             },
         };
         const prev = (() => {

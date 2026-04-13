@@ -432,9 +432,45 @@
                 meansAllEl.innerText = '';
                 return;
             }
-            const avgMidRange = perExp.reduce((acc, x) => acc + x.means.midRange, 0) / perExp.length;
-            const avgMeanByOi = perExp.reduce((acc, x) => acc + x.means.meanByOi, 0) / perExp.length;
-            meansAllEl.innerText = `Médias (todos vencimentos): Intervalo ${formatMeanValue(avgMidRange)} | Por OI ${formatMeanValue(avgMeanByOi)}`;
+
+            const pickCurrentExpiry = () => {
+                const now = new Date();
+                const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+                for (const e of expiries) {
+                    const t = Date.parse(`${String(e)}T00:00:00Z`);
+                    if (Number.isFinite(t) && t >= todayUtc) return e;
+                }
+                return expiries[0];
+            };
+
+            const currentExpiry = pickCurrentExpiry();
+            const currentRow = perExp.find((x) => x.e === currentExpiry) || null;
+            const currentLine = currentRow
+                ? `Médias (contrato atual ${currentExpiry}): Intervalo ${formatMeanValue(currentRow.means.midRange)} | Por OI ${formatMeanValue(currentRow.means.meanByOi)}`
+                : '';
+
+            const merged = (() => {
+                const byStrike = new Map();
+                for (const e of expiries) {
+                    const pts = buildPoints(e, minOi);
+                    for (const p of pts) {
+                        const s = Number(p.strike);
+                        const w = Number(p.total);
+                        if (!Number.isFinite(s) || !Number.isFinite(w) || w <= 0) continue;
+                        byStrike.set(s, (byStrike.get(s) || 0) + w);
+                    }
+                }
+                const out = Array.from(byStrike.entries())
+                    .map(([strike, total]) => ({ strike, call: 0, put: 0, total }))
+                    .sort((a, b) => a.strike - b.strike);
+                return out;
+            })();
+            const allMeans = calcMeans(merged);
+            const allLine = allMeans
+                ? `Médias (todos vencimentos): Intervalo ${formatMeanValue(allMeans.midRange)} | Por OI ${formatMeanValue(allMeans.meanByOi)}`
+                : '';
+
+            meansAllEl.innerHTML = currentLine && allLine ? `${currentLine}<br>${allLine}` : (currentLine || allLine || '');
         };
 
         const render = () => {
