@@ -1382,6 +1382,16 @@ function renderRegimeConviction(data) {
         const wSum = basketParts.reduce((s, x) => s + x.w, 0);
         const exportScore = wSum > 0 ? basketParts.reduce((s, x) => s + (x.v * x.w), 0) / wSum : null;
         const tipsEtfPct = pctOfAlias('TIPS_ETF');
+        const zqCurve = (() => {
+            try {
+                return window.ZQ_CURVE_DATA || null;
+            } catch {
+                return null;
+            }
+        })();
+        const zqSlope = zqCurve && typeof zqCurve.slopePct === 'number' && Number.isFinite(zqCurve.slopePct) ? zqCurve.slopePct : null;
+        const zqRisk = zqCurve && zqCurve.riskMode ? String(zqCurve.riskMode) : null;
+        const zqCount = zqCurve && typeof zqCurve.contractCount === 'number' && Number.isFinite(zqCurve.contractCount) ? zqCurve.contractCount : null;
         operationalInputs.macro = {
             flow: { label: regimeLabel, score: regimeScore },
             betaDelta,
@@ -1394,7 +1404,9 @@ function renderRegimeConviction(data) {
             },
             exportScore,
             yields: { us10yPct, br10yPct, tipsEtfPct },
+            zq: zqCurve ? { riskMode: zqRisk, slopePct: zqSlope, contractCount: zqCount, generatedAt: zqCurve.generatedAt || null } : null,
         };
+        operationalInputs.zqCurve = zqCurve;
     } catch {
     }
     try { renderOperationalBriefing(); } catch { }
@@ -3353,16 +3365,6 @@ function renderBtcOperationalBriefing() {
         return `Camadas: Driver ${fmt2(d.net)} (${String(d.count)}) • Conf ${fmt2(c.net)} (${String(c.count)}) • Contexto ${fmt2(x.net)} (${String(x.count)})`;
     })();
 
-    const corrLine = (() => {
-        const fc = hkNow.flowCorr || null;
-        const items = fc && Array.isArray(fc.items) ? fc.items : [];
-        const parts = items
-            .filter(x => x && typeof x.corr === 'number' && Number.isFinite(x.corr) && typeof x.n === 'number' && Number.isFinite(x.n) && x.n >= 20)
-            .slice(0, 5)
-            .map(x => `${String(x.label || 'Corr')} ${fmt2(x.corr)} (n=${String(Math.floor(x.n))})`);
-        return parts.length ? `Corr (fluxo): ${parts.join(' • ')}` : '';
-    })();
-
     const missing = btcNow.coverage && Array.isArray(btcNow.coverage.missing) ? btcNow.coverage.missing : [];
     const missingPretty = (() => {
         const keyLabels = btcNow.coverage && btcNow.coverage.keyLabels && typeof btcNow.coverage.keyLabels === 'object' ? btcNow.coverage.keyLabels : {};
@@ -3445,7 +3447,17 @@ function renderHk50OperationalBriefing() {
     const data = getData();
     const rawWeb = operationalInputs.webNews || null;
     const web = rawWeb && rawWeb.ok === true ? rawWeb : null;
-    const hkNow = data ? computeHk50PulseNow(data, web) : null;
+    let hkNow = null;
+    try {
+        hkNow = data ? computeHk50PulseNow(data, web) : null;
+    } catch {
+        el.innerHTML = `
+            <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);opacity:.88;">
+                HK50: erro ao montar o bloco (verifique se os aliases HK50/HSI e drivers estão na carteira).
+            </div>
+        `;
+        return;
+    }
 
     const badge = (tone, text) => {
         const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
@@ -3550,6 +3562,15 @@ function renderHk50OperationalBriefing() {
         const c = g.confirm || { net: 0, count: 0 };
         const x = g.context || { net: 0, count: 0 };
         return `Camadas: Driver ${fmt2(d.net)} (${String(d.count)}) • Conf ${fmt2(c.net)} (${String(c.count)}) • Contexto ${fmt2(x.net)} (${String(x.count)})`;
+    })();
+    const corrLine = (() => {
+        const fc = hkNow.flowCorr || null;
+        const items = fc && Array.isArray(fc.items) ? fc.items : [];
+        const parts = items
+            .filter(x => x && typeof x.corr === 'number' && Number.isFinite(x.corr) && typeof x.n === 'number' && Number.isFinite(x.n) && x.n >= 20)
+            .slice(0, 5)
+            .map(x => `${String(x.label || 'Corr')} ${fmt2(x.corr)} (n=${String(Math.floor(x.n))})`);
+        return parts.length ? `Corr (fluxo): ${parts.join(' • ')}` : '';
     })();
 
     const missing = hkNow.coverage && Array.isArray(hkNow.coverage.missing) ? hkNow.coverage.missing : [];
@@ -4113,11 +4134,11 @@ function saveAgenda(items) {
 let agendaAutoCache = null;
 let agendaAutoLoading = false;
 
-let operationalInputs = { regime: null, optionsGamma: null, webNews: null, foreignFlow: null, macro: null };
+let operationalInputs = { regime: null, optionsGamma: null, webNews: null, foreignFlow: null, zqCurve: null, macro: null };
 
 const operationalTuning = {
-    threshold: { dxy: 0.12, em: 0.12, export: 0.25, yields: 0.12, foreignFlow: 0.25 },
-    weight: { flow: 0.5, dxy: 0.4, export: 0.3, em: 0.4, yields: 0.25, foreignFlow: 0.22 },
+    threshold: { dxy: 0.12, em: 0.12, export: 0.25, yields: 0.12, foreignFlow: 0.25, zqSlope: 0.08 },
+    weight: { flow: 0.5, dxy: 0.4, export: 0.3, em: 0.4, yields: 0.25, foreignFlow: 0.22, zq: 0.22 },
 };
 
 function loadOperationalTuning() {
@@ -6123,6 +6144,99 @@ async function loadForeignFlow() {
     return false;
 }
 
+function renderZqCurveBriefing() {
+    const el = document.getElementById('zqCurveBriefing');
+    if (!el) return;
+
+    const data = (() => {
+        try {
+            return window.ZQ_CURVE_DATA || null;
+        } catch {
+            return null;
+        }
+    })();
+
+    const badge = (tone, text) => {
+        const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
+        return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
+    };
+
+    if (!data || !Array.isArray(data.items) || !data.items.length) {
+        el.innerHTML = `
+            <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);opacity:.88;">
+                Curva ZQ indisponível (zq_curve.js/json).
+            </div>
+        `;
+        return;
+    }
+
+    const items = data.items.slice(0, 36);
+    const count = typeof data.contractCount === 'number' && Number.isFinite(data.contractCount) ? data.contractCount : data.items.length;
+    const slope = typeof data.slopePct === 'number' && Number.isFinite(data.slopePct) ? data.slopePct : null;
+    const risk = String(data.riskMode || 'N/D');
+    const tone = risk === 'RISK_OFF' ? 'negative' : risk === 'RISK_ON' ? 'positive' : 'neutral';
+
+    const first = data.items[0] || null;
+    const last = data.items[data.items.length - 1] || null;
+    const headLine = (() => {
+        const a = first && typeof first.impliedRatePct === 'number' ? first.impliedRatePct : null;
+        const b = last && typeof last.impliedRatePct === 'number' ? last.impliedRatePct : null;
+        const lo = a !== null ? `${formatNumber(a, 3)}%` : '—';
+        const hi = b !== null ? `${formatNumber(b, 3)}%` : '—';
+        const sl = slope !== null ? `${formatNumber(slope, 2)}%` : '—';
+        return `Curva: curto ${lo} → longo ${hi} • slope ${sl}`;
+    })();
+
+    const rowsHtml = items.map(it => {
+        const vertex = it && it.vertex ? String(it.vertex) : '—';
+        const exp = it && it.expirationFmt ? String(it.expirationFmt) : '—';
+        const px = it && typeof it.lastPrice === 'number' ? formatNumber(it.lastPrice, 4) : '—';
+        const rate = it && typeof it.impliedRatePct === 'number' ? `${formatNumber(it.impliedRatePct, 3)}%` : '—';
+        const dayPct = it && typeof it.dayChangePct === 'number' && Number.isFinite(it.dayChangePct) ? formatPercent(it.dayChangePct, 2) : '—';
+        return `
+            <tr>
+                <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(vertex)}</td>
+                <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);opacity:.92;">${escapeHtml(exp)}</td>
+                <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;">${escapeHtml(px)}</td>
+                <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(rate)}</td>
+                <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;">${escapeHtml(dayPct)}</td>
+            </tr>
+        `;
+    }).join('');
+
+    el.innerHTML = `
+        <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;">Curva Fed Funds (ZQ)</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    ${badge(tone, `Regime: ${risk}`)}
+                    ${badge('neutral', `Contratos: ${String(count)}`)}
+                </div>
+            </div>
+            <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+                ${escapeHtml(headLine)}
+            </div>
+            <div style="margin-top:10px;border-top:1px solid rgba(255,255,255,.10);padding-top:10px;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Vértice</th>
+                            <th style="text-align:left;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Venc.</th>
+                            <th style="text-align:right;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Preço</th>
+                            <th style="text-align:right;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Juro Implícito</th>
+                            <th style="text-align:right;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Δ% dia</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+            </div>
+            <div style="margin-top:10px;opacity:.72;font-size:12px;">
+                Fórmula: <span style="font-family:'Share Tech Mono',monospace;">100 - preço</span> • Atualizado em ${escapeHtml(formatDateTime(data.generatedAt || ''))}
+            </div>
+        </div>
+    `;
+}
+
 function renderOperationalBriefing() {
     const el = document.getElementById('operationalBriefing');
     if (!el) return;
@@ -6277,6 +6391,15 @@ function renderOperationalBriefing() {
                 const b = symbol === 'WDO' ? dir : -dir;
                 push(b, operationalTuning.weight.yields * 0.8);
             }
+        }
+        if (macro.zq && typeof macro.zq.slopePct === 'number' && Number.isFinite(macro.zq.slopePct)) {
+            const t = typeof operationalTuning.threshold.zqSlope === 'number' && Number.isFinite(operationalTuning.threshold.zqSlope)
+                ? operationalTuning.threshold.zqSlope
+                : 0.08;
+            const dir = macro.zq.slopePct > t ? +1 : macro.zq.slopePct < -t ? -1 : 0;
+            const b = symbol === 'WDO' ? dir : -dir;
+            const wZq = typeof operationalTuning.weight.zq === 'number' && Number.isFinite(operationalTuning.weight.zq) ? operationalTuning.weight.zq : 0.22;
+            push(b, wZq);
         }
         const score = w > 0 ? s / w : 0;
         const bias = score > 0.22 ? 'buy' : score < -0.22 ? 'sell' : 'neutral';
@@ -6572,6 +6695,11 @@ function renderOperationalBriefing() {
             const y = macro && macro.yields ? macro.yields : null;
             if (y && typeof y.us10yPct === 'number' && Number.isFinite(y.us10yPct)) parts.push(`Juros US10Y ${formatPercent(y.us10yPct, 2)}`);
             if (y && typeof y.br10yPct === 'number' && Number.isFinite(y.br10yPct)) parts.push(`Juros BR10Y ${formatPercent(y.br10yPct, 2)}`);
+            const zq = macro && macro.zq ? macro.zq : null;
+            if (zq && typeof zq.slopePct === 'number' && Number.isFinite(zq.slopePct)) {
+                const rm = zq.riskMode ? String(zq.riskMode) : '';
+                parts.push(`FedFunds ZQ ${rm ? `${rm} ` : ''}slope ${formatNumber(zq.slopePct, 2)}%`);
+            }
             const symSpx = findAliasSymbolBest(data, 'SPX') || findAliasSymbol(data, 'SPX');
             const spxPct = symSpx ? getChangePct(data, symSpx) : null;
             if (typeof spxPct === 'number' && Number.isFinite(spxPct)) {
@@ -9598,6 +9726,7 @@ function renderAll(data) {
 
     safe(() => renderOverview(data));
     safe(() => renderOperationalBriefing());
+    safe(() => renderZqCurveBriefing());
     safe(() => renderBtcOperationalBriefing());
     safe(() => renderHk50OperationalBriefing());
     safe(() => renderFavorites(data));
@@ -9735,6 +9864,7 @@ async function triggerUpdaterAndReload() {
         }
 
         await loadScriptFresh('assets/data/market_quotes.js');
+        await loadScriptFresh('assets/data/zq_curve.js');
         await loadScriptFresh('assets/data/economic_calendar.js');
         agendaAutoCache = null;
         const updated = getData();
@@ -9806,6 +9936,7 @@ const NAVIGATION_DEFINITION = {
                 { href: '#fx-carry', label: 'FX / Carry' },
                 { href: '#carryIntel', label: 'Carry Trade' },
                 { href: '#ratesBuckets', label: 'Curva (Buckets)' },
+                { href: '#zq-curve', label: 'Curva ZQ' },
                 { href: '#brazilFixedIncomeFlow', label: 'Renda Fixa 🇧🇷' },
                 { href: '#agendaMatrix', label: 'Agenda & Matriz' },
             ],
@@ -10254,6 +10385,7 @@ async function boot() {
     if (!data) {
         try {
             await loadScriptFresh('assets/data/market_quotes.js');
+            await loadScriptFresh('assets/data/zq_curve.js');
             await loadScriptFresh('assets/data/economic_calendar.js');
             await loadScriptFresh('assets/data/foreign_flow.js');
             agendaAutoCache = null;
@@ -10276,6 +10408,7 @@ async function boot() {
                 const ok = await triggerUpdaterAndReload();
                 if (!ok) {
                     await loadScriptFresh('assets/data/market_quotes.js');
+                    await loadScriptFresh('assets/data/zq_curve.js');
                     await loadScriptFresh('assets/data/economic_calendar.js');
                     agendaAutoCache = null;
                     const updated = getData();
@@ -10305,6 +10438,7 @@ async function boot() {
     const refreshQuotes = async source => {
         try {
             await loadScriptFresh('assets/data/market_quotes.js');
+            await loadScriptFresh('assets/data/zq_curve.js');
             await loadScriptFresh('assets/data/economic_calendar.js');
             agendaAutoCache = null;
             const updated = getData();
