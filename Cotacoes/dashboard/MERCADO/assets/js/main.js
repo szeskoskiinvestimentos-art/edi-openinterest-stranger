@@ -6986,6 +6986,12 @@ function renderOperationalBriefing() {
             if (hr > 9 || (hr === 9 && min >= 1)) return '';
             const assets = data && Array.isArray(data.assets) ? data.assets : [];
             const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+            const isRecentPremarketSnapshot = asOf => {
+                if (!(asOf instanceof Date) || !Number.isFinite(asOf.getTime())) return false;
+                const ageMs = now.getTime() - asOf.getTime();
+                const maxAgeMs = 20 * 60 * 60 * 1000;
+                return ageMs >= -2 * 60 * 1000 && ageMs <= maxAgeMs;
+            };
             const rows = assets.map(a => {
                 const last = getLastPoint(data, a.symbol);
                 const asOfVal = last && (last.asOf || last.t) ? (last.asOf || last.t) : null;
@@ -6993,10 +6999,9 @@ function renderOperationalBriefing() {
                 const asOf = Number.isFinite(tMs) ? new Date(tMs) : null;
                 const extPct = last && typeof last.extendedChangePct === 'number' && Number.isFinite(last.extendedChangePct) ? last.extendedChangePct : null;
                 const regularPct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
-                const asOfMin = asOf ? asOf.getHours() * 60 + asOf.getMinutes() : null;
-                const pct = extPct !== null ? extPct : asOf && sameDay(asOf, now) && typeof asOfMin === 'number' && asOfMin <= 9 * 60 ? regularPct : null;
+                const pct = extPct !== null ? extPct : isRecentPremarketSnapshot(asOf) ? regularPct : null;
                 return { symbol: a.symbol, name: a.name, last, pct, asOf, isAdr: isBrazilAdr({ symbol: a.symbol, name: a.name }) };
-            }).filter(r => r.isAdr && r.pct !== null && r.asOf && sameDay(r.asOf, now));
+            }).filter(r => r.isAdr && r.pct !== null && r.asOf && isRecentPremarketSnapshot(r.asOf));
             if (!rows.length) return '';
             const ups = rows.filter(r => r.pct > 0);
             const downs = rows.filter(r => r.pct < 0);
