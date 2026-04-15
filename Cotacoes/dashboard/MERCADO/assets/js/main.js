@@ -268,21 +268,28 @@ function toggleFavorite(symbol) {
 }
 
 const BRAZIL_ADR_SYMBOLS = new Set([
+    'ABEV.K',
     'BBD',
+    'BBDO.K',
     'BOLSY.PK',
     'BSBR.K',
     'EMBJ.K',
+    'EGIEY.PK',
     'GGB',
     'LND',
+    'NU',
+    'PAGS.K',
     'PBR',
     'PBRA',
     'SID',
+    'STNE.O',
     'SUZ',
     'UGP',
     'VALE.K',
     'WEGZY.PK',
     'BDORY.PK',
     'ITUB.K',
+    'XP.O',
 ]);
 
 function isBrazilAdr(row) {
@@ -1392,6 +1399,14 @@ function renderRegimeConviction(data) {
         const zqSlope = zqCurve && typeof zqCurve.slopePct === 'number' && Number.isFinite(zqCurve.slopePct) ? zqCurve.slopePct : null;
         const zqRisk = zqCurve && zqCurve.riskMode ? String(zqCurve.riskMode) : null;
         const zqCount = zqCurve && typeof zqCurve.contractCount === 'number' && Number.isFinite(zqCurve.contractCount) ? zqCurve.contractCount : null;
+        const flowSentinel = data && data.meta && data.meta.flowSentinel ? data.meta.flowSentinel : null;
+        const fsComposite = flowSentinel && typeof flowSentinel.composite === 'number' && Number.isFinite(flowSentinel.composite) ? flowSentinel.composite : null;
+        const fsMode = flowSentinel && typeof flowSentinel.regime === 'object' && flowSentinel.regime && typeof flowSentinel.regime.mode === 'string'
+            ? String(flowSentinel.regime.mode)
+            : null;
+        const fsLabel = flowSentinel && typeof flowSentinel.regime === 'object' && flowSentinel.regime && typeof flowSentinel.regime.label === 'string'
+            ? String(flowSentinel.regime.label)
+            : null;
         operationalInputs.macro = {
             flow: { label: regimeLabel, score: regimeScore },
             betaDelta,
@@ -1405,6 +1420,7 @@ function renderRegimeConviction(data) {
             exportScore,
             yields: { us10yPct, br10yPct, tipsEtfPct },
             zq: zqCurve ? { riskMode: zqRisk, slopePct: zqSlope, contractCount: zqCount, generatedAt: zqCurve.generatedAt || null } : null,
+            flowSentinel: flowSentinel ? { mode: fsMode, label: fsLabel, composite: fsComposite, generatedAt: flowSentinel.generatedAt || null } : null,
         };
         operationalInputs.zqCurve = zqCurve;
     } catch {
@@ -4137,8 +4153,8 @@ let agendaAutoLoading = false;
 let operationalInputs = { regime: null, optionsGamma: null, webNews: null, foreignFlow: null, zqCurve: null, macro: null };
 
 const operationalTuning = {
-    threshold: { dxy: 0.12, em: 0.12, export: 0.25, yields: 0.12, foreignFlow: 0.25, zqSlope: 0.08 },
-    weight: { flow: 0.5, dxy: 0.4, export: 0.3, em: 0.4, yields: 0.25, foreignFlow: 0.22, zq: 0.22 },
+    threshold: { dxy: 0.12, em: 0.12, export: 0.25, yields: 0.12, foreignFlow: 0.25, zqSlope: 0.08, flowSentinel: 0.25 },
+    weight: { flow: 0.5, dxy: 0.4, export: 0.3, em: 0.4, yields: 0.25, foreignFlow: 0.22, zq: 0.22, flowSentinel: 0.18 },
 };
 
 function loadOperationalTuning() {
@@ -6401,6 +6417,15 @@ function renderOperationalBriefing() {
             const wZq = typeof operationalTuning.weight.zq === 'number' && Number.isFinite(operationalTuning.weight.zq) ? operationalTuning.weight.zq : 0.22;
             push(b, wZq);
         }
+        if (macro.flowSentinel && typeof macro.flowSentinel.composite === 'number' && Number.isFinite(macro.flowSentinel.composite)) {
+            const t = typeof operationalTuning.threshold.flowSentinel === 'number' && Number.isFinite(operationalTuning.threshold.flowSentinel)
+                ? operationalTuning.threshold.flowSentinel
+                : 0.25;
+            const dirUsd = macro.flowSentinel.composite < -t ? +1 : macro.flowSentinel.composite > t ? -1 : 0;
+            const b = symbol === 'WDO' ? dirUsd : -dirUsd;
+            const wFs = typeof operationalTuning.weight.flowSentinel === 'number' && Number.isFinite(operationalTuning.weight.flowSentinel) ? operationalTuning.weight.flowSentinel : 0.18;
+            push(b, wFs);
+        }
         const score = w > 0 ? s / w : 0;
         const bias = score > 0.22 ? 'buy' : score < -0.22 ? 'sell' : 'neutral';
         return { bias, score };
@@ -6706,6 +6731,11 @@ function renderOperationalBriefing() {
             if (zq && typeof zq.slopePct === 'number' && Number.isFinite(zq.slopePct)) {
                 const rm = zq.riskMode ? String(zq.riskMode) : '';
                 parts.push(`FedFunds ZQ ${rm ? `${rm} ` : ''}slope ${formatNumber(zq.slopePct, 2)}%`);
+            }
+            const fs = macro && macro.flowSentinel ? macro.flowSentinel : null;
+            if (fs && typeof fs.composite === 'number' && Number.isFinite(fs.composite)) {
+                const lab = fs.label ? String(fs.label) : '';
+                parts.push(`FlowSentinel ${lab ? `${lab} ` : ''}${formatNumber(fs.composite, 3)}`);
             }
             const symSpx = findAliasSymbolBest(data, 'SPX') || findAliasSymbol(data, 'SPX');
             const spxPct = symSpx ? getChangePct(data, symSpx) : null;
@@ -7350,7 +7380,7 @@ function assetAliasMatchers(key) {
     if (k === 'WTI') return [/^USO$/i, /^CL$|^CL=F$|^WTI$/i, /\bWTI\b/i];
     if (k === 'OIL') return [/^BNO$/i, /^LCO\b/i, /^USO$/i, /^CL$|^CL=F$|^BRN$|^BRN=F$|^BZ=F$/i, /\bBrent\b/i, /\bWTI\b/i];
 
-    if (k === 'IRON') return [/^TIOc1$/i, /^SM58Fc1$/i, /^9047$/i, /^3047$/i, /\bmin[eé]rio\b/i, /\biron ore\b/i];
+    if (k === 'IRON') return [/^DCE_I0$/i, /^TIOc1$/i, /^SM58Fc1$/i, /^9047$/i, /^3047$/i, /\bmin[eé]rio\b/i, /\biron ore\b/i];
     if (k === 'SOY') return [/^ZS$/i, /\bsoja\b/i, /\bsoy\b/i];
     if (k === 'COPPER') return [/^HG\b/i, /\bcopper\b/i, /\bcobre\b/i];
     if (k === 'BCI') return [/^BCI$/i, /\babrdn Bloomberg All Commodity Strategy\b/i];
@@ -8750,7 +8780,7 @@ function renderBrazilExportBasket(data) {
     };
 
     const items = [
-        getItem({ key: 'iron', label: 'Minério', matchers: [/^TIOc1$/i, /^SM58Fc1$/i, /^9047$/i, /^3047$/i], weight: 0.28 }),
+        getItem({ key: 'iron', label: 'Minério', matchers: [/^DCE_I0$/i, /^TIOc1$/i, /^SM58Fc1$/i, /^9047$/i, /^3047$/i], weight: 0.28 }),
         getItem({ key: 'soy', label: 'Soja', matchers: [/^ZS$/i], weight: 0.20 }),
         getItem({ key: 'oil', label: 'Petróleo', matchers: [/\bBrent\b/i, /\bWTI\b/i], weight: 0.18 }),
         getItem({ key: 'lumber', label: 'Madeira serrada', matchers: [/^LBc1$/i, /^LBc\d+$/i, /^LXRc1$/i, /^LXRc\d+$/i, /\bMadeira Serrada\b/i, /\bLumber\b/i], weight: 0.02 }),
