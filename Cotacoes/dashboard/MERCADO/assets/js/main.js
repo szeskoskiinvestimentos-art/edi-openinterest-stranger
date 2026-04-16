@@ -1429,16 +1429,9 @@ function renderRegimeConviction(data) {
         const fsProtectionState = flowSentinel && flowSentinel.protectionBlock && flowSentinel.protectionBlock.action && typeof flowSentinel.protectionBlock.action.state === 'string'
             ? String(flowSentinel.protectionBlock.action.state)
             : null;
-        const fsDivergence = (() => {
-            if (!flowSentinel) return false;
-            if (!fsRiskState || !fsProtectionState) return false;
-            if (fsRiskState === 'neutral' || fsProtectionState === 'neutral') return false;
-            if (fsRiskState === fsProtectionState) return false;
-            const strong = Math.max(0.18, fsNeutralThreshold * 1.5);
-            const okRisk = typeof fsRiskScore === 'number' && Math.abs(fsRiskScore) >= strong && (fsRiskObserved === null || fsRiskObserved >= 2);
-            const okProt = typeof fsProtectionScore === 'number' && Math.abs(fsProtectionScore) >= strong && (fsProtectionObserved === null || fsProtectionObserved >= 2);
-            return okRisk && okProt;
-        })();
+        const fsDivergence = flowSentinel && flowSentinel.divergence && typeof flowSentinel.divergence.active === 'boolean'
+            ? flowSentinel.divergence.active
+            : false;
         operationalInputs.macro = {
             flow: { label: regimeLabel, score: regimeScore },
             betaDelta,
@@ -2450,6 +2443,8 @@ function computeOperationalPulseNow(data) {
         { key: 'us10y', group: 'confirm', weight: 0.25, capAbs: 0.6, wdoSign: +1, winSign: -1 },
         { key: 'spx', group: 'confirm', weight: 0.35, capAbs: 1.1, wdoSign: -1, winSign: +1 },
         { key: 'ewz', group: 'confirm', weight: 0.4, capAbs: 1.2, wdoSign: -1, winSign: +1 },
+        { key: 'win', group: 'confirm', weight: 0.32, capAbs: 1.2, wdoSign: -1, winSign: +1 },
+        { key: 'wdo', group: 'confirm', weight: 0.32, capAbs: 1.2, wdoSign: +1, winSign: -1 },
         { key: 'hyg', group: 'confirm', weight: 0.2, capAbs: 1.2, wdoSign: -1, winSign: +1 },
 
         { key: 'us2y', group: 'context', weight: 0.15, capAbs: 0.6, wdoSign: +1, winSign: -1 },
@@ -2519,6 +2514,60 @@ function computeOperationalPulseNow(data) {
 
     const wdo = buildSide('wdo');
     const win = buildSide('win');
+
+    const pair = (() => {
+        const winPct = drv.win.pct;
+        const wdoPct = drv.wdo.pct;
+        if (!isNum(winPct) || !isNum(wdoPct)) return null;
+        const th = 0.25;
+        if (!(winPct >= th && wdoPct <= -th)) return null;
+        const raw = (winPct - wdoPct) / 2;
+        const score = clamp(raw, -1.5, 1.5);
+        const capAbs = 1.5;
+        const weight = 0.85;
+        return { winPct, wdoPct, score, capAbs, weight };
+    })();
+
+    const applyPair = (sideObj, side) => {
+        if (!pair) return;
+        const signed = side === 'wdo' ? -pair.score : +pair.score;
+        const capped = clamp(signed, -pair.capAbs, pair.capAbs);
+        const contrib = pair.weight * (pair.capAbs > 0 ? capped / pair.capAbs : 0);
+        const pnl = pair.weight * capped;
+        sideObj.contribution.net += contrib;
+        sideObj.pnlLike.net += pnl;
+        sideObj.groups.driver.net += contrib;
+        sideObj.groups.driver.pnl += pnl;
+        sideObj.groups.driver.count += 1;
+        if (contrib > 0) {
+            sideObj.breadth.pos += 1;
+            sideObj.contribution.posSum += contrib;
+            sideObj.pnlLike.posSum += pnl;
+        } else if (contrib < 0) {
+            sideObj.breadth.neg += 1;
+            sideObj.contribution.negSum += contrib;
+            sideObj.pnlLike.negSum += pnl;
+        } else {
+            sideObj.breadth.zero += 1;
+        }
+        sideObj.rows.push({
+            key: 'pair',
+            group: 'driver',
+            label: 'WIN↑ + WDO↓ (confirmação)',
+            symbol: null,
+            pct: side === 'wdo' ? pair.wdoPct : pair.winPct,
+            signed,
+            weight: pair.weight,
+            capAbs: pair.capAbs,
+            contrib,
+            pnl,
+        });
+        sideObj.net = clamp(sideObj.contribution.net, -3, 3);
+        sideObj.bias = sideObj.net > 0.25 ? 'buy' : sideObj.net < -0.25 ? 'sell' : 'neutral';
+    };
+
+    applyPair(wdo, 'wdo');
+    applyPair(win, 'win');
 
     const align = (aSym, bSym, th = 0.06) => {
         const a = get(aSym);
@@ -6491,6 +6540,28 @@ function renderOperationalBriefing() {
         WIN: { bias: combined.win.conflict ? macroWin.bias : combined.win.bias, source: combined.win.conflict ? 'MACRO' : 'REGIME+NEWS' },
     };
 
+    const priceLead = (() => {
+        if (!data) return { active: false, reason: '' };
+        const pulse = typeof computeOperationalPulseNow === 'function' ? computeOperationalPulseNow(data) : null;
+        const winPct = pulse && pulse.market ? pulse.market.winPct : null;
+        const wdoPct = pulse && pulse.market ? pulse.market.wdoPct : null;
+        const usdSym = findAliasSymbolBest(data, 'USD_BRL') || findAliasSymbol(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i);
+        const usdPct = usdSym ? getChangePct(data, usdSym) : null;
+        const thWin = 0.25;
+        const thWdo = 0.25;
+        const ok = typeof winPct === 'number' && Number.isFinite(winPct) && typeof wdoPct === 'number' && Number.isFinite(wdoPct)
+            ? (winPct >= thWin && wdoPct <= -thWdo)
+            : false;
+        const okUsd = typeof usdPct === 'number' && Number.isFinite(usdPct) ? usdPct <= -0.04 : true;
+        if (!ok || !okUsd) return { active: false, reason: '' };
+        return { active: true, reason: `WIN ${formatPercent(winPct, 2)} • WDO ${formatPercent(wdoPct, 2)} • USD/BRL ${typeof usdPct === 'number' && Number.isFinite(usdPct) ? formatPercent(usdPct, 2) : '—'}` };
+    })();
+
+    if (priceLead.active) {
+        finalBias.WIN = { bias: 'buy', source: 'PREÇO' };
+        finalBias.WDO = { bias: 'sell', source: 'PREÇO' };
+    }
+
     const confidence = (() => {
         const base = regime && typeof regime.convictionScore === 'number' && Number.isFinite(regime.convictionScore)
             ? regime.convictionScore
@@ -6508,7 +6579,8 @@ function renderOperationalBriefing() {
             }
             return adj;
         })();
-        const out = Math.max(0, Math.min(1, base + newsAdj + macroAdj - conflicts * 0.10));
+        const priceAdj = priceLead.active ? 0.06 : 0;
+        const out = Math.max(0, Math.min(1, base + newsAdj + macroAdj + priceAdj - conflicts * 0.10));
         const label = out >= 0.72 ? 'ALTA' : out >= 0.56 ? 'MÉDIA' : 'BAIXA';
         return { score: out, label };
     })();
@@ -6845,6 +6917,127 @@ function renderOperationalBriefing() {
         return `Flow ${String(macro.flow ? macro.flow.label : '—')} • ${foreignPart} • DXY ${typeof macro.dxyPct === 'number' ? formatPercent(macro.dxyPct, 2) : '—'} • Export ${typeof macro.exportScore === 'number' ? formatPercent(macro.exportScore, 2) : '—'} • EM ${typeof (macro.em && macro.em.pct) === 'number' ? formatPercent(macro.em.pct, 2) : '—'}${corrPart ? ` • ${corrPart}` : ''}${extras}${cdsSignal ? ` • CDS ${typeof cdsSignal.drivers.cds === 'number' ? formatPercent(cdsSignal.drivers.cds, 2) : '—'} (${cdsSignal.mode === 'hedge_on_risk_on' ? 'Hedge-on' : cdsSignal.mode === 'risk_off_classic' ? 'Risk-off' : cdsSignal.mode === 'relief_risk_on' ? 'Alívio' : 'Leitura'})` : ''}`;
     })();
 
+    const corrLine = (() => {
+        if (!data) return null;
+
+        const buildReturnSeries = (symbol, maxPoints = 96) => {
+            const points = data.series && data.series[symbol] ? data.series[symbol] : [];
+            if (!Array.isArray(points) || points.length < 6) return [];
+            const start = Math.max(0, points.length - maxPoints);
+            const out = [];
+            for (let i = start + 1; i < points.length; i += 1) {
+                const a = points[i - 1];
+                const b = points[i];
+                const pa = a && typeof a.price === 'number' && Number.isFinite(a.price) ? a.price : null;
+                const pb = b && typeof b.price === 'number' && Number.isFinite(b.price) ? b.price : null;
+                const ta = a && typeof a.tMs === 'number' && Number.isFinite(a.tMs) ? a.tMs : null;
+                const tb = b && typeof b.tMs === 'number' && Number.isFinite(b.tMs) ? b.tMs : null;
+                if (pa === null || pb === null || ta === null || tb === null) continue;
+                if (pa <= 0 || pb <= 0) continue;
+                const r = Math.log(pb / pa);
+                if (!Number.isFinite(r)) continue;
+                out.push({ tMs: tb, r });
+            }
+            return out;
+        };
+
+        const correlationAligned = (seriesA, seriesB, minPoints = 20) => {
+            if (!Array.isArray(seriesA) || !Array.isArray(seriesB)) return null;
+            const mapB = new Map();
+            for (const p of seriesB) mapB.set(p.tMs, p.r);
+            const xs = [];
+            const ys = [];
+            for (const p of seriesA) {
+                const y = mapB.get(p.tMs);
+                if (typeof y !== 'number' || !Number.isFinite(y)) continue;
+                if (typeof p.r !== 'number' || !Number.isFinite(p.r)) continue;
+                xs.push(p.r);
+                ys.push(y);
+            }
+            const n = xs.length;
+            if (n < minPoints) return null;
+            const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+            const mx = mean(xs);
+            const my = mean(ys);
+            let cov = 0;
+            let vx = 0;
+            let vy = 0;
+            for (let i = 0; i < n; i += 1) {
+                const dx = xs[i] - mx;
+                const dy = ys[i] - my;
+                cov += dx * dy;
+                vx += dx * dx;
+                vy += dy * dy;
+            }
+            if (vx <= 1e-18 || vy <= 1e-18) return null;
+            return { corr: cov / Math.sqrt(vx * vy), n };
+        };
+
+        const corrPair = (aSym, bSym) => {
+            if (!aSym || !bSym) return null;
+            const a = buildReturnSeries(aSym, 96);
+            const b = buildReturnSeries(bSym, 96);
+            const c = correlationAligned(a, b, 20);
+            if (!c || typeof c.corr !== 'number' || !Number.isFinite(c.corr)) return null;
+            return c;
+        };
+
+        const symWin = findAliasSymbolBest(data, 'WIN') || findAssetSymbol(data, /^WINc\d$/i) || null;
+        const symWdo = findAliasSymbolBest(data, 'WDO') || findAssetSymbol(data, /^WDOc\d$/i) || null;
+        const symEwz = findAliasSymbolBest(data, 'EWZ') || findAssetSymbol(data, /^EWZ(\.\w+)?$/i) || null;
+        const symSpx = findAliasSymbolBest(data, 'SPX') || findAliasSymbol(data, 'SPX') || null;
+        const symUsd = findAliasSymbolBest(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i) || null;
+        const symVxbr = findAliasSymbolBest(data, 'VXBR') || findAssetSymbol(data, /(^\.VXBR$|\bVXBR\b)/i) || null;
+
+        const winEwz = corrPair(symWin, symEwz);
+        const winSpx = corrPair(symWin, symSpx);
+        const wdoUsd = corrPair(symWdo, symUsd);
+        const vxbrWin = corrPair(symVxbr, symWin);
+
+        const usdEmfx = (() => {
+            if (!symUsd) return null;
+            const usd = buildReturnSeries(symUsd, 96);
+            const symCnh = findAssetSymbol(data, /^USD\/CNH\b/i);
+            const symMxn = findAssetSymbol(data, /^USD\/MXN\b/i);
+            const symZar = findAssetSymbol(data, /^USD\/ZAR\b/i);
+            const comps = [
+                symCnh ? { sym: symCnh, w: 1 } : null,
+                symMxn ? { sym: symMxn, w: 1 } : null,
+                symZar ? { sym: symZar, w: 1 } : null,
+            ].filter(Boolean);
+            if (!comps.length) return null;
+
+            const compSeries = comps.map(c => ({ w: c.w, map: new Map(buildReturnSeries(c.sym, 96).map(p => [p.tMs, p.r])) }));
+            const basket = [];
+            for (const p of usd) {
+                let sumW = 0;
+                let sumR = 0;
+                let have = 0;
+                for (const cs of compSeries) {
+                    const r = cs.map.get(p.tMs);
+                    if (typeof r !== 'number' || !Number.isFinite(r)) continue;
+                    sumW += cs.w;
+                    sumR += cs.w * r;
+                    have += 1;
+                }
+                if (have < 2 || sumW <= 0) continue;
+                basket.push({ tMs: p.tMs, r: sumR / sumW });
+            }
+            const c = correlationAligned(usd, basket, 20);
+            return c && typeof c.corr === 'number' && Number.isFinite(c.corr) ? c : null;
+        })();
+
+        const fmt = c => `${formatNumber(c.corr, 2)}${c.n ? ` (n=${String(c.n)})` : ''}`;
+        const parts = [];
+        if (winEwz) parts.push(`WIN×EWZ ${fmt(winEwz)}`);
+        if (winSpx) parts.push(`WIN×SPX ${fmt(winSpx)}`);
+        if (wdoUsd) parts.push(`WDO×USD/BRL ${fmt(wdoUsd)}`);
+        if (usdEmfx) parts.push(`USD/BRL×EMFX ${fmt(usdEmfx)}`);
+        if (vxbrWin) parts.push(`VXBR×WIN ${fmt(vxbrWin)}`);
+        if (!parts.length) return null;
+        return `Correlações (janela curta): ${parts.join(' • ')}`;
+    })();
+
     const pulseNow = data ? computeOperationalPulseNow(data) : null;
     const pulseCard = (() => {
         if (!pulseNow) return '';
@@ -6979,7 +7172,7 @@ function renderOperationalBriefing() {
             </div>
         </div>
         <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
-            ${escapeHtml(regimeLine)} • ${escapeHtml(newsLine)} • ${escapeHtml(macroLine)}
+            ${escapeHtml(regimeLine)} • ${escapeHtml(newsLine)} • ${escapeHtml(macroLine)}${corrLine ? ` • ${escapeHtml(corrLine)}` : ''}
         </div>
         <div id="opTuningPanel" style="display:none;margin-top:10px;border:1px dashed rgba(255,255,255,.20);border-radius:12px;padding:10px;background:rgba(0,0,0,.18);">
             <div style="font-weight:900;letter-spacing:.8px;margin-bottom:8px;opacity:.92;">Calibração rápida</div>
@@ -7163,6 +7356,15 @@ function renderOperationalBriefing() {
                         `);
                         rows.push(`
                             <tr>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">Confirmação (WIN↑ &amp; WDO↓)</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(priceLead.active ? 'positive' : 'neutral', priceLead.active ? priceLead.reason : '—')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(priceLead.active ? 'negative' : 'neutral', priceLead.active ? 'Venda' : 'Neutro')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(priceLead.active ? 'positive' : 'neutral', priceLead.active ? 'Compra' : 'Neutro')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', 'tático')}</td>
+                            </tr>
+                        `);
+                        rows.push(`
+                            <tr>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">DXY</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mkPct(macro ? macro.dxyPct : null)}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWdo.score), macroWdo.bias === 'buy' ? 'Compra' : macroWdo.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
@@ -7213,7 +7415,7 @@ function renderOperationalBriefing() {
                                     const b = -dirUsd;
                                     return mk(dirTone(b), b > 0 ? 'Compra' : b < 0 ? 'Venda' : 'Neutro');
                                 })()}</td>
-                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', String(operationalTuning.weight.flowSentinel || 0.18))}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', String((typeof operationalTuning.weight.flowSentinel === 'number' && Number.isFinite(operationalTuning.weight.flowSentinel)) ? operationalTuning.weight.flowSentinel : 0.18))}</td>
                             </tr>
                         `);
                         rows.push(`
@@ -7825,21 +8027,7 @@ function renderFlowSentinel(data) {
             </div>
         `);
 
-            const baseAlerts = Array.isArray(pre.alerts) ? pre.alerts : [];
-            const derivedAlerts = (() => {
-                const out = [];
-                const betaPosAbs = typeof betaPosScore === 'number' ? Math.abs(betaPosScore) : 0;
-                const betaNegAbs = typeof betaNegScore === 'number' ? Math.abs(betaNegScore) : 0;
-                const strong = Math.max(0.18, neutralThreshold * 1.5);
-                if (betaPosCount >= 2 && betaNegCount >= 2 && betaPosAction.state !== betaNegAction.state && betaPosAbs >= strong && betaNegAbs >= strong) {
-                    out.push('Divergência: blocos Risco e Proteção estão puxando para lados opostos.');
-                }
-                if (delta !== null && Math.abs(delta) < neutralThreshold && betaPosAbs >= strong && betaNegAbs >= strong) {
-                    out.push('Sem consenso: delta neutro com blocos “fortes” (ruído/abertura).');
-                }
-                return out;
-            })();
-            const merged = Array.from(new Set(baseAlerts.concat(derivedAlerts).map(x => String(x || '').trim()).filter(Boolean)));
+            const merged = Array.from(new Set((Array.isArray(pre.alerts) ? pre.alerts : []).map(x => String(x || '').trim()).filter(Boolean)));
             setHtml('fs-alerts', merged.length
                 ? `
                 <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
