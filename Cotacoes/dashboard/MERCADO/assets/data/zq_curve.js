@@ -1,1 +1,1 @@
-window.ZQ_CURVE_DATA={"generatedAt":"2026-04-16T14:26:11.683Z","rootSymbol":"ZQ=F","contractCount":0,"formula":"implied_rate_pct = 100 - last_price","slopePct":null,"riskMode":"N/D","items":[]};
+window.ZQ_CURVE_DATA={"generatedAt":"2026-04-16T14:29:55.251Z","rootSymbol":"ZQ=F","contractCount":0,"formula":"implied_rate_pct = 100 - last_price","slopePct":null,"riskMode":"N/D","items":[]};
