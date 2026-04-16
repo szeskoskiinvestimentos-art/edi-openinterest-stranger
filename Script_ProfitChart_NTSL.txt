@@ -1,4 +1,4 @@
-// NTSL Indicator - Edi OpenInterest Levels - 16/04/2026 10:03
+// NTSL Indicator - Edi OpenInterest Levels - 16/04/2026 13:20
 // Gerado Automaticamente
 
 const
@@ -29,672 +29,273 @@ input
   MostrarTodosPontos(false);
   ModeloFlip(7);
   spot(0);
-  // 1 = Classic (259081.28)
-  // 2 = Spline (259081.28)
-  // 3 = HVL (146649.78)
-  // 4 = HVL Log (146649.78)
-  // 5 = Sigma Kernel (146649.78)
-  // 6 = PVOP (259081.28)
-  // 7 = HVL Gaussian (259081.28)
+  // 1 = Classic (145541.91)
+  // 2 = Spline (145541.91)
+  // 3 = HVL (145541.91)
+  // 4 = HVL Log (145541.91)
+  // 5 = Sigma Kernel (145541.91)
+  // 6 = PVOP (145541.91)
+  // 7 = HVL Gaussian (145541.91)
 
 var
   GammaVal: Float;
 
 begin
   // Inicializa GammaVal com o primeiro disponivel por seguranca
-  GammaVal := 259081.28;
+  GammaVal := 145541.91;
 
-  if (ModeloFlip = 1) then GammaVal := 259081.28;
-  if (ModeloFlip = 2) then GammaVal := 259081.28;
-  if (ModeloFlip = 3) then GammaVal := 146649.78;
-  if (ModeloFlip = 4) then GammaVal := 146649.78;
-  if (ModeloFlip = 5) then GammaVal := 146649.78;
-  if (ModeloFlip = 6) then GammaVal := 259081.28;
-  if (ModeloFlip = 7) then GammaVal := 259081.28;
+  if (ModeloFlip = 1) then GammaVal := 145541.91;
+  if (ModeloFlip = 2) then GammaVal := 145541.91;
+  if (ModeloFlip = 3) then GammaVal := 145541.91;
+  if (ModeloFlip = 4) then GammaVal := 145541.91;
+  if (ModeloFlip = 5) then GammaVal := 145541.91;
+  if (ModeloFlip = 6) then GammaVal := 145541.91;
+  if (ModeloFlip = 7) then GammaVal := 145541.91;
 
   // --- Linhas Principais (Com Intercalação de Texto) ---
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(68436.57, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(67919.56, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(68436.57, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(67919.56, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(73324.89, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(72770.95, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(73324.89, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(72770.95, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(78213.22, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(77622.35, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(78213.22, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(77622.35, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(83101.54, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(82473.75, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(83101.54, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(82473.75, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(87989.87, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(87325.14, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(87989.87, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(87325.14, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(92878.20, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(92176.54, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(92878.20, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(92176.54, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(97766.52, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(97027.94, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(97766.52, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(97027.94, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(102654.85, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(101879.34, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(102654.85, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(101879.34, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(107543.17, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(106730.73, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(107543.17, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(106730.73, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(112431.50, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(111582.13, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(112431.50, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(111582.13, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(117319.83, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(116433.53, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(117319.83, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(116433.53, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(122208.15, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(121284.92, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(122208.15, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(121284.92, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(127096.48, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(126136.32, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(127096.48, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(126136.32, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(131984.80, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(130987.72, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(131984.80, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(130987.72, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(136873.13, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(135839.11, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(136873.13, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(135839.11, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(141761.46, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(140690.51, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(141761.46, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(140690.51, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(146649.78, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(145541.91, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(146649.78, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(151538.11, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(151538.11, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(153982.27, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(153982.27, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(156426.44, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(156426.44, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(158870.60, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(158870.60, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(161314.76, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(161314.76, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(145541.91, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirEffectiveWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(161813.75, clEffectiveWall, 2, psDashDot, "Edi Effective Put", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(148425.09, clEffectiveWall, 2, psDashDot, "Edi Effective Put", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(163758.92, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(150393.30, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(163758.92, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(150393.30, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(166203.09, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(152819.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(166203.09, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(152819.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+  if (ExibirWalls and MostrarTodosPontos) then
+    HorizontalLineCustom(155244.70, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+  if (ExibirWalls and MostrarTodosPontos) then
+    HorizontalLineCustom(155244.70, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+  if (ExibirEffectiveWalls and MostrarTodosPontos) then
+    HorizontalLineCustom(155244.70, clEffectiveWall, 2, psDashDot, "Edi Effective Call", TamanhoFonte, tpBottomRight, 0, 0);
   if (ExibirMaxPain and MostrarTodosPontos) then
-    HorizontalLineCustom(166203.09, clMaxPain, 2, psSolid, "Edi_MaxPain", TamanhoFonte, tpBottomRight, CurrentDate, 0);
+    HorizontalLineCustom(155244.70, clMaxPain, 2, psSolid, "Edi_MaxPain", TamanhoFonte, tpTopRight, CurrentDate, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(168647.25, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(157670.40, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(168647.25, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(157670.40, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(171091.41, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(160096.10, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(171091.41, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(173535.58, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(173535.58, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(175979.74, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(175979.74, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(178423.90, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(178423.90, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(180868.07, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(180868.07, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(183312.23, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(183312.23, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(185756.39, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(185756.39, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(188200.55, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(188200.55, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(190644.72, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(190644.72, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(193088.88, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(193088.88, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(193088.88, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(193088.88, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(195533.04, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(195533.04, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(195533.04, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(195533.04, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(160096.10, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirRange and MostrarTodosPontos) then
-    HorizontalLineCustom(196195.85, clRangeLow, 1, psDot, "Edi_Range_1D", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(194995.46, clRangeLow, 1, psDot, "Edi_Range_1D", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirRange and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(196195.85, clRangeLow, 1, psDot, "Edi_Range_1D", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(194995.46, clRangeLow, 1, psDot, "Edi_Range_1D", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirExpMoves and MostrarTodosPontos) then
-    HorizontalLineCustom(196195.85, clExpMove, 1, psDot, "Edi_EM_Exp", TamanhoFonte, tpBottomRight, 0, 0);
+    HorizontalLineCustom(194995.46, clExpMove, 1, psDot, "Edi_EM_Exp", TamanhoFonte, tpBottomRight, 0, 0);
   if (ExibirExpMoves and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(196195.85, clExpMove, 1, psDot, "Edi_EM_Exp", TamanhoFonte, tpBottomRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(197977.21, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(197977.21, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(197977.21, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(197977.21, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(200421.37, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(200421.37, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(200421.37, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(200421.37, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(202865.53, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(202865.53, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(202865.53, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(202865.53, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(205309.70, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(205309.70, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(205309.70, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(205309.70, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(207753.86, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(207753.86, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(207753.86, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(207753.86, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(194995.46, clExpMove, 1, psDot, "Edi_EM_Exp", TamanhoFonte, tpBottomRight, 0, 0);
   if (ExibirRange and MostrarTodosPontos) then
-    HorizontalLineCustom(209144.15, clRangeHigh, 1, psDot, "Edi_Range_1D", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(207864.54, clRangeHigh, 1, psDot, "Edi_Range_1D", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirRange and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(209144.15, clRangeHigh, 1, psDot, "Edi_Range_1D", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(207864.54, clRangeHigh, 1, psDot, "Edi_Range_1D", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirExpMoves and MostrarTodosPontos) then
-    HorizontalLineCustom(209144.15, clExpMove, 1, psDot, "Edi_EM_Exp", TamanhoFonte, tpBottomRight, 0, 0);
+    HorizontalLineCustom(207864.54, clExpMove, 1, psDot, "Edi_EM_Exp", TamanhoFonte, tpBottomRight, 0, 0);
   if (ExibirExpMoves and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(209144.15, clExpMove, 1, psDot, "Edi_EM_Exp", TamanhoFonte, tpBottomRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(210198.02, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(210198.02, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(210198.02, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(210198.02, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(212642.19, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(212642.19, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(212642.19, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(212642.19, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirEffectiveWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(213136.19, clEffectiveWall, 2, psDashDot, "Edi Effective Call", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(215086.35, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(215086.35, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(217530.51, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(217530.51, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(219974.67, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(219974.67, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(224863.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(224863.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(229751.33, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(229751.33, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(234639.65, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(234639.65, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(239527.98, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(239527.98, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(244416.30, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(244416.30, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(249304.63, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(249304.63, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(254192.96, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(254192.96, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(259081.28, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(263969.61, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(268857.94, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(268857.94, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(273746.26, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(278634.59, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(293299.57, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(207864.54, clExpMove, 1, psDot, "Edi_EM_Exp", TamanhoFonte, tpBottomRight, 0, 0);
 
   // Flips (Dinâmicos)
   if (ExibirFlips) then begin
     if (GammaVal > 0) then
       HorizontalLineCustom(GammaVal, clGammaFlip, 2, psDash, "Edi_GammaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    if (172269.50 > 0) then
-      HorizontalLineCustom(172269.50, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    if (171215.50 > 0) then
+      HorizontalLineCustom(171215.50, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
   end;
 
   // Edi_Wall (Midpoints) - Grid Completo
   if (ExibirEdiWall) then begin
-    if (MostrarTodosPontos) then HorizontalLineCustom(70880.73, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(75769.05, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(80657.38, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(85545.71, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(90434.03, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(95322.36, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(100210.68, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(105099.01, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(109987.34, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(114875.66, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(119763.99, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(124652.32, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(129540.64, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(134428.97, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(139317.29, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(144205.62, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(149093.95, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(152760.19, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(155204.35, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(157648.52, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(160092.68, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(162536.84, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(164981.01, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(167425.17, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(169869.33, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(172313.49, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(174757.66, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(177201.82, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(179645.98, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(182090.15, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(184534.31, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(186978.47, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(189422.64, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(191866.80, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(194310.96, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(194310.96, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(196755.13, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(196755.13, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(199199.29, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(199199.29, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(201643.45, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(201643.45, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(204087.61, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(204087.61, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(206531.78, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(206531.78, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(208975.94, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(208975.94, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(211420.10, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(211420.10, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(213864.27, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(216308.43, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(218752.59, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(222418.84, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(227307.16, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(232195.49, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(237083.82, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(241972.14, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(246860.47, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(251748.79, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(256637.12, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(261525.45, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(266413.77, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(271302.10, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(276190.42, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(285967.08, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(70345.26, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(75196.65, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(80048.05, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(84899.45, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(89750.84, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(94602.24, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(99453.64, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(104305.03, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(109156.43, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(114007.83, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(118859.22, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(123710.62, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(128562.02, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(133413.42, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(138264.81, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(143116.21, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(147967.61, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(151606.15, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(154031.85, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(156457.55, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(158883.25, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
   end;
 
   if (MostrarPLUS) then begin
-    if (MostrarTodosPontos) then HorizontalLineCustom(70303.91, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(71457.55, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(75192.23, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(76345.88, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(80080.56, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(81234.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(84968.88, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(86122.53, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(89857.21, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(91010.86, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(94745.54, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(95899.18, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(99633.86, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(100787.51, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(104522.19, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(105675.83, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(109410.51, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(110564.16, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(114298.84, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(115452.49, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(119187.17, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(120340.81, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(124075.49, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(125229.14, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(128963.82, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(130117.46, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(133852.15, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(135005.79, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(138740.47, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(139894.12, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(143628.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(144782.44, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(148517.12, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(149670.77, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(152471.78, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(153048.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(154915.94, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(155492.76, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(157360.11, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(157936.93, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(159804.27, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(160381.09, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(162248.43, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(162825.25, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(164692.59, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(165269.42, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(167136.76, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(167713.58, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(169580.92, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(170157.74, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(172025.08, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(172601.91, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(174469.25, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(175046.07, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(176913.41, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(177490.23, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(179357.57, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(179934.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(181801.74, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(182378.56, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(184245.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(184822.72, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(186690.06, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(187266.88, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(189134.23, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(189711.05, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(191578.39, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(192155.21, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(194022.55, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(194022.55, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(194599.37, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(194599.37, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(196466.71, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(196466.71, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(197043.54, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(197043.54, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(198910.88, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(198910.88, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(199487.70, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(199487.70, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(201355.04, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(201355.04, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(201931.86, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(201931.86, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(203799.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(203799.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(204376.03, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(204376.03, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(206243.37, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(206243.37, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(206820.19, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(206820.19, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(208687.53, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(208687.53, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(209264.35, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(209264.35, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(211131.69, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(211131.69, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(211708.51, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(211708.51, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(213575.86, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(214152.68, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(216020.02, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(216596.84, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(218464.18, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(219041.00, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(221842.01, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(222995.66, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(226730.34, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(227883.99, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(231618.67, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(232772.31, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(236506.99, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(237660.64, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(241395.32, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(242548.96, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(246283.65, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(247437.29, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(251171.97, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(252325.62, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(256060.30, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(257213.94, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(260948.62, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(262102.27, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(265836.95, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(266990.59, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(270725.28, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(271878.92, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(275613.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(276767.25, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(284236.61, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(287697.54, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(69772.79, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(70917.72, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(74624.19, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(75769.12, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(79475.58, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(80620.51, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(84326.98, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(85471.91, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(89178.38, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(90323.31, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(94029.78, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(95174.70, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(98881.17, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(100026.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(103732.57, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(104877.50, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(108583.97, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(109728.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(113435.36, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(114580.29, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(118286.76, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(119431.69, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(123138.16, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(124283.09, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(127989.55, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(129134.48, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(132840.95, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(133985.88, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(137692.35, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(138837.28, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(142543.74, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(143688.67, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(147395.14, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(148540.07, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(151319.92, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(151892.39, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(153745.62, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(154318.08, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(156171.32, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(156743.78, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(158597.02, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(159169.48, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
   end;
 
   if (MostrarPLUS2) then begin
-    if (MostrarTodosPontos) then HorizontalLineCustom(69590.21, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(72171.25, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(74478.54, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(77059.57, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(79366.86, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(81947.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(84255.19, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(86836.22, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(89143.51, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(91724.55, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(94031.84, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(96612.88, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(98920.17, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(101501.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(103808.49, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(106389.53, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(108696.82, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(111277.86, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(113585.15, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(116166.18, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(118473.47, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(121054.51, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(123361.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(125942.83, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(128250.12, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(130831.16, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(133138.45, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(135719.49, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(138026.78, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(140607.81, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(142915.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(145496.14, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(147803.43, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(150384.46, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(152114.93, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(153405.45, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(154559.09, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(155849.61, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(157003.26, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(158293.78, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(159447.42, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(160737.94, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(161891.58, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(163182.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(164335.75, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(165626.26, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(166779.91, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(168070.43, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(169224.07, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(170514.59, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(171668.24, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(172958.75, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(174112.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(175402.92, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(176556.56, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(177847.08, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(179000.73, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(180291.24, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(181444.89, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(182735.41, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(183889.05, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(185179.57, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(186333.21, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(187623.73, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(188777.38, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(190067.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(191221.54, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(192512.06, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(193665.70, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(193665.70, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(194956.22, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(194956.22, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(196109.87, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(196109.87, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(197400.38, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(197400.38, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(198554.03, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(198554.03, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(199844.55, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(199844.55, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(200998.19, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(200998.19, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(202288.71, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(202288.71, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(203442.36, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(203442.36, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(204732.87, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(204732.87, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(205886.52, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(205886.52, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(207177.04, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(207177.04, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(208330.68, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(208330.68, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(209621.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(209621.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(210774.84, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(210774.84, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(212065.36, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (not MostrarTodosPontos) then HorizontalLineCustom(212065.36, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(213219.01, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(214509.53, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(215663.17, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(216953.69, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(218107.33, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(219397.85, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(221128.32, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(223709.36, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(226016.65, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(228597.68, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(230904.97, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(233486.01, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(235793.30, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(238374.33, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(240681.62, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(243262.66, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(245569.95, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(248150.99, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(250458.28, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(253039.31, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(255346.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(257927.64, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(260234.93, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(262815.96, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(265123.25, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(267704.29, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(270011.58, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(272592.62, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(274899.91, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(277480.94, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(282095.52, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
-    if (MostrarTodosPontos) then HorizontalLineCustom(289838.63, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(69064.49, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(71626.02, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(73915.88, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(76477.42, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(78767.28, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(81328.82, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(83618.68, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(86180.21, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(88470.07, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(91031.61, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(93321.47, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(95883.01, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(98172.87, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(100734.41, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(103024.26, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(105585.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(107875.66, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(110437.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(112727.06, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(115288.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(117578.46, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(120139.99, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(122429.85, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(124991.39, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(127281.25, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(129842.79, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(132132.65, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(134694.18, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(136984.04, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(139545.58, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(141835.44, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(144396.98, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(146686.84, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(149248.37, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(150965.77, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(152246.54, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(153391.47, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(154672.24, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(155817.17, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(157097.93, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(158242.86, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    if (MostrarTodosPontos) then HorizontalLineCustom(159523.63, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
   end;
 
   if (ExibirMelhoresPontos) then
   begin
-    HorizontalLineCustom(202770.44, clRed, 1, psDash, "Edi_Wall_Venda", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    HorizontalLineCustom(202569.61, clLime, 1, psDash, "Edi_Wall_Compra", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    HorizontalLineCustom(203152.90, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    HorizontalLineCustom(202188.25, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    HorizontalLineCustom(204147.11, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    HorizontalLineCustom(201203.58, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    HorizontalLineCustom(208947.70, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    HorizontalLineCustom(196580.91, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(201529.83, clRed, 1, psDash, "Edi_Wall_Venda", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(201330.22, clLime, 1, psDash, "Edi_Wall_Compra", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(201909.95, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(200951.20, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(202898.07, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(199972.55, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(207669.29, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(195378.16, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
   end;
 end;
