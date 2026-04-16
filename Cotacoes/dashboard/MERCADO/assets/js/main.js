@@ -6708,6 +6708,7 @@ function renderOperationalBriefing() {
             const bits = [
                 `Fluxo estrangeiro (5 dias) ${formatBrlCompact(cum5, 2)}`,
                 `Último dia (${lastDate}) ${formatBrlCompact(last, 2)}`,
+                foreignFlow.generatedAt ? `Atualizado ${formatDateTime(String(foreignFlow.generatedAt))}` : null,
                 alert ? `ALERTA: ${alert}` : null,
                 hypothesis,
             ].filter(Boolean);
