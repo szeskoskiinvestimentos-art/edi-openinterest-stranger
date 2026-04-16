@@ -1401,12 +1401,44 @@ function renderRegimeConviction(data) {
         const zqCount = zqCurve && typeof zqCurve.contractCount === 'number' && Number.isFinite(zqCurve.contractCount) ? zqCurve.contractCount : null;
         const flowSentinel = data && data.meta && data.meta.flowSentinel ? data.meta.flowSentinel : null;
         const fsComposite = flowSentinel && typeof flowSentinel.composite === 'number' && Number.isFinite(flowSentinel.composite) ? flowSentinel.composite : null;
+        const fsDelta = flowSentinel && typeof flowSentinel.delta === 'number' && Number.isFinite(flowSentinel.delta) ? flowSentinel.delta : null;
         const fsMode = flowSentinel && typeof flowSentinel.regime === 'object' && flowSentinel.regime && typeof flowSentinel.regime.mode === 'string'
             ? String(flowSentinel.regime.mode)
             : null;
         const fsLabel = flowSentinel && typeof flowSentinel.regime === 'object' && flowSentinel.regime && typeof flowSentinel.regime.label === 'string'
             ? String(flowSentinel.regime.label)
             : null;
+        const fsNeutralThreshold = flowSentinel && typeof flowSentinel.neutralThreshold === 'number' && Number.isFinite(flowSentinel.neutralThreshold)
+            ? flowSentinel.neutralThreshold
+            : 0.12;
+        const fsRiskScore = flowSentinel && flowSentinel.riskBlock && typeof flowSentinel.riskBlock.score === 'number' && Number.isFinite(flowSentinel.riskBlock.score)
+            ? flowSentinel.riskBlock.score
+            : null;
+        const fsProtectionScore = flowSentinel && flowSentinel.protectionBlock && typeof flowSentinel.protectionBlock.score === 'number' && Number.isFinite(flowSentinel.protectionBlock.score)
+            ? flowSentinel.protectionBlock.score
+            : null;
+        const fsRiskObserved = flowSentinel && flowSentinel.riskBlock && typeof flowSentinel.riskBlock.observed === 'number' && Number.isFinite(flowSentinel.riskBlock.observed)
+            ? flowSentinel.riskBlock.observed
+            : null;
+        const fsProtectionObserved = flowSentinel && flowSentinel.protectionBlock && typeof flowSentinel.protectionBlock.observed === 'number' && Number.isFinite(flowSentinel.protectionBlock.observed)
+            ? flowSentinel.protectionBlock.observed
+            : null;
+        const fsRiskState = flowSentinel && flowSentinel.riskBlock && flowSentinel.riskBlock.action && typeof flowSentinel.riskBlock.action.state === 'string'
+            ? String(flowSentinel.riskBlock.action.state)
+            : null;
+        const fsProtectionState = flowSentinel && flowSentinel.protectionBlock && flowSentinel.protectionBlock.action && typeof flowSentinel.protectionBlock.action.state === 'string'
+            ? String(flowSentinel.protectionBlock.action.state)
+            : null;
+        const fsDivergence = (() => {
+            if (!flowSentinel) return false;
+            if (!fsRiskState || !fsProtectionState) return false;
+            if (fsRiskState === 'neutral' || fsProtectionState === 'neutral') return false;
+            if (fsRiskState === fsProtectionState) return false;
+            const strong = Math.max(0.18, fsNeutralThreshold * 1.5);
+            const okRisk = typeof fsRiskScore === 'number' && Math.abs(fsRiskScore) >= strong && (fsRiskObserved === null || fsRiskObserved >= 2);
+            const okProt = typeof fsProtectionScore === 'number' && Math.abs(fsProtectionScore) >= strong && (fsProtectionObserved === null || fsProtectionObserved >= 2);
+            return okRisk && okProt;
+        })();
         operationalInputs.macro = {
             flow: { label: regimeLabel, score: regimeScore },
             betaDelta,
@@ -1420,7 +1452,19 @@ function renderRegimeConviction(data) {
             exportScore,
             yields: { us10yPct, br10yPct, tipsEtfPct },
             zq: zqCurve ? { riskMode: zqRisk, slopePct: zqSlope, contractCount: zqCount, generatedAt: zqCurve.generatedAt || null } : null,
-            flowSentinel: flowSentinel ? { mode: fsMode, label: fsLabel, composite: fsComposite, generatedAt: flowSentinel.generatedAt || null } : null,
+            flowSentinel: flowSentinel
+                ? {
+                    mode: fsMode,
+                    label: fsLabel,
+                    composite: fsComposite,
+                    delta: fsDelta,
+                    neutralThreshold: fsNeutralThreshold,
+                    risk: { score: fsRiskScore, observed: fsRiskObserved, state: fsRiskState },
+                    protection: { score: fsProtectionScore, observed: fsProtectionObserved, state: fsProtectionState },
+                    divergence: fsDivergence,
+                    generatedAt: flowSentinel.generatedAt || null,
+                }
+                : null,
         };
         operationalInputs.zqCurve = zqCurve;
     } catch {
@@ -6418,13 +6462,16 @@ function renderOperationalBriefing() {
             push(b, wZq);
         }
         if (macro.flowSentinel && typeof macro.flowSentinel.composite === 'number' && Number.isFinite(macro.flowSentinel.composite)) {
-            const t = typeof operationalTuning.threshold.flowSentinel === 'number' && Number.isFinite(operationalTuning.threshold.flowSentinel)
-                ? operationalTuning.threshold.flowSentinel
-                : 0.25;
-            const dirUsd = macro.flowSentinel.composite < -t ? +1 : macro.flowSentinel.composite > t ? -1 : 0;
-            const b = symbol === 'WDO' ? dirUsd : -dirUsd;
-            const wFs = typeof operationalTuning.weight.flowSentinel === 'number' && Number.isFinite(operationalTuning.weight.flowSentinel) ? operationalTuning.weight.flowSentinel : 0.18;
-            push(b, wFs);
+            const fs = macro.flowSentinel;
+            if (!fs.divergence) {
+                const t = typeof operationalTuning.threshold.flowSentinel === 'number' && Number.isFinite(operationalTuning.threshold.flowSentinel)
+                    ? operationalTuning.threshold.flowSentinel
+                    : 0.25;
+                const dirUsd = fs.composite < -t ? +1 : fs.composite > t ? -1 : 0;
+                const b = symbol === 'WDO' ? dirUsd : -dirUsd;
+                const wFs = typeof operationalTuning.weight.flowSentinel === 'number' && Number.isFinite(operationalTuning.weight.flowSentinel) ? operationalTuning.weight.flowSentinel : 0.18;
+                push(b, wFs);
+            }
         }
         const score = w > 0 ? s / w : 0;
         const bias = score > 0.22 ? 'buy' : score < -0.22 ? 'sell' : 'neutral';
@@ -6736,7 +6783,16 @@ function renderOperationalBriefing() {
             const fs = macro && macro.flowSentinel ? macro.flowSentinel : null;
             if (fs && typeof fs.composite === 'number' && Number.isFinite(fs.composite)) {
                 const lab = fs.label ? String(fs.label) : '';
-                parts.push(`FlowSentinel ${lab ? `${lab} ` : ''}${formatNumber(fs.composite, 3)}`);
+                const riskScore = fs.risk && typeof fs.risk.score === 'number' && Number.isFinite(fs.risk.score) ? fs.risk.score : null;
+                const protScore = fs.protection && typeof fs.protection.score === 'number' && Number.isFinite(fs.protection.score) ? fs.protection.score : null;
+                const bits = [
+                    `FlowSentinel ${lab ? `${lab} ` : ''}${formatNumber(fs.composite, 3)}`,
+                    (typeof fs.delta === 'number' && Number.isFinite(fs.delta)) ? `Δ ${formatNumber(fs.delta, 3)}` : null,
+                    riskScore !== null ? `Risco ${formatNumber(riskScore, 3)}` : null,
+                    protScore !== null ? `Prot ${formatNumber(protScore, 3)}` : null,
+                    fs.divergence ? 'DIVERGENTE' : null,
+                ].filter(Boolean);
+                parts.push(bits.join(' • '));
             }
             const symSpx = findAliasSymbolBest(data, 'SPX') || findAliasSymbol(data, 'SPX');
             const spxPct = symSpx ? getChangePct(data, symSpx) : null;
@@ -7130,6 +7186,34 @@ function renderOperationalBriefing() {
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWdo.score), macroWdo.bias === 'buy' ? 'Compra' : macroWdo.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWin.score), macroWin.bias === 'buy' ? 'Compra' : macroWin.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', String(operationalTuning.weight.em))}</td>
+                            </tr>
+                        `);
+                        rows.push(`
+                            <tr>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">Sentinela de Fluxo (FX)</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
+                                    const fs = macro && macro.flowSentinel ? macro.flowSentinel : null;
+                                    if (!fs || typeof fs.composite !== 'number' || !Number.isFinite(fs.composite)) return mk('neutral', '—');
+                                    const lab = fs.label ? String(fs.label) : '';
+                                    const txt = `${lab ? `${lab} ` : ''}${formatNumber(fs.composite, 3)}${fs.divergence ? ' • DIVERGENTE' : ''}`;
+                                    return mk(fs.divergence ? 'negative' : 'neutral', txt);
+                                })()}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
+                                    const fs = macro && macro.flowSentinel ? macro.flowSentinel : null;
+                                    if (!fs || fs.divergence || typeof fs.composite !== 'number' || !Number.isFinite(fs.composite)) return mk('neutral', 'Neutro');
+                                    const t = typeof operationalTuning.threshold.flowSentinel === 'number' && Number.isFinite(operationalTuning.threshold.flowSentinel) ? operationalTuning.threshold.flowSentinel : 0.25;
+                                    const dirUsd = fs.composite < -t ? +1 : fs.composite > t ? -1 : 0;
+                                    return mk(dirTone(dirUsd), dirUsd > 0 ? 'Compra' : dirUsd < 0 ? 'Venda' : 'Neutro');
+                                })()}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
+                                    const fs = macro && macro.flowSentinel ? macro.flowSentinel : null;
+                                    if (!fs || fs.divergence || typeof fs.composite !== 'number' || !Number.isFinite(fs.composite)) return mk('neutral', 'Neutro');
+                                    const t = typeof operationalTuning.threshold.flowSentinel === 'number' && Number.isFinite(operationalTuning.threshold.flowSentinel) ? operationalTuning.threshold.flowSentinel : 0.25;
+                                    const dirUsd = fs.composite < -t ? +1 : fs.composite > t ? -1 : 0;
+                                    const b = -dirUsd;
+                                    return mk(dirTone(b), b > 0 ? 'Compra' : b < 0 ? 'Venda' : 'Neutro');
+                                })()}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', String(operationalTuning.weight.flowSentinel || 0.18))}</td>
                             </tr>
                         `);
                         rows.push(`
@@ -7741,8 +7825,21 @@ function renderFlowSentinel(data) {
             </div>
         `);
 
-            const alerts = Array.isArray(pre.alerts) ? pre.alerts : [];
-            const merged = Array.from(new Set(alerts.map(x => String(x || '').trim()).filter(Boolean)));
+            const baseAlerts = Array.isArray(pre.alerts) ? pre.alerts : [];
+            const derivedAlerts = (() => {
+                const out = [];
+                const betaPosAbs = typeof betaPosScore === 'number' ? Math.abs(betaPosScore) : 0;
+                const betaNegAbs = typeof betaNegScore === 'number' ? Math.abs(betaNegScore) : 0;
+                const strong = Math.max(0.18, neutralThreshold * 1.5);
+                if (betaPosCount >= 2 && betaNegCount >= 2 && betaPosAction.state !== betaNegAction.state && betaPosAbs >= strong && betaNegAbs >= strong) {
+                    out.push('Divergência: blocos Risco e Proteção estão puxando para lados opostos.');
+                }
+                if (delta !== null && Math.abs(delta) < neutralThreshold && betaPosAbs >= strong && betaNegAbs >= strong) {
+                    out.push('Sem consenso: delta neutro com blocos “fortes” (ruído/abertura).');
+                }
+                return out;
+            })();
+            const merged = Array.from(new Set(baseAlerts.concat(derivedAlerts).map(x => String(x || '').trim()).filter(Boolean)));
             setHtml('fs-alerts', merged.length
                 ? `
                 <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
