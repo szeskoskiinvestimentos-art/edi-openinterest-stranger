@@ -8816,6 +8816,236 @@ function renderOperationalBriefing() {
             const ctxTone = conflictsWith(scalpBiasRaw, ctxBias) ? 'negative' : (ctxBias !== 'neutral' ? 'positive' : 'neutral');
             const blockReason = hardBlock ? 'Bloqueado por risco/paridade (contexto forte)' : flowBlock ? 'Bloqueado por fluxo (forte)' : parityBlock ? 'Bloqueado por paridade' : '';
 
+            const winStats = (lookbackMs) => {
+                const s = String(sym || '');
+                const series = data && data.series && Array.isArray(data.series[s]) ? data.series[s] : [];
+                if (!series.length) return null;
+                const last = series[series.length - 1];
+                const lastMs = last && last.t ? Date.parse(last.t) : NaN;
+                if (!Number.isFinite(lastMs)) return null;
+                const cut = lastMs - lookbackMs;
+                let hi = -Infinity;
+                let lo = +Infinity;
+                let hiPrev = -Infinity;
+                let loPrev = +Infinity;
+                let n = 0;
+                for (let i = series.length - 1; i >= 0; i -= 1) {
+                    const p = series[i];
+                    const ms = p && p.t ? Date.parse(p.t) : NaN;
+                    const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                    if (!Number.isFinite(ms) || price === null) continue;
+                    if (ms < cut) break;
+                    n += 1;
+                    if (price > hi) hi = price;
+                    if (price < lo) lo = price;
+                    if (i < series.length - 1) {
+                        if (price > hiPrev) hiPrev = price;
+                        if (price < loPrev) loPrev = price;
+                    }
+                }
+                if (n < 4 || !Number.isFinite(hi) || !Number.isFinite(lo)) return null;
+                const rangePts = hi - lo;
+                const rangePct = lo > 0 ? ((hi / lo) - 1) * 100 : null;
+                return {
+                    hi,
+                    lo,
+                    hiPrev: Number.isFinite(hiPrev) ? hiPrev : hi,
+                    loPrev: Number.isFinite(loPrev) ? loPrev : lo,
+                    rangePts: Number.isFinite(rangePts) ? rangePts : null,
+                    rangePct: typeof rangePct === 'number' && Number.isFinite(rangePct) ? rangePct : null,
+                    n,
+                };
+            };
+            const s15 = winStats(15 * 60 * 1000);
+            const s30 = winStats(30 * 60 * 1000);
+            const priceNow = typeof m.lastPrice === 'number' && Number.isFinite(m.lastPrice) ? m.lastPrice : null;
+            const range30Pts = s30 && typeof s30.rangePts === 'number' && Number.isFinite(s30.rangePts) ? s30.rangePts : null;
+            const range30Pct = s30 && typeof s30.rangePct === 'number' && Number.isFinite(s30.rangePct) ? s30.rangePct : null;
+
+            const scalpState = (() => {
+                if (hardBlock || flowBlock || parityBlock) return { label: 'BLOQUEADO', tone: 'negative', reason: blockReason || 'Bloqueado' };
+                if (ctxBias !== 'neutral' && conflictsWith(scalpBiasRaw, ctxBias)) return { label: 'CAUTELA', tone: 'neutral', reason: 'Contexto diverge (reduzir mão / exigir confirmação)' };
+                if (parity.ok === null) return { label: 'CAUTELA', tone: 'neutral', reason: 'Sem paridade (reduzir mão / exigir confirmação)' };
+                return { label: 'OK', tone: 'positive', reason: 'Liberado (micro + paridade/contexto ok)' };
+            })();
+
+            const microGate = scalpBiasRaw;
+            const pbFrac = 0.25;
+            const pbLevel = (() => {
+                if (priceNow === null || range30Pts === null) return null;
+                const d = range30Pts * pbFrac;
+                if (microGate === 'buy') return priceNow - d;
+                if (microGate === 'sell') return priceNow + d;
+                return null;
+            })();
+            const reArm = (() => {
+                if (priceNow === null || range30Pts === null) return null;
+                const b = range30Pts * 0.10;
+                if (microGate === 'buy') return priceNow + b;
+                if (microGate === 'sell') return priceNow - b;
+                return null;
+            })();
+
+            const windowStats = (lookbackMs) => {
+                const s = String(sym || '');
+                const series = data && data.series && Array.isArray(data.series[s]) ? data.series[s] : [];
+                if (!series.length) return null;
+                const last = series[series.length - 1];
+                const lastMs = last && last.t ? Date.parse(last.t) : NaN;
+                if (!Number.isFinite(lastMs)) return null;
+                const cut = lastMs - lookbackMs;
+                let hi = -Infinity;
+                let lo = +Infinity;
+                let n = 0;
+                let lastPrice = null;
+                let prevPrice = null;
+                for (let i = series.length - 1; i >= 0; i -= 1) {
+                    const p = series[i];
+                    const ms = p && p.t ? Date.parse(p.t) : NaN;
+                    const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                    if (!Number.isFinite(ms) || price === null) continue;
+                    if (lastPrice === null) lastPrice = price;
+                    else if (prevPrice === null) prevPrice = price;
+                    if (ms < cut) break;
+                    n += 1;
+                    if (price > hi) hi = price;
+                    if (price < lo) lo = price;
+                }
+                if (n < 3 || !Number.isFinite(hi) || !Number.isFinite(lo)) return null;
+                return { hi, lo, n, lastPrice, prevPrice };
+            };
+
+            const setups = (() => {
+                const fmtLvl = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 0) : '—');
+                const status = (mode, note = '') => ({ mode, note });
+                const w10 = windowStats(10 * 60 * 1000);
+                const w5 = windowStats(5 * 60 * 1000);
+                const h15 = s15 && typeof s15.hiPrev === 'number' && Number.isFinite(s15.hiPrev) ? s15.hiPrev : null;
+                const l15 = s15 && typeof s15.loPrev === 'number' && Number.isFinite(s15.loPrev) ? s15.loPrev : null;
+                const rPts = range30Pts;
+                const cur = priceNow;
+
+                const distPB = (typeof rPts === 'number' && Number.isFinite(rPts) && rPts > 0) ? rPts * 0.25 : (cur ? cur * 0.0018 : null);
+                const distResume = (typeof rPts === 'number' && Number.isFinite(rPts) && rPts > 0) ? rPts * 0.10 : (cur ? cur * 0.0008 : null);
+
+                const pullback = (() => {
+                    if (!w10 || !distPB || !distResume || cur === null) return status('N/D');
+                    if (microGate !== 'buy' && microGate !== 'sell') return status('N/D');
+                    const anchor = microGate === 'buy' ? h15 : l15;
+                    if (typeof anchor !== 'number' || !Number.isFinite(anchor)) return status('N/D');
+                    const levelPB = microGate === 'buy' ? (anchor - distPB) : (anchor + distPB);
+                    const levelResume = microGate === 'buy' ? (anchor - distResume) : (anchor + distResume);
+                    const touched = microGate === 'buy' ? (w10.lo <= levelPB) : (w10.hi >= levelPB);
+                    const confirm = microGate === 'buy' ? (cur >= levelResume) : (cur <= levelResume);
+                    if (touched && confirm) return status('ACIONADO', `Retomada confirmada acima/abaixo de ${fmtLvl(levelResume)}`);
+                    if (touched) return status('ARMADO', `Aguardando retomada em ${fmtLvl(levelResume)}`);
+                    const near = microGate === 'buy' ? (cur <= levelResume && cur >= levelPB) : (cur >= levelResume && cur <= levelPB);
+                    if (near) return status('ARMADO', `Na zona (PB ${fmtLvl(levelPB)} → retomar ${fmtLvl(levelResume)})`);
+                    return status('ESPERE', `PB ${fmtLvl(levelPB)} → retomar ${fmtLvl(levelResume)}`);
+                })();
+
+                const breakout = (() => {
+                    if (!w5 || cur === null) return status('N/D');
+                    if (microGate === 'buy' && typeof h15 === 'number' && Number.isFinite(h15)) {
+                        const pad = (typeof rPts === 'number' && Number.isFinite(rPts) && rPts > 0) ? rPts * 0.05 : cur * 0.0006;
+                        const armed = cur >= (h15 - pad) && cur <= (h15 + pad);
+                        const fired = cur > (h15 + pad) && typeof w5.prevPrice === 'number' && w5.prevPrice <= (h15 + pad);
+                        if (fired) return status('ACIONADO', `Rompimento confirmado > ${fmtLvl(h15)}`);
+                        if (armed) return status('ARMADO', `Próximo do H15 ${fmtLvl(h15)}`);
+                        return status('ESPERE', `H15 ${fmtLvl(h15)}`);
+                    }
+                    if (microGate === 'sell' && typeof l15 === 'number' && Number.isFinite(l15)) {
+                        const pad = (typeof rPts === 'number' && Number.isFinite(rPts) && rPts > 0) ? rPts * 0.05 : cur * 0.0006;
+                        const armed = cur <= (l15 + pad) && cur >= (l15 - pad);
+                        const fired = cur < (l15 - pad) && typeof w5.prevPrice === 'number' && w5.prevPrice >= (l15 - pad);
+                        if (fired) return status('ACIONADO', `Rompimento confirmado < ${fmtLvl(l15)}`);
+                        if (armed) return status('ARMADO', `Próximo do L15 ${fmtLvl(l15)}`);
+                        return status('ESPERE', `L15 ${fmtLvl(l15)}`);
+                    }
+                    return status('N/D');
+                })();
+
+                const failure = (() => {
+                    if (!w10 || cur === null) return status('N/D');
+                    if (typeof h15 === 'number' && Number.isFinite(h15)) {
+                        const pad = (typeof rPts === 'number' && Number.isFinite(rPts) && rPts > 0) ? rPts * 0.05 : cur * 0.0006;
+                        const triedUp = w10.hi >= (h15 + pad);
+                        const failed = triedUp && cur < h15 && typeof w10.prevPrice === 'number' && w10.prevPrice > h15;
+                        if (failed) return status('ACIONADO', `Falha no topo (volta abaixo de H15 ${fmtLvl(h15)})`);
+                        if (triedUp) return status('ARMADO', `Tentou romper H15 ${fmtLvl(h15)} (vigiar falha)`);
+                    }
+                    if (typeof l15 === 'number' && Number.isFinite(l15)) {
+                        const pad = (typeof rPts === 'number' && Number.isFinite(rPts) && rPts > 0) ? rPts * 0.05 : cur * 0.0006;
+                        const triedDn = w10.lo <= (l15 - pad);
+                        const failed = triedDn && cur > l15 && typeof w10.prevPrice === 'number' && w10.prevPrice < l15;
+                        if (failed) return status('ACIONADO', `Falha no fundo (volta acima de L15 ${fmtLvl(l15)})`);
+                        if (triedDn) return status('ARMADO', `Tentou romper L15 ${fmtLvl(l15)} (vigiar falha)`);
+                    }
+                    return status('ESPERE');
+                })();
+
+                return { pullback, breakout, failure };
+            })();
+
+            const setupBadges = (() => {
+                const mkB = (name, st) => {
+                    const mode = st && st.mode ? String(st.mode) : 'N/D';
+                    const tone = mode === 'ACIONADO' ? 'positive' : mode === 'ARMADO' ? 'neutral' : mode === 'ESPERE' ? 'neutral' : 'neutral';
+                    return badge(tone, `${name}: ${mode}`);
+                };
+                return `
+                    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        ${mkB('Pullback', setups.pullback)}
+                        ${mkB('Romp.', setups.breakout)}
+                        ${mkB('Falha', setups.failure)}
+                    </div>
+                    ${(() => {
+                        const notes = [setups.pullback.note, setups.breakout.note, setups.failure.note].filter(Boolean);
+                        if (!notes.length) return '';
+                        return `<div style="margin-top:6px;opacity:.78;font-size:12px;line-height:1.35;">${notes.map(n => `• ${escapeHtml(n)}`).join('<br>')}</div>`;
+                    })()}
+                `;
+            })();
+            const setupLines = (() => {
+                const lines = [];
+                const fmtLvl = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 0) : '—');
+                const fmtP = v => (typeof v === 'number' && Number.isFinite(v) ? formatPercent(v, 2) : '—');
+                const h15 = s15 && typeof s15.hiPrev === 'number' && Number.isFinite(s15.hiPrev) ? s15.hiPrev : null;
+                const l15 = s15 && typeof s15.loPrev === 'number' && Number.isFinite(s15.loPrev) ? s15.loPrev : null;
+                const pb = pbLevel;
+                const ra = reArm;
+
+                if (microGate === 'buy') {
+                    if (pb !== null && priceNow !== null) {
+                        const txt = priceNow > pb
+                            ? `Setup (preferido): pullback até ≤ ${fmtLvl(pb)} e retomada (5m volta ↑) • stop curto`
+                            : `Setup (preferido): já no pullback • entrar na retomada acima de ${fmtLvl(ra)} (ou candle 5m virar)`;
+                        lines.push(txt);
+                    }
+                    if (h15 !== null) lines.push(`Alternativo: rompimento com confirmação acima de ${fmtLvl(h15)} (H15)`);
+                    if (h15 !== null) lines.push(`Reversão: falha no topo • vender se perder ${fmtLvl(h15)} após tentativa`);
+                } else if (microGate === 'sell') {
+                    if (pb !== null && priceNow !== null) {
+                        const txt = priceNow < pb
+                            ? `Setup (preferido): repique até ≥ ${fmtLvl(pb)} e rejeição (5m volta ↓) • stop curto`
+                            : `Setup (preferido): já no repique • entrar na rejeição abaixo de ${fmtLvl(ra)} (ou candle 5m virar)`;
+                        lines.push(txt);
+                    }
+                    if (l15 !== null) lines.push(`Alternativo: rompimento com confirmação abaixo de ${fmtLvl(l15)} (L15)`);
+                    if (l15 !== null) lines.push(`Reversão: falha no fundo • comprar se recuperar ${fmtLvl(l15)} após tentativa`);
+                } else {
+                    if (h15 !== null && l15 !== null) lines.push(`Range: trabalhar ${fmtLvl(l15)}–${fmtLvl(h15)} com stops curtos`);
+                    if (parity.ok === false) lines.push('Evitar scalp direcional: paridade divergente');
+                }
+
+                const meta = [
+                    s15 ? `H15 ${fmtLvl(s15.hi)} • L15 ${fmtLvl(s15.lo)}` : null,
+                    s30 ? `Range30 ${fmtP(range30Pct)} (${fmtLvl(range30Pts)} pts)` : null,
+                ].filter(Boolean);
+                if (meta.length) lines.push(`Níveis: ${meta.join(' • ')}`);
+                return lines;
+            })();
+
             const r5 = typeof m.ret5 === 'number' && Number.isFinite(m.ret5) ? formatPercent(m.ret5, 2) : '—';
             const r15 = typeof m.ret15 === 'number' && Number.isFinite(m.ret15) ? formatPercent(m.ret15, 2) : '—';
             const r60 = typeof m.ret60 === 'number' && Number.isFinite(m.ret60) ? formatPercent(m.ret60, 2) : '—';
@@ -8846,6 +9076,7 @@ function renderOperationalBriefing() {
                             ${badge(tone, `Scalp: ${txt}`)}
                             ${badge('neutral', `${escapeHtml(sym)}`)}
                             ${badge(ctxTone, `Contexto: ${escapeHtml(ctxTxt)} (${formatNumber(ctxNet, 2)})`)}
+                            ${badge(scalpState.tone, `Estado: ${escapeHtml(scalpState.label)}`)}
                         </div>
                     </div>
                     <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
@@ -8857,6 +9088,13 @@ function renderOperationalBriefing() {
                     <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                         ${badge(parity.ok === false ? 'negative' : parity.ok === true ? 'positive' : 'neutral', escapeHtml(parity.label))}
                         ${badge(flowStrong && conflictsWith(scalpBiasRaw, flowBias) ? 'negative' : flowBias !== 'neutral' ? 'neutral' : 'neutral', escapeHtml(flowTxt))}
+                    </div>
+                    <div style="margin-top:10px;border:1px dashed rgba(255,255,255,.16);border-radius:12px;padding:10px;background:rgba(0,0,0,.14);">
+                        <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:6px;">Gatilhos (entrada)</div>
+                        ${setupBadges}
+                        <div style="opacity:.86;font-size:12px;line-height:1.45;">
+                            ${setupLines.map(x => `• ${escapeHtml(x)}`).join('<br>')}
+                        </div>
                     </div>
                     <div style="margin-top:10px;opacity:.92;line-height:1.35;">
                         <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:6px;">Plano (scalp)</div>
