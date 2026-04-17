@@ -1465,6 +1465,8 @@ function renderRegimeConviction(data) {
     try { renderOperationalBriefing(); } catch { }
     try { renderBtcOperationalBriefing(); } catch { }
     try { renderHk50OperationalBriefing(); } catch { }
+    try { renderUsEquitiesOperationalBriefing(); } catch { }
+    try { renderCommoditiesOperationalBriefing(); } catch { }
 
     el.innerHTML = html;
 }
@@ -2988,6 +2990,802 @@ function computeHk50PulseNow(data, web) {
     };
 }
 
+function computeUsEquitiesPulseNow(data, web) {
+    const isNum = v => typeof v === 'number' && Number.isFinite(v);
+    const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+    const pick = patterns => patterns.map(re => findAssetSymbol(data, re)).find(Boolean) || null;
+    const get = s => (s ? getChangePct(data, s) : null);
+    const asSource = (symbol, futurePatterns = []) => {
+        const s = String(symbol || '');
+        if (!s) return 'missing';
+        for (const re of futurePatterns) if (re.test(s)) return 'future';
+        return 'proxy';
+    };
+    const pickPreferred = (futurePatterns, fallbackPatterns, aliasKey = null) => {
+        const fut = pick(futurePatterns || []);
+        if (fut) return fut;
+        const ali = aliasKey ? findAliasSymbolBest(data, aliasKey) : null;
+        if (ali) return ali;
+        return pick(fallbackPatterns || []);
+    };
+
+    const sym = {
+        spx: pickPreferred([/^ES[HMUZ]\d{2}$/i], [/^\.SPX$/i, /^SPX$/i, /^SPY(\.\w+)?$/i, /\bS&P\s*500\b/i, /\bS\s*&\s*P\s*500\b/i], 'SPX'),
+        ndx: pickPreferred([/^NQ[HMUZ]\d{2}$/i], [/^\.NDX$/i, /^NDX$/i, /^QQQ(\.\w+)?$/i, /\bNasdaq\s*100\b/i], 'NDX'),
+        dow: pickPreferred([/^YM[HMUZ]\d{2}$/i], [/^\.DJI$/i, /\bDow\s*Jones\b/i, /^DIA(\.\w+)?$/i], 'DOW'),
+        dxy: findAliasSymbolBest(data, 'DXY') || pick([/^\.DXY$/i, /^DXY$/i, /^DX=F$/i, /^DXc\d$/i, /\bUS\s*Dollar\s*Index\b/i]),
+        vix: findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX') || pick([/^\.?VIX(9D)?$/i]),
+        vvix: findAliasSymbolBest(data, 'VVIX') || pick([/^\.VVIX$/i]),
+        vxn: findAliasSymbolBest(data, 'VXN') || pick([/^\.VXN$/i]),
+        rvx: pick([/^\.?RVX$/i, /\bRussell\s*2000\s*Vol/i]),
+        us2y: findAliasSymbolBest(data, 'US2Y') || pick([/^US2YT=RR$/i, /^TUc\d=\$?$/i, /\bUS2Y\b/i, /\bUnited States 2-Year\b/i]),
+        us10y: findAliasSymbolBest(data, 'US10Y') || pick([/^US10YT=RR$/i, /^USGV10YUSAB=R$/i, /^TNc\d=\$?$/i, /^TYc\d=\$?$/i, /\bUS10Y\b/i, /\bUnited States 10-Year\b/i]),
+        us30y: findAliasSymbolBest(data, 'US30Y') || pick([/^US30YT=RR$/i, /^WNc\d=\$?$/i, /\bUS30Y\b/i, /\bUnited States 30-Year\b/i]),
+        tlt: findAliasSymbolBest(data, 'TLT') || pick([/^TLT(\.\w+)?$/i]),
+        hyg: findAliasSymbolBest(data, 'HYG') || pick([/^HYG(\.\w+)?$/i]),
+        eem: findAliasSymbolBest(data, 'EEM') || findAliasSymbolBest(data, 'VWO') || pick([/^EEM(\.\w+)?$/i, /^VWO(\.\w+)?$/i]),
+        iwm: pick([/^IWM(\.\w+)?$/i, /\bRussell\s*2000\b/i]),
+        xlf: pick([/^XLF(\.\w+)?$/i, /\bFinancial\s*Select\s*Sector\b/i]),
+        xlk: pick([/^XLK(\.\w+)?$/i, /\bTechnology\s*Select\s*Sector\b/i]),
+        oil: findAliasSymbolBest(data, 'BRENT') || findAliasSymbolBest(data, 'WTI') || pick([/^BZ=F$/i, /^LCOc\d$/i, /^BRNc\d$/i, /^CL=F$/i, /^CLc\d$/i, /\bBrent\b/i, /\bWTI\b/i]),
+        gold: findAliasSymbolBest(data, 'GOLD') || pick([/^GC=F$/i, /^GCc\d$/i, /^XAU(USD)?$/i, /^GLD(\.\w+)?$/i, /\bGold\b/i, /\bOuro\b/i]),
+        copper: findAliasSymbolBest(data, 'COPPER') || pick([/^HG=F$/i, /^HGc\d$/i, /^CPER(\.\w+)?$/i, /\bCopper\b/i, /\bCobre\b/i]),
+        btc: findAliasSymbolBest(data, 'BTC') || pick([/^BTC\/USD$/i, /\bbitcoin\b/i]),
+    };
+
+    const computeNews = (() => {
+        const items = web && Array.isArray(web.items) ? web.items : [];
+        const confW = c => {
+            const s = String(c || '').toLowerCase();
+            if (s.includes('high') || s.includes('alta')) return 1.0;
+            if (s.includes('medium') || s.includes('média') || s.includes('media')) return 0.75;
+            if (s.includes('low') || s.includes('baixa')) return 0.55;
+            return 0.7;
+        };
+        const kw = s =>
+            /\bfed\b|\bfomc\b|\bpowell\b|\brate\s*cut\b|\brate\s*hike\b|\byield(s)?\b|\btreasury\b|\binflation\b|\bcpi\b|\bppi\b|\bjobs\b|\bnfp\b|\brecession\b|\bsoft\s*landing\b|\bdollar\b|\bdxy\b|\bbanks?\b|\bcredit\b|\bdefault\b|\bliquidity\b|\brisk\s*off\b|\brisk\s*on\b|\bvix\b|\bgeopolitic\w*\b|\bsanction\w*\b|\bwar\b|\biran\b|\bisrael\b|\brussia\b|\bchina\b|\btaiwan\b|\btariff\w*\b|\boil\b|\bbrent\b|\bwti\b/i.test(s);
+        const pos = [
+            /\brally\b/i,
+            /\bsurge\b/i,
+            /\bgain(s|ed)?\b/i,
+            /\brise(s|d)?\b/i,
+            /\bbull(ish)?\b/i,
+            /\brate\s*cut\b/i,
+            /\bsoft\s*landing\b/i,
+            /\bdisinflation\b/i,
+        ];
+        const neg = [
+            /\bsell[-\s]?off\b/i,
+            /\bplunge\b/i,
+            /\bcrash\b/i,
+            /\bstress\b/i,
+            /\bdefault\b/i,
+            /\bcredit\s*event\b/i,
+            /\brate\s*hike\b/i,
+            /\bhot\s*inflation\b/i,
+            /\bshock\b/i,
+        ];
+        let matched = 0;
+        let score = 0;
+        const top = [];
+        for (const it of items.slice(0, 70)) {
+            const title = it && it.title ? String(it.title) : '';
+            if (!title) continue;
+            if (!kw(title)) continue;
+            if (top.length < 6) top.push(it);
+            matched++;
+            const w = confW(it && it.confidence);
+            let s = 0;
+            for (const re of pos) if (re.test(title)) s += 1;
+            for (const re of neg) if (re.test(title)) s -= 1;
+            score += w * clamp(s, -3, 3);
+        }
+        const denom = matched > 0 ? matched * 3 : 1;
+        const normalized = clamp(score / denom, -1, 1);
+        return { used: !!items.length, matched, score: normalized, top };
+    })();
+
+    const buildReturnSeries = (symbol, windowPoints = 96) => {
+        const series = data && data.series && Array.isArray(data.series[symbol]) ? data.series[symbol] : [];
+        if (!series.length) return [];
+        const start = Math.max(0, series.length - windowPoints);
+        const out = [];
+        for (let i = start + 1; i < series.length; i += 1) {
+            const a = series[i - 1];
+            const b = series[i];
+            const pa = a && typeof a.price === 'number' && Number.isFinite(a.price) ? a.price : null;
+            const pb = b && typeof b.price === 'number' && Number.isFinite(b.price) ? b.price : null;
+            const tb = b && b.t ? Date.parse(b.t) : NaN;
+            const tMs = Number.isFinite(tb) ? tb : null;
+            if (pa === null || pb === null || tMs === null) continue;
+            if (pa <= 0 || pb <= 0) continue;
+            const r = Math.log(pb / pa);
+            if (!Number.isFinite(r)) continue;
+            out.push({ tMs: tMs, r });
+        }
+        return out;
+    };
+    const correlationAligned = (a, b, minPoints = 20) => {
+        const mapB = new Map();
+        for (const p of (b || [])) mapB.set(p.tMs, p.r);
+        const xs = [];
+        const ys = [];
+        for (const p of (a || [])) {
+            const y = mapB.get(p.tMs);
+            if (!isNum(p.r) || !isNum(y)) continue;
+            xs.push(p.r);
+            ys.push(y);
+        }
+        const n = xs.length;
+        if (n < minPoints) return null;
+        const mean = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
+        const mx = mean(xs);
+        const my = mean(ys);
+        let cov = 0;
+        let vx = 0;
+        let vy = 0;
+        for (let i = 0; i < n; i += 1) {
+            const dx = xs[i] - mx;
+            const dy = ys[i] - my;
+            cov += dx * dy;
+            vx += dx * dx;
+            vy += dy * dy;
+        }
+        if (vx <= 1e-18 || vy <= 1e-18) return null;
+        return { corr: cov / Math.sqrt(vx * vy), n };
+    };
+    const corrPair = (label, aSym, bSym) => {
+        if (!aSym || !bSym) return null;
+        const out = correlationAligned(buildReturnSeries(aSym), buildReturnSeries(bSym));
+        if (!out) return null;
+        return { label, corr: out.corr, n: out.n };
+    };
+
+    const microStats = (symbol) => {
+        const s = String(symbol || '');
+        if (!s) return null;
+        const series = data && data.series && Array.isArray(data.series[s]) ? data.series[s] : [];
+        if (!series.length) return null;
+        const last = series[series.length - 1];
+        const lastPrice = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
+        const lastTmsRaw = last && last.t ? Date.parse(last.t) : NaN;
+        const lastTms = Number.isFinite(lastTmsRaw) ? lastTmsRaw : null;
+        if (lastPrice === null || lastTms === null) return null;
+
+        const findAt = (lookbackMs) => {
+            const target = lastTms - lookbackMs;
+            let best = null;
+            for (let i = series.length - 1; i >= 0; i -= 1) {
+                const p = series[i];
+                const tRaw = p && p.t ? Date.parse(p.t) : NaN;
+                const t = Number.isFinite(tRaw) ? tRaw : null;
+                const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                if (t === null || price === null) continue;
+                if (t <= target) { best = { tMs: t, price }; break; }
+            }
+            return best;
+        };
+        const pctFrom = (priceThen) => (typeof priceThen === 'number' && Number.isFinite(priceThen) && priceThen > 0 ? ((lastPrice / priceThen) - 1) * 100 : null);
+
+        const p5 = findAt(5 * 60 * 1000);
+        const p15 = findAt(15 * 60 * 1000);
+        const p60 = findAt(60 * 60 * 1000);
+        const ret5 = p5 ? pctFrom(p5.price) : null;
+        const ret15 = p15 ? pctFrom(p15.price) : null;
+        const ret60 = p60 ? pctFrom(p60.price) : null;
+
+        const range30 = (() => {
+            const cut = lastTms - 30 * 60 * 1000;
+            let hi = -Infinity;
+            let lo = +Infinity;
+            let n = 0;
+            for (let i = series.length - 1; i >= 0; i -= 1) {
+                const p = series[i];
+                const tRaw = p && p.t ? Date.parse(p.t) : NaN;
+                const t = Number.isFinite(tRaw) ? tRaw : null;
+                const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                if (t === null || price === null) continue;
+                if (t < cut) break;
+                n += 1;
+                if (price > hi) hi = price;
+                if (price < lo) lo = price;
+            }
+            if (n < 4 || !Number.isFinite(hi) || !Number.isFinite(lo) || lo <= 0) return null;
+            const pct = ((hi / lo) - 1) * 100;
+            return { pct, n };
+        })();
+
+        const vol30 = (() => {
+            const cut = lastTms - 30 * 60 * 1000;
+            let sumAbs = 0;
+            let prev = null;
+            let n = 0;
+            for (let i = series.length - 1; i >= 0; i -= 1) {
+                const p = series[i];
+                const tRaw = p && p.t ? Date.parse(p.t) : NaN;
+                const t = Number.isFinite(tRaw) ? tRaw : null;
+                const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                if (t === null || price === null) continue;
+                if (t < cut) break;
+                if (prev && prev.price > 0) {
+                    const r = ((prev.price / price) - 1) * 100;
+                    if (Number.isFinite(r)) { sumAbs += Math.abs(r); n += 1; }
+                }
+                prev = { price };
+            }
+            if (n < 4) return null;
+            return { sumAbsPct: sumAbs, n };
+        })();
+
+        const scalp = (() => {
+            const th5 = 0.08;
+            const th15 = 0.14;
+            const s5 = typeof ret5 === 'number' && Number.isFinite(ret5) ? ret5 : null;
+            const s15 = typeof ret15 === 'number' && Number.isFinite(ret15) ? ret15 : null;
+            if (s5 === null || s15 === null) return { signal: 'neutral', strength: 0, label: 'n/d' };
+            const alignedUp = s5 >= th5 && s15 >= th15;
+            const alignedDn = s5 <= -th5 && s15 <= -th15;
+            if (alignedUp) return { signal: 'buy', strength: Math.min(1, (Math.abs(s15) / 0.6)), label: 'tendência curta (↑)' };
+            if (alignedDn) return { signal: 'sell', strength: Math.min(1, (Math.abs(s15) / 0.6)), label: 'tendência curta (↓)' };
+            const conflict = (s5 > 0 && s15 < 0) || (s5 < 0 && s15 > 0);
+            if (conflict && Math.abs(s5) >= th5) return { signal: 'neutral', strength: 0.5, label: 'conflito 5m×15m' };
+            return { signal: 'neutral', strength: Math.min(0.6, Math.abs(s5) / 0.5), label: 'range/ruído' };
+        })();
+
+        return { ret5, ret15, ret60, range30, vol30, scalp, lastTms, lastPrice };
+    };
+
+    const buildPulse = (baseKey) => {
+        const cfgBase = baseKey === 'ndx'
+            ? [
+                { key: 'ndx', group: 'driver', weight: 0.85, capAbs: 1.6, sign: +1 },
+                { key: 'spx', group: 'confirm', weight: 0.45, capAbs: 1.2, sign: +1 },
+                { key: 'dow', group: 'confirm', weight: 0.25, capAbs: 1.2, sign: +1 },
+                { key: 'vxn', group: 'driver', weight: 0.55, capAbs: 4.5, sign: -1 },
+                { key: 'vvix', group: 'confirm', weight: 0.25, capAbs: 4.8, sign: -1 },
+                { key: 'vix', group: 'driver', weight: 0.35, capAbs: 4.5, sign: -1 },
+                { key: 'dxy', group: 'driver', weight: 0.45, capAbs: 0.7, sign: -1 },
+                { key: 'us2y', group: 'driver', weight: 0.35, capAbs: 0.8, sign: -1 },
+                { key: 'us10y', group: 'driver', weight: 0.35, capAbs: 0.8, sign: -1 },
+                { key: 'hyg', group: 'confirm', weight: 0.35, capAbs: 1.3, sign: +1 },
+                { key: 'tlt', group: 'context', weight: 0.2, capAbs: 1.3, sign: +1 },
+                { key: 'eem', group: 'context', weight: 0.2, capAbs: 1.4, sign: +1 },
+                { key: 'xlk', group: 'context', weight: 0.18, capAbs: 1.6, sign: +1 },
+                { key: 'oil', group: 'context', weight: 0.12, capAbs: 2.0, sign: -0.6 },
+                { key: 'gold', group: 'context', weight: 0.12, capAbs: 1.6, sign: -0.4 },
+                { key: 'btc', group: 'context', weight: 0.12, capAbs: 2.0, sign: +0.4 },
+            ]
+            : baseKey === 'dow'
+                ? [
+                    { key: 'dow', group: 'driver', weight: 0.85, capAbs: 1.4, sign: +1 },
+                    { key: 'spx', group: 'confirm', weight: 0.45, capAbs: 1.2, sign: +1 },
+                    { key: 'ndx', group: 'confirm', weight: 0.25, capAbs: 1.4, sign: +1 },
+                    { key: 'vix', group: 'driver', weight: 0.55, capAbs: 4.5, sign: -1 },
+                    { key: 'dxy', group: 'driver', weight: 0.45, capAbs: 0.7, sign: -1 },
+                    { key: 'us10y', group: 'driver', weight: 0.25, capAbs: 0.8, sign: -1 },
+                    { key: 'us30y', group: 'context', weight: 0.18, capAbs: 0.8, sign: -1 },
+                    { key: 'hyg', group: 'confirm', weight: 0.35, capAbs: 1.3, sign: +1 },
+                    { key: 'tlt', group: 'context', weight: 0.2, capAbs: 1.3, sign: +1 },
+                    { key: 'eem', group: 'context', weight: 0.2, capAbs: 1.4, sign: +1 },
+                    { key: 'xlf', group: 'context', weight: 0.2, capAbs: 1.6, sign: +1 },
+                    { key: 'oil', group: 'context', weight: 0.12, capAbs: 2.0, sign: -0.4 },
+                    { key: 'gold', group: 'context', weight: 0.12, capAbs: 1.6, sign: -0.2 },
+                ]
+                : [
+                    { key: 'spx', group: 'driver', weight: 0.9, capAbs: 1.4, sign: +1 },
+                    { key: 'ndx', group: 'confirm', weight: 0.35, capAbs: 1.4, sign: +1 },
+                    { key: 'dow', group: 'confirm', weight: 0.25, capAbs: 1.2, sign: +1 },
+                    { key: 'vix', group: 'driver', weight: 0.6, capAbs: 4.5, sign: -1 },
+                    { key: 'dxy', group: 'driver', weight: 0.45, capAbs: 0.7, sign: -1 },
+                    { key: 'us2y', group: 'driver', weight: 0.25, capAbs: 0.8, sign: -1 },
+                    { key: 'us10y', group: 'driver', weight: 0.25, capAbs: 0.8, sign: -1 },
+                    { key: 'hyg', group: 'confirm', weight: 0.35, capAbs: 1.3, sign: +1 },
+                    { key: 'tlt', group: 'context', weight: 0.2, capAbs: 1.3, sign: +1 },
+                    { key: 'eem', group: 'context', weight: 0.2, capAbs: 1.4, sign: +1 },
+                    { key: 'iwm', group: 'context', weight: 0.18, capAbs: 1.6, sign: +1 },
+                    { key: 'oil', group: 'context', weight: 0.12, capAbs: 2.0, sign: -0.5 },
+                    { key: 'gold', group: 'context', weight: 0.12, capAbs: 1.6, sign: -0.3 },
+                    { key: 'copper', group: 'context', weight: 0.12, capAbs: 1.8, sign: +0.3 },
+                ];
+
+        const rows = [];
+        const groups = {
+            driver: { net: 0, pnl: 0, count: 0 },
+            confirm: { net: 0, pnl: 0, count: 0 },
+            context: { net: 0, pnl: 0, count: 0 },
+        };
+        const breadth = { pos: 0, neg: 0, zero: 0 };
+        const contribution = { posSum: 0, negSum: 0, net: 0 };
+        const pnlLike = { posSum: 0, negSum: 0, net: 0 };
+
+        for (const c of cfgBase) {
+            const s = sym[c.key] || null;
+            const pct = get(s);
+            if (!isNum(pct)) continue;
+            const signed = pct * c.sign;
+            const capped = clamp(signed, -c.capAbs, c.capAbs);
+            const contrib = c.weight * (c.capAbs > 0 ? capped / c.capAbs : 0);
+            const pnl = c.weight * capped;
+            contribution.net += contrib;
+            pnlLike.net += pnl;
+            const g = groups[c.group] || groups.context;
+            g.net += contrib;
+            g.pnl += pnl;
+            g.count += 1;
+            if (contrib > 0) {
+                breadth.pos += 1;
+                contribution.posSum += contrib;
+                pnlLike.posSum += pnl;
+            } else if (contrib < 0) {
+                breadth.neg += 1;
+                contribution.negSum += contrib;
+                pnlLike.negSum += pnl;
+            } else {
+                breadth.zero += 1;
+            }
+            rows.push({ key: c.key, group: c.group, label: c.key.toUpperCase(), symbol: s, pct, signed, weight: c.weight, capAbs: c.capAbs, contrib, pnl });
+        }
+        const net = clamp(contribution.net, -3, 3);
+        const bias = net > 0.25 ? 'buy' : net < -0.25 ? 'sell' : 'neutral';
+        return { bias, net, breadth, contribution, pnlLike, groups, rows };
+    };
+
+    const spxPulse = buildPulse('spx');
+    const ndxPulse = buildPulse('ndx');
+    const dowPulse = buildPulse('dow');
+    const micro = {
+        spx: microStats(sym.spx),
+        ndx: microStats(sym.ndx),
+        dow: microStats(sym.dow),
+    };
+
+    const corr = {
+        spx: {
+            items: [
+                corrPair('SPX × DXY', sym.spx, sym.dxy),
+                corrPair('SPX × VIX', sym.spx, sym.vix),
+                corrPair('SPX × US10Y', sym.spx, sym.us10y),
+                corrPair('SPX × HYG', sym.spx, sym.hyg),
+            ].filter(Boolean),
+        },
+        ndx: {
+            items: [
+                corrPair('NDX × DXY', sym.ndx, sym.dxy),
+                corrPair('NDX × VXN', sym.ndx, sym.vxn),
+                corrPair('NDX × US10Y', sym.ndx, sym.us10y),
+                corrPair('NDX × HYG', sym.ndx, sym.hyg),
+            ].filter(Boolean),
+        },
+        dow: {
+            items: [
+                corrPair('DOW × DXY', sym.dow, sym.dxy),
+                corrPair('DOW × VIX', sym.dow, sym.vix),
+                corrPair('DOW × US10Y', sym.dow, sym.us10y),
+                corrPair('DOW × XLF', sym.dow, sym.xlf),
+            ].filter(Boolean),
+        },
+    };
+
+    const expected = ['spx', 'ndx', 'dow', 'dxy', 'vix', 'us10y', 'hyg', 'tlt', 'eem'];
+    const missing = expected.filter(k => !sym[k]);
+    const execution = {
+        spx: sym.spx,
+        ndx: sym.ndx,
+        dow: sym.dow,
+    };
+    const source = {
+        spx: asSource(sym.spx, [/^ES[HMUZ]\d{2}$/i]),
+        ndx: asSource(sym.ndx, [/^NQ[HMUZ]\d{2}$/i]),
+        dow: asSource(sym.dow, [/^YM[HMUZ]\d{2}$/i]),
+    };
+    const keyLabels = {
+        spx: 'S&P 500 (SPX/SPY/ES)',
+        ndx: 'Nasdaq 100 (NDX/QQQ/NQ)',
+        dow: 'US30/Dow (DIA/.DJI/YM)',
+        dxy: 'DXY',
+        vix: 'VIX',
+        us10y: 'US10Y',
+        hyg: 'HYG',
+        tlt: 'TLT',
+        eem: 'EEM/VWO',
+    };
+
+    return {
+        sym,
+        market: {
+            spxPct: get(sym.spx),
+            ndxPct: get(sym.ndx),
+            dowPct: get(sym.dow),
+        },
+        pulse: { spx: spxPulse, ndx: ndxPulse, dow: dowPulse },
+        corr,
+        micro,
+        execution,
+        source,
+        coverage: { expected: expected.length, missing, keyLabels },
+        news: computeNews.top || [],
+        newsMeta: { used: computeNews.used, matched: computeNews.matched, score: computeNews.score },
+    };
+}
+
+function computeCommoditiesPulseNow(data, web) {
+    const isNum = v => typeof v === 'number' && Number.isFinite(v);
+    const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+    const pick = patterns => patterns.map(re => findAssetSymbol(data, re)).find(Boolean) || null;
+    const get = s => (s ? getChangePct(data, s) : null);
+    const asSource = (symbol, futurePatterns = []) => {
+        const s = String(symbol || '');
+        if (!s) return 'missing';
+        for (const re of futurePatterns) if (re.test(s)) return 'future';
+        return 'proxy';
+    };
+    const pickPreferred = (futurePatterns, fallbackPatterns, aliasKey = null) => {
+        const fut = pick(futurePatterns || []);
+        if (fut) return fut;
+        const ali = aliasKey ? findAliasSymbolBest(data, aliasKey) : null;
+        if (ali) return ali;
+        return pick(fallbackPatterns || []);
+    };
+
+    const sym = {
+        gold: pickPreferred([/^GCc\d$/i, /^GC=F$/i], [/^XAU(USD)?$/i, /^GLD(\.\w+)?$/i, /\bGold\b/i, /\bOuro\b/i], 'GOLD'),
+        brent: pickPreferred([/^LCOc\d$/i, /^BRNc\d$/i, /^BZ=F$/i], [/^BNO(\.\w+)?$/i, /\bBrent\b/i], 'BRENT'),
+        wti: pickPreferred([/^CLc\d$/i, /^CL=F$/i], [/^USO(\.\w+)?$/i, /\bWTI\b/i], 'WTI'),
+        dxy: findAliasSymbolBest(data, 'DXY') || pick([/^\.DXY$/i, /^DXY$/i, /^DX=F$/i, /^DXc\d$/i, /\bUS\s*Dollar\s*Index\b/i]),
+        vix: findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX') || pick([/^\.?VIX(9D)?$/i]),
+        us2y: findAliasSymbolBest(data, 'US2Y') || pick([/^US2YT=RR$/i, /^TUc\d=\$?$/i, /\bUS2Y\b/i, /\bUnited States 2-Year\b/i]),
+        us10y: findAliasSymbolBest(data, 'US10Y') || pick([/^US10YT=RR$/i, /^USGV10YUSAB=R$/i, /^TNc\d=\$?$/i, /^TYc\d=\$?$/i, /\bUS10Y\b/i, /\bUnited States 10-Year\b/i]),
+        tlt: findAliasSymbolBest(data, 'TLT') || pick([/^TLT(\.\w+)?$/i]),
+        hyg: findAliasSymbolBest(data, 'HYG') || pick([/^HYG(\.\w+)?$/i]),
+        eem: findAliasSymbolBest(data, 'EEM') || findAliasSymbolBest(data, 'VWO') || pick([/^EEM(\.\w+)?$/i, /^VWO(\.\w+)?$/i]),
+        spx: findAliasSymbolBest(data, 'SPX') || pick([/^\.SPX$/i, /^SPX$/i, /^SPY(\.\w+)?$/i, /\bS&P\s*500\b/i, /\bS\s*&\s*P\s*500\b/i]),
+        copper: findAliasSymbolBest(data, 'COPPER') || pick([/^HG=F$/i, /^HGc\d$/i, /^CPER(\.\w+)?$/i, /\bCopper\b/i, /\bCobre\b/i]),
+        usdcad: findAliasSymbolBest(data, 'USD_CAD') || pick([/^USD\/CAD\b/i, /\bUSDCAD\b/i]),
+        usdrub: pick([/^USD\/RUB\b/i, /\bUSDRUB\b/i]),
+        xle: pick([/^XLE(\.\w+)?$/i, /\bEnergy\s*Select\s*Sector\b/i]),
+        btc: findAliasSymbolBest(data, 'BTC') || pick([/^BTC\/USD$/i, /\bbitcoin\b/i]),
+    };
+
+    const computeNews = (() => {
+        const items = web && Array.isArray(web.items) ? web.items : [];
+        const confW = c => {
+            const s = String(c || '').toLowerCase();
+            if (s.includes('high') || s.includes('alta')) return 1.0;
+            if (s.includes('medium') || s.includes('média') || s.includes('media')) return 0.75;
+            if (s.includes('low') || s.includes('baixa')) return 0.55;
+            return 0.7;
+        };
+        const kwGoldOil = s =>
+            /\bgold\b|\bouro\b|\bxau\b|\bcentral\s*bank\b|\breserves\b|\binflation\b|\bcpi\b|\breal\s*yields?\b|\btreasury\b|\brate\s*cut\b|\brate\s*hike\b|\boil\b|\bcrude\b|\bbrent\b|\bwti\b|\bopec\b|\bpec\b|\boutput\b|\brefiner\w*\b|\bstockpile\w*\b|\binventory\b|\bshipping\b|\bred\s*sea\b|\bhormuz\b|\bsanction\w*\b|\bwar\b|\biran\b|\bisrael\b|\brussia\b|\bukraine\b|\bmiddle\s*east\b|\bchina\b|\btaiwan\b/i.test(s);
+        const pos = [
+            /\bde[-\s]?escalat\w*\b/i,
+            /\bceasefire\b/i,
+            /\bincrease\s*supply\b/i,
+            /\boutput\s*hike\b/i,
+            /\bstock\s*build\b/i,
+            /\binventory\s*build\b/i,
+            /\brate\s*cut\b/i,
+            /\bdisinflation\b/i,
+            /\bdovish\b/i,
+        ];
+        const neg = [
+            /\bescalat\w*\b/i,
+            /\battack\b/i,
+            /\bdrone\b/i,
+            /\bmissile\b/i,
+            /\bsanction\w*\b/i,
+            /\bsupply\s*cut\b/i,
+            /\boutage\b/i,
+            /\bshipping\s*disrupt\w*\b/i,
+            /\brate\s*hike\b/i,
+            /\bhawkish\b/i,
+        ];
+        let matched = 0;
+        let score = 0;
+        const top = [];
+        for (const it of items.slice(0, 80)) {
+            const title = it && it.title ? String(it.title) : '';
+            if (!title) continue;
+            if (!kwGoldOil(title)) continue;
+            if (top.length < 6) top.push(it);
+            matched++;
+            const w = confW(it && it.confidence);
+            let s = 0;
+            for (const re of pos) if (re.test(title)) s += 1;
+            for (const re of neg) if (re.test(title)) s -= 1;
+            score += w * clamp(s, -3, 3);
+        }
+        const denom = matched > 0 ? matched * 3 : 1;
+        const normalized = clamp(score / denom, -1, 1);
+        return { used: !!items.length, matched, score: normalized, top };
+    })();
+
+    const buildReturnSeries = (symbol, windowPoints = 96) => {
+        const series = data && data.series && Array.isArray(data.series[symbol]) ? data.series[symbol] : [];
+        if (!series.length) return [];
+        const start = Math.max(0, series.length - windowPoints);
+        const out = [];
+        for (let i = start + 1; i < series.length; i += 1) {
+            const a = series[i - 1];
+            const b = series[i];
+            const pa = a && typeof a.price === 'number' && Number.isFinite(a.price) ? a.price : null;
+            const pb = b && typeof b.price === 'number' && Number.isFinite(b.price) ? b.price : null;
+            const tb = b && b.t ? Date.parse(b.t) : NaN;
+            const tMs = Number.isFinite(tb) ? tb : null;
+            if (pa === null || pb === null || tMs === null) continue;
+            if (pa <= 0 || pb <= 0) continue;
+            const r = Math.log(pb / pa);
+            if (!Number.isFinite(r)) continue;
+            out.push({ tMs: tMs, r });
+        }
+        return out;
+    };
+    const correlationAligned = (a, b, minPoints = 20) => {
+        const mapB = new Map();
+        for (const p of (b || [])) mapB.set(p.tMs, p.r);
+        const xs = [];
+        const ys = [];
+        for (const p of (a || [])) {
+            const y = mapB.get(p.tMs);
+            if (!isNum(p.r) || !isNum(y)) continue;
+            xs.push(p.r);
+            ys.push(y);
+        }
+        const n = xs.length;
+        if (n < minPoints) return null;
+        const mean = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
+        const mx = mean(xs);
+        const my = mean(ys);
+        let cov = 0;
+        let vx = 0;
+        let vy = 0;
+        for (let i = 0; i < n; i += 1) {
+            const dx = xs[i] - mx;
+            const dy = ys[i] - my;
+            cov += dx * dy;
+            vx += dx * dx;
+            vy += dy * dy;
+        }
+        if (vx <= 1e-18 || vy <= 1e-18) return null;
+        return { corr: cov / Math.sqrt(vx * vy), n };
+    };
+    const corrPair = (label, aSym, bSym) => {
+        if (!aSym || !bSym) return null;
+        const out = correlationAligned(buildReturnSeries(aSym), buildReturnSeries(bSym));
+        if (!out) return null;
+        return { label, corr: out.corr, n: out.n };
+    };
+
+    const microStats = (symbol) => {
+        const s = String(symbol || '');
+        if (!s) return null;
+        const series = data && data.series && Array.isArray(data.series[s]) ? data.series[s] : [];
+        if (!series.length) return null;
+        const last = series[series.length - 1];
+        const lastPrice = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
+        const lastTmsRaw = last && last.t ? Date.parse(last.t) : NaN;
+        const lastTms = Number.isFinite(lastTmsRaw) ? lastTmsRaw : null;
+        if (lastPrice === null || lastTms === null) return null;
+
+        const findAt = (lookbackMs) => {
+            const target = lastTms - lookbackMs;
+            let best = null;
+            for (let i = series.length - 1; i >= 0; i -= 1) {
+                const p = series[i];
+                const tRaw = p && p.t ? Date.parse(p.t) : NaN;
+                const t = Number.isFinite(tRaw) ? tRaw : null;
+                const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                if (t === null || price === null) continue;
+                if (t <= target) { best = { tMs: t, price }; break; }
+            }
+            return best;
+        };
+        const pctFrom = (priceThen) => (typeof priceThen === 'number' && Number.isFinite(priceThen) && priceThen > 0 ? ((lastPrice / priceThen) - 1) * 100 : null);
+
+        const p5 = findAt(5 * 60 * 1000);
+        const p15 = findAt(15 * 60 * 1000);
+        const p60 = findAt(60 * 60 * 1000);
+        const ret5 = p5 ? pctFrom(p5.price) : null;
+        const ret15 = p15 ? pctFrom(p15.price) : null;
+        const ret60 = p60 ? pctFrom(p60.price) : null;
+
+        const range30 = (() => {
+            const cut = lastTms - 30 * 60 * 1000;
+            let hi = -Infinity;
+            let lo = +Infinity;
+            let n = 0;
+            for (let i = series.length - 1; i >= 0; i -= 1) {
+                const p = series[i];
+                const tRaw = p && p.t ? Date.parse(p.t) : NaN;
+                const t = Number.isFinite(tRaw) ? tRaw : null;
+                const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                if (t === null || price === null) continue;
+                if (t < cut) break;
+                n += 1;
+                if (price > hi) hi = price;
+                if (price < lo) lo = price;
+            }
+            if (n < 4 || !Number.isFinite(hi) || !Number.isFinite(lo) || lo <= 0) return null;
+            const pct = ((hi / lo) - 1) * 100;
+            return { pct, n };
+        })();
+
+        const vol30 = (() => {
+            const cut = lastTms - 30 * 60 * 1000;
+            let sumAbs = 0;
+            let prev = null;
+            let n = 0;
+            for (let i = series.length - 1; i >= 0; i -= 1) {
+                const p = series[i];
+                const tRaw = p && p.t ? Date.parse(p.t) : NaN;
+                const t = Number.isFinite(tRaw) ? tRaw : null;
+                const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                if (t === null || price === null) continue;
+                if (t < cut) break;
+                if (prev && prev.price > 0) {
+                    const r = ((prev.price / price) - 1) * 100;
+                    if (Number.isFinite(r)) { sumAbs += Math.abs(r); n += 1; }
+                }
+                prev = { price };
+            }
+            if (n < 4) return null;
+            return { sumAbsPct: sumAbs, n };
+        })();
+
+        const scalp = (() => {
+            const th5 = 0.10;
+            const th15 = 0.18;
+            const s5 = typeof ret5 === 'number' && Number.isFinite(ret5) ? ret5 : null;
+            const s15 = typeof ret15 === 'number' && Number.isFinite(ret15) ? ret15 : null;
+            if (s5 === null || s15 === null) return { signal: 'neutral', strength: 0, label: 'n/d' };
+            const alignedUp = s5 >= th5 && s15 >= th15;
+            const alignedDn = s5 <= -th5 && s15 <= -th15;
+            if (alignedUp) return { signal: 'buy', strength: Math.min(1, (Math.abs(s15) / 0.9)), label: 'tendência curta (↑)' };
+            if (alignedDn) return { signal: 'sell', strength: Math.min(1, (Math.abs(s15) / 0.9)), label: 'tendência curta (↓)' };
+            const conflict = (s5 > 0 && s15 < 0) || (s5 < 0 && s15 > 0);
+            if (conflict && Math.abs(s5) >= th5) return { signal: 'neutral', strength: 0.5, label: 'conflito 5m×15m' };
+            return { signal: 'neutral', strength: Math.min(0.6, Math.abs(s5) / 0.7), label: 'range/ruído' };
+        })();
+
+        return { ret5, ret15, ret60, range30, vol30, scalp, lastTms, lastPrice };
+    };
+
+    const buildPulse = (baseKey) => {
+        const cfg = baseKey === 'gold'
+            ? [
+                { key: 'gold', group: 'driver', weight: 0.9, capAbs: 1.2, sign: +1 },
+                { key: 'dxy', group: 'driver', weight: 0.6, capAbs: 0.8, sign: -1 },
+                { key: 'us10y', group: 'driver', weight: 0.45, capAbs: 0.9, sign: -1 },
+                { key: 'tlt', group: 'confirm', weight: 0.25, capAbs: 1.3, sign: +1 },
+                { key: 'vix', group: 'confirm', weight: 0.25, capAbs: 4.5, sign: +0.6 },
+                { key: 'hyg', group: 'context', weight: 0.2, capAbs: 1.3, sign: -0.5 },
+                { key: 'spx', group: 'context', weight: 0.25, capAbs: 1.2, sign: -0.4 },
+                { key: 'eem', group: 'context', weight: 0.18, capAbs: 1.4, sign: -0.3 },
+                { key: 'btc', group: 'context', weight: 0.12, capAbs: 2.0, sign: -0.2 },
+            ]
+            : [
+                { key: 'brent', group: 'driver', weight: 0.55, capAbs: 2.0, sign: +1 },
+                { key: 'wti', group: 'driver', weight: 0.45, capAbs: 2.0, sign: +1 },
+                { key: 'dxy', group: 'driver', weight: 0.35, capAbs: 0.8, sign: -0.6 },
+                { key: 'spx', group: 'confirm', weight: 0.25, capAbs: 1.2, sign: +0.4 },
+                { key: 'hyg', group: 'confirm', weight: 0.25, capAbs: 1.3, sign: +0.4 },
+                { key: 'vix', group: 'confirm', weight: 0.25, capAbs: 4.5, sign: -0.5 },
+                { key: 'us10y', group: 'context', weight: 0.2, capAbs: 0.9, sign: -0.25 },
+                { key: 'copper', group: 'context', weight: 0.18, capAbs: 1.8, sign: +0.35 },
+                { key: 'xle', group: 'context', weight: 0.18, capAbs: 1.6, sign: +0.35 },
+                { key: 'usdcad', group: 'context', weight: 0.15, capAbs: 0.8, sign: -0.35 },
+                { key: 'usdrub', group: 'context', weight: 0.12, capAbs: 1.0, sign: +0.15 },
+            ];
+
+        const rows = [];
+        const groups = {
+            driver: { net: 0, pnl: 0, count: 0 },
+            confirm: { net: 0, pnl: 0, count: 0 },
+            context: { net: 0, pnl: 0, count: 0 },
+        };
+        const breadth = { pos: 0, neg: 0, zero: 0 };
+        const contribution = { posSum: 0, negSum: 0, net: 0 };
+        const pnlLike = { posSum: 0, negSum: 0, net: 0 };
+
+        for (const c of cfg) {
+            const s = sym[c.key] || null;
+            const pct = get(s);
+            if (!isNum(pct)) continue;
+            const signed = pct * c.sign;
+            const capped = clamp(signed, -c.capAbs, c.capAbs);
+            const contrib = c.weight * (c.capAbs > 0 ? capped / c.capAbs : 0);
+            const pnl = c.weight * capped;
+            contribution.net += contrib;
+            pnlLike.net += pnl;
+            const g = groups[c.group] || groups.context;
+            g.net += contrib;
+            g.pnl += pnl;
+            g.count += 1;
+            if (contrib > 0) {
+                breadth.pos += 1;
+                contribution.posSum += contrib;
+                pnlLike.posSum += pnl;
+            } else if (contrib < 0) {
+                breadth.neg += 1;
+                contribution.negSum += contrib;
+                pnlLike.negSum += pnl;
+            } else {
+                breadth.zero += 1;
+            }
+            rows.push({ key: c.key, group: c.group, label: c.key.toUpperCase(), symbol: s, pct, signed, weight: c.weight, capAbs: c.capAbs, contrib, pnl });
+        }
+        const net = clamp(contribution.net, -3, 3);
+        const bias = net > 0.25 ? 'buy' : net < -0.25 ? 'sell' : 'neutral';
+        return { bias, net, breadth, contribution, pnlLike, groups, rows };
+    };
+
+    const goldPulse = buildPulse('gold');
+    const oilPulse = buildPulse('oil');
+    const micro = {
+        gold: microStats(sym.gold),
+        oil: microStats(sym.brent || sym.wti || null),
+    };
+
+    const corr = {
+        gold: {
+            items: [
+                corrPair('Ouro × DXY', sym.gold, sym.dxy),
+                corrPair('Ouro × US10Y', sym.gold, sym.us10y),
+                corrPair('Ouro × SPX', sym.gold, sym.spx),
+                corrPair('Ouro × VIX', sym.gold, sym.vix),
+            ].filter(Boolean),
+        },
+        oil: {
+            items: [
+                corrPair('Brent × DXY', sym.brent, sym.dxy),
+                corrPair('WTI × DXY', sym.wti, sym.dxy),
+                corrPair('Brent × SPX', sym.brent, sym.spx),
+                corrPair('Brent × Cobre', sym.brent, sym.copper),
+                corrPair('Brent × USD/CAD', sym.brent, sym.usdcad),
+            ].filter(Boolean),
+        },
+    };
+
+    const expected = ['gold', 'brent', 'wti', 'dxy', 'us10y', 'vix', 'hyg'];
+    const missing = expected.filter(k => !sym[k]);
+    const execution = {
+        gold: sym.gold,
+        oil: sym.brent || sym.wti || null,
+    };
+    const source = {
+        gold: asSource(sym.gold, [/^GCc\d$/i, /^GC=F$/i]),
+        brent: asSource(sym.brent, [/^LCOc\d$/i, /^BRNc\d$/i, /^BZ=F$/i]),
+        wti: asSource(sym.wti, [/^CLc\d$/i, /^CL=F$/i]),
+        oil: asSource(sym.brent || sym.wti || null, [/^LCOc\d$/i, /^BRNc\d$/i, /^BZ=F$/i, /^CLc\d$/i, /^CL=F$/i]),
+    };
+    const keyLabels = {
+        gold: 'Ouro (GC/XAU/GLD)',
+        brent: 'Petróleo Brent',
+        wti: 'Petróleo WTI',
+        dxy: 'DXY',
+        us10y: 'US10Y',
+        vix: 'VIX',
+        hyg: 'HYG',
+    };
+
+    return {
+        sym,
+        market: {
+            goldPct: get(sym.gold),
+            brentPct: get(sym.brent),
+            wtiPct: get(sym.wti),
+        },
+        pulse: { gold: goldPulse, oil: oilPulse },
+        corr,
+        micro,
+        execution,
+        source,
+        coverage: { expected: expected.length, missing, keyLabels },
+        news: computeNews.top || [],
+        newsMeta: { used: computeNews.used, matched: computeNews.matched, score: computeNews.score },
+    };
+}
+
 function computeBtcPulseNow(data, web) {
     const isNum = v => typeof v === 'number' && Number.isFinite(v);
     const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -3443,6 +4241,122 @@ function renderBtcOperationalBriefing() {
     const btcLine = `${btcNow.sym.btc ? btcNow.sym.btc : '—'} • ${btcSpot.spot !== null ? `$${fmt0(btcSpot.spot)}` : '—'} • ${fmtP(btcNow.market.btcPct)}`;
     const asOf = btcSpot.t ? formatDateTime(btcSpot.t) : '—';
 
+    const scalperPanel = (() => {
+        const symbol = btcNow.sym && btcNow.sym.btc ? String(btcNow.sym.btc) : '';
+        if (!symbol) return '';
+        const series = data && data.series && Array.isArray(data.series[symbol]) ? data.series[symbol] : [];
+        if (!series.length) return '';
+        const last = series[series.length - 1];
+        const lastPrice = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
+        const lastMs = last && last.t ? Date.parse(last.t) : NaN;
+        if (lastPrice === null || !Number.isFinite(lastMs)) return '';
+
+        const findAt = (lookbackMs) => {
+            const target = lastMs - lookbackMs;
+            for (let i = series.length - 1; i >= 0; i -= 1) {
+                const p = series[i];
+                const ms = p && p.t ? Date.parse(p.t) : NaN;
+                const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                if (!Number.isFinite(ms) || price === null) continue;
+                if (ms <= target) return price;
+            }
+            return null;
+        };
+        const pctFrom = (priceThen) => (typeof priceThen === 'number' && Number.isFinite(priceThen) && priceThen > 0 ? ((lastPrice / priceThen) - 1) * 100 : null);
+        const r5 = pctFrom(findAt(5 * 60 * 1000));
+        const r15 = pctFrom(findAt(15 * 60 * 1000));
+        const r60 = pctFrom(findAt(60 * 60 * 1000));
+
+        const range30 = (() => {
+            const cut = lastMs - 30 * 60 * 1000;
+            let hi = -Infinity;
+            let lo = +Infinity;
+            let n = 0;
+            for (let i = series.length - 1; i >= 0; i -= 1) {
+                const p = series[i];
+                const ms = p && p.t ? Date.parse(p.t) : NaN;
+                const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                if (!Number.isFinite(ms) || price === null) continue;
+                if (ms < cut) break;
+                n += 1;
+                if (price > hi) hi = price;
+                if (price < lo) lo = price;
+            }
+            if (n < 4 || !Number.isFinite(hi) || !Number.isFinite(lo) || lo <= 0) return null;
+            return { pct: ((hi / lo) - 1) * 100 };
+        })();
+
+        const th5 = 0.12;
+        const th15 = 0.22;
+        const s5 = typeof r5 === 'number' && Number.isFinite(r5) ? r5 : null;
+        const s15 = typeof r15 === 'number' && Number.isFinite(r15) ? r15 : null;
+        const microBias = (s5 !== null && s15 !== null && s5 >= th5 && s15 >= th15)
+            ? 'buy'
+            : (s5 !== null && s15 !== null && s5 <= -th5 && s15 <= -th15)
+                ? 'sell'
+                : 'neutral';
+
+        const ctxBias = p && p.bias ? String(p.bias) : 'neutral';
+        const ctxStrong = typeof p.net === 'number' && Number.isFinite(p.net) ? Math.abs(p.net) >= 0.35 : false;
+        const finalBias = (microBias !== 'neutral' && ctxStrong && ctxBias !== 'neutral' && microBias !== ctxBias) ? 'neutral' : microBias;
+
+        const sign = (v, th = 0.10) => (typeof v === 'number' && Number.isFinite(v) ? (v > th ? +1 : v < -th ? -1 : 0) : 0);
+        const ok = (a, b, inverse = false) => {
+            const sa = sign(a);
+            const sb = sign(b);
+            if (!sa || !sb) return null;
+            return inverse ? (sa === -sb) : (sa === sb);
+        };
+        const ndx = btcNow.sym && btcNow.sym.ndx ? getChangePct(data, btcNow.sym.ndx) : null;
+        const dxy = btcNow.sym && btcNow.sym.dxy ? getChangePct(data, btcNow.sym.dxy) : null;
+        const eth = btcNow.sym && btcNow.sym.eth ? getChangePct(data, btcNow.sym.eth) : null;
+        const sol = btcNow.sym && btcNow.sym.sol ? getChangePct(data, btcNow.sym.sol) : null;
+        const hyg = btcNow.sym && btcNow.sym.hyg ? getChangePct(data, btcNow.sym.hyg) : null;
+        const tlt = btcNow.sym && btcNow.sym.tlt ? getChangePct(data, btcNow.sym.tlt) : null;
+        const mstr = btcNow.sym && btcNow.sym.mstr ? getChangePct(data, btcNow.sym.mstr) : null;
+        const coin = btcNow.sym && btcNow.sym.coin ? getChangePct(data, btcNow.sym.coin) : null;
+
+        const pBtcNdx = ok(btcNow.market ? btcNow.market.btcPct : null, ndx, true) === null ? ok(btcNow.market ? btcNow.market.btcPct : null, ndx, false) : ok(btcNow.market ? btcNow.market.btcPct : null, ndx, false);
+        const pBtcDxy = ok(btcNow.market ? btcNow.market.btcPct : null, dxy, true);
+
+        const parityBadge = (name, v) => badge(v === true ? 'positive' : v === false ? 'negative' : 'neutral', `${name}: ${v === true ? 'OK' : v === false ? 'DIVERGE' : '—'}`);
+        const fmtMicro = (label, v) => `${label} ${typeof v === 'number' && Number.isFinite(v) ? formatPercent(v, 2) : '—'}`;
+        const stop = range30 && typeof range30.pct === 'number' ? Math.max(0.25, range30.pct * 0.25) : null;
+        const alvo = range30 && typeof range30.pct === 'number' ? Math.max(0.45, range30.pct * 0.5) : null;
+        const plan = finalBias === 'buy'
+            ? `Comprar (scalp) • Stop ~${stop !== null ? formatPercent(stop, 2) : '—'} • Alvo ~${alvo !== null ? formatPercent(alvo, 2) : '—'}`
+            : finalBias === 'sell'
+                ? `Vender (scalp) • Stop ~${stop !== null ? formatPercent(stop, 2) : '—'} • Alvo ~${alvo !== null ? formatPercent(alvo, 2) : '—'}`
+                : 'Neutro (scalp) • espere alinhamento 5m×15m e paridades.';
+
+        const tone = finalBias === 'buy' ? 'positive' : finalBias === 'sell' ? 'negative' : 'neutral';
+        const action = finalBias === 'buy' ? 'COMPRA' : finalBias === 'sell' ? 'VENDA' : 'NEUTRO';
+
+        return `
+            <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <div style="font-weight:900;letter-spacing:.8px;opacity:.95;">⚡ Scalper — BTC</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        ${badge(tone, `Scalp: ${action}`)}
+                        ${badge('neutral', `Macro: ${biasLabel(ctxBias)} (${formatNumber(p.net, 2)})`)}
+                        ${parityBadge('BTC×NDX', pBtcNdx)}
+                        ${parityBadge('BTC×DXY (inv)', pBtcDxy)}
+                    </div>
+                </div>
+                <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+                    Micro: ${escapeHtml(fmtMicro('5m', r5))} • ${escapeHtml(fmtMicro('15m', r15))} • ${escapeHtml(fmtMicro('60m', r60))} • Range30 ${escapeHtml(range30 ? formatPercent(range30.pct, 2) : '—')}
+                </div>
+                <div style="margin-top:8px;opacity:.84;font-size:12px;line-height:1.35;">
+                    Fluxo/risco: HYG ${escapeHtml(fmtP(hyg))} • TLT ${escapeHtml(fmtP(tlt))} • ETH ${escapeHtml(fmtP(eth))} • SOL ${escapeHtml(fmtP(sol))}
+                </div>
+                <div style="margin-top:8px;opacity:.84;font-size:12px;line-height:1.35;">
+                    Empresas/setor: MSTR ${escapeHtml(fmtP(mstr))} • COIN ${escapeHtml(fmtP(coin))}
+                </div>
+                <div style="margin-top:10px;opacity:.86;font-size:12px;line-height:1.35;">${escapeHtml(plan)}</div>
+            </div>
+        `;
+    })();
+
     const groupTop = (groupKey, max = 7) => {
         const xs = (p.rows || []).filter(r => r && r.group === groupKey);
         xs.sort((a, b) => Math.abs(b.contrib || 0) - Math.abs(a.contrib || 0));
@@ -3524,6 +4438,7 @@ function renderBtcOperationalBriefing() {
             </div>
             ${suggestLine ? `<div style="margin-top:8px;opacity:.82;font-size:12px;line-height:1.35;">${escapeHtml(suggestLine)}</div>` : ''}
         </div>
+        ${scalperPanel}
 
         <div style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">
             <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
@@ -3544,6 +4459,474 @@ function renderBtcOperationalBriefing() {
                     <div style="opacity:.86;font-size:12px;font-weight:900;letter-spacing:.6px;margin-bottom:6px;">Notícias (recorte)</div>
                     <div style="opacity:.84;font-size:12px;line-height:1.35;">${newsHtml}</div>
                 </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderUsEquitiesOperationalBriefing() {
+    const el = document.getElementById('usEquitiesOperationalBriefing');
+    if (!el) return;
+
+    const data = getData();
+    const rawWeb = operationalInputs.webNews || null;
+    const web = rawWeb && rawWeb.ok === true ? rawWeb : null;
+    const usNow = data ? computeUsEquitiesPulseNow(data, web) : null;
+
+    const badge = (tone, text) => {
+        const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
+        return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
+    };
+
+    if (!data || !usNow) {
+        el.innerHTML = `<div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);opacity:.88;">Sem dados suficientes para montar o bloco EUA agora.</div>`;
+        return;
+    }
+
+    const fmtP = v => (typeof v === 'number' && Number.isFinite(v) ? formatPercent(v, 2) : '—');
+    const fmt0 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 0) : '—');
+    const fmt2 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 2) : '—');
+    const srcLabel = s => (s === 'future' ? 'FUTURO' : s === 'proxy' ? 'PROXY' : 'N/D');
+    const biasLabel = b => (b === 'buy' ? 'COMPRA' : b === 'sell' ? 'VENDA' : 'NEUTRO');
+
+    const spotOf = s => {
+        const pt = s ? (getMostRecentPointWithPrice(data, s) || getLastPoint(data, s)) : null;
+        const spot = pt && typeof pt.price === 'number' && Number.isFinite(pt.price) ? pt.price : null;
+        const t = pt && pt.t ? String(pt.t) : null;
+        return { spot, t };
+    };
+
+    const planFor = (name, p, extras, execSym, src, micro) => {
+        const scalp = micro && micro.scalp ? micro.scalp : { signal: 'neutral', strength: 0, label: 'n/d' };
+        const scalpBias = scalp && scalp.signal ? String(scalp.signal) : 'neutral';
+        const primaryBias = scalpBias !== 'neutral' ? scalpBias : (p && p.bias ? p.bias : 'neutral');
+        const tone = primaryBias === 'buy' ? 'positive' : primaryBias === 'sell' ? 'negative' : 'neutral';
+        const action = primaryBias === 'buy' ? 'Compra' : primaryBias === 'sell' ? 'Venda' : 'Neutro';
+        const macroTxt = p && p.bias ? (p.bias === 'buy' ? 'Compra' : p.bias === 'sell' ? 'Venda' : 'Neutro') : '—';
+
+        const microLine = (() => {
+            if (!micro) return null;
+            const r5 = typeof micro.ret5 === 'number' && Number.isFinite(micro.ret5) ? micro.ret5 : null;
+            const r15 = typeof micro.ret15 === 'number' && Number.isFinite(micro.ret15) ? micro.ret15 : null;
+            const r60 = typeof micro.ret60 === 'number' && Number.isFinite(micro.ret60) ? micro.ret60 : null;
+            const range30 = micro.range30 && typeof micro.range30.pct === 'number' && Number.isFinite(micro.range30.pct) ? micro.range30.pct : null;
+            const vol30 = micro.vol30 && typeof micro.vol30.sumAbsPct === 'number' && Number.isFinite(micro.vol30.sumAbsPct) ? micro.vol30.sumAbsPct : null;
+            const bits = [
+                r5 !== null ? `5m ${formatPercent(r5, 2)}` : null,
+                r15 !== null ? `15m ${formatPercent(r15, 2)}` : null,
+                r60 !== null ? `60m ${formatPercent(r60, 2)}` : null,
+                range30 !== null ? `Range30 ${formatPercent(range30, 2)}` : null,
+                vol30 !== null ? `Vol30 ${formatPercent(vol30, 2)}` : null,
+            ].filter(Boolean);
+            if (!bits.length) return null;
+            return `Micro: ${bits.join(' • ')}`;
+        })();
+
+        const scalpPlan = (() => {
+            const rangePct = micro && micro.range30 && typeof micro.range30.pct === 'number' && Number.isFinite(micro.range30.pct) ? micro.range30.pct : null;
+            const stopPct = rangePct !== null ? Math.max(0.08, rangePct * 0.25) : null;
+            const alvoPct = rangePct !== null ? Math.max(0.12, rangePct * 0.5) : null;
+            const risk = stopPct !== null ? `Stop ~${formatPercent(stopPct, 2)}` : 'Stop: curto';
+            const reward = alvoPct !== null ? `Alvo ~${formatPercent(alvoPct, 2)}` : 'Alvo: curto';
+            if (primaryBias === 'buy') return `Scalp: comprar a favor do fluxo curto (pullback leve ou rompimento) • ${risk} • ${reward}`;
+            if (primaryBias === 'sell') return `Scalp: vender a favor do fluxo curto (repique ou rompimento) • ${risk} • ${reward}`;
+            return 'Scalp: sem edge (5m×15m não alinhado) • prefira esperar gatilho e operar range.';
+        })();
+
+        const w = p.groups ? p.groups.driver || { net: 0, count: 0 } : { net: 0, count: 0 };
+        const c = p.groups ? p.groups.confirm || { net: 0, count: 0 } : { net: 0, count: 0 };
+        const x = p.groups ? p.groups.context || { net: 0, count: 0 } : { net: 0, count: 0 };
+        return `<div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;">${escapeHtml(name)}</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    ${badge(tone, `Scalp: ${action}`)}
+                    ${badge('neutral', `Macro: ${macroTxt}`)}
+                    ${badge('neutral', `Drivers net ${escapeHtml(fmt2(p.net))}`)}
+                    ${badge(src === 'future' ? 'positive' : src === 'proxy' ? 'warn' : 'neutral', `Execução: ${escapeHtml(execSym || '—')} (${srcLabel(src)})`)}
+                </div>
+            </div>
+            <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">${escapeHtml(extras)}</div>
+            ${microLine ? `<div style="margin-top:6px;opacity:.84;font-size:12px;line-height:1.35;">${escapeHtml(microLine)}</div>` : ''}
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                ${badge('neutral', `Camadas: Driver ${escapeHtml(fmt2(w.net))} (${String(w.count)}) • Conf ${escapeHtml(fmt2(c.net))} (${String(c.count)}) • Contexto ${escapeHtml(fmt2(x.net))} (${String(x.count)})`)}
+            </div>
+            <div style="margin-top:10px;opacity:.90;line-height:1.45;">
+                <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:6px;">Plano</div>
+                <div style="opacity:.86;font-size:12px;">${escapeHtml(scalpPlan)}</div>
+            </div>
+        </div>`;
+    };
+
+    const corrLine = (items) => {
+        const xs = Array.isArray(items) ? items.slice(0, 5) : [];
+        if (!xs.length) return 'Correlações: —';
+        return `Correlações: ${xs.map(it => `${it.label} ${formatNumber(it.corr, 2)}${it.n ? ` (n=${String(it.n)})` : ''}`).join(' • ')}`;
+    };
+
+    const news = Array.isArray(usNow.news) ? usNow.news : [];
+    const newsHtml = (() => {
+        if (!news.length) return `<div style="opacity:.78;font-size:12px;">• —</div>`;
+        return news
+            .slice(0, 6)
+            .map(it => {
+                const title = it && it.title ? String(it.title) : '';
+                const url = it && it.url ? String(it.url) : '';
+                const safeUrl = url && /^https?:\/\//i.test(url) ? url : '';
+                const a = safeUrl
+                    ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noreferrer" style="color:rgba(0,243,255,.92);text-decoration:none;">${escapeHtml(title)}</a>`
+                    : escapeHtml(title);
+                return `• ${a}`;
+            })
+            .join('<br>');
+    })();
+
+    const mkMissing = (() => {
+        const miss = usNow.coverage && Array.isArray(usNow.coverage.missing) ? usNow.coverage.missing : [];
+        const labels = usNow.coverage && usNow.coverage.keyLabels ? usNow.coverage.keyLabels : {};
+        const src = usNow.source || {};
+        const futMissing = ['spx', 'ndx', 'dow'].filter(k => src[k] !== 'future');
+        if (!miss.length && !futMissing.length) return badge('positive', 'Drivers: completos');
+        const txt = miss.slice(0, 6).map(k => labels[k] || k).join(' • ');
+        const futTxt = futMissing.length ? `Sem futuro em: ${futMissing.map(k => (labels[k] || k)).join(' • ')}` : '';
+        const msg = [txt ? `Faltando (dados): ${txt}${miss.length > 6 ? `… +${miss.length - 6}` : ''}` : '', futTxt].filter(Boolean).join(' | ');
+        return badge('neutral', msg || 'Cobertura parcial');
+    })();
+
+    const spxSpot = spotOf(usNow.sym.spx);
+    const ndxSpot = spotOf(usNow.sym.ndx);
+    const dowSpot = spotOf(usNow.sym.dow);
+    const asOf = (spxSpot.t || ndxSpot.t || dowSpot.t) ? formatDateTime(String(spxSpot.t || ndxSpot.t || dowSpot.t)) : '—';
+
+    const spxExtras = `${usNow.sym.spx || '—'} • ${spxSpot.spot !== null ? fmt0(spxSpot.spot) : '—'} • ${fmtP(usNow.market.spxPct)} • ${corrLine(usNow.corr && usNow.corr.spx ? usNow.corr.spx.items : [])}`;
+    const ndxExtras = `${usNow.sym.ndx || '—'} • ${ndxSpot.spot !== null ? fmt0(ndxSpot.spot) : '—'} • ${fmtP(usNow.market.ndxPct)} • ${corrLine(usNow.corr && usNow.corr.ndx ? usNow.corr.ndx.items : [])}`;
+    const dowExtras = `${usNow.sym.dow || '—'} • ${dowSpot.spot !== null ? fmt0(dowSpot.spot) : '—'} • ${fmtP(usNow.market.dowPct)} • ${corrLine(usNow.corr && usNow.corr.dow ? usNow.corr.dow.items : [])}`;
+
+    const nScore = usNow.newsMeta && typeof usNow.newsMeta.score === 'number' && Number.isFinite(usNow.newsMeta.score) ? usNow.newsMeta.score : 0;
+    const nTone = nScore > 0.15 ? 'positive' : nScore < -0.15 ? 'negative' : 'neutral';
+
+    const scalperPanel = (() => {
+        const sign = (v, th = 0.08) => (typeof v === 'number' && Number.isFinite(v) ? (v > th ? +1 : v < -th ? -1 : 0) : 0);
+        const ok = (a, b) => {
+            const sa = sign(a);
+            const sb = sign(b);
+            if (!sa || !sb) return null;
+            return sa === sb;
+        };
+        const spx = usNow.market ? usNow.market.spxPct : null;
+        const ndx = usNow.market ? usNow.market.ndxPct : null;
+        const dow = usNow.market ? usNow.market.dowPct : null;
+        const xlf = usNow.sym && usNow.sym.xlf ? getChangePct(data, usNow.sym.xlf) : null;
+        const xlk = usNow.sym && usNow.sym.xlk ? getChangePct(data, usNow.sym.xlk) : null;
+        const iwm = usNow.sym && usNow.sym.iwm ? getChangePct(data, usNow.sym.iwm) : null;
+        const hyg = usNow.sym && usNow.sym.hyg ? getChangePct(data, usNow.sym.hyg) : null;
+        const tlt = usNow.sym && usNow.sym.tlt ? getChangePct(data, usNow.sym.tlt) : null;
+        const eem = usNow.sym && usNow.sym.eem ? getChangePct(data, usNow.sym.eem) : null;
+        const dxy = usNow.sym && usNow.sym.dxy ? getChangePct(data, usNow.sym.dxy) : null;
+        const vix = usNow.sym && usNow.sym.vix ? getChangePct(data, usNow.sym.vix) : null;
+        const us10y = usNow.sym && usNow.sym.us10y ? getChangePct(data, usNow.sym.us10y) : null;
+
+        const p1 = ok(spx, ndx);
+        const p2 = ok(dow, xlf);
+        const riskOn = (() => {
+            const s1 = sign(hyg, 0.06);
+            const s2 = sign(tlt, 0.06);
+            const s3 = sign(dxy, 0.06);
+            const s4 = sign(vix, 0.20);
+            const score = (s1 > 0 ? 1 : s1 < 0 ? -1 : 0) + (s2 > 0 ? 0.5 : s2 < 0 ? -0.5 : 0) + (s3 < 0 ? 0.5 : s3 > 0 ? -0.5 : 0) + (s4 < 0 ? 1 : s4 > 0 ? -1 : 0);
+            if (score >= 1.5) return { label: 'RISK ON', tone: 'positive' };
+            if (score <= -1.5) return { label: 'RISK OFF', tone: 'negative' };
+            return { label: 'MISTO', tone: 'neutral' };
+        })();
+
+        const mk = (label, v, maxAbs = 2.0) => `<span style="font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(label)} ${escapeHtml(typeof v === 'number' && Number.isFinite(v) ? formatPercent(v, 2) : '—')}</span>`;
+        const parityBadge = (name, v) => badge(v === true ? 'positive' : v === false ? 'negative' : 'neutral', `${name}: ${v === true ? 'OK' : v === false ? 'DIVERGE' : '—'}`);
+
+        return `
+            <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <div style="font-weight:900;letter-spacing:.8px;opacity:.95;">⚡ Scalper — Contexto, Paridades, Setores</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        ${badge(riskOn.tone, riskOn.label)}
+                        ${parityBadge('SPX×NDX', p1)}
+                        ${parityBadge('DOW×XLF', p2)}
+                    </div>
+                </div>
+                <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+                    ${mk('HYG', hyg)} • ${mk('TLT', tlt)} • ${mk('EEM', eem)} • ${mk('DXY', dxy)} • ${mk('VIX', vix, 5)} • ${mk('US10Y', us10y, 1)}
+                </div>
+                <div style="margin-top:8px;opacity:.84;font-size:12px;line-height:1.35;">
+                    Setores: ${mk('XLK', xlk)} • ${mk('XLF', xlf)} • ${mk('IWM', iwm)}
+                </div>
+                <div style="margin-top:8px;opacity:.78;font-size:12px;line-height:1.35;">
+                    Regra de scalp: se paridades divergirem ou RISK OFF forte, reduzir mão e exigir confirmação (rompimento + pullback curto).
+                </div>
+            </div>
+        `;
+    })();
+
+    el.innerHTML = `
+        <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;">EUA — Roteiro Operacional</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    ${mkMissing}
+                    ${badge(nTone, `News/Geo score ${escapeHtml(fmt2(nScore))}`)}
+                    ${badge('neutral', `asOf ${escapeHtml(asOf)}`)}
+                </div>
+            </div>
+            <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">
+                ${planFor('S&P 500', usNow.pulse.spx, spxExtras, usNow.execution ? usNow.execution.spx : null, usNow.source ? usNow.source.spx : null, usNow.micro ? usNow.micro.spx : null)}
+                ${planFor('Nasdaq', usNow.pulse.ndx, ndxExtras, usNow.execution ? usNow.execution.ndx : null, usNow.source ? usNow.source.ndx : null, usNow.micro ? usNow.micro.ndx : null)}
+                ${planFor('US30 (Dow)', usNow.pulse.dow, dowExtras, usNow.execution ? usNow.execution.dow : null, usNow.source ? usNow.source.dow : null, usNow.micro ? usNow.micro.dow : null)}
+            </div>
+        </div>
+        ${scalperPanel}
+        <div style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;">
+            <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+                    <div style="font-weight:900;letter-spacing:.6px;opacity:.92;">Notícias (macro/geopolítica)</div>
+                    <div style="opacity:.72;font-size:12px;">matched ${escapeHtml(String(usNow.newsMeta && typeof usNow.newsMeta.matched === 'number' ? usNow.newsMeta.matched : 0))}</div>
+                </div>
+                <div style="opacity:.84;font-size:12px;line-height:1.35;">${newsHtml}</div>
+            </div>
+        </div>
+    `;
+}
+
+function renderCommoditiesOperationalBriefing() {
+    const el = document.getElementById('commoditiesOperationalBriefing');
+    if (!el) return;
+
+    const data = getData();
+    const rawWeb = operationalInputs.webNews || null;
+    const web = rawWeb && rawWeb.ok === true ? rawWeb : null;
+    const cm = data ? computeCommoditiesPulseNow(data, web) : null;
+
+    const badge = (tone, text) => {
+        const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
+        return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
+    };
+
+    if (!data || !cm) {
+        el.innerHTML = `<div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);opacity:.88;">Sem dados suficientes para montar o bloco Ouro/Petróleo agora.</div>`;
+        return;
+    }
+
+    const fmtP = v => (typeof v === 'number' && Number.isFinite(v) ? formatPercent(v, 2) : '—');
+    const fmt0 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 0) : '—');
+    const fmt2 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 2) : '—');
+    const srcLabel = s => (s === 'future' ? 'FUTURO' : s === 'proxy' ? 'PROXY' : 'N/D');
+    const biasLabel = b => (b === 'buy' ? 'COMPRA' : b === 'sell' ? 'VENDA' : 'NEUTRO');
+
+    const spotOf = s => {
+        const pt = s ? (getMostRecentPointWithPrice(data, s) || getLastPoint(data, s)) : null;
+        const spot = pt && typeof pt.price === 'number' && Number.isFinite(pt.price) ? pt.price : null;
+        const t = pt && pt.t ? String(pt.t) : null;
+        return { spot, t };
+    };
+
+    const corrLine = (items) => {
+        const xs = Array.isArray(items) ? items.slice(0, 5) : [];
+        if (!xs.length) return 'Correlações: —';
+        return `Correlações: ${xs.map(it => `${it.label} ${formatNumber(it.corr, 2)}${it.n ? ` (n=${String(it.n)})` : ''}`).join(' • ')}`;
+    };
+
+    const planFor = (title, p, extras, note, execSym, src, micro) => {
+        const scalp = micro && micro.scalp ? micro.scalp : { signal: 'neutral', strength: 0, label: 'n/d' };
+        const scalpBias = scalp && scalp.signal ? String(scalp.signal) : 'neutral';
+        const primaryBias = scalpBias !== 'neutral' ? scalpBias : (p && p.bias ? p.bias : 'neutral');
+        const tone = primaryBias === 'buy' ? 'positive' : primaryBias === 'sell' ? 'negative' : 'neutral';
+        const action = biasLabel(primaryBias);
+        const macroTxt = p && p.bias ? biasLabel(p.bias) : '—';
+        const w = p.groups ? p.groups.driver || { net: 0, count: 0 } : { net: 0, count: 0 };
+        const c = p.groups ? p.groups.confirm || { net: 0, count: 0 } : { net: 0, count: 0 };
+        const x = p.groups ? p.groups.context || { net: 0, count: 0 } : { net: 0, count: 0 };
+        const microLine = (() => {
+            if (!micro) return null;
+            const r5 = typeof micro.ret5 === 'number' && Number.isFinite(micro.ret5) ? micro.ret5 : null;
+            const r15 = typeof micro.ret15 === 'number' && Number.isFinite(micro.ret15) ? micro.ret15 : null;
+            const r60 = typeof micro.ret60 === 'number' && Number.isFinite(micro.ret60) ? micro.ret60 : null;
+            const range30 = micro.range30 && typeof micro.range30.pct === 'number' && Number.isFinite(micro.range30.pct) ? micro.range30.pct : null;
+            const vol30 = micro.vol30 && typeof micro.vol30.sumAbsPct === 'number' && Number.isFinite(micro.vol30.sumAbsPct) ? micro.vol30.sumAbsPct : null;
+            const bits = [
+                r5 !== null ? `5m ${formatPercent(r5, 2)}` : null,
+                r15 !== null ? `15m ${formatPercent(r15, 2)}` : null,
+                r60 !== null ? `60m ${formatPercent(r60, 2)}` : null,
+                range30 !== null ? `Range30 ${formatPercent(range30, 2)}` : null,
+                vol30 !== null ? `Vol30 ${formatPercent(vol30, 2)}` : null,
+            ].filter(Boolean);
+            if (!bits.length) return null;
+            return `Micro: ${bits.join(' • ')}`;
+        })();
+
+        const scalpPlan = (() => {
+            const rangePct = micro && micro.range30 && typeof micro.range30.pct === 'number' && Number.isFinite(micro.range30.pct) ? micro.range30.pct : null;
+            const stopPct = rangePct !== null ? Math.max(0.10, rangePct * 0.25) : null;
+            const alvoPct = rangePct !== null ? Math.max(0.15, rangePct * 0.5) : null;
+            const risk = stopPct !== null ? `Stop ~${formatPercent(stopPct, 2)}` : 'Stop: curto';
+            const reward = alvoPct !== null ? `Alvo ~${formatPercent(alvoPct, 2)}` : 'Alvo: curto';
+            if (primaryBias === 'buy') return `Scalp: comprar com confirmação de dólar/juros (pullback leve ou rompimento) • ${risk} • ${reward}`;
+            if (primaryBias === 'sell') return `Scalp: vender com confirmação de dólar/juros (repique ou rompimento) • ${risk} • ${reward}`;
+            return 'Scalp: sem edge (5m×15m não alinhado) • espere alinhamento ou opere micro-range.';
+        })();
+
+        return `<div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;">${escapeHtml(title)}</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    ${badge(tone, `Scalp: ${action}`)}
+                    ${badge('neutral', `Macro: ${macroTxt}`)}
+                    ${badge('neutral', `Drivers net ${escapeHtml(fmt2(p.net))}`)}
+                    ${badge(src === 'future' ? 'positive' : src === 'proxy' ? 'warn' : 'neutral', `Execução: ${escapeHtml(execSym || '—')} (${srcLabel(src)})`)}
+                </div>
+            </div>
+            <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">${escapeHtml(extras)}</div>
+            ${microLine ? `<div style="margin-top:6px;opacity:.84;font-size:12px;line-height:1.35;">${escapeHtml(microLine)}</div>` : ''}
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                ${badge('neutral', `Camadas: Driver ${escapeHtml(fmt2(w.net))} (${String(w.count)}) • Conf ${escapeHtml(fmt2(c.net))} (${String(c.count)}) • Contexto ${escapeHtml(fmt2(x.net))} (${String(x.count)})`)}
+            </div>
+            <div style="margin-top:10px;opacity:.90;line-height:1.45;">
+                <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:6px;">Plano</div>
+                <div style="opacity:.86;font-size:12px;">${escapeHtml(scalpPlan)}</div>
+                ${note ? `<div style="margin-top:6px;opacity:.78;font-size:12px;">${escapeHtml(note)}</div>` : ''}
+            </div>
+        </div>`;
+    };
+
+    const mkMissing = (() => {
+        const miss = cm.coverage && Array.isArray(cm.coverage.missing) ? cm.coverage.missing : [];
+        const labels = cm.coverage && cm.coverage.keyLabels ? cm.coverage.keyLabels : {};
+        const src = cm.source || {};
+        const futMissing = ['gold', 'oil'].filter(k => src[k] !== 'future');
+        if (!miss.length && !futMissing.length) return badge('positive', 'Drivers: completos');
+        const txt = miss.slice(0, 6).map(k => labels[k] || k).join(' • ');
+        const futTxt = futMissing.length ? `Sem futuro em: ${futMissing.map(k => (k === 'gold' ? 'Ouro' : 'Petróleo')).join(' • ')}` : '';
+        const msg = [txt ? `Faltando (dados): ${txt}${miss.length > 6 ? `… +${miss.length - 6}` : ''}` : '', futTxt].filter(Boolean).join(' | ');
+        return badge('neutral', msg || 'Cobertura parcial');
+    })();
+
+    const goldSpot = spotOf(cm.sym.gold);
+    const brentSpot = spotOf(cm.sym.brent);
+    const wtiSpot = spotOf(cm.sym.wti);
+    const asOf = (goldSpot.t || brentSpot.t || wtiSpot.t) ? formatDateTime(String(goldSpot.t || brentSpot.t || wtiSpot.t)) : '—';
+
+    const goldExtras = `${cm.sym.gold || '—'} • ${goldSpot.spot !== null ? fmt0(goldSpot.spot) : '—'} • ${fmtP(cm.market.goldPct)} • ${corrLine(cm.corr && cm.corr.gold ? cm.corr.gold.items : [])}`;
+    const oilBench = (() => {
+        const a = cm.sym.brent ? `Brent ${fmtP(cm.market.brentPct)}` : null;
+        const b = cm.sym.wti ? `WTI ${fmtP(cm.market.wtiPct)}` : null;
+        const parts = [a, b].filter(Boolean);
+        return parts.length ? parts.join(' • ') : '—';
+    })();
+    const oilSpotTxt = (() => {
+        const parts = [];
+        if (cm.sym.brent) parts.push(`${cm.sym.brent} ${brentSpot.spot !== null ? fmt0(brentSpot.spot) : '—'}`);
+        if (cm.sym.wti) parts.push(`${cm.sym.wti} ${wtiSpot.spot !== null ? fmt0(wtiSpot.spot) : '—'}`);
+        return parts.length ? parts.join(' • ') : '—';
+    })();
+    const oilExtras = `${oilSpotTxt} • ${oilBench} • ${corrLine(cm.corr && cm.corr.oil ? cm.corr.oil.items : [])}`;
+
+    const news = Array.isArray(cm.news) ? cm.news : [];
+    const newsHtml = (() => {
+        if (!news.length) return `<div style="opacity:.78;font-size:12px;">• —</div>`;
+        return news
+            .slice(0, 6)
+            .map(it => {
+                const title = it && it.title ? String(it.title) : '';
+                const url = it && it.url ? String(it.url) : '';
+                const safeUrl = url && /^https?:\/\//i.test(url) ? url : '';
+                const a = safeUrl
+                    ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noreferrer" style="color:rgba(0,243,255,.92);text-decoration:none;">${escapeHtml(title)}</a>`
+                    : escapeHtml(title);
+                return `• ${a}`;
+            })
+            .join('<br>');
+    })();
+
+    const nScore = cm.newsMeta && typeof cm.newsMeta.score === 'number' && Number.isFinite(cm.newsMeta.score) ? cm.newsMeta.score : 0;
+    const nTone = nScore > 0.15 ? 'positive' : nScore < -0.15 ? 'negative' : 'neutral';
+
+    const scalperPanel = (() => {
+        const sign = (v, th = 0.10) => (typeof v === 'number' && Number.isFinite(v) ? (v > th ? +1 : v < -th ? -1 : 0) : 0);
+        const ok = (a, b, inverse = false) => {
+            const sa = sign(a);
+            const sb = sign(b);
+            if (!sa || !sb) return null;
+            return inverse ? (sa === -sb) : (sa === sb);
+        };
+        const gold = cm.market ? cm.market.goldPct : null;
+        const oil = (typeof cm.market?.brentPct === 'number' ? cm.market.brentPct : cm.market?.wtiPct) ?? null;
+        const dxy = cm.sym && cm.sym.dxy ? getChangePct(data, cm.sym.dxy) : null;
+        const us10y = cm.sym && cm.sym.us10y ? getChangePct(data, cm.sym.us10y) : null;
+        const xle = cm.sym && cm.sym.xle ? getChangePct(data, cm.sym.xle) : null;
+        const usdcad = cm.sym && cm.sym.usdcad ? getChangePct(data, cm.sym.usdcad) : null;
+        const copper = cm.sym && cm.sym.copper ? getChangePct(data, cm.sym.copper) : null;
+        const spx = cm.sym && cm.sym.spx ? getChangePct(data, cm.sym.spx) : null;
+        const hyg = cm.sym && cm.sym.hyg ? getChangePct(data, cm.sym.hyg) : null;
+        const vix = cm.sym && cm.sym.vix ? getChangePct(data, cm.sym.vix) : null;
+
+        const pGoldDxy = ok(gold, dxy, true);
+        const pGoldY = ok(gold, us10y, true);
+        const pOilXle = ok(oil, xle, false);
+        const pOilCad = ok(oil, usdcad, true);
+
+        const mk = (label, v) => `<span style="font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(label)} ${escapeHtml(typeof v === 'number' && Number.isFinite(v) ? formatPercent(v, 2) : '—')}</span>`;
+        const parityBadge = (name, v) => badge(v === true ? 'positive' : v === false ? 'negative' : 'neutral', `${name}: ${v === true ? 'OK' : v === false ? 'DIVERGE' : '—'}`);
+        const risk = (() => {
+            const sHyg = sign(hyg, 0.06);
+            const sVix = sign(vix, 0.20);
+            const sSpx = sign(spx, 0.08);
+            const score = (sSpx > 0 ? 1 : sSpx < 0 ? -1 : 0) + (sHyg > 0 ? 1 : sHyg < 0 ? -1 : 0) + (sVix < 0 ? 1 : sVix > 0 ? -1 : 0);
+            if (score >= 2) return { label: 'RISK ON', tone: 'positive' };
+            if (score <= -2) return { label: 'RISK OFF', tone: 'negative' };
+            return { label: 'MISTO', tone: 'neutral' };
+        })();
+
+        return `
+            <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <div style="font-weight:900;letter-spacing:.8px;opacity:.95;">⚡ Scalper — Paridades & Fluxo (Ouro/Petróleo)</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        ${badge(risk.tone, risk.label)}
+                        ${parityBadge('Ouro×DXY (inv)', pGoldDxy)}
+                        ${parityBadge('Ouro×US10Y (inv)', pGoldY)}
+                        ${parityBadge('Petróleo×XLE', pOilXle)}
+                        ${parityBadge('Petróleo×USD/CAD (inv)', pOilCad)}
+                    </div>
+                </div>
+                <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+                    ${mk('DXY', dxy)} • ${mk('US10Y', us10y)} • ${mk('HYG', hyg)} • ${mk('VIX', vix)} • ${mk('Cobre', copper)}
+                </div>
+                <div style="margin-top:8px;opacity:.78;font-size:12px;line-height:1.35;">
+                    Regra de scalp: se paridade-chave divergir, reduzir agressividade e operar apenas com confirmação (rompimento + pullback curto).
+                </div>
+            </div>
+        `;
+    })();
+
+    el.innerHTML = `
+        <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;">Commodities — Roteiro Operacional</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    ${mkMissing}
+                    ${badge(nTone, `News/Geo score ${escapeHtml(fmt2(nScore))}`)}
+                    ${badge('neutral', `asOf ${escapeHtml(asOf)}`)}
+                </div>
+            </div>
+            <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">
+                ${planFor('Ouro', cm.pulse.gold, goldExtras, 'Leitura típica: ouro responde a dólar/juros reais e busca por proteção.', cm.execution ? cm.execution.gold : null, cm.source ? cm.source.gold : null, cm.micro ? cm.micro.gold : null)}
+                ${planFor('Petróleo', cm.pulse.oil, oilExtras, 'Leitura típica: petróleo responde a risco global, dólar e choque de oferta (geo/OPEC).', cm.execution ? cm.execution.oil : null, cm.source ? cm.source.oil : null, cm.micro ? cm.micro.oil : null)}
+            </div>
+        </div>
+        ${scalperPanel}
+        <div style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;">
+            <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+                    <div style="font-weight:900;letter-spacing:.6px;opacity:.92;">Notícias (macro/geopolítica)</div>
+                    <div style="opacity:.72;font-size:12px;">matched ${escapeHtml(String(cm.newsMeta && typeof cm.newsMeta.matched === 'number' ? cm.newsMeta.matched : 0))}</div>
+                </div>
+                <div style="opacity:.84;font-size:12px;line-height:1.35;">${newsHtml}</div>
             </div>
         </div>
     `;
@@ -3642,6 +5025,121 @@ function renderHk50OperationalBriefing() {
     const hkSpot = spotOf(hkNow.sym.hk50);
     const hkLine = `${hkNow.sym.hk50 ? hkNow.sym.hk50 : '—'} • ${hkSpot.spot !== null ? fmt0(hkSpot.spot) : '—'} • ${fmtP(hkNow.market.hk50Pct)}`;
     const asOf = hkSpot.t ? formatDateTime(hkSpot.t) : '—';
+
+    const scalperPanel = (() => {
+        const symbol = hkNow && hkNow.sym && hkNow.sym.hk50 ? String(hkNow.sym.hk50) : '';
+        if (!symbol) return '';
+        const series = data && data.series && Array.isArray(data.series[symbol]) ? data.series[symbol] : [];
+        if (!series.length) return '';
+        const last = series[series.length - 1];
+        const lastPrice = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
+        const lastMs = last && last.t ? Date.parse(last.t) : NaN;
+        if (lastPrice === null || !Number.isFinite(lastMs)) return '';
+
+        const findAt = (lookbackMs) => {
+            const target = lastMs - lookbackMs;
+            for (let i = series.length - 1; i >= 0; i -= 1) {
+                const p = series[i];
+                const ms = p && p.t ? Date.parse(p.t) : NaN;
+                const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                if (!Number.isFinite(ms) || price === null) continue;
+                if (ms <= target) return price;
+            }
+            return null;
+        };
+        const pctFrom = (priceThen) => (typeof priceThen === 'number' && Number.isFinite(priceThen) && priceThen > 0 ? ((lastPrice / priceThen) - 1) * 100 : null);
+        const r5 = pctFrom(findAt(5 * 60 * 1000));
+        const r15 = pctFrom(findAt(15 * 60 * 1000));
+        const r60 = pctFrom(findAt(60 * 60 * 1000));
+        const range30 = (() => {
+            const cut = lastMs - 30 * 60 * 1000;
+            let hi = -Infinity;
+            let lo = +Infinity;
+            let n = 0;
+            for (let i = series.length - 1; i >= 0; i -= 1) {
+                const p = series[i];
+                const ms = p && p.t ? Date.parse(p.t) : NaN;
+                const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                if (!Number.isFinite(ms) || price === null) continue;
+                if (ms < cut) break;
+                n += 1;
+                if (price > hi) hi = price;
+                if (price < lo) lo = price;
+            }
+            if (n < 4 || !Number.isFinite(hi) || !Number.isFinite(lo) || lo <= 0) return null;
+            return { pct: ((hi / lo) - 1) * 100 };
+        })();
+
+        const th5 = 0.10;
+        const th15 = 0.18;
+        const s5 = typeof r5 === 'number' && Number.isFinite(r5) ? r5 : null;
+        const s15 = typeof r15 === 'number' && Number.isFinite(r15) ? r15 : null;
+        const microBias = (s5 !== null && s15 !== null && s5 >= th5 && s15 >= th15)
+            ? 'buy'
+            : (s5 !== null && s15 !== null && s5 <= -th5 && s15 <= -th15)
+                ? 'sell'
+                : 'neutral';
+
+        const ctxBias = p && p.bias ? String(p.bias) : 'neutral';
+        const ctxStrong = typeof p.net === 'number' && Number.isFinite(p.net) ? Math.abs(p.net) >= 0.35 : false;
+        const finalBias = (microBias !== 'neutral' && ctxStrong && ctxBias !== 'neutral' && microBias !== ctxBias) ? 'neutral' : microBias;
+        const tone = finalBias === 'buy' ? 'positive' : finalBias === 'sell' ? 'negative' : 'neutral';
+        const action = finalBias === 'buy' ? 'COMPRA' : finalBias === 'sell' ? 'VENDA' : 'NEUTRO';
+
+        const sign = (v, th = 0.10) => (typeof v === 'number' && Number.isFinite(v) ? (v > th ? +1 : v < -th ? -1 : 0) : 0);
+        const ok = (a, b, inverse = false) => {
+            const sa = sign(a);
+            const sb = sign(b);
+            if (!sa || !sb) return null;
+            return inverse ? (sa === -sb) : (sa === sb);
+        };
+        const usdCnh = hkNow.sym && (hkNow.sym.usdCnh || hkNow.sym.usdCny) ? getChangePct(data, hkNow.sym.usdCnh || hkNow.sym.usdCny) : null;
+        const spx = hkNow.sym && hkNow.sym.spx ? getChangePct(data, hkNow.sym.spx) : null;
+        const dxy = hkNow.sym && hkNow.sym.dxy ? getChangePct(data, hkNow.sym.dxy) : null;
+        const vix = hkNow.sym && hkNow.sym.vix ? getChangePct(data, hkNow.sym.vix) : null;
+        const fxi = hkNow.sym && hkNow.sym.fxChina ? getChangePct(data, hkNow.sym.fxChina) : null;
+        const hstech = hkNow.sym && hkNow.sym.hstech ? getChangePct(data, hkNow.sym.hstech) : null;
+        const iron = hkNow.sym && hkNow.sym.iron ? getChangePct(data, hkNow.sym.iron) : null;
+        const copper = hkNow.sym && hkNow.sym.copper ? getChangePct(data, hkNow.sym.copper) : null;
+
+        const pCnh = ok(hkNow.market.hk50Pct, usdCnh, true);
+        const pSpx = ok(hkNow.market.hk50Pct, spx, false);
+        const pChina = ok(hkNow.market.hk50Pct, fxi, false);
+
+        const parityBadge = (name, v) => badge(v === true ? 'positive' : v === false ? 'negative' : 'neutral', `${name}: ${v === true ? 'OK' : v === false ? 'DIVERGE' : '—'}`);
+        const stop = range30 && typeof range30.pct === 'number' ? Math.max(0.20, range30.pct * 0.25) : null;
+        const alvo = range30 && typeof range30.pct === 'number' ? Math.max(0.35, range30.pct * 0.5) : null;
+        const plan = finalBias === 'buy'
+            ? `Comprar (scalp) • Stop ~${stop !== null ? formatPercent(stop, 2) : '—'} • Alvo ~${alvo !== null ? formatPercent(alvo, 2) : '—'}`
+            : finalBias === 'sell'
+                ? `Vender (scalp) • Stop ~${stop !== null ? formatPercent(stop, 2) : '—'} • Alvo ~${alvo !== null ? formatPercent(alvo, 2) : '—'}`
+                : 'Neutro (scalp) • aguarde alinhamento 5m×15m e paridades.';
+
+        return `
+            <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <div style="font-weight:900;letter-spacing:.8px;opacity:.95;">⚡ Scalper — HK50</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        ${badge(tone, `Scalp: ${action}`)}
+                        ${badge('neutral', `Macro: ${biasLabel(ctxBias)} (${formatNumber(p.net, 2)})`)}
+                        ${parityBadge('HK50×USD/CNH (inv)', pCnh)}
+                        ${parityBadge('HK50×SPX', pSpx)}
+                        ${parityBadge('HK50×China', pChina)}
+                    </div>
+                </div>
+                <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+                    Micro: 5m ${escapeHtml(typeof r5 === 'number' ? formatPercent(r5, 2) : '—')} • 15m ${escapeHtml(typeof r15 === 'number' ? formatPercent(r15, 2) : '—')} • 60m ${escapeHtml(typeof r60 === 'number' ? formatPercent(r60, 2) : '—')} • Range30 ${escapeHtml(range30 ? formatPercent(range30.pct, 2) : '—')}
+                </div>
+                <div style="margin-top:8px;opacity:.84;font-size:12px;line-height:1.35;">
+                    Fluxo/risco: DXY ${escapeHtml(fmtP(dxy))} • VIX ${escapeHtml(fmtP(vix))} • USD/CNH ${escapeHtml(fmtP(usdCnh))}
+                </div>
+                <div style="margin-top:8px;opacity:.84;font-size:12px;line-height:1.35;">
+                    Setores/proxies: HSTECH ${escapeHtml(fmtP(hstech))} • FXI/MCHI ${escapeHtml(fmtP(fxi))} • Minério ${escapeHtml(fmtP(iron))} • Cobre ${escapeHtml(fmtP(copper))}
+                </div>
+                <div style="margin-top:10px;opacity:.86;font-size:12px;line-height:1.35;">${escapeHtml(plan)}</div>
+            </div>
+        `;
+    })();
 
     const groupTop = (groupKey, max = 7) => {
         const xs = (p.rows || []).filter(r => r && r.group === groupKey);
@@ -3788,6 +5286,7 @@ function renderHk50OperationalBriefing() {
             </div>
             ${suggestLine ? `<div style="margin-top:8px;opacity:.82;font-size:12px;line-height:1.35;">${escapeHtml(suggestLine)}</div>` : ''}
         </div>
+        ${scalperPanel}
         ${ratesAndCreditHtml}
 
         <div style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">
@@ -5723,6 +7222,8 @@ function renderOptionsGammaSummary(payload) {
     try { renderOperationalBriefing(); } catch { }
     try { renderBtcOperationalBriefing(); } catch { }
     try { renderHk50OperationalBriefing(); } catch { }
+    try { renderUsEquitiesOperationalBriefing(); } catch { }
+    try { renderCommoditiesOperationalBriefing(); } catch { }
 
     const fmt0 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 0) : '—');
     const fmt2 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 2) : '—');
@@ -6000,6 +7501,8 @@ function renderWebNewsModule(payload) {
     try { renderOperationalBriefing(); } catch { }
     try { renderBtcOperationalBriefing(); } catch { }
     try { renderHk50OperationalBriefing(); } catch { }
+    try { renderUsEquitiesOperationalBriefing(); } catch { }
+    try { renderCommoditiesOperationalBriefing(); } catch { }
 
     const sentiment = summary && summary.sentiment ? String(summary.sentiment) : 'Neutro';
     const conflicts = summary && Array.isArray(summary.conflicts) ? summary.conflicts : [];
@@ -7162,6 +8665,461 @@ function renderOperationalBriefing() {
         `;
     })();
 
+    const scalpModule = (() => {
+        if (!pulseNow) return '';
+        const symWdo = pulseNow.sym && pulseNow.sym.wdo ? String(pulseNow.sym.wdo) : '';
+        const symWin = pulseNow.sym && pulseNow.sym.win ? String(pulseNow.sym.win) : '';
+
+        const microStats = (symbol, tune) => {
+            const s = String(symbol || '');
+            if (!s) return null;
+            const series = data && data.series && Array.isArray(data.series[s]) ? data.series[s] : [];
+            if (!series.length) return null;
+            const last = series[series.length - 1];
+            const lastPrice = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
+            const lastTmsRaw = last && last.t ? Date.parse(last.t) : NaN;
+            const lastTms = Number.isFinite(lastTmsRaw) ? lastTmsRaw : null;
+            if (lastPrice === null || lastTms === null) return null;
+
+            const findAt = (lookbackMs) => {
+                const target = lastTms - lookbackMs;
+                for (let i = series.length - 1; i >= 0; i -= 1) {
+                    const p = series[i];
+                    const tRaw = p && p.t ? Date.parse(p.t) : NaN;
+                    const t = Number.isFinite(tRaw) ? tRaw : null;
+                    const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                    if (t === null || price === null) continue;
+                    if (t <= target) return { tMs: t, price };
+                }
+                return null;
+            };
+            const pctFrom = (priceThen) => (typeof priceThen === 'number' && Number.isFinite(priceThen) && priceThen > 0 ? ((lastPrice / priceThen) - 1) * 100 : null);
+
+            const p5 = findAt(5 * 60 * 1000);
+            const p15 = findAt(15 * 60 * 1000);
+            const p60 = findAt(60 * 60 * 1000);
+            const ret5 = p5 ? pctFrom(p5.price) : null;
+            const ret15 = p15 ? pctFrom(p15.price) : null;
+            const ret60 = p60 ? pctFrom(p60.price) : null;
+
+            const range30 = (() => {
+                const cut = lastTms - 30 * 60 * 1000;
+                let hi = -Infinity;
+                let lo = +Infinity;
+                let n = 0;
+                for (let i = series.length - 1; i >= 0; i -= 1) {
+                    const p = series[i];
+                    const tRaw = p && p.t ? Date.parse(p.t) : NaN;
+                    const t = Number.isFinite(tRaw) ? tRaw : null;
+                    const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                    if (t === null || price === null) continue;
+                    if (t < cut) break;
+                    n += 1;
+                    if (price > hi) hi = price;
+                    if (price < lo) lo = price;
+                }
+                if (n < 4 || !Number.isFinite(hi) || !Number.isFinite(lo) || lo <= 0) return null;
+                const pct = ((hi / lo) - 1) * 100;
+                const pts = hi - lo;
+                return { pct, pts, n, hi, lo };
+            })();
+
+            const scalp = (() => {
+                const th5 = tune && typeof tune.th5 === 'number' && Number.isFinite(tune.th5) ? tune.th5 : 0.05;
+                const th15 = tune && typeof tune.th15 === 'number' && Number.isFinite(tune.th15) ? tune.th15 : 0.10;
+                const s5 = typeof ret5 === 'number' && Number.isFinite(ret5) ? ret5 : null;
+                const s15 = typeof ret15 === 'number' && Number.isFinite(ret15) ? ret15 : null;
+                if (s5 === null || s15 === null) return { signal: 'neutral', label: 'n/d' };
+                const alignedUp = s5 >= th5 && s15 >= th15;
+                const alignedDn = s5 <= -th5 && s15 <= -th15;
+                if (alignedUp) return { signal: 'buy', label: '5m×15m alinhado (↑)' };
+                if (alignedDn) return { signal: 'sell', label: '5m×15m alinhado (↓)' };
+                const conflict = (s5 > 0 && s15 < 0) || (s5 < 0 && s15 > 0);
+                if (conflict && Math.abs(s5) >= th5) return { signal: 'neutral', label: 'conflito 5m×15m' };
+                return { signal: 'neutral', label: 'range/ruído' };
+            })();
+
+            const risk = (() => {
+                const rp = range30 && typeof range30.pct === 'number' && Number.isFinite(range30.pct) ? range30.pct : null;
+                const stopPct = rp !== null ? Math.max(0.08, rp * 0.25) : null;
+                const alvoPct = rp !== null ? Math.max(0.12, rp * 0.5) : null;
+                const stopPts = stopPct !== null ? (lastPrice * (stopPct / 100)) : null;
+                const alvoPts = alvoPct !== null ? (lastPrice * (alvoPct / 100)) : null;
+                return { stopPct, alvoPct, stopPts, alvoPts };
+            })();
+
+            return { lastPrice, ret5, ret15, ret60, range30, scalp, risk };
+        };
+
+        const keyLevelsFor = (symKey) => {
+            if (!options || !options.items) return null;
+            const it = options.items[symKey];
+            const key = it && it.keyLevels ? it.keyLevels : null;
+            if (!key) return null;
+            const gf = typeof key.gammaFlip === 'number' && Number.isFinite(key.gammaFlip) ? key.gammaFlip : null;
+            const rangeLow = typeof key.rangeLow === 'number' && Number.isFinite(key.rangeLow) ? key.rangeLow : null;
+            const rangeHigh = typeof key.rangeHigh === 'number' && Number.isFinite(key.rangeHigh) ? key.rangeHigh : null;
+            return { gf, rangeLow, rangeHigh };
+        };
+
+        const mk = (label, sym, symKey, tune) => {
+            if (!sym) return '';
+            const m = microStats(sym, tune);
+            if (!m) return '';
+            const side = symKey === 'WDO' ? 'wdo' : 'win';
+            const scalpBiasRaw = m.scalp && m.scalp.signal ? m.scalp.signal : 'neutral';
+            const ctx = pulseNow && pulseNow.pulse && pulseNow.pulse[side] ? pulseNow.pulse[side] : null;
+            const ctxBias = ctx && ctx.bias ? String(ctx.bias) : 'neutral';
+            const ctxNet = ctx && typeof ctx.net === 'number' && Number.isFinite(ctx.net) ? ctx.net : 0;
+            const ctxStrong = Math.abs(ctxNet) >= 0.35;
+
+            const usdSym = pulseNow && pulseNow.sym && pulseNow.sym.usdbrl ? String(pulseNow.sym.usdbrl) : (findAliasSymbolBest(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i) || '');
+            const ibovSym = pulseNow && pulseNow.sym && pulseNow.sym.ibov ? String(pulseNow.sym.ibov) : (findAliasSymbolBest(data, 'IBOV') || findAssetSymbol(data, /^\.BVSP$/i) || '');
+            const usdPct = usdSym ? getChangePct(data, usdSym) : null;
+            const ibovPct = ibovSym ? getChangePct(data, ibovSym) : null;
+            const selfPct = getChangePct(data, sym);
+            const sign = (v, th = 0.06) => (typeof v === 'number' && Number.isFinite(v) ? (v > th ? +1 : v < -th ? -1 : 0) : 0);
+            const parity = (() => {
+                const sSelf = sign(selfPct);
+                if (side === 'wdo') {
+                    const sUsd = sign(usdPct);
+                    if (!sSelf || !sUsd) return { ok: null, label: 'Paridade: —' };
+                    const ok = sSelf === sUsd;
+                    return { ok, label: `Paridade USD/BRL: ${ok ? 'OK' : 'DIVERGE'}` };
+                }
+                const sIbov = sign(ibovPct);
+                if (!sSelf || !sIbov) return { ok: null, label: 'Paridade: —' };
+                const ok = sSelf === sIbov;
+                return { ok, label: `Paridade IBOV: ${ok ? 'OK' : 'DIVERGE'}` };
+            })();
+
+            const flowScore = foreignFlow && foreignFlow.signal && typeof foreignFlow.signal.score === 'number' && Number.isFinite(foreignFlow.signal.score)
+                ? foreignFlow.signal.score
+                : null;
+            const tFlow = typeof operationalTuning.threshold.foreignFlow === 'number' && Number.isFinite(operationalTuning.threshold.foreignFlow) ? operationalTuning.threshold.foreignFlow : 0.25;
+            const flowDir = typeof flowScore === 'number'
+                ? (flowScore > tFlow ? +1 : flowScore < -tFlow ? -1 : 0)
+                : 0;
+            const flowBias = side === 'win' ? (flowDir > 0 ? 'buy' : flowDir < 0 ? 'sell' : 'neutral') : (flowDir > 0 ? 'sell' : flowDir < 0 ? 'buy' : 'neutral');
+            const flowStrong = typeof flowScore === 'number' && Math.abs(flowScore) >= tFlow;
+
+            const conflictsWith = (a, b) => (a !== 'neutral' && b !== 'neutral' && a !== b);
+            const hardBlock = conflictsWith(scalpBiasRaw, ctxBias) && ctxStrong;
+            const flowBlock = conflictsWith(scalpBiasRaw, flowBias) && flowStrong;
+            const parityBlock = parity.ok === false && Math.abs(sign(selfPct)) > 0;
+
+            const scalpBias = (hardBlock || flowBlock || parityBlock) ? 'neutral' : scalpBiasRaw;
+            const tone = scalpBias === 'buy' ? 'positive' : scalpBias === 'sell' ? 'negative' : 'neutral';
+            const txt = scalpBias === 'buy' ? 'COMPRA' : scalpBias === 'sell' ? 'VENDA' : 'NEUTRO';
+            const ctxTxt = ctxBias === 'buy' ? 'Compra' : ctxBias === 'sell' ? 'Venda' : 'Neutro';
+            const flowTxt = typeof flowScore === 'number' ? `Fluxo ${formatNumber(flowScore, 2)} (${flowBias === 'buy' ? 'Compra' : flowBias === 'sell' ? 'Venda' : 'Neutro'})` : 'Fluxo: —';
+            const ctxTone = conflictsWith(scalpBiasRaw, ctxBias) ? 'negative' : (ctxBias !== 'neutral' ? 'positive' : 'neutral');
+            const blockReason = hardBlock ? 'Bloqueado por risco/paridade (contexto forte)' : flowBlock ? 'Bloqueado por fluxo (forte)' : parityBlock ? 'Bloqueado por paridade' : '';
+
+            const r5 = typeof m.ret5 === 'number' && Number.isFinite(m.ret5) ? formatPercent(m.ret5, 2) : '—';
+            const r15 = typeof m.ret15 === 'number' && Number.isFinite(m.ret15) ? formatPercent(m.ret15, 2) : '—';
+            const r60 = typeof m.ret60 === 'number' && Number.isFinite(m.ret60) ? formatPercent(m.ret60, 2) : '—';
+            const rangeP = m.range30 && typeof m.range30.pct === 'number' && Number.isFinite(m.range30.pct) ? formatPercent(m.range30.pct, 2) : '—';
+            const rangePts = m.range30 && typeof m.range30.pts === 'number' && Number.isFinite(m.range30.pts) ? formatNumber(m.range30.pts, 0) : '—';
+
+            const stop = m.risk && typeof m.risk.stopPct === 'number' && Number.isFinite(m.risk.stopPct) ? formatPercent(m.risk.stopPct, 2) : '—';
+            const alvo = m.risk && typeof m.risk.alvoPct === 'number' && Number.isFinite(m.risk.alvoPct) ? formatPercent(m.risk.alvoPct, 2) : '—';
+            const stopPts = m.risk && typeof m.risk.stopPts === 'number' && Number.isFinite(m.risk.stopPts) ? formatNumber(m.risk.stopPts, 0) : '—';
+            const alvoPts = m.risk && typeof m.risk.alvoPts === 'number' && Number.isFinite(m.risk.alvoPts) ? formatNumber(m.risk.alvoPts, 0) : '—';
+
+            const lvl = keyLevelsFor(symKey);
+            const gf = lvl && typeof lvl.gf === 'number' ? fmt0(lvl.gf) : '—';
+            const rl = lvl && typeof lvl.rangeLow === 'number' ? fmt0(lvl.rangeLow) : '—';
+            const rh = lvl && typeof lvl.rangeHigh === 'number' ? fmt0(lvl.rangeHigh) : '—';
+
+            const plan = (() => {
+                if (scalpBias === 'buy') return `Scalp: comprar a favor (5m×15m) • Stop ~${stop} (~${stopPts} pts) • Alvo ~${alvo} (~${alvoPts} pts) • Pivô GF ${gf}`;
+                if (scalpBias === 'sell') return `Scalp: vender a favor (5m×15m) • Stop ~${stop} (~${stopPts} pts) • Alvo ~${alvo} (~${alvoPts} pts) • Pivô GF ${gf}`;
+                return `Scalp: sem edge (5m×15m) • Range ${rl}–${rh} • Pivô GF ${gf}`;
+            })();
+
+            return `
+                <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <div style="font-weight:900;letter-spacing:1px;">${escapeHtml(label)}</div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                            ${badge(tone, `Scalp: ${txt}`)}
+                            ${badge('neutral', `${escapeHtml(sym)}`)}
+                            ${badge(ctxTone, `Contexto: ${escapeHtml(ctxTxt)} (${formatNumber(ctxNet, 2)})`)}
+                        </div>
+                    </div>
+                    <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+                        Micro: 5m ${escapeHtml(r5)} • 15m ${escapeHtml(r15)} • 60m ${escapeHtml(r60)} • Range30 ${escapeHtml(rangeP)} (${escapeHtml(rangePts)} pts)
+                    </div>
+                    <div style="margin-top:8px;opacity:.90;font-size:12px;line-height:1.35;">
+                        ${escapeHtml(m.scalp && m.scalp.label ? m.scalp.label : '—')}
+                    </div>
+                    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        ${badge(parity.ok === false ? 'negative' : parity.ok === true ? 'positive' : 'neutral', escapeHtml(parity.label))}
+                        ${badge(flowStrong && conflictsWith(scalpBiasRaw, flowBias) ? 'negative' : flowBias !== 'neutral' ? 'neutral' : 'neutral', escapeHtml(flowTxt))}
+                    </div>
+                    <div style="margin-top:10px;opacity:.92;line-height:1.35;">
+                        <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:6px;">Plano (scalp)</div>
+                        <div style="opacity:.86;font-size:12px;">${escapeHtml(plan)}</div>
+                        ${blockReason ? `<div style="margin-top:6px;opacity:.78;font-size:12px;">${escapeHtml(blockReason)}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        };
+
+        const wdoCard = mk('WDO (Day Trade)', symWdo, 'WDO', { th5: 0.05, th15: 0.10 });
+        const winCard = mk('WIN (Day Trade)', symWin, 'WIN', { th5: 0.05, th15: 0.10 });
+        if (!wdoCard && !winCard) return '';
+
+        return `
+            <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <div style="font-weight:900;letter-spacing:1px;opacity:.95;">⚡ Scalp (Day Trade) — WDO • WIN</div>
+                    <div style="opacity:.78;font-size:12px;">Sinal curto baseado em 5m×15m (microtendência) + Range30 (gestão).</div>
+                </div>
+                <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;">
+                    ${wdoCard}
+                    ${winCard}
+                </div>
+            </div>
+        `;
+    })();
+
+    const winProjectionModule = (() => {
+        if (!data) return '';
+
+        const symWin = pulseNow && pulseNow.sym && pulseNow.sym.win ? String(pulseNow.sym.win) : '';
+        const symIron = pulseNow && pulseNow.sym && pulseNow.sym.iron ? String(pulseNow.sym.iron) : (findAliasSymbolBest(data, 'IRON') || findAssetSymbol(data, /^DCE_I0$/i) || '');
+        const symCopper = pulseNow && pulseNow.sym && pulseNow.sym.copper ? String(pulseNow.sym.copper) : (findAliasSymbolBest(data, 'COPPER') || '');
+        const symOil = pulseNow && pulseNow.sym && pulseNow.sym.brent ? String(pulseNow.sym.brent) : (findAliasSymbolBest(data, 'BRENT') || '');
+
+        const lastPoint = (symbol) => {
+            const s = String(symbol || '');
+            if (!s) return null;
+            const pts = data && data.series && Array.isArray(data.series[s]) ? data.series[s] : [];
+            for (let i = pts.length - 1; i >= 0; i -= 1) {
+                const p = pts[i];
+                const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                if (price === null) continue;
+                const t = p && p.t ? String(p.t) : null;
+                return { price, t };
+            }
+            return null;
+        };
+        const lastPrice = s => {
+            const p = lastPoint(s);
+            return p && typeof p.price === 'number' ? p.price : null;
+        };
+        const lastTime = s => {
+            const p = lastPoint(s);
+            return p && p.t ? p.t : null;
+        };
+
+        const pct = s => {
+            const v = s ? getChangePct(data, s) : null;
+            return typeof v === 'number' && Number.isFinite(v) ? v : null;
+        };
+        const fmtP = v => (typeof v === 'number' && Number.isFinite(v) ? formatPercent(v, 2) : '—');
+        const fmt0 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 0) : '—');
+
+        const readState = () => {
+            try {
+                const raw = localStorage.getItem('mercado_win_proj_v1');
+                const obj = raw ? JSON.parse(raw) : null;
+                return obj && typeof obj === 'object' ? obj : {};
+            } catch {
+                return {};
+            }
+        };
+        const st = (() => {
+            const cur = readState();
+            const today = (() => {
+                const d = new Date();
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${dd}`;
+            })();
+            const day = typeof cur.day === 'string' ? String(cur.day) : '';
+            if (day !== today) {
+                const next = { ...cur, day: today, overrides: {} };
+                delete next.refClose;
+                delete next.refAdjust;
+                try { localStorage.setItem('mercado_win_proj_v1', JSON.stringify(next)); } catch { }
+                return next;
+            }
+            return cur;
+        })();
+
+        const prevClose = (() => {
+            const s = String(symWin || '');
+            if (!s) return null;
+            const pts = data && data.series && Array.isArray(data.series[s]) ? data.series[s] : [];
+            if (!pts.length) return null;
+            const last = lastPoint(s);
+            if (!last || !last.t || typeof last.price !== 'number') return null;
+            const lastYmd = (() => {
+                const ms = Date.parse(last.t);
+                if (!Number.isFinite(ms)) return '';
+                return new Date(ms).toISOString().slice(0, 10);
+            })();
+            if (!lastYmd) return null;
+            for (let i = pts.length - 1; i >= 0; i -= 1) {
+                const p = pts[i];
+                const t = p && p.t ? String(p.t) : '';
+                const ms = Date.parse(t);
+                if (!Number.isFinite(ms)) continue;
+                const ymd = new Date(ms).toISOString().slice(0, 10);
+                const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                if (ymd !== lastYmd && price !== null) return price;
+            }
+            return null;
+        })();
+
+        const defaultClose = (() => {
+            if (typeof prevClose === 'number' && Number.isFinite(prevClose)) return prevClose;
+            const p = lastPrice(symWin);
+            return typeof p === 'number' && Number.isFinite(p) ? p : (options && options.items && options.items.WIN && typeof options.items.WIN.spot === 'number' ? options.items.WIN.spot : null);
+        })();
+        const defaultAdjust = (options && options.items && options.items.WIN && typeof options.items.WIN.spot === 'number' && Number.isFinite(options.items.WIN.spot)) ? options.items.WIN.spot : lastPrice(symWin);
+        const refClose = typeof st.refClose === 'number' && Number.isFinite(st.refClose) ? st.refClose : defaultClose;
+        const refAdjust = typeof st.refAdjust === 'number' && Number.isFinite(st.refAdjust) ? st.refAdjust : defaultAdjust;
+
+        const betaIron = typeof st.betaIron === 'number' && Number.isFinite(st.betaIron) ? st.betaIron : 1.0;
+        const betaCopper = typeof st.betaCopper === 'number' && Number.isFinite(st.betaCopper) ? st.betaCopper : 1.0;
+        const betaOil = typeof st.betaOil === 'number' && Number.isFinite(st.betaOil) ? st.betaOil : 1.0;
+
+        const ovr = st.overrides && typeof st.overrides === 'object' ? st.overrides : {};
+        const ironManual = (typeof ovr.ironPct === 'number' && Number.isFinite(ovr.ironPct));
+        const copperManual = (typeof ovr.copperPct === 'number' && Number.isFinite(ovr.copperPct));
+        const oilManual = (typeof ovr.oilPct === 'number' && Number.isFinite(ovr.oilPct));
+        const ironPct = ironManual ? ovr.ironPct : pct(symIron);
+        const copperPct = copperManual ? ovr.copperPct : pct(symCopper);
+        const oilPct = oilManual ? ovr.oilPct : pct(symOil);
+
+        const proj = (base, driverPct, beta) => {
+            if (!(typeof base === 'number' && Number.isFinite(base))) return { lvl: null, dPts: null };
+            if (!(typeof driverPct === 'number' && Number.isFinite(driverPct))) return { lvl: null, dPts: null };
+            const movePct = (driverPct * beta) / 100;
+            const lvl = base * (1 + movePct);
+            const dPts = lvl - base;
+            return { lvl, dPts };
+        };
+
+        const row = (label, driverSym, driverPct, beta, k, isManual) => {
+            const t = lastTime(driverSym);
+            const fromClose = proj(refClose, driverPct, beta);
+            const fromAdj = proj(refAdjust, driverPct, beta);
+            const betaTxt = (typeof beta === 'number' && Number.isFinite(beta)) ? formatNumber(beta, 2) : '—';
+            const dpTxt = `${fmtP(driverPct)}${isManual ? ' (manual)' : ''}`;
+            return `
+                <tr>
+                    <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);font-weight:900;opacity:.92;">${escapeHtml(label)}</td>
+                    <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.9;">${escapeHtml(driverSym || '—')}</td>
+                    <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(dpTxt)}</td>
+                    <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(betaTxt)}</td>
+                    <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(fmt0(fromClose.lvl))} <span style="opacity:.7;">(${escapeHtml(fmt0(fromClose.dPts))})</span></td>
+                    <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(fmt0(fromAdj.lvl))} <span style="opacity:.7;">(${escapeHtml(fmt0(fromAdj.dPts))})</span></td>
+                    <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;opacity:.78;white-space:nowrap;">${t ? escapeHtml(formatDateTime(t)) : '—'}</td>
+                    <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;">
+                        <button type="button" data-winproj-copy="${escapeHtml(k)}" style="border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:6px 8px;background:#151515;color:#e0e0e0;font-weight:900;letter-spacing:.4px;cursor:pointer;">Copiar</button>
+                    </td>
+                </tr>
+            `;
+        };
+
+        const header = (() => {
+            const tWin = lastTime(symWin);
+            const winLast = lastPrice(symWin);
+            const winBadge = (typeof winLast === 'number' && Number.isFinite(winLast)) ? `${fmt0(winLast)} • ${tWin ? formatDateTime(tWin) : '—'}` : '—';
+            return winBadge;
+        })();
+
+        return `
+            <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <div style="font-weight:900;letter-spacing:1px;opacity:.95;">📐 Projeções WIN (pré) — Ferro • Cobre • Petróleo</div>
+                    <div style="opacity:.78;font-size:12px;">Projeção: <span style="font-family:'Share Tech Mono',monospace;font-weight:900;">WIN_ref × (1 + β × Δ%_driver)</span> • Base por Fechamento e por Ajuste.</div>
+                </div>
+                <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    ${badge('neutral', `WIN agora: ${header}`)}
+                    ${badge('neutral', `Ref Fechamento: ${fmt0(refClose)}`)}
+                    ${badge('neutral', `Ref Ajuste: ${fmt0(refAdjust)}`)}
+                    ${badge(typeof prevClose === 'number' ? 'neutral' : 'warn', `Fech (ontem): ${fmt0(prevClose)}`)}
+                </div>
+                <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;">
+                    <div>
+                        <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Ref Fechamento (WIN)</div>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input id="winproj-ref-close" type="number" step="1" value="${typeof refClose === 'number' && Number.isFinite(refClose) ? String(Math.round(refClose)) : ''}" style="flex:1;background:#101010;color:#e0e0e0;border:1px solid rgba(255,255,255,.14);padding:8px 10px;border-radius:10px;font-weight:900;" />
+                            <button type="button" id="winproj-use-prevclose" data-value="${typeof prevClose === 'number' && Number.isFinite(prevClose) ? String(prevClose) : ''}" style="border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:8px 10px;background:#151515;color:#e0e0e0;font-weight:900;letter-spacing:.4px;cursor:pointer;white-space:nowrap;">Usar</button>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Ref Ajuste (WIN)</div>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input id="winproj-ref-adjust" type="number" step="1" value="${typeof refAdjust === 'number' && Number.isFinite(refAdjust) ? String(Math.round(refAdjust)) : ''}" style="flex:1;background:#101010;color:#e0e0e0;border:1px solid rgba(255,255,255,.14);padding:8px 10px;border-radius:10px;font-weight:900;" />
+                            <button type="button" id="winproj-use-now" data-value="${typeof defaultAdjust === 'number' && Number.isFinite(defaultAdjust) ? String(defaultAdjust) : ''}" style="border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:8px 10px;background:#151515;color:#e0e0e0;font-weight:900;letter-spacing:.4px;cursor:pointer;white-space:nowrap;">Agora</button>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="opacity:.85;font-size:12px;margin-bottom:4px;">β Ferro→WIN</div>
+                        <input id="winproj-beta-iron" type="number" step="0.05" value="${escapeHtml(String(betaIron))}" style="width:100%;background:#101010;color:#e0e0e0;border:1px solid rgba(255,255,255,.14);padding:8px 10px;border-radius:10px;font-weight:900;" />
+                    </div>
+                    <div>
+                        <div style="opacity:.85;font-size:12px;margin-bottom:4px;">β Cobre→WIN</div>
+                        <input id="winproj-beta-copper" type="number" step="0.05" value="${escapeHtml(String(betaCopper))}" style="width:100%;background:#101010;color:#e0e0e0;border:1px solid rgba(255,255,255,.14);padding:8px 10px;border-radius:10px;font-weight:900;" />
+                    </div>
+                    <div>
+                        <div style="opacity:.85;font-size:12px;margin-bottom:4px;">β Petróleo→WIN</div>
+                        <input id="winproj-beta-oil" type="number" step="0.05" value="${escapeHtml(String(betaOil))}" style="width:100%;background:#101010;color:#e0e0e0;border:1px solid rgba(255,255,255,.14);padding:8px 10px;border-radius:10px;font-weight:900;" />
+                    </div>
+                    <div>
+                        <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Δ% Ferro override (manual)</div>
+                        <input id="winproj-ovr-iron" type="number" step="0.01" value="${ironManual ? escapeHtml(String(ovr.ironPct)) : ''}" placeholder="ex.: 1.00" style="width:100%;background:#101010;color:#e0e0e0;border:1px solid rgba(255,255,255,.14);padding:8px 10px;border-radius:10px;font-weight:900;" />
+                    </div>
+                    <div>
+                        <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Δ% Cobre override (manual)</div>
+                        <input id="winproj-ovr-copper" type="number" step="0.01" value="${copperManual ? escapeHtml(String(ovr.copperPct)) : ''}" placeholder="ex.: -0.40" style="width:100%;background:#101010;color:#e0e0e0;border:1px solid rgba(255,255,255,.14);padding:8px 10px;border-radius:10px;font-weight:900;" />
+                    </div>
+                    <div>
+                        <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Δ% Petróleo override (manual)</div>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input id="winproj-ovr-oil" type="number" step="0.01" value="${oilManual ? escapeHtml(String(ovr.oilPct)) : ''}" placeholder="ex.: 0.70" style="flex:1;background:#101010;color:#e0e0e0;border:1px solid rgba(255,255,255,.14);padding:8px 10px;border-radius:10px;font-weight:900;" />
+                            <button type="button" id="winproj-clear-overrides" style="border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:8px 10px;background:#151515;color:#e0e0e0;font-weight:900;letter-spacing:.4px;cursor:pointer;white-space:nowrap;">Limpar</button>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top:12px;border:1px solid rgba(255,255,255,.10);border-radius:12px;overflow:hidden;">
+                    <div style="overflow:auto;">
+                        <table style="width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align:left;padding:8px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Driver</th>
+                                    <th style="text-align:left;padding:8px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Símbolo</th>
+                                    <th style="text-align:right;padding:8px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Δ% driver</th>
+                                    <th style="text-align:right;padding:8px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">β</th>
+                                    <th style="text-align:right;padding:8px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Proj (Fech.)</th>
+                                    <th style="text-align:right;padding:8px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Proj (Ajuste)</th>
+                                    <th style="text-align:right;padding:8px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Carimbo</th>
+                                    <th style="text-align:right;padding:8px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${row('Ferro (Sina/Dalian)', symIron, ironPct, betaIron, 'iron', ironManual)}
+                                ${row('Cobre', symCopper, copperPct, betaCopper, 'copper', copperManual)}
+                                ${row('Petróleo', symOil, oilPct, betaOil, 'oil', oilManual)}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div style="margin-top:10px;opacity:.78;font-size:12px;line-height:1.35;">
+                    Automático quando os drivers estiverem atualizando no <span style="font-family:'Share Tech Mono',monospace;">market_quotes.json</span>. Quando Sina/driver falhar ou você quiser fixar o valor das 08:55, use o override manual (salva localmente por dia).
+                </div>
+            </div>
+        `;
+    })();
+
     el.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
             <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Roteiro do momento</div>
@@ -7226,6 +9184,8 @@ function renderOperationalBriefing() {
             </div>
         </div>
         ${pulseCard}
+        ${scalpModule}
+        ${winProjectionModule}
         <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">
             ${items.length ? items.map(makePlan).join('') : `<div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);opacity:.88;">Sem dados de WDO/WIN em Opções & Gamma (Resumo).</div>`}
         </div>
@@ -7499,6 +9459,136 @@ function renderOperationalBriefing() {
         bindRange('op-w-em', 'weight', 'em');
         bindRange('op-w-yields', 'weight', 'yields');
         bindRange('op-w-zq', 'weight', 'zq');
+
+        const readWinProj = () => {
+            try {
+                const raw = localStorage.getItem('mercado_win_proj_v1');
+                const obj = raw ? JSON.parse(raw) : null;
+                return obj && typeof obj === 'object' ? obj : {};
+            } catch {
+                return {};
+            }
+        };
+        const writeWinProj = (next) => {
+            try {
+                localStorage.setItem('mercado_win_proj_v1', JSON.stringify(next || {}));
+            } catch {
+            }
+        };
+        const bindWinProjNum = (id, field) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('change', () => {
+                const v = Number(el.value);
+                const st = readWinProj();
+                if (!Number.isFinite(v)) {
+                    delete st[field];
+                    writeWinProj(st);
+                    renderOperationalBriefing();
+                    return;
+                }
+                st[field] = v;
+                writeWinProj(st);
+                renderOperationalBriefing();
+            });
+        };
+        bindWinProjNum('winproj-ref-close', 'refClose');
+        bindWinProjNum('winproj-ref-adjust', 'refAdjust');
+        bindWinProjNum('winproj-beta-iron', 'betaIron');
+        bindWinProjNum('winproj-beta-copper', 'betaCopper');
+        bindWinProjNum('winproj-beta-oil', 'betaOil');
+
+        const bindWinProjOverride = (id, key) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('change', () => {
+                const v = Number(el.value);
+                const st = readWinProj();
+                const next = st.overrides && typeof st.overrides === 'object' ? st.overrides : {};
+                if (!Number.isFinite(v)) {
+                    delete next[key];
+                } else {
+                    next[key] = v;
+                }
+                st.overrides = next;
+                writeWinProj(st);
+                renderOperationalBriefing();
+            });
+        };
+        bindWinProjOverride('winproj-ovr-iron', 'ironPct');
+        bindWinProjOverride('winproj-ovr-copper', 'copperPct');
+        bindWinProjOverride('winproj-ovr-oil', 'oilPct');
+
+        const clearOvr = document.getElementById('winproj-clear-overrides');
+        if (clearOvr) {
+            clearOvr.addEventListener('click', () => {
+                const st = readWinProj();
+                st.overrides = {};
+                writeWinProj(st);
+                renderOperationalBriefing();
+            });
+        }
+
+        const usePrevClose = document.getElementById('winproj-use-prevclose');
+        if (usePrevClose) {
+            usePrevClose.addEventListener('click', () => {
+                const v = Number(usePrevClose.getAttribute('data-value'));
+                if (!Number.isFinite(v)) return;
+                const st = readWinProj();
+                st.refClose = v;
+                writeWinProj(st);
+                renderOperationalBriefing();
+            });
+        }
+        const useNow = document.getElementById('winproj-use-now');
+        if (useNow) {
+            useNow.addEventListener('click', () => {
+                const v = Number(useNow.getAttribute('data-value'));
+                if (!Number.isFinite(v)) return;
+                const st = readWinProj();
+                st.refAdjust = v;
+                writeWinProj(st);
+                renderOperationalBriefing();
+            });
+        }
+
+        const copyText = (text) => {
+            const s = String(text || '');
+            const fallback = () => {
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = s;
+                    ta.setAttribute('readonly', 'true');
+                    ta.style.position = 'fixed';
+                    ta.style.left = '-9999px';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    return true;
+                } catch {
+                    return false;
+                }
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(s).catch(() => fallback());
+                return;
+            }
+            fallback();
+        };
+        document.querySelectorAll('[data-winproj-copy]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tr = btn.closest('tr');
+                if (!tr) return;
+                const tds = Array.from(tr.querySelectorAll('td'));
+                const label = tds[0] ? tds[0].textContent : '';
+                const sym = tds[1] ? tds[1].textContent : '';
+                const dp = tds[2] ? tds[2].textContent : '';
+                const projClose = tds[4] ? tds[4].textContent : '';
+                const projAdj = tds[5] ? tds[5].textContent : '';
+                copyText(`WIN proj • ${label} • ${sym} • Δ% ${dp} • Fech ${projClose} • Ajuste ${projAdj}`.replace(/\s+/g, ' ').trim());
+            });
+        });
     } catch {
     }
 
@@ -9560,6 +11650,127 @@ function renderPetrobrasModule(data) {
     const operables = used.filter(r => r && operableKeySet[String(r.key || '')])
     const drivers = used.filter(r => r && !operableKeySet[String(r.key || '')])
 
+    const scalperHtml = (() => {
+        const pickSym = k => {
+            const row = used.find(x => x && String(x.key || '') === k)
+            return row && row.symbol ? String(row.symbol) : ''
+        }
+        const symPetr = pickSym('petr4') || pickSym('petr3') || ''
+        const symBrent = (drivers.find(x => x && String(x.key || '') === 'brent') || {}).symbol || ''
+        const symUsdBrl = findAliasSymbolBest(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i) || ''
+        const symIbov = findAliasSymbolBest(data, 'IBOV') || findAssetSymbol(data, /^\.BVSP$/i) || ''
+        const symVix = findAliasSymbolBest(data, 'VIX') || findAliasSymbolBest(data, 'VIX9D') || ''
+        const symVale = findAssetSymbol(data, /^VALE3\.SA$/i) || findAssetSymbol(data, /^VALE\.K$/i) || ''
+        const symBanks = findAssetSymbol(data, /^ITUB4\.SA$/i) || findAssetSymbol(data, /^BBDC4\.SA$/i) || ''
+
+        const micro = (() => {
+            const s = String(symPetr || '')
+            if (!s) return null
+            const series = data && data.series && Array.isArray(data.series[s]) ? data.series[s] : []
+            if (!series.length) return null
+            const last = series[series.length - 1]
+            const lastPrice = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null
+            const lastMs = last && last.t ? Date.parse(last.t) : NaN
+            if (lastPrice === null || !Number.isFinite(lastMs)) return null
+            const findAt = (lookbackMs) => {
+                const target = lastMs - lookbackMs
+                for (let i = series.length - 1; i >= 0; i -= 1) {
+                    const p = series[i]
+                    const ms = p && p.t ? Date.parse(p.t) : NaN
+                    const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null
+                    if (!Number.isFinite(ms) || price === null) continue
+                    if (ms <= target) return price
+                }
+                return null
+            }
+            const pctFrom = (priceThen) => (typeof priceThen === 'number' && Number.isFinite(priceThen) && priceThen > 0 ? ((lastPrice / priceThen) - 1) * 100 : null)
+            const r5 = pctFrom(findAt(5 * 60 * 1000))
+            const r15 = pctFrom(findAt(15 * 60 * 1000))
+            const range30 = (() => {
+                const cut = lastMs - 30 * 60 * 1000
+                let hi = -Infinity
+                let lo = +Infinity
+                let n = 0
+                for (let i = series.length - 1; i >= 0; i -= 1) {
+                    const p = series[i]
+                    const ms = p && p.t ? Date.parse(p.t) : NaN
+                    const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null
+                    if (!Number.isFinite(ms) || price === null) continue
+                    if (ms < cut) break
+                    n += 1
+                    if (price > hi) hi = price
+                    if (price < lo) lo = price
+                }
+                if (n < 4 || !Number.isFinite(hi) || !Number.isFinite(lo) || lo <= 0) return null
+                return { pct: ((hi / lo) - 1) * 100 }
+            })()
+            const th5 = 0.10
+            const th15 = 0.18
+            const s5 = typeof r5 === 'number' && Number.isFinite(r5) ? r5 : null
+            const s15 = typeof r15 === 'number' && Number.isFinite(r15) ? r15 : null
+            const bias = (s5 !== null && s15 !== null && s5 >= th5 && s15 >= th15) ? 'buy' : (s5 !== null && s15 !== null && s5 <= -th5 && s15 <= -th15) ? 'sell' : 'neutral'
+            return { r5, r15, range30, bias }
+        })()
+        if (!micro) return ''
+
+        const sign = (v, th = 0.10) => (typeof v === 'number' && Number.isFinite(v) ? (v > th ? +1 : v < -th ? -1 : 0) : 0)
+        const ok = (a, b, inverse = false) => {
+            const sa = sign(a)
+            const sb = sign(b)
+            if (!sa || !sb) return null
+            return inverse ? (sa === -sb) : (sa === sb)
+        }
+        const pPetr = symPetr ? getChangePct(data, symPetr) : null
+        const pBrent = symBrent ? getChangePct(data, symBrent) : null
+        const pUsd = symUsdBrl ? getChangePct(data, symUsdBrl) : null
+        const pIbov = symIbov ? getChangePct(data, symIbov) : null
+        const pVix = symVix ? getChangePct(data, symVix) : null
+        const pVale = symVale ? getChangePct(data, symVale) : null
+        const pBanks = symBanks ? getChangePct(data, symBanks) : null
+
+        const parOil = ok(pPetr, pBrent, false)
+        const parIbov = ok(pPetr, pIbov, false)
+        const flowScore = foreignFlow && foreignFlow.signal && typeof foreignFlow.signal.score === 'number' && Number.isFinite(foreignFlow.signal.score) ? foreignFlow.signal.score : null
+        const flowTone = typeof flowScore === 'number' ? (flowScore > 0.25 ? 'positive' : flowScore < -0.25 ? 'negative' : 'neutral') : 'neutral'
+        const flowTxt = typeof flowScore === 'number' ? `Fluxo ${formatNumber(flowScore, 2)}` : 'Fluxo —'
+
+        const parityBadge = (name, v) => badge(v === true ? 'positive' : v === false ? 'negative' : 'neutral', `${name}: ${v === true ? 'OK' : v === false ? 'DIVERGE' : '—'}`)
+        const tone = micro.bias === 'buy' ? 'positive' : micro.bias === 'sell' ? 'negative' : 'neutral'
+        const action = micro.bias === 'buy' ? 'COMPRA' : micro.bias === 'sell' ? 'VENDA' : 'NEUTRO'
+        const stop = micro.range30 && typeof micro.range30.pct === 'number' ? Math.max(0.25, micro.range30.pct * 0.25) : null
+        const alvo = micro.range30 && typeof micro.range30.pct === 'number' ? Math.max(0.40, micro.range30.pct * 0.5) : null
+        const plan = micro.bias === 'buy'
+            ? `Comprar (scalp) • Stop ~${stop !== null ? formatPercent(stop, 2) : '—'} • Alvo ~${alvo !== null ? formatPercent(alvo, 2) : '—'}`
+            : micro.bias === 'sell'
+                ? `Vender (scalp) • Stop ~${stop !== null ? formatPercent(stop, 2) : '—'} • Alvo ~${alvo !== null ? formatPercent(alvo, 2) : '—'}`
+                : 'Neutro (scalp) • aguarde alinhamento 5m×15m e paridades.'
+
+        return `
+            <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <div style="font-weight:900;letter-spacing:.8px;opacity:.95;">⚡ Scalper — Petrobras</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        ${badge(tone, `Scalp: ${action}`)}
+                        ${badge(flowTone, flowTxt)}
+                        ${parityBadge('PETR×Brent', parOil)}
+                        ${parityBadge('PETR×IBOV', parIbov)}
+                    </div>
+                </div>
+                <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+                    Micro: 5m ${escapeHtml(typeof micro.r5 === 'number' ? formatPercent(micro.r5, 2) : '—')} • 15m ${escapeHtml(typeof micro.r15 === 'number' ? formatPercent(micro.r15, 2) : '—')} • Range30 ${escapeHtml(micro.range30 ? formatPercent(micro.range30.pct, 2) : '—')}
+                </div>
+                <div style="margin-top:8px;opacity:.84;font-size:12px;line-height:1.35;">
+                    Paridades/risco: Brent ${escapeHtml(fmtP(pBrent))} • USD/BRL ${escapeHtml(fmtP(pUsd))} • VIX ${escapeHtml(fmtP(pVix))}
+                </div>
+                <div style="margin-top:8px;opacity:.84;font-size:12px;line-height:1.35;">
+                    Empresas/setores: VALE ${escapeHtml(fmtP(pVale))} • Bancos ${escapeHtml(fmtP(pBanks))}
+                </div>
+                <div style="margin-top:10px;opacity:.86;font-size:12px;line-height:1.35;">${escapeHtml(plan)}</div>
+            </div>
+        `
+    })()
+    if (scalperHtml) gaugeEl.innerHTML += scalperHtml
+
     const header = `
         <tr>
             <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.15);">Fator</th>
@@ -10068,6 +12279,8 @@ function renderAll(data) {
     safe(() => renderZqCurveBriefing());
     safe(() => renderBtcOperationalBriefing());
     safe(() => renderHk50OperationalBriefing());
+    safe(() => renderUsEquitiesOperationalBriefing());
+    safe(() => renderCommoditiesOperationalBriefing());
     safe(() => renderFavorites(data));
     safe(() => renderFlowSentinel(data));
     safe(() => renderCarryTradeMonitor(data));
@@ -10719,6 +12932,8 @@ async function boot() {
     try { renderOperationalBriefing(); } catch { }
     try { renderBtcOperationalBriefing(); } catch { }
     try { renderHk50OperationalBriefing(); } catch { }
+    try { renderUsEquitiesOperationalBriefing(); } catch { }
+    try { renderCommoditiesOperationalBriefing(); } catch { }
 
     let data = getData();
     if (!data) {
