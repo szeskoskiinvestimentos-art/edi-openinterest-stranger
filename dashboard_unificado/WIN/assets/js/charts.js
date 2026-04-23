@@ -2452,8 +2452,54 @@ class StrangerThingsCharts {
         const copyBtn = document.getElementById('copy-ntsl');
         // const feedback = document.getElementById('copyFeedback'); // Removed in new HTML
 
+        const appendWinPreProjections = (raw) => {
+            const s = String(raw || '');
+            const proj = data && typeof data === 'object' ? data.win_pre_projections : null;
+            const levels = proj && Array.isArray(proj.levels) ? proj.levels : null;
+            if (!levels || levels.length === 0) return s;
+
+            const stale = !!(proj && proj.stale);
+            const age = proj && typeof proj.age_minutes === 'number' ? proj.age_minutes : null;
+            const maxAge = proj && typeof proj.max_age_minutes === 'number' ? proj.max_age_minutes : null;
+            const tooOld = typeof age === 'number' && typeof maxAge === 'number' ? age > maxAge : false;
+            if (stale || tooOld) return s;
+
+            const toId = (v) => String(v || '')
+                .normalize('NFKD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-zA-Z0-9]+/g, '_')
+                .replace(/^_+|_+$/g, '')
+                .slice(0, 48) || 'WIN_PRE';
+
+            const lines = [];
+            for (const it of levels) {
+                const price = Number(it && typeof it === 'object' ? (it.price ?? it.level ?? it.value) : NaN);
+                if (!Number.isFinite(price) || price <= 0) continue;
+                const label = it && typeof it === 'object' ? (it.label ?? it.name ?? it.key) : null;
+                const id = toId(label);
+                lines.push(`    HorizontalLineCustom(${price.toFixed(2)}, clExpMove, 2, psDash, "ProjWIN_${id}", TamanhoFonte, tpTopRight, 0, 0);`);
+            }
+
+            if (lines.length === 0) return s;
+
+            let out = s;
+            if (!out.includes('ExibirProjWinPre')) {
+                out = out.replace(/\n(\s*spot\(0\);\s*\n)/, `\n$1  ExibirProjWinPre(true);\n`);
+            }
+
+            const block =
+                `\n  if (ExibirProjWinPre) then\n` +
+                `  begin\n` +
+                lines.join('\n') +
+                `\n  end;\n`;
+
+            out = out.replace(/\nend;\s*$/m, `${block}\nend;`);
+            return out;
+        };
+
         if (ntslArea) {
-            ntslArea.innerText = data.ntsl_script || '// Código não disponível. Verifique exportação.';
+            const raw = data.ntsl_script || '// Código não disponível. Verifique exportação.';
+            ntslArea.innerText = appendWinPreProjections(raw);
         }
 
         if (copyBtn && ntslArea) {
