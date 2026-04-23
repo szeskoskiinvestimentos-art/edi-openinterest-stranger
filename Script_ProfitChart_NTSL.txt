@@ -1,4 +1,4 @@
-// NTSL Indicator - Edi OpenInterest Levels - 22/04/2026 22:06
+// NTSL Indicator - Edi OpenInterest Levels - 23/04/2026 08:01
 // Gerado Automaticamente
 
 const
@@ -29,28 +29,28 @@ input
   MostrarTodosPontos(false);
   ModeloFlip(7);
   spot(0);
-  // 1 = Classic (224365.47)
-  // 2 = Spline (225458.67)
-  // 3 = HVL (208006.28)
+  // 1 = Classic (224723.62)
+  // 2 = Spline (225747.89)
+  // 3 = HVL (208294.81)
   // 4 = HVL Log (140484.60)
-  // 5 = Sigma Kernel (212768.87)
-  // 6 = PVOP (224365.47)
-  // 7 = HVL Gaussian (224347.58)
+  // 5 = Sigma Kernel (212924.03)
+  // 6 = PVOP (224723.62)
+  // 7 = HVL Gaussian (224689.15)
 
 var
   GammaVal: Float;
 
 begin
   // Inicializa GammaVal com o primeiro disponivel por seguranca
-  GammaVal := 224365.47;
+  GammaVal := 224723.62;
 
-  if (ModeloFlip = 1) then GammaVal := 224365.47;
-  if (ModeloFlip = 2) then GammaVal := 225458.67;
-  if (ModeloFlip = 3) then GammaVal := 208006.28;
+  if (ModeloFlip = 1) then GammaVal := 224723.62;
+  if (ModeloFlip = 2) then GammaVal := 225747.89;
+  if (ModeloFlip = 3) then GammaVal := 208294.81;
   if (ModeloFlip = 4) then GammaVal := 140484.60;
-  if (ModeloFlip = 5) then GammaVal := 212768.87;
-  if (ModeloFlip = 6) then GammaVal := 224365.47;
-  if (ModeloFlip = 7) then GammaVal := 224347.58;
+  if (ModeloFlip = 5) then GammaVal := 212924.03;
+  if (ModeloFlip = 6) then GammaVal := 224723.62;
+  if (ModeloFlip = 7) then GammaVal := 224689.15;
 
   // --- Linhas Principais (Com Intercalação de Texto) ---
   if (ExibirWalls and MostrarTodosPontos) then
@@ -179,10 +179,6 @@ begin
     HorizontalLineCustom(186505.42, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
     HorizontalLineCustom(186505.42, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirExpMoves and MostrarTodosPontos) then
-    HorizontalLineCustom(187747.03, clExpMove, 1, psDot, "Edi_EM_Exp", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirExpMoves and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(187747.03, clExpMove, 1, psDot, "Edi_EM_Exp", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
     HorizontalLineCustom(188927.57, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and (not MostrarTodosPontos)) then
@@ -195,6 +191,10 @@ begin
     HorizontalLineCustom(190348.79, clRangeLow, 1, psDot, "Edi_Range_1D", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirRange and (not MostrarTodosPontos)) then
     HorizontalLineCustom(190348.79, clRangeLow, 1, psDot, "Edi_Range_1D", TamanhoFonte, tpTopRight, 0, 0);
+  if (ExibirExpMoves and MostrarTodosPontos) then
+    HorizontalLineCustom(190348.79, clExpMove, 1, psDot, "Edi_EM_Exp", TamanhoFonte, tpBottomRight, 0, 0);
+  if (ExibirExpMoves and (not MostrarTodosPontos)) then
+    HorizontalLineCustom(190348.79, clExpMove, 1, psDot, "Edi_EM_Exp", TamanhoFonte, tpBottomRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
     HorizontalLineCustom(191349.72, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and (not MostrarTodosPontos)) then
@@ -239,22 +239,22 @@ begin
     HorizontalLineCustom(202911.21, clRangeHigh, 1, psDot, "Edi_Range_1D", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirRange and (not MostrarTodosPontos)) then
     HorizontalLineCustom(202911.21, clRangeHigh, 1, psDot, "Edi_Range_1D", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(203460.46, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(203460.46, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(203460.46, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(203460.46, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirExpMoves and MostrarTodosPontos) then
-    HorizontalLineCustom(205512.97, clExpMove, 1, psDot, "Edi_EM_Exp", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(202911.21, clExpMove, 1, psDot, "Edi_EM_Exp", TamanhoFonte, tpBottomRight, 0, 0);
   if (ExibirExpMoves and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(205512.97, clExpMove, 1, psDot, "Edi_EM_Exp", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(202911.21, clExpMove, 1, psDot, "Edi_EM_Exp", TamanhoFonte, tpBottomRight, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
-    HorizontalLineCustom(205882.61, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpBottomRight, 0, 0);
+    HorizontalLineCustom(203460.46, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and (not MostrarTodosPontos)) then
-    HorizontalLineCustom(205882.61, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpBottomRight, 0, 0);
+    HorizontalLineCustom(203460.46, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+  if (ExibirWalls and MostrarTodosPontos) then
+    HorizontalLineCustom(203460.46, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+  if (ExibirWalls and (not MostrarTodosPontos)) then
+    HorizontalLineCustom(203460.46, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+  if (ExibirWalls and MostrarTodosPontos) then
+    HorizontalLineCustom(205882.61, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+  if (ExibirWalls and (not MostrarTodosPontos)) then
+    HorizontalLineCustom(205882.61, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls and MostrarTodosPontos) then
     HorizontalLineCustom(205882.61, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls and (not MostrarTodosPontos)) then
