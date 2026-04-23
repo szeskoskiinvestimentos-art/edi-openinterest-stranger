@@ -755,13 +755,13 @@ class StrangerThingsCharts {
 
         const yahoo = window.yahooUupOptionsData || null;
         if (!yahoo || !Array.isArray(yahoo.expiries) || !yahoo.by_expiry) {
-            if (metaEl) metaEl.innerText = 'Dados indisponíveis (Yahoo). Execute o exportador para gerar o cache.';
+            if (metaEl) metaEl.innerText = 'Dados indisponíveis (EdiMap). Execute o exportador para gerar o cache.';
             return;
         }
 
         const expiries = yahoo.expiries.map(String).filter(Boolean);
         if (expiries.length === 0) {
-            if (metaEl) metaEl.innerText = 'Sem vencimentos disponíveis (Yahoo).';
+            if (metaEl) metaEl.innerText = 'Sem vencimentos disponíveis (EdiMap).';
             return;
         }
 
@@ -777,9 +777,8 @@ class StrangerThingsCharts {
             if (!metaEl) return;
             const spot = Number(yahoo.spot);
             const spotText = Number.isFinite(spot) ? `Spot proxy: ${this.formatNumberBr(spot, 4)}` : 'Spot proxy: N/A';
-            const label = String(yahoo.ticker_used || 'UUP');
             const captured = String(yahoo.captured_at_utc || '');
-            metaEl.innerText = `Fonte: Yahoo (${label}) | ${spotText} | Captura: ${captured} | Venc: ${expiry}`;
+            metaEl.innerText = `Fonte: EdiMap | ${spotText} | Captura: ${captured} | Venc: ${expiry}`;
         };
 
         const ensureSelect = () => {
@@ -860,6 +859,10 @@ class StrangerThingsCharts {
             return { midRange, meanByOi };
         };
 
+        const fmtMeans = (means) => {
+            return `Range ${formatMeanWdo(means.midRange)} | OI ${formatMeanWdo(means.meanByOi)} (Proxy ${this.formatNumberBr(means.midRange, 2)} | ${this.formatNumberBr(means.meanByOi, 2)})`;
+        };
+
         const updateMeansAll = () => {
             if (!meansAllEl) return;
             const allPoints = [];
@@ -872,7 +875,7 @@ class StrangerThingsCharts {
                 meansAllEl.innerText = '';
                 return;
             }
-            meansAllEl.innerText = `Médias (todos vencimentos): Intervalo ${formatMeanWdo(means.midRange)} | Por OI ${formatMeanWdo(means.meanByOi)}`;
+            meansAllEl.innerText = `Preço médio (todos vencimentos): ${fmtMeans(means)}`;
         };
 
         const render = () => {
@@ -885,7 +888,6 @@ class StrangerThingsCharts {
             const means = calcMeans(points);
             if (!means) return;
             const spotProxy = Number(yahoo.spot);
-            const spotLabel = String(yahoo.ticker_used || 'UUP');
 
             if (this.charts.uupOi) this.charts.uupOi.destroy();
             const ctx = canvas.getContext('2d');
@@ -899,15 +901,15 @@ class StrangerThingsCharts {
                         {
                             label: 'Call OI',
                             data: points.map((p) => p.call),
-                            backgroundColor: 'rgba(0, 255, 0, 0.6)',
-                            borderColor: '#00ff00',
+                            backgroundColor: 'rgba(0, 180, 255, 0.6)',
+                            borderColor: '#00b4ff',
                             borderWidth: 1
                         },
                         {
                             label: 'Put OI',
                             data: points.map((p) => p.put),
-                            backgroundColor: 'rgba(255, 7, 58, 0.6)',
-                            borderColor: '#ff073a',
+                            backgroundColor: 'rgba(255, 170, 0, 0.6)',
+                            borderColor: '#ffaa00',
                             borderWidth: 1
                         }
                     ]
@@ -924,7 +926,7 @@ class StrangerThingsCharts {
                                     dash: [2, 4],
                                     width: 2,
                                     labelOffsetY: 54,
-                                    labelText: `SPOT ${spotLabel} ${this.formatNumberBr(spotProxy, 4)}`
+                                    labelText: `SPOT Proxy ${this.formatNumberBr(spotProxy, 4)}`
                                 }
                             }
                             : {}),
@@ -935,7 +937,7 @@ class StrangerThingsCharts {
                                     color: '#00f3ff',
                                     dash: [6, 4],
                                     width: 2,
-                                    labelText: `Média (intervalo): ${formatMeanWdo(means.midRange)}`,
+                                    labelText: `Preço médio (range): ${formatMeanWdo(means.midRange)}`,
                                     labelOffsetY: 0
                                 },
                                 {
@@ -943,14 +945,14 @@ class StrangerThingsCharts {
                                     color: '#ff00ff',
                                     dash: [2, 6],
                                     width: 2,
-                                    labelText: `Média (por OI): ${formatMeanWdo(means.meanByOi)}`,
+                                    labelText: `Preço médio (OI): ${formatMeanWdo(means.meanByOi)}`,
                                     labelOffsetY: 18
                                 }
                             ]
                         },
                         title: {
                             display: true,
-                            text: 'Open Interest por Strike (Proxy Dólar via Yahoo) | UUP',
+                            text: `Opções EdiMap — Proxy A | ${expiry}`,
                             color: '#ff00ff',
                             font: {
                                 family: 'Orbitron',
@@ -992,13 +994,13 @@ class StrangerThingsCharts {
 
         const yahoo = window.yahooUsduOptionsData || null;
         if (!yahoo || !Array.isArray(yahoo.expiries) || !yahoo.by_expiry) {
-            if (metaEl) metaEl.innerText = 'Dados indisponíveis (Yahoo). Execute o exportador para gerar o cache.';
+            if (metaEl) metaEl.innerText = 'Dados indisponíveis (EdiMap). Execute o exportador para gerar o cache.';
             return;
         }
 
         const expiries = yahoo.expiries.map(String).filter(Boolean);
         if (expiries.length === 0) {
-            if (metaEl) metaEl.innerText = 'Sem vencimentos disponíveis (Yahoo).';
+            if (metaEl) metaEl.innerText = 'Sem vencimentos disponíveis (EdiMap).';
             return;
         }
 
@@ -1014,9 +1016,8 @@ class StrangerThingsCharts {
             if (!metaEl) return;
             const spot = Number(yahoo.spot);
             const spotText = Number.isFinite(spot) ? `Spot proxy: ${this.formatNumberBr(spot, 4)}` : 'Spot proxy: N/A';
-            const label = String(yahoo.ticker_used || 'USDU');
             const captured = String(yahoo.captured_at_utc || '');
-            metaEl.innerText = `Fonte: Yahoo (${label}) | ${spotText} | Captura: ${captured} | Venc: ${expiry}`;
+            metaEl.innerText = `Fonte: EdiMap | ${spotText} | Captura: ${captured} | Venc: ${expiry}`;
         };
 
         const ensureSelect = () => {
@@ -1097,6 +1098,10 @@ class StrangerThingsCharts {
             return { midRange, meanByOi };
         };
 
+        const fmtMeans = (means) => {
+            return `Range ${formatMeanWdo(means.midRange)} | OI ${formatMeanWdo(means.meanByOi)} (Proxy ${this.formatNumberBr(means.midRange, 2)} | ${this.formatNumberBr(means.meanByOi, 2)})`;
+        };
+
         const updateMeansAll = () => {
             if (!meansAllEl) return;
             const allPoints = [];
@@ -1109,7 +1114,7 @@ class StrangerThingsCharts {
                 meansAllEl.innerText = '';
                 return;
             }
-            meansAllEl.innerText = `Médias (todos vencimentos): Intervalo ${formatMeanWdo(means.midRange)} | Por OI ${formatMeanWdo(means.meanByOi)}`;
+            meansAllEl.innerText = `Preço médio (todos vencimentos): ${fmtMeans(means)}`;
         };
 
         const render = () => {
@@ -1122,7 +1127,6 @@ class StrangerThingsCharts {
             const means = calcMeans(points);
             if (!means) return;
             const spotProxy = Number(yahoo.spot);
-            const spotLabel = String(yahoo.ticker_used || 'USDU');
 
             if (this.charts.usduOi) this.charts.usduOi.destroy();
             const ctx = canvas.getContext('2d');
@@ -1161,7 +1165,7 @@ class StrangerThingsCharts {
                                     dash: [2, 4],
                                     width: 2,
                                     labelOffsetY: 54,
-                                    labelText: `SPOT ${spotLabel} ${this.formatNumberBr(spotProxy, 4)}`
+                                    labelText: `SPOT Proxy ${this.formatNumberBr(spotProxy, 4)}`
                                 }
                             }
                             : {}),
@@ -1172,7 +1176,7 @@ class StrangerThingsCharts {
                                     color: '#00f3ff',
                                     dash: [6, 4],
                                     width: 2,
-                                    labelText: `Média (intervalo): ${formatMeanWdo(means.midRange)}`,
+                                    labelText: `Preço médio (range): ${formatMeanWdo(means.midRange)}`,
                                     labelOffsetY: 0
                                 },
                                 {
@@ -1180,14 +1184,14 @@ class StrangerThingsCharts {
                                     color: '#ff00ff',
                                     dash: [2, 6],
                                     width: 2,
-                                    labelText: `Média (por OI): ${formatMeanWdo(means.meanByOi)}`,
+                                    labelText: `Preço médio (OI): ${formatMeanWdo(means.meanByOi)}`,
                                     labelOffsetY: 18
                                 }
                             ]
                         },
                         title: {
                             display: true,
-                            text: 'Open Interest por Strike (Proxy Dólar via Yahoo) | USDU',
+                            text: `Opções EdiMap — Proxy B | ${expiry}`,
                             color: '#ff00ff',
                             font: {
                                 family: 'Orbitron',
@@ -1223,6 +1227,7 @@ class StrangerThingsCharts {
         if (!container) return;
 
         const chartCanvas = document.getElementById('usdBetaChart');
+        const enabledToggle = document.getElementById('usdBetaEnabledToggle');
         const proxySelect = document.getElementById('usdBetaProxySelect');
         const expirySelect = document.getElementById('usdBetaExpirySelect');
         const windowSelect = document.getElementById('usdBetaWindowSelect');
@@ -1260,6 +1265,17 @@ class StrangerThingsCharts {
             if (!windows || typeof windows !== 'object') return null;
             const key = String(w || '').trim();
             return windows[key] || null;
+        };
+
+        const enabledKey = 'usdBetaEnabled';
+        const getEnabled = () => {
+            const raw = (localStorage.getItem(enabledKey) || '').trim().toLowerCase();
+            if (!raw) return true;
+            return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+        };
+
+        const setEnabled = (v) => {
+            localStorage.setItem(enabledKey, v ? '1' : '0');
         };
 
         const ensureExpiryOptions = (data) => {
@@ -1312,11 +1328,52 @@ class StrangerThingsCharts {
                 });
         };
 
+        const calcProjectionMeans = (rows) => {
+            if (!Array.isArray(rows) || rows.length === 0) return null;
+            const strikes = rows.map((r) => Number(r?.strike)).filter((n) => Number.isFinite(n));
+            if (strikes.length === 0) return null;
+            const min = Math.min(...strikes);
+            const max = Math.max(...strikes);
+            const midStrike = (min + max) / 2;
+            let best = null;
+            let bestDist = Infinity;
+            for (const r of rows) {
+                const s = Number(r?.strike);
+                const fx = Number(r?.fxProj);
+                if (!Number.isFinite(s) || !Number.isFinite(fx)) continue;
+                const d = Math.abs(s - midStrike);
+                if (d < bestDist) {
+                    bestDist = d;
+                    best = r;
+                }
+            }
+            let wSum = 0;
+            let vSum = 0;
+            for (const r of rows) {
+                const fx = Number(r?.fxProj);
+                const oi = Number(r?.callOi || 0) + Number(r?.putOi || 0);
+                if (!Number.isFinite(fx) || !Number.isFinite(oi) || oi <= 0) continue;
+                wSum += fx * oi;
+                vSum += oi;
+            }
+            const meanByOi = vSum > 0 ? (wSum / vSum) : null;
+            return { midStrike, midFx: best ? Number(best.fxProj) : null, meanByOi };
+        };
+
         const render = () => {
+            const enabled = getEnabled();
+            if (enabledToggle) enabledToggle.checked = enabled;
+            if (!enabled) {
+                container.innerHTML = '<div class="loading-text">Mapeamento desativado.</div>';
+                if (statsEl) statsEl.innerText = '';
+                if (this.charts.usdBeta) this.charts.usdBeta.destroy();
+                return;
+            }
+
             const proxyKey = getProxyKey();
             const data = getData();
             if (!data) {
-                container.innerHTML = '<div class="loading-text">Dados indisponíveis (Yahoo).</div>';
+                container.innerHTML = '<div class="loading-text">Dados indisponíveis (EdiMap).</div>';
                 if (statsEl) statsEl.innerText = '';
                 if (this.charts.usdBeta) this.charts.usdBeta.destroy();
                 return;
@@ -1346,15 +1403,25 @@ class StrangerThingsCharts {
             const r2 = Number(betaRow.r2);
             const n = Number(betaRow.n);
 
+            const rows = buildMapping(data, expiry, betaRow);
+            const projMeans = calcProjectionMeans(rows);
+
             if (statsEl) {
                 const proxyTxt = Number.isFinite(proxyClose) ? this.formatNumberBr(proxyClose, 4) : '-';
                 const fxTxt = Number.isFinite(fxClose) ? this.formatNumberBr(fxClose, 4) : '-';
                 const fxPtsTxt = Number.isFinite(fxPoints) ? this.formatNumberBr(fxPoints, 2) : '-';
                 const wdoTxt = Number.isFinite(wdoSpot) ? this.formatNumberBr(wdoSpot, 2) : '-';
-                statsEl.innerText = `Ativo: ${proxyKey} | Venc: ${expiry || '-'} | Janela: ${win}d | α=${alpha.toFixed(6)} | β=${beta.toFixed(4)} | r=${Number.isFinite(corr) ? corr.toFixed(3) : '-'} | R²=${Number.isFinite(r2) ? r2.toFixed(3) : '-'} | n=${Number.isFinite(n) ? n : '-'} | Proxy=${proxyTxt} | USDBRL=${fxTxt} (${fxPtsTxt}) | Spot WDO=${wdoTxt}`;
+                const winLabel = win === 'all' ? 'tudo' : `${win}d`;
+                const extras = [];
+                if (projMeans) {
+                    const midFx = projMeans.midFx;
+                    const meanByOi = projMeans.meanByOi;
+                    if (Number.isFinite(midFx)) extras.push(`Preço médio (range)=${this.formatNumberBr(midFx, 4)} (${this.formatNumberBr(midFx * 1000.0, 0)} pts)`);
+                    if (Number.isFinite(meanByOi)) extras.push(`Preço médio (OI)=${this.formatNumberBr(meanByOi, 4)} (${this.formatNumberBr(meanByOi * 1000.0, 0)} pts)`);
+                }
+                statsEl.innerText = `Ativo: ${proxyKey} | Venc: ${expiry || '-'} | Janela: ${winLabel} | α=${alpha.toFixed(6)} | β=${beta.toFixed(4)} | r=${Number.isFinite(corr) ? corr.toFixed(3) : '-'} | R²=${Number.isFinite(r2) ? r2.toFixed(3) : '-'} | n=${Number.isFinite(n) ? n : '-'} | Proxy=${proxyTxt} | USDBRL=${fxTxt} (${fxPtsTxt}) | Spot WDO=${wdoTxt}${extras.length ? ` | ${extras.join(' • ')}` : ''}`;
             }
 
-            const rows = buildMapping(data, expiry, betaRow);
             if (rows.length === 0) {
                 container.innerHTML = '<div class="loading-text">Sem strikes para o vencimento selecionado.</div>';
                 if (this.charts.usdBeta) this.charts.usdBeta.destroy();
@@ -1481,7 +1548,7 @@ class StrangerThingsCharts {
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `usdbrl_beta_${proxyKey}_${expiry || 'NA'}_${win}d.json`;
+                    a.download = `usdbrl_beta_${proxyKey}_${expiry || 'NA'}_${win === 'all' ? 'all' : `${win}d`}.json`;
                     document.body.appendChild(a);
                     a.click();
                     a.remove();
@@ -1496,6 +1563,12 @@ class StrangerThingsCharts {
             render();
         };
 
+        if (enabledToggle) {
+            enabledToggle.onchange = () => {
+                setEnabled(!!enabledToggle.checked);
+                render();
+            };
+        }
         if (proxySelect) proxySelect.onchange = onProxyChanged;
         if (expirySelect) expirySelect.onchange = render;
         if (windowSelect) windowSelect.onchange = render;
