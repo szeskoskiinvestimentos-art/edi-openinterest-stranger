@@ -875,13 +875,37 @@ class StrangerThingsCharts {
             meansAllEl.innerText = `Médias (todos vencimentos): Intervalo ${formatMeanWdo(means.midRange)} | Por OI ${formatMeanWdo(means.meanByOi)}`;
         };
 
+        const drawEmptyState = (msg) => {
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            const dpr = window.devicePixelRatio || 1;
+            const w = canvas.clientWidth || 900;
+            const h = canvas.clientHeight || 320;
+            canvas.width = Math.floor(w * dpr);
+            canvas.height = Math.floor(h * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = 'rgba(255, 0, 255, 0.9)';
+            ctx.font = '700 14px Orbitron, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(msg || 'Sem dados.'), w / 2, h / 2);
+        };
+
         const render = () => {
             const expiry = select ? String(select.value || '') : pickDefaultExpiry();
             localStorage.setItem(storageKey, expiry);
             setMeta(expiry);
             updateMeansAll();
             const points = buildPoints(expiry);
-            if (!points || points.length === 0) return;
+            if (!points || points.length === 0) {
+                if (this.charts.uupOi) {
+                    this.charts.uupOi.destroy();
+                    this.charts.uupOi = null;
+                }
+                drawEmptyState(`Sem OI (min ${parseMinOi()}) para ${expiry}`);
+                return;
+            }
             const means = calcMeans(points);
             if (!means) return;
             const spotProxy = Number(yahoo.spot);
@@ -1112,13 +1136,37 @@ class StrangerThingsCharts {
             meansAllEl.innerText = `Médias (todos vencimentos): Intervalo ${formatMeanWdo(means.midRange)} | Por OI ${formatMeanWdo(means.meanByOi)}`;
         };
 
+        const drawEmptyState = (msg) => {
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            const dpr = window.devicePixelRatio || 1;
+            const w = canvas.clientWidth || 900;
+            const h = canvas.clientHeight || 320;
+            canvas.width = Math.floor(w * dpr);
+            canvas.height = Math.floor(h * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = 'rgba(255, 0, 255, 0.9)';
+            ctx.font = '700 14px Orbitron, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(msg || 'Sem dados.'), w / 2, h / 2);
+        };
+
         const render = () => {
             const expiry = select ? String(select.value || '') : pickDefaultExpiry();
             localStorage.setItem(storageKey, expiry);
             setMeta(expiry);
             updateMeansAll();
             const points = buildPoints(expiry);
-            if (!points || points.length === 0) return;
+            if (!points || points.length === 0) {
+                if (this.charts.usduOi) {
+                    this.charts.usduOi.destroy();
+                    this.charts.usduOi = null;
+                }
+                drawEmptyState(`Sem OI (min ${parseMinOi()}) para ${expiry}`);
+                return;
+            }
             const means = calcMeans(points);
             if (!means) return;
             const spotProxy = Number(yahoo.spot);
