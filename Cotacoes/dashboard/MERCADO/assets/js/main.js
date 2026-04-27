@@ -7957,51 +7957,53 @@ function renderOperationalBriefing() {
 
     const macro = operationalInputs.macro || null;
     const macroBiasFor = symbol => {
-        if (!macro) return { bias: 'neutral', score: 0 };
+        if (!macro) return { bias: 'neutral', score: 0, parts: [] };
         const neutral = t => String(t || '').toLowerCase().includes('neutro');
         let s = 0;
         let w = 0;
-        const push = (val, wVal) => {
+        const parts = [];
+        const push = (label, val, wVal) => {
             s += val * wVal;
             w += wVal;
+            if (val !== 0) parts.push({ label: String(label || '—'), val: Number(val) * Number(wVal) });
         };
         if (macro.flow && !neutral(macro.flow.label)) {
             const b = macro.flow.label === 'Risk-On' ? (symbol === 'WDO' ? -1 : +1) : (symbol === 'WDO' ? +1 : -1);
-            push(b, operationalTuning.weight.flow);
+            push(`Flow (${macro.flow.label})`, b, operationalTuning.weight.flow);
         }
         if (foreignFlow && foreignFlow.signal && typeof foreignFlow.signal.score === 'number' && Number.isFinite(foreignFlow.signal.score)) {
             const t = typeof operationalTuning.threshold.foreignFlow === 'number' ? operationalTuning.threshold.foreignFlow : 0.25;
             const dir = foreignFlow.signal.score > t ? +1 : foreignFlow.signal.score < -t ? -1 : 0;
             const b = symbol === 'WDO' ? -dir : +dir;
             const wFlow = typeof operationalTuning.weight.foreignFlow === 'number' ? operationalTuning.weight.foreignFlow : 0.22;
-            push(b, wFlow);
+            push('Fluxo estrangeiro', b, wFlow);
         }
         if (typeof macro.dxyPct === 'number' && Number.isFinite(macro.dxyPct)) {
             const dir = macro.dxyPct > operationalTuning.threshold.dxy ? +1 : macro.dxyPct < -operationalTuning.threshold.dxy ? -1 : 0;
             const b = symbol === 'WDO' ? dir : -dir;
-            push(b, operationalTuning.weight.dxy);
+            push('DXY', b, operationalTuning.weight.dxy);
         }
         if (typeof macro.exportScore === 'number' && Number.isFinite(macro.exportScore)) {
             const dir = macro.exportScore > operationalTuning.threshold.export ? +1 : macro.exportScore < -operationalTuning.threshold.export ? -1 : 0;
             const b = symbol === 'WDO' ? -dir : +dir;
-            push(b, operationalTuning.weight.export);
+            push('Exportadoras/Commodities', b, operationalTuning.weight.export);
         }
         if (macro.em && typeof macro.em.pct === 'number' && Number.isFinite(macro.em.pct)) {
             const dir = macro.em.pct > operationalTuning.threshold.em ? +1 : macro.em.pct < -operationalTuning.threshold.em ? -1 : 0;
             const b = symbol === 'WDO' ? dir : -dir;
-            push(b, operationalTuning.weight.em);
+            push('Emergentes (EM)', b, operationalTuning.weight.em);
         }
         if (macro.yields) {
             const y = macro.yields;
             if (typeof y.us10yPct === 'number' && Number.isFinite(y.us10yPct)) {
                 const dir = y.us10yPct > operationalTuning.threshold.yields ? +1 : y.us10yPct < -operationalTuning.threshold.yields ? -1 : 0;
                 const b = symbol === 'WDO' ? dir : -dir;
-                push(b, operationalTuning.weight.yields);
+                push('US10Y', b, operationalTuning.weight.yields);
             }
             if (typeof y.br10yPct === 'number' && Number.isFinite(y.br10yPct)) {
                 const dir = y.br10yPct > operationalTuning.threshold.yields ? +1 : y.br10yPct < -operationalTuning.threshold.yields ? -1 : 0;
                 const b = symbol === 'WDO' ? dir : -dir;
-                push(b, operationalTuning.weight.yields * 0.8);
+                push('BR10Y', b, operationalTuning.weight.yields * 0.8);
             }
         }
         if (macro.zq && typeof macro.zq.slopePct === 'number' && Number.isFinite(macro.zq.slopePct)) {
@@ -8011,7 +8013,7 @@ function renderOperationalBriefing() {
             const dir = macro.zq.slopePct > t ? +1 : macro.zq.slopePct < -t ? -1 : 0;
             const b = symbol === 'WDO' ? dir : -dir;
             const wZq = typeof operationalTuning.weight.zq === 'number' && Number.isFinite(operationalTuning.weight.zq) ? operationalTuning.weight.zq : 0.22;
-            push(b, wZq);
+            push('Curva ZQ (Fed Funds)', b, wZq);
         }
         if (macro.flowSentinel && typeof macro.flowSentinel.composite === 'number' && Number.isFinite(macro.flowSentinel.composite)) {
             const fs = macro.flowSentinel;
@@ -8022,16 +8024,139 @@ function renderOperationalBriefing() {
                 const dirUsd = fs.composite < -t ? +1 : fs.composite > t ? -1 : 0;
                 const b = symbol === 'WDO' ? dirUsd : -dirUsd;
                 const wFs = typeof operationalTuning.weight.flowSentinel === 'number' && Number.isFinite(operationalTuning.weight.flowSentinel) ? operationalTuning.weight.flowSentinel : 0.18;
-                push(b, wFs);
+                push('Flow Sentinel', b, wFs);
             }
         }
         const score = w > 0 ? s / w : 0;
         const bias = score > 0.22 ? 'buy' : score < -0.22 ? 'sell' : 'neutral';
-        return { bias, score };
+        return { bias, score, parts };
     };
 
     const macroWdo = macroBiasFor('WDO');
     const macroWin = macroBiasFor('WIN');
+
+    const diSignal = (() => {
+        if (!data) return { ok: false };
+        const seriesKeys = Object.keys((data && data.series) || {});
+        const diMatcher = /^DI1[FGHJKMNQUVXZ]\d{2}$/i;
+
+        const monthNum = code => {
+            const c = String(code || '').toUpperCase();
+            if (c === 'F') return 1;
+            if (c === 'G') return 2;
+            if (c === 'H') return 3;
+            if (c === 'J') return 4;
+            if (c === 'K') return 5;
+            if (c === 'M') return 6;
+            if (c === 'N') return 7;
+            if (c === 'Q') return 8;
+            if (c === 'U') return 9;
+            if (c === 'V') return 10;
+            if (c === 'X') return 11;
+            if (c === 'Z') return 12;
+            return null;
+        };
+
+        const symbolsFromSeries = seriesKeys.filter(sym => diMatcher.test(sym));
+        const symbolsFromAssets = (data.assets || [])
+            .map(a => String(a && a.symbol ? a.symbol : ''))
+            .filter(sym => diMatcher.test(sym));
+        const symbolsAll = Array.from(new Set([...symbolsFromSeries, ...symbolsFromAssets]));
+        if (!symbolsAll.length) return { ok: false };
+
+        const maturityYears = (y, m) => {
+            if (!Number.isFinite(y) || !Number.isFinite(m)) return null;
+            const now = new Date();
+            const t = new Date(y, m - 1, 1);
+            const months = (t.getFullYear() - now.getFullYear()) * 12 + (t.getMonth() - now.getMonth());
+            if (!Number.isFinite(months)) return null;
+            return months / 12;
+        };
+
+        const list = symbolsAll
+            .map(symbol => {
+                const last = getMostRecentPointWithPrice(data, symbol);
+                const rate = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
+                const chgPct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+                const y = 2000 + Number(String(symbol).slice(-2));
+                const m = monthNum(String(symbol)[3]);
+                return { symbol, rate, chgPct, year: Number.isFinite(y) ? y : null, month: m };
+            })
+            .filter(x => x.rate !== null && x.year !== null && x.month !== null)
+            .map(x => ({ ...x, yrs: maturityYears(x.year, x.month) }))
+            .filter(x => typeof x.yrs === 'number' && Number.isFinite(x.yrs) && x.yrs > 0);
+
+        if (!list.length) return { ok: false };
+
+        const median = vals => {
+            const xs = (vals || []).filter(v => typeof v === 'number' && Number.isFinite(v)).slice().sort((a, b) => a - b);
+            if (!xs.length) return null;
+            const mid = Math.floor(xs.length / 2);
+            return xs.length % 2 ? xs[mid] : (xs[mid - 1] + xs[mid]) / 2;
+        };
+        const bucketOfYears = yrs => yrs < 2 ? 'short' : yrs <= 5 ? 'mid' : 'long';
+        const avg = vals => {
+            const xs = (vals || []).filter(v => typeof v === 'number' && Number.isFinite(v));
+            return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+        };
+        const pickAnchor = (bucketItems, targetYrs) => {
+            const xs = (bucketItems || []).slice().filter(x => x && typeof x.yrs === 'number' && Number.isFinite(x.yrs));
+            if (!xs.length) return null;
+            const isJan = x => String(x && x.symbol ? x.symbol : '')[3]?.toUpperCase?.() === 'F';
+            const jan = xs.filter(isJan);
+            const pool = jan.length ? jan : xs;
+            const tgt = typeof targetYrs === 'number' && Number.isFinite(targetYrs) ? targetYrs : null;
+            const score = x => {
+                if (tgt === null) return x.yrs;
+                return Math.abs(x.yrs - tgt);
+            };
+            return pool.reduce((best, cur) => (best === null || score(cur) < score(best) ? cur : best), null);
+        };
+        const pick = k => list.filter(x => bucketOfYears(x.yrs) === k);
+
+        const short = pick('short');
+        const mid = pick('mid');
+        const long = pick('long');
+
+        const shortRate = avg(short.map(x => x.rate));
+        const midRate = avg(mid.map(x => x.rate));
+        const longRate = avg(long.map(x => x.rate));
+
+        const shortChg = avg(short.map(x => x.chgPct));
+        const midChg = avg(mid.map(x => x.chgPct));
+        const longChg = avg(long.map(x => x.chgPct));
+
+        const avgChg = avg(list.map(x => x.chgPct));
+        const medChg = median(list.map(x => x.chgPct));
+        const slope = typeof longRate === 'number' && typeof shortRate === 'number' ? (longRate - shortRate) : null;
+        const shape = slope === null ? 'N/A' : slope > 0.15 ? 'STEEPEN' : slope < -0.15 ? 'FLATTEN' : '≈';
+
+        const th = 0.08;
+        const dirUsd = typeof medChg === 'number' && Number.isFinite(medChg) ? (medChg > th ? 1 : medChg < -th ? -1 : 0) : 0;
+        const wdoBias = dirUsd > 0 ? 'buy' : dirUsd < 0 ? 'sell' : 'neutral';
+        const winBias = dirUsd > 0 ? 'sell' : dirUsd < 0 ? 'buy' : 'neutral';
+
+        return {
+            ok: true,
+            shape,
+            slope,
+            buckets: {
+                short: { rate: shortRate, chgPct: shortChg, n: short.length },
+                mid: { rate: midRate, chgPct: midChg, n: mid.length },
+                long: { rate: longRate, chgPct: longChg, n: long.length },
+            },
+            anchors: {
+                short: pickAnchor(short, 1.0),
+                mid: pickAnchor(mid, 3.5),
+                long: pickAnchor(long, 8.0),
+            },
+            avgChg,
+            medChg,
+            dirUsd,
+            wdoBias,
+            winBias,
+        };
+    })();
 
     const resolved = {
         wdo: combined.wdo.conflict ? macroWdo : combined.wdo,
@@ -8212,6 +8337,50 @@ function renderOperationalBriefing() {
                 ? 'Gamma -: tende a acelerar; prefira rompimento confirmado e gestão rápida.'
                 : 'Gamma: sem leitura.';
 
+        const whyLines = (() => {
+            const lines = [];
+            const symKey = sym === 'WDO' ? 'wdo' : sym === 'WIN' ? 'win' : '';
+            const biasTxt = bias === 'buy' ? 'COMPRA' : bias === 'sell' ? 'VENDA' : 'NEUTRO';
+            if (regime && regime.label && regime.operational && symKey && regime.operational[symKey]) {
+                lines.push(`Regime (${regime.label}): ${String(regime.operational[symKey])}`);
+            } else if (regime && regime.label) {
+                lines.push(`Regime: ${String(regime.label)}`);
+            }
+            const nt = sym === 'WDO' ? newsTilt.wdo : newsTilt.win;
+            if (web && typeof nt.score === 'number' && Number.isFinite(nt.score)) {
+                const nb = nt.bias === 'buy' ? 'COMPRA' : nt.bias === 'sell' ? 'VENDA' : 'NEUTRO';
+                lines.push(`News tilt: ${fmt1(nt.score)} → ${nb}`);
+            }
+            if (priceLead.active && fb.source === 'PREÇO') {
+                lines.push(`Preço liderando: ${priceLead.reason}`);
+            }
+            if (combined && ((sym === 'WDO' && combined.wdo && combined.wdo.conflict) || (sym === 'WIN' && combined.win && combined.win.conflict))) {
+                lines.push('Regime x News em conflito → decisão por Macro');
+            }
+            if (fb.source === 'MACRO') {
+                const m = sym === 'WDO' ? macroWdo : macroWin;
+                const mb = m && m.bias ? (m.bias === 'buy' ? 'COMPRA' : m.bias === 'sell' ? 'VENDA' : 'NEUTRO') : 'NEUTRO';
+                const ms = m && typeof m.score === 'number' && Number.isFinite(m.score) ? fmt1(m.score) : '—';
+                lines.push(`Macro: score ${ms} → ${mb}`);
+                const parts = m && Array.isArray(m.parts) ? m.parts.slice() : [];
+                parts.sort((a, b) => Math.abs(b.val || 0) - Math.abs(a.val || 0));
+                const top = parts.slice(0, 3).map(p => String(p.label || '')).filter(Boolean);
+                if (top.length) lines.push(`Drivers: ${top.join(' • ')}`);
+            }
+            if (diSignal && diSignal.ok) {
+                const a = diSignal.anchors || {};
+                const anchorShort = a && a.short ? a.short : null;
+                const d = anchorShort && typeof anchorShort.chgPct === 'number' && Number.isFinite(anchorShort.chgPct) ? `${formatNumber(anchorShort.chgPct, 2)}%` : '—';
+                const b = sym === 'WDO' ? diSignal.wdoBias : sym === 'WIN' ? diSignal.winBias : 'neutral';
+                const bt = b === 'buy' ? 'COMPRA' : b === 'sell' ? 'VENDA' : 'NEUTRO';
+                const lab = anchorShort && anchorShort.symbol ? `Curto ${anchorShort.symbol}` : 'Curto';
+                lines.push(`DI (B3): ${diSignal.shape} • ${lab} Δ% ${d} → ${bt}`);
+            }
+            if (r) lines.push(`Execução: ${gammaLabel} (define tipo de execução, não o lado)`);
+            lines.push(`Saída: ${sym} ${biasTxt} (Fonte: ${fb.source})`);
+            return lines;
+        })();
+
         return `
             <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
@@ -8235,6 +8404,12 @@ function renderOperationalBriefing() {
                         <div style="margin-top:6px;">${escapeHtml(gate)}</div>
                         <div style="margin-top:6px;">${escapeHtml(targets)}</div>
                         ${stop ? `<div style="margin-top:6px;opacity:.90;">${escapeHtml(stop)}</div>` : ''}
+                        <div style="margin-top:10px;border-top:1px solid rgba(255,255,255,.10);padding-top:10px;">
+                            <div style="font-weight:900;letter-spacing:.6px;">Por quê</div>
+                            <ul style="margin:6px 0 0 18px;padding:0;opacity:.84;font-size:12px;line-height:1.35;">
+                                ${(whyLines || []).map(x => `<li>${escapeHtml(x)}</li>`).join('') || '<li>—</li>'}
+                            </ul>
+                        </div>
                         <div style="margin-top:6px;opacity:.78;font-size:12px;">${escapeHtml(note)}</div>
                     </div>
                 </div>
@@ -9534,10 +9709,14 @@ function renderOperationalBriefing() {
                         const mkPct = v => (typeof v === 'number' ? formatPercent(v, 2) : '—');
                         const mkNum = v => (typeof v === 'number' ? formatNumber(v, 2) : '—');
                         const dirTone = d => d > 0 ? 'positive' : d < 0 ? 'negative' : 'neutral';
+                        const link = (href, label) => {
+                            if (!href) return escapeHtml(label);
+                            return `<a href="${href}" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,.25);text-underline-offset:3px;">${escapeHtml(label)}</a>`;
+                        };
                         const rows = [];
                         rows.push(`
                             <tr>
-                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">Flow (Regime)</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${link('#regimeConviction', 'Flow (Regime)')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', regime ? regime.label : '—')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWdo.score), macroWdo.bias === 'buy' ? 'Compra' : macroWdo.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWin.score), macroWin.bias === 'buy' ? 'Compra' : macroWin.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
@@ -9546,7 +9725,7 @@ function renderOperationalBriefing() {
                         `);
                         rows.push(`
                             <tr>
-                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">Notícias (tilt)</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${link('#newsWebModule', 'Notícias (tilt)')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">WDO ${mkNum(newsTilt.wdo.score)} • WIN ${mkNum(newsTilt.win.score)}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(newsTilt.wdo.score), newsTilt.wdo.score > 0.22 ? 'Compra' : newsTilt.wdo.score < -0.22 ? 'Venda' : 'Neutro')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(newsTilt.win.score), newsTilt.win.score > 0.22 ? 'Compra' : newsTilt.win.score < -0.22 ? 'Venda' : 'Neutro')}</td>
@@ -9555,7 +9734,7 @@ function renderOperationalBriefing() {
                         `);
                         rows.push(`
                             <tr>
-                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">Confirmação (WIN↑ &amp; WDO↓)</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${link('#operational-now', 'Confirmação (WIN↑ & WDO↓)')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(priceLead.active ? 'positive' : 'neutral', priceLead.active ? priceLead.reason : '—')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(priceLead.active ? 'negative' : 'neutral', priceLead.active ? 'Venda' : 'Neutro')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(priceLead.active ? 'positive' : 'neutral', priceLead.active ? 'Compra' : 'Neutro')}</td>
@@ -9564,7 +9743,7 @@ function renderOperationalBriefing() {
                         `);
                         rows.push(`
                             <tr>
-                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">DXY</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${link('#overview', 'DXY')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mkPct(macro ? macro.dxyPct : null)}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWdo.score), macroWdo.bias === 'buy' ? 'Compra' : macroWdo.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWin.score), macroWin.bias === 'buy' ? 'Compra' : macroWin.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
@@ -9573,7 +9752,35 @@ function renderOperationalBriefing() {
                         `);
                         rows.push(`
                             <tr>
-                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">Export Basket</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${link('#overview', 'USDX (DX=F)')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
+                                    const last = getLastPoint(data, 'USDX') || null;
+                                    const price = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
+                                    const pct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+                                    const px = price !== null ? mk('neutral', mkNum(price)) : mk('neutral', '—');
+                                    const pp = pct !== null ? mk('neutral', mkPct(pct)) : mk('neutral', '—');
+                                    return `${px} • ${pp}`;
+                                })()}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
+                                    const last = getLastPoint(data, 'USDX') || null;
+                                    const pct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+                                    const t = typeof operationalTuning.threshold.dxy === 'number' && Number.isFinite(operationalTuning.threshold.dxy) ? operationalTuning.threshold.dxy : 0.12;
+                                    const dir = typeof pct === 'number' ? (pct > t ? +1 : pct < -t ? -1 : 0) : 0;
+                                    return mk(dirTone(dir), dir > 0 ? 'Compra' : dir < 0 ? 'Venda' : 'Neutro');
+                                })()}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
+                                    const last = getLastPoint(data, 'USDX') || null;
+                                    const pct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+                                    const t = typeof operationalTuning.threshold.dxy === 'number' && Number.isFinite(operationalTuning.threshold.dxy) ? operationalTuning.threshold.dxy : 0.12;
+                                    const dir = typeof pct === 'number' ? (pct > t ? -1 : pct < -t ? +1 : 0) : 0;
+                                    return mk(dirTone(dir), dir > 0 ? 'Compra' : dir < 0 ? 'Venda' : 'Neutro');
+                                })()}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', 'informativo')}</td>
+                            </tr>
+                        `);
+                        rows.push(`
+                            <tr>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${link('#chinaBrazil', 'Export Basket')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mkPct(macro ? macro.exportScore : null)}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWdo.score), macroWdo.bias === 'sell' ? 'Venda' : macroWdo.bias === 'buy' ? 'Compra' : 'Neutro')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWin.score), macroWin.bias === 'buy' ? 'Compra' : macroWin.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
@@ -9582,7 +9789,7 @@ function renderOperationalBriefing() {
                         `);
                         rows.push(`
                             <tr>
-                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">EM Basket (USD/EM)</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${link('#chinaBrazil', 'EM Basket (USD/EM)')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mkPct(macro && macro.em ? macro.em.pct : null)}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWdo.score), macroWdo.bias === 'buy' ? 'Compra' : macroWdo.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWin.score), macroWin.bias === 'buy' ? 'Compra' : macroWin.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
@@ -9591,7 +9798,35 @@ function renderOperationalBriefing() {
                         `);
                         rows.push(`
                             <tr>
-                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">Sentinela de Fluxo (FX)</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${link('#us-equities', 'HTDIX (Dividend+Momentum)')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
+                                    const last = getLastPoint(data, 'HTDIX') || null;
+                                    const price = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
+                                    const pct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+                                    const px = price !== null ? mk('neutral', mkNum(price)) : mk('neutral', '—');
+                                    const pp = pct !== null ? mk('neutral', mkPct(pct)) : mk('neutral', '—');
+                                    return `${px} • ${pp}`;
+                                })()}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
+                                    const last = getLastPoint(data, 'HTDIX') || null;
+                                    const pct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+                                    const t = 0.25;
+                                    const dir = typeof pct === 'number' ? (pct > t ? -1 : pct < -t ? +1 : 0) : 0;
+                                    return mk(dirTone(dir), dir > 0 ? 'Compra' : dir < 0 ? 'Venda' : 'Neutro');
+                                })()}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
+                                    const last = getLastPoint(data, 'HTDIX') || null;
+                                    const pct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+                                    const t = 0.25;
+                                    const dir = typeof pct === 'number' ? (pct > t ? +1 : pct < -t ? -1 : 0) : 0;
+                                    return mk(dirTone(dir), dir > 0 ? 'Compra' : dir < 0 ? 'Venda' : 'Neutro');
+                                })()}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', 'informativo')}</td>
+                            </tr>
+                        `);
+                        rows.push(`
+                            <tr>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${link('#flow-sentinel', 'Sentinela de Fluxo (FX)')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
                                     const fs = macro && macro.flowSentinel ? macro.flowSentinel : null;
                                     if (!fs || typeof fs.composite !== 'number' || !Number.isFinite(fs.composite)) return mk('neutral', '—');
@@ -9619,7 +9854,7 @@ function renderOperationalBriefing() {
                         `);
                         rows.push(`
                             <tr>
-                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">Juros (US10Y/BR10Y)</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${link('#ratesBuckets', 'Juros (US10Y/BR10Y)')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">US ${mkPct(macro && macro.yields ? macro.yields.us10yPct : null)} • BR ${mkPct(macro && macro.yields ? macro.yields.br10yPct : null)}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWdo.score), macroWdo.bias === 'buy' ? 'Compra' : macroWdo.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk(dirTone(macroWin.score), macroWin.bias === 'buy' ? 'Compra' : macroWin.bias === 'sell' ? 'Venda' : 'Neutro')}</td>
@@ -9628,7 +9863,41 @@ function renderOperationalBriefing() {
                         `);
                         rows.push(`
                             <tr>
-                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">CDS Brasil (fluxo x hedge)</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${link('#ratesBuckets', 'DI1 (B3)')}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
+                                    if (!diSignal || !diSignal.ok) return mk('neutral', '—');
+                                    const fmtRate = v => (typeof v === 'number' && Number.isFinite(v) ? `${formatNumber(v, 2)}%` : '—');
+                                    const fmtChg = v => (typeof v === 'number' && Number.isFinite(v) ? `${v > 0 ? '+' : ''}${formatNumber(v, 2)}%` : '—');
+                                    const a = diSignal.anchors || {};
+                                    const s = a.short || null;
+                                    const m = a.mid || null;
+                                    const l = a.long || null;
+                                    const pickTxt = (label, x) => {
+                                        if (!x) return `${label} —`;
+                                        const sym = x.symbol ? String(x.symbol) : '—';
+                                        return `${label} ${sym} ${fmtRate(x.rate)} (${fmtChg(x.chgPct)})`;
+                                    };
+                                    const label = `${pickTxt('Curto', s)} • ${pickTxt('Médio', m)} • ${pickTxt('Longo', l)} • ${escapeHtml(diSignal.shape)}`;
+                                    return escapeHtml(label);
+                                })()}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
+                                    if (!diSignal || !diSignal.ok) return mk('neutral', 'Neutro');
+                                    const b = diSignal.wdoBias;
+                                    const tone = b === 'buy' ? 'positive' : b === 'sell' ? 'negative' : 'neutral';
+                                    return mk(tone, b === 'buy' ? 'Compra' : b === 'sell' ? 'Venda' : 'Neutro');
+                                })()}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
+                                    if (!diSignal || !diSignal.ok) return mk('neutral', 'Neutro');
+                                    const b = diSignal.winBias;
+                                    const tone = b === 'buy' ? 'positive' : b === 'sell' ? 'negative' : 'neutral';
+                                    return mk(tone, b === 'buy' ? 'Compra' : b === 'sell' ? 'Venda' : 'Neutro');
+                                })()}</td>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mk('neutral', 'informativo')}</td>
+                            </tr>
+                        `);
+                        rows.push(`
+                            <tr>
+                                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${link('#operational-now', 'CDS Brasil (fluxo x hedge)')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${mkPct(cdsSignal && cdsSignal.drivers ? cdsSignal.drivers.cds : null)} • ${mk(cdsSignal ? cdsSignal.tone : 'neutral', cdsSignal ? cdsSignal.label : 'n/d')}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
                                     if (!cdsSignal) return mk('neutral', 'Neutro');
