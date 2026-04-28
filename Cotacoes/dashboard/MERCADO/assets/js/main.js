@@ -5742,7 +5742,7 @@ function saveAgenda(items) {
 let agendaAutoCache = null;
 let agendaAutoLoading = false;
 
-let operationalInputs = { regime: null, optionsGamma: null, webNews: null, foreignFlow: null, zqCurve: null, macro: null };
+let operationalInputs = { regime: null, optionsGamma: null, webNews: null, foreignFlow: null, focusSummary: null, zqCurve: null, macro: null };
 
 const operationalTuning = {
     threshold: { dxy: 0.12, em: 0.12, export: 0.25, yields: 0.12, foreignFlow: 0.25, zqSlope: 0.08, flowSentinel: 0.25 },
@@ -7756,6 +7756,63 @@ async function loadForeignFlow() {
     return false;
 }
 
+async function loadFocusSummary() {
+    try {
+        const local = (() => {
+            try {
+                return window.FOCUS_SUMMARY_DATA || null;
+            } catch {
+                return null;
+            }
+        })();
+        if (local) {
+            operationalInputs.focusSummary = local;
+            try { renderOperationalBriefing(); } catch { }
+            try { renderBtcOperationalBriefing(); } catch { }
+            try { renderHk50OperationalBriefing(); } catch { }
+            return true;
+        }
+    } catch {
+    }
+
+    try {
+        await loadScriptFresh('assets/data/focus_summary.js');
+        const local = (() => {
+            try {
+                return window.FOCUS_SUMMARY_DATA || null;
+            } catch {
+                return null;
+            }
+        })();
+        if (local) {
+            operationalInputs.focusSummary = local;
+            try { renderOperationalBriefing(); } catch { }
+            try { renderBtcOperationalBriefing(); } catch { }
+            try { renderHk50OperationalBriefing(); } catch { }
+            return true;
+        }
+    } catch {
+    }
+
+    try {
+        const fromFile = await fetchJsonWithTimeout(`assets/data/focus_summary.json?ts=${Date.now()}`, 1600);
+        if (fromFile) {
+            operationalInputs.focusSummary = fromFile;
+            try { renderOperationalBriefing(); } catch { }
+            try { renderBtcOperationalBriefing(); } catch { }
+            try { renderHk50OperationalBriefing(); } catch { }
+            return true;
+        }
+    } catch {
+    }
+
+    operationalInputs.focusSummary = { ok: false, message: 'Boletim Focus indisponível (assets/data/focus_summary.json/js)' };
+    try { renderOperationalBriefing(); } catch { }
+    try { renderBtcOperationalBriefing(); } catch { }
+    try { renderHk50OperationalBriefing(); } catch { }
+    return false;
+}
+
 function renderZqCurveBriefing() {
     const el = document.getElementById('zqCurveBriefing');
     if (!el) return;
@@ -7858,6 +7915,7 @@ function renderOperationalBriefing() {
     const rawOptions = operationalInputs.optionsGamma || null;
     const rawWeb = operationalInputs.webNews || null;
     const rawForeign = operationalInputs.foreignFlow || null;
+    const rawFocus = operationalInputs.focusSummary || null;
  
 
     const fallbackRegime = (() => {
@@ -7878,11 +7936,12 @@ function renderOperationalBriefing() {
     const options = rawOptions && rawOptions.ok === true ? rawOptions : null;
     const web = rawWeb && rawWeb.ok === true ? rawWeb : null;
     const foreignFlow = rawForeign && rawForeign.ok === true ? rawForeign : null;
+    const focus = rawFocus && rawFocus.ok === true ? rawFocus : null;
 
     const fmt0 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 0) : '—');
     const fmt1 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 1) : '—');
 
-    if (!regime && !options && !web) {
+    if (!regime && !options && !web && !focus) {
         const badge = (tone, text) => {
             const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
             return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
@@ -7896,6 +7955,7 @@ function renderOperationalBriefing() {
                         ${badge('neutral', 'Regime')} ${st(rawRegime)}
                         ${badge('neutral', 'Opções')} ${st(rawOptions)}
                         ${badge('neutral', 'News')} ${st(rawWeb)}
+                        ${badge('neutral', 'Focus')} ${st(rawFocus)}
                     </div>
                 </div>
                 <div style="margin-top:10px;opacity:.88;line-height:1.35;">
@@ -9597,6 +9657,313 @@ function renderOperationalBriefing() {
                 </div>
             </div>
         </div>
+        ${(() => {
+            const raw = operationalInputs.focusSummary || null;
+            if (!raw) return '';
+            const ok = raw && raw.ok === true;
+            const msg = raw && raw.message ? String(raw.message) : 'Indisponível.';
+            const pageUrl = raw && raw.source && raw.source.pageUrl ? String(raw.source.pageUrl) : 'https://www.bcb.gov.br/publicacoes/focus';
+            const pdfUrl = raw && raw.source && raw.source.pdfUrl ? String(raw.source.pdfUrl) : '';
+            const cutoffDate = raw && raw.source && raw.source.cutoffDate ? String(raw.source.cutoffDate) : '';
+            const publishedAt = raw && raw.source && raw.source.publishedAt ? String(raw.source.publishedAt) : '';
+            const datasetUrl = raw && raw.source && raw.source.datasetUrl ? String(raw.source.datasetUrl) : '';
+            const fmt2 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 2) : '—');
+            const fmt4 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 4) : '—');
+            const dTone = (k, d) => {
+                if (!(typeof d === 'number' && Number.isFinite(d)) || d === 0) return 'neutral';
+                if (k === 'pib') return d > 0 ? 'positive' : 'negative';
+                return d > 0 ? 'negative' : 'positive';
+            };
+            const dTxt = d => (typeof d === 'number' && Number.isFinite(d) && d !== 0 ? `${d > 0 ? '+' : ''}${fmt2(d)}` : '0.00');
+            const line = (label, k, p, fmtVal) => {
+                const med = p && typeof p.mediana === 'number' ? p.mediana : null;
+                const d = p && typeof p.deltaMediana === 'number' ? p.deltaMediana : null;
+                const t = dTone(k, d);
+                const deltaBadge = toneBadgeHtmlFromTone(t, d || 0, `Δ ${dTxt(d)}`, { maxAbs: 2 });
+                return `
+                    <div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">
+                        <div style="opacity:.9;font-weight:900;">${escapeHtml(label)}</div>
+                        <div style="display:flex;gap:8px;align-items:center;font-family:'Share Tech Mono',monospace;font-weight:900;">
+                            <span style="opacity:.95;">${escapeHtml(fmtVal(med))}</span>
+                            ${deltaBadge}
+                        </div>
+                    </div>
+                `;
+            };
+            if (!ok) {
+                return `
+                    <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                            <div style="font-weight:900;letter-spacing:1px;opacity:.95;">🧩 Boletim Focus (BCB)</div>
+                            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                                ${publishedAt ? badge('neutral', `Publicado: ${formatDateTimeLoose(publishedAt)}`) : ''}
+                                ${cutoffDate ? badge('neutral', `Corte: ${cutoffDate}`) : ''}
+                                <a href="${escapeHtml(pageUrl)}" target="_blank" class="underline_link" style="font-size:12px;opacity:.92;">página</a>
+                                ${pdfUrl ? `<a href="${escapeHtml(pdfUrl)}" target="_blank" class="underline_link" style="font-size:12px;opacity:.92;">pdf</a>` : ''}
+                            </div>
+                        </div>
+                        <div style="margin-top:8px;opacity:.88;line-height:1.35;">${escapeHtml(msg)}</div>
+                    </div>
+                `;
+            }
+            const refYear = raw && raw.derived && raw.derived.referenceYear ? String(raw.derived.referenceYear) : '';
+            const yearKeys = (() => {
+                const start = /^\d{4}$/.test(refYear) ? Number(refYear) : NaN;
+                if (Number.isFinite(start)) return [start, start + 1, start + 2, start + 3].map(y => String(y));
+                const ys = raw && raw.years && typeof raw.years === 'object' ? Object.keys(raw.years) : [];
+                return ys.filter(y => /^\d{4}$/.test(y)).sort().slice(0, 4);
+            })();
+            const y0 = raw && raw.years && yearKeys[0] && raw.years[yearKeys[0]] ? raw.years[yearKeys[0]] : null;
+            const bias = raw && raw.derived && raw.derived.bias ? String(raw.derived.bias) : 'mixed';
+            const score = raw && raw.derived && typeof raw.derived.score === 'number' && Number.isFinite(raw.derived.score) ? raw.derived.score : 0;
+            const wdo = raw && raw.derived && raw.derived.wdo ? String(raw.derived.wdo) : '≈';
+            const win = raw && raw.derived && raw.derived.win ? String(raw.derived.win) : '≈';
+            const biasLabel = bias === 'hawkish' ? 'mais duro' : bias === 'dovish' ? 'mais leve' : 'misto';
+            const biasTone = bias === 'hawkish' ? 'negative' : bias === 'dovish' ? 'positive' : 'neutral';
+            const interpretation =
+                bias === 'hawkish'
+                    ? 'Leitura: revisões para cima em inflação/juros/câmbio e/ou para baixo em crescimento → piora de condições financeiras. Operacional: tende a WDO↑ / WIN↓ (precisa confirmar com preço/fluxo).'
+                    : bias === 'dovish'
+                        ? 'Leitura: revisões para baixo em inflação/juros/câmbio e/ou para cima em crescimento → alívio de condições financeiras. Operacional: tende a WDO↓ / WIN↑ (precisa confirmar com preço/fluxo).'
+                        : 'Leitura: revisões mistas (sem direção clara). Operacional: tratar como neutro e esperar confirmação por preço/fluxo.';
+            const focusInsights = (() => {
+                const getPack = y => (raw && raw.years && y && raw.years[y] ? raw.years[y] : null);
+                const series = (yearKeys || []).map(y => ({ y, pack: getPack(y) })).filter(x => !!x.pack);
+                if (!series.length) return { macroText: '', carryText: '', curveText: '' };
+                const getNum = x => (typeof x === 'number' && Number.isFinite(x) ? x : null);
+                const points = series.map(({ y, pack }) => ({
+                    y,
+                    ipcaMed: getNum(pack.ipca && pack.ipca.mediana),
+                    selicMed: getNum(pack.selic && pack.selic.mediana),
+                    fxMed: getNum(pack.cambio && pack.cambio.mediana),
+                    pibMed: getNum(pack.pib && pack.pib.mediana),
+                    ipcaD: getNum(pack.ipca && pack.ipca.deltaMediana),
+                    selicD: getNum(pack.selic && pack.selic.deltaMediana),
+                    fxD: getNum(pack.cambio && pack.cambio.deltaMediana),
+                    pibD: getNum(pack.pib && pack.pib.deltaMediana),
+                }));
+                const head = points[0];
+                const tail = points[points.length - 1];
+                const ipcaMed = head ? head.ipcaMed : null;
+                const selicMed = head ? head.selicMed : null;
+                const fxMed = head ? head.fxMed : null;
+                const ipcaD = head ? head.ipcaD : null;
+                const selicD = head ? head.selicD : null;
+                const fxD = head ? head.fxD : null;
+                const pibD = head ? head.pibD : null;
+                const s = v => (typeof v === 'number' && Number.isFinite(v) ? (v > 0 ? '+' : '') + formatNumber(v, 2) : '—');
+                const sFx = v => (typeof v === 'number' && Number.isFinite(v) ? (v > 0 ? '+' : '') + formatNumber(v, 4) : '—');
+                const avg = arr => {
+                    const xs = (arr || []).filter(v => typeof v === 'number' && Number.isFinite(v));
+                    if (!xs.length) return null;
+                    return xs.reduce((a, b) => a + b, 0) / xs.length;
+                };
+                const listDelta = (key, fmt) => {
+                    const parts = points
+                        .map(p => (typeof p[key] === 'number' ? `${p.y} ${fmt(p[key])}` : ''))
+                        .filter(Boolean);
+                    return parts.join(' • ');
+                };
+                const listLevel = (key, fmt) => {
+                    const parts = points
+                        .map(p => (typeof p[key] === 'number' ? `${p.y} ${fmt(p[key])}` : ''))
+                        .filter(Boolean);
+                    return parts.join(' • ');
+                };
+                const ipcaAvgD = avg(points.map(p => p.ipcaD));
+                const selicAvgD = avg(points.map(p => p.selicD));
+                const fxAvgD = avg(points.map(p => p.fxD));
+                const pibAvgD = avg(points.map(p => p.pibD));
+                const ipcaShortD = head ? head.ipcaD : null;
+                const ipcaLongD = tail ? tail.ipcaD : null;
+                const selicShortD = head ? head.selicD : null;
+                const selicLongD = tail ? tail.selicD : null;
+                const ipcaConcentration = (() => {
+                    if (typeof ipcaShortD !== 'number' || typeof ipcaLongD !== 'number') return '';
+                    const aS = Math.abs(ipcaShortD);
+                    const aL = Math.abs(ipcaLongD);
+                    if (aS < 0.01 && aL < 0.01) return 'Revisões pequenas ao longo do horizonte.';
+                    if (aL > aS * 1.4) return 'Revisão mais forte no longo (sinal de desancoragem).';
+                    if (aS > aL * 1.4) return 'Revisão concentrada no curto (choque mais imediato).';
+                    return 'Revisão relativamente espalhada no horizonte (curto e longo).';
+                })();
+
+                const macroRegime = (() => {
+                    const infUp = typeof ipcaAvgD === 'number' && ipcaAvgD > 0.03;
+                    const infDown = typeof ipcaAvgD === 'number' && ipcaAvgD < -0.03;
+                    const actUp = typeof pibAvgD === 'number' && pibAvgD > 0.03;
+                    const actDown = typeof pibAvgD === 'number' && pibAvgD < -0.03;
+                    if (infUp && actDown) return 'Macro: risco de estagflação (inflação ↑ e atividade ↓).';
+                    if (infUp && actUp) return 'Macro: pressão de demanda (inflação ↑ com atividade ↑).';
+                    if (infDown && actDown) return 'Macro: desinflação com desaceleração (crescimento sob pressão).';
+                    if (infDown && actUp) return 'Macro: cenário benigno (inflação ↓ com atividade ↑).';
+                    return 'Macro: quadro misto (sem diagnóstico único).';
+                })();
+                const macroParts = [];
+                const ipcaDeltaList = listDelta('ipcaD', v => `${s(v)} p.p.`);
+                const selicDeltaList = listDelta('selicD', v => `${s(v)} p.p.`);
+                const fxDeltaList = listDelta('fxD', v => `${sFx(v)}`);
+                const pibDeltaList = listDelta('pibD', v => `${s(v)} p.p.`);
+                if (ipcaDeltaList) macroParts.push(`IPCA Δ: ${ipcaDeltaList}`);
+                if (selicDeltaList) macroParts.push(`Selic Δ: ${selicDeltaList}`);
+                if (fxDeltaList) macroParts.push(`Câmbio Δ: ${fxDeltaList}`);
+                if (pibDeltaList) macroParts.push(`PIB Δ: ${pibDeltaList}`);
+                const macroText = `${macroRegime} ${ipcaConcentration}${macroParts.length ? ` ${macroParts.join(' • ')}` : ''}`;
+
+                const usdSpot = (() => {
+                    if (!data) return null;
+                    const sym = findAliasSymbolBest(data, 'USD_BRL') || findAliasSymbol(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i);
+                    if (!sym) return null;
+                    const p = getMostRecentPointWithPrice(data, sym) || getLastPoint(data, sym);
+                    const px = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                    return px;
+                })();
+                const usShort = (() => {
+                    try {
+                        const zq = window.ZQ_CURVE_DATA || null;
+                        const it = zq && Array.isArray(zq.items) ? zq.items[0] : null;
+                        const r = it && typeof it.impliedRatePct === 'number' && Number.isFinite(it.impliedRatePct) ? it.impliedRatePct : null;
+                        if (typeof r === 'number') return r;
+                    } catch {
+                    }
+                    if (!data) return null;
+                    const sym = findAliasSymbolBest(data, 'US10Y') || findAliasSymbol(data, 'US10Y');
+                    if (!sym) return null;
+                    const p = getMostRecentPointWithPrice(data, sym) || getLastPoint(data, sym);
+                    const px = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                    return px;
+                })();
+                const carryDiff = typeof selicMed === 'number' && typeof usShort === 'number' ? (selicMed - usShort) : null;
+                const fxDepPct = typeof fxMed === 'number' && typeof usdSpot === 'number' && usdSpot > 0 ? ((fxMed / usdSpot) - 1) * 100 : null;
+                const carryNet = typeof carryDiff === 'number' && typeof fxDepPct === 'number' ? (carryDiff - fxDepPct) : null;
+                const realBr = typeof selicMed === 'number' && typeof ipcaMed === 'number' ? (selicMed - ipcaMed) : null;
+                const selicLevelList = listLevel('selicMed', v => `${formatNumber(v, 2)}%`);
+                const ipcaLevelList = listLevel('ipcaMed', v => `${formatNumber(v, 2)}%`);
+                const termLabel = (first, last, unit) => {
+                    if (typeof first !== 'number' || typeof last !== 'number') return '';
+                    const d = last - first;
+                    const arrow = d > 0.02 ? '↑' : d < -0.02 ? '↓' : '≈';
+                    return `${arrow} ${formatNumber(d, 2)}${unit}`;
+                };
+                const selicTerm = termLabel(head ? head.selicMed : null, tail ? tail.selicMed : null, ' p.p.');
+                const ipcaTerm = termLabel(head ? head.ipcaMed : null, tail ? tail.ipcaMed : null, ' p.p.');
+                const carryConclusion = typeof carryNet === 'number'
+                    ? (carryNet >= 3 ? 'Carry: atrativo (se risco permitir).' : carryNet <= 0.5 ? 'Carry: fraco/assimétrico (risco FX domina).' : 'Carry: moderado (sensível ao risco/FX).')
+                    : 'Carry: dados insuficientes para estimar diferencial/FX.';
+                const carryParts = [];
+                if (typeof selicMed === 'number') carryParts.push(`Selic ${formatNumber(selicMed, 2)}%`);
+                if (typeof usShort === 'number') carryParts.push(`US ${formatNumber(usShort, 2)}%`);
+                if (typeof carryDiff === 'number') carryParts.push(`Dif ${formatNumber(carryDiff, 2)} p.p.`);
+                if (typeof usdSpot === 'number' && typeof fxMed === 'number') {
+                    const fxImp = typeof fxDepPct === 'number' ? `${formatNumber(fxDepPct, 2)}%` : '—';
+                    carryParts.push(`USD/BRL ${formatNumber(usdSpot, 4)} → ${formatNumber(fxMed, 4)} (FX implícito ${fxImp})`);
+                }
+                if (typeof carryNet === 'number') carryParts.push(`Carry líquido ~ ${formatNumber(carryNet, 2)} p.p.`);
+                if (typeof realBr === 'number') carryParts.push(`Juro real BR ~ ${formatNumber(realBr, 2)} p.p.`);
+                if (selicLevelList) carryParts.push(`Termo Selic: ${selicLevelList}${selicTerm ? ` (${selicTerm})` : ''}`);
+                if (ipcaLevelList) carryParts.push(`Termo IPCA: ${ipcaLevelList}${ipcaTerm ? ` (${ipcaTerm})` : ''}`);
+                const carryText = `${carryConclusion}${carryParts.length ? ` ${carryParts.join(' • ')}` : ''}`;
+
+                const curveText = (() => {
+                    if (!diSignal || !diSignal.ok) return 'Curva: sem leitura DI (B3) no histórico.';
+                    const sh = diSignal.shape ? String(diSignal.shape) : '≈';
+                    const slope = typeof diSignal.slope === 'number' && Number.isFinite(diSignal.slope) ? `${formatNumber(diSignal.slope, 2)} p.p.` : '—';
+                    const shapeLab = sh === 'STEEPEN' ? 'inclinando' : sh === 'FLATTEN' ? 'achatando' : 'estável';
+                    const aS = diSignal.anchors && diSignal.anchors.short ? diSignal.anchors.short : null;
+                    const aL = diSignal.anchors && diSignal.anchors.long ? diSignal.anchors.long : null;
+                    const shortLab = aS && aS.symbol ? String(aS.symbol) : '';
+                    const longLab = aL && aL.symbol ? String(aL.symbol) : '';
+                    const shortChg = aS && typeof aS.chgPct === 'number' && Number.isFinite(aS.chgPct) ? `${formatNumber(aS.chgPct, 2)}%` : '—';
+                    const longChg = aL && typeof aL.chgPct === 'number' && Number.isFinite(aL.chgPct) ? `${formatNumber(aL.chgPct, 2)}%` : '—';
+                    const focusJuros = (() => {
+                        const shortUp = typeof selicShortD === 'number' && selicShortD > 0.03;
+                        const shortDown = typeof selicShortD === 'number' && selicShortD < -0.03;
+                        const longUp = typeof selicLongD === 'number' && selicLongD > 0.03;
+                        const longDown = typeof selicLongD === 'number' && selicLongD < -0.03;
+                        if (shortUp && longUp) return 'Focus mais duro → pressão generalizada (curto e longo).';
+                        if (shortDown && longDown) return 'Focus mais leve → alívio generalizado (curto e longo).';
+                        if (shortUp && !longUp) return 'Focus mais duro → pressão no curto (longo menos afetado).';
+                        if (shortDown && !longDown) return 'Focus mais leve → alívio no curto (longo menos afetado).';
+                        if (!shortUp && longUp) return 'Focus mais duro no longo → prêmio/ancoragem em foco.';
+                        if (!shortDown && longDown) return 'Focus mais leve no longo → alívio de prêmio/ancoragem.';
+                        if (typeof selicAvgD === 'number' && selicAvgD > 0.03) return 'Selic média revisada para cima no horizonte.';
+                        if (typeof selicAvgD === 'number' && selicAvgD < -0.03) return 'Selic média revisada para baixo no horizonte.';
+                        return 'Focus sem choque claro de Selic no horizonte.';
+                    })();
+                    const parts = [];
+                    if (shortLab) parts.push(`${shortLab} Δ% ${shortChg}`);
+                    if (longLab) parts.push(`${longLab} Δ% ${longChg}`);
+                    return `Curva: DI (B3) ${shapeLab} • slope ${slope}. ${focusJuros}${parts.length ? ` ${parts.join(' • ')}` : ''}`;
+                })();
+
+                return { macroText, carryText, curveText };
+            })();
+            const insightCard = (title, text) => {
+                if (!text) return '';
+                return `
+                    <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(0,0,0,.12);">
+                        <div style="font-weight:900;letter-spacing:.6px;opacity:.92;">${escapeHtml(title)}</div>
+                        <div style="margin-top:6px;opacity:.86;line-height:1.35;font-size:12px;">${escapeHtml(text)}</div>
+                    </div>
+                `;
+            };
+            const insightsHtml = (() => {
+                const blocks = [
+                    insightCard('Macro', focusInsights.macroText),
+                    insightCard('Carry Trade', focusInsights.carryText),
+                    insightCard('Curva de Juros', focusInsights.curveText),
+                ].filter(Boolean);
+                if (!blocks.length) return '';
+                return `
+                    <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">
+                        ${blocks.join('')}
+                    </div>
+                `;
+            })();
+            const yearCard = (title, pack) => {
+                if (!pack) return '';
+                const updated = pack.updatedAt ? formatDateTimeLoose(pack.updatedAt) : '';
+                return `
+                    <div style="border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(0,0,0,.12);">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                            <div style="font-weight:900;letter-spacing:.8px;">${escapeHtml(title)}</div>
+                            <div style="opacity:.75;font-size:12px;white-space:nowrap;">${escapeHtml(updated || '')}</div>
+                        </div>
+                        <div style="margin-top:8px;">
+                            ${line('IPCA (%)', 'ipca', pack.ipca, fmt2)}
+                            ${line('Selic (%)', 'selic', pack.selic, fmt2)}
+                            ${line('Câmbio (R$/US$)', 'cambio', pack.cambio, fmt4)}
+                            ${line('PIB (%)', 'pib', pack.pib, fmt2)}
+                        </div>
+                    </div>
+                `;
+            };
+            return `
+                <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <div style="font-weight:900;letter-spacing:1px;opacity:.95;">🧩 Boletim Focus (BCB)</div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                            ${badge(biasTone, `Viés: ${biasLabel}`)}
+                            ${badge('neutral', `Score: ${formatNumber(score, 2)}`)}
+                            ${badge('neutral', `WDO ${wdo}`)}
+                            ${badge('neutral', `WIN ${win}`)}
+                            ${publishedAt ? badge('neutral', `Publicado: ${formatDateTimeLoose(publishedAt)}`) : ''}
+                            ${cutoffDate ? badge('neutral', `Corte: ${cutoffDate}`) : ''}
+                            <a href="${escapeHtml(pageUrl)}" target="_blank" class="underline_link" style="font-size:12px;opacity:.92;">página</a>
+                            ${pdfUrl ? `<a href="${escapeHtml(pdfUrl)}" target="_blank" class="underline_link" style="font-size:12px;opacity:.92;">pdf</a>` : ''}
+                            ${datasetUrl ? `<a href="${escapeHtml(datasetUrl)}" target="_blank" class="underline_link" style="font-size:12px;opacity:.75;">dataset</a>` : ''}
+                        </div>
+                    </div>
+                    <div style="margin-top:8px;opacity:.90;line-height:1.35;">${escapeHtml(interpretation)}</div>
+                    ${insightsHtml}
+                    <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">
+                        ${(yearKeys || [])
+                            .map(y => yearCard(`Mediana ${y}`, raw && raw.years ? raw.years[y] : null))
+                            .join('')}
+                    </div>
+                </div>
+            `;
+        })()}
         ${pulseCard}
         ${scalpModule}
         ${winProjectionModule}
@@ -12932,6 +13299,7 @@ async function triggerUpdaterAndReload() {
         void loadOptionsGammaSummary();
         void loadFinancialJuice();
         void loadWebNewsModule();
+        void loadFocusSummary();
         void loadForeignFlow();
         const sum = formatUpdaterSummary(lastPayload);
         if (sum && sum.text) {
@@ -13461,6 +13829,7 @@ async function boot() {
     void loadOptionsGammaSummary();
     void loadFinancialJuice();
     void loadWebNewsModule();
+    void loadFocusSummary();
     void loadForeignFlow();
 
     const reloadBtn = document.getElementById('reloadDataBtn');
@@ -13479,6 +13848,7 @@ async function boot() {
                 void loadOptionsGammaSummary();
                 void loadFinancialJuice();
                 void loadWebNewsModule();
+                void loadFocusSummary();
                 void loadForeignFlow();
             } catch (e) {
             }
@@ -13508,6 +13878,7 @@ async function boot() {
             void loadOptionsGammaSummary();
             void loadFinancialJuice();
             void loadWebNewsModule();
+            void loadFocusSummary();
             void loadForeignFlow();
             if (source) {
                 setDataStatus('AUTO • Dados atualizados', 'positive');

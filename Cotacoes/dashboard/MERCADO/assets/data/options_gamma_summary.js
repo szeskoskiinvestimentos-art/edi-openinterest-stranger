@@ -1,1 +1,1 @@
-window.OPTIONS_GAMMA_SUMMARY_DATA={"ok":false,"generatedAt":"2026-04-27T11:52:32.921Z","provider":"options_gamma_summary","message":"Sem arquivos de opções em C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\B3_System\\dashboard_unificado"};
+window.OPTIONS_GAMMA_SUMMARY_DATA={"ok":false,"generatedAt":"2026-04-28T01:41:21.686Z","provider":"options_gamma_summary","message":"Sem arquivos de opções em C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\B3_System\\dashboard_unificado"};
