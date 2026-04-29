@@ -1,4 +1,4 @@
-// NTSL Indicator - Edi OpenInterest Levels - 28/04/2026 08:34
+// NTSL Indicator - Edi OpenInterest Levels - 28/04/2026 21:59
 // Gerado Automaticamente
 
 const
@@ -23,14 +23,11 @@ input
   ExibirExpMoves(true);
   ExibirEdiWall(false);
   ExibirEffectiveWalls(true);
-  MostrarPLUS(true);
-  MostrarPLUS2(true);
-  ExibirMelhoresPontos(false);
+  MostrarPLUS(false);
+  MostrarPLUS2(false);
+  ExibirMelhoresPontos(true);
   ModeloFlip(7);
   spot(0);
-  ExibirUsdBeta(true);
-  JanelaUsdBeta(0);
-  ExibirOpcoesEdi(true);
   // 1 = Classic (4800.00)
   // 2 = Spline (4922.08)
   // 3 = HVL (4800.00)
@@ -104,6 +101,7 @@ begin
       HorizontalLineCustom(GammaVal, clGammaFlip, 2, psDash, "Edi_GammaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
     if (5022.88 > 0) then
       HorizontalLineCustom(5022.88, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
+  end;
 
   // Edi_Wall (Midpoints) - Grid Completo
   if (ExibirEdiWall) then begin
@@ -119,6 +117,7 @@ begin
     HorizontalLineCustom(5600.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     HorizontalLineCustom(5800.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     HorizontalLineCustom(5950.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+  end;
 
   if (MostrarPLUS) then begin
     HorizontalLineCustom(4847.75, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
@@ -145,6 +144,7 @@ begin
     HorizontalLineCustom(5823.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     HorizontalLineCustom(5938.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     HorizontalLineCustom(5961.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+  end;
 
   if (MostrarPLUS2) then begin
     HorizontalLineCustom(4829.50, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
@@ -171,6 +171,7 @@ begin
     HorizontalLineCustom(5852.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     HorizontalLineCustom(5923.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
     HorizontalLineCustom(5976.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+  end;
 
   if (ExibirMelhoresPontos) then
   begin
@@ -183,56 +184,4 @@ begin
     HorizontalLineCustom(5135.29, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
     HorizontalLineCustom(4831.35, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
   end;
-  if (ExibirOpcoesEdi) then
-  begin
-    HorizontalLineCustom(4354.97, clFib, 1, psDot, "OpcoesEdiMap_A_P_2400", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(4536.43, clEffectiveWall, 1, psDot, "OpcoesEdiMap_A_C_2500", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(6169.54, clEffectiveWall, 1, psDot, "OpcoesEdiMap_A_C_3400", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5262.26, clEdiWall, 2, psSolid, "OpcoesEdiMap_A_MediaIntervalo", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5667.64, clEffectiveWall, 2, psDashDot, "OpcoesEdiMap_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-  end;
-
-  if (ExibirUsdBeta) then
-  begin
-    if (JanelaUsdBeta = 30) then
-    begin
-    HorizontalLineCustom(5262.26, clEffectiveWall, 2, psSolid, "UsdBeta_30_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5667.64, clFib, 2, psDashDot, "UsdBeta_30_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5030.80, clMaxPain, 1, psDot, "UsdBeta_30_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
-    end;
-    if (JanelaUsdBeta = 60) then
-    begin
-    HorizontalLineCustom(5262.26, clEffectiveWall, 2, psSolid, "UsdBeta_60_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5667.64, clFib, 2, psDashDot, "UsdBeta_60_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5030.80, clMaxPain, 1, psDot, "UsdBeta_60_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
-    end;
-    if (JanelaUsdBeta = 90) then
-    begin
-    HorizontalLineCustom(5262.26, clEffectiveWall, 2, psSolid, "UsdBeta_90_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5667.64, clFib, 2, psDashDot, "UsdBeta_90_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5030.80, clMaxPain, 1, psDot, "UsdBeta_90_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
-    end;
-    if (JanelaUsdBeta = 252) then
-    begin
-    HorizontalLineCustom(5262.26, clEffectiveWall, 2, psSolid, "UsdBeta_252_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5667.64, clFib, 2, psDashDot, "UsdBeta_252_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5030.80, clMaxPain, 1, psDot, "UsdBeta_252_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
-    end;
-    if (JanelaUsdBeta = 0) then
-    begin
-    HorizontalLineCustom(5262.26, clEffectiveWall, 2, psSolid, "UsdBeta_30_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5667.64, clFib, 2, psDashDot, "UsdBeta_30_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5030.80, clMaxPain, 1, psDot, "UsdBeta_30_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5262.26, clEffectiveWall, 2, psSolid, "UsdBeta_60_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5667.64, clFib, 2, psDashDot, "UsdBeta_60_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5030.80, clMaxPain, 1, psDot, "UsdBeta_60_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5262.26, clEffectiveWall, 2, psSolid, "UsdBeta_90_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5667.64, clFib, 2, psDashDot, "UsdBeta_90_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5030.80, clMaxPain, 1, psDot, "UsdBeta_90_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5262.26, clEffectiveWall, 2, psSolid, "UsdBeta_252_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5667.64, clFib, 2, psDashDot, "UsdBeta_252_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-    HorizontalLineCustom(5030.80, clMaxPain, 1, psDot, "UsdBeta_252_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
-    end;
-  end;
-
 end;

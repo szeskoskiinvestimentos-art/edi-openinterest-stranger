@@ -121,6 +121,8 @@ function assetIcon(row) {
     const sym = String(row && row.symbol ? row.symbol : '').toLowerCase();
     const tags = Array.isArray(row && row.tags) ? row.tags.map(t => String(t).toLowerCase()) : [];
 
+    const has = (...needles) => needles.some(n => n && (name.includes(String(n).toLowerCase()) || sym.includes(String(n).toLowerCase())));
+
     const flagFromCurrency = ccy => {
         const c = String(ccy || '').toUpperCase().trim();
         if (!c) return '';
@@ -212,6 +214,18 @@ function assetIcon(row) {
     };
 
     const risk = tags.includes('risk_on') ? '🟢' : tags.includes('risk_off') ? '🔴' : '';
+
+    if (sym === '.dxy' || has('índice do dólar', 'indice do dolar', 'dxy')) return `💵${risk ? ` ${risk}` : ''}`;
+    if (sym.startsWith('xau') || has('xau/usd', 'ouro', 'gold')) return `🥇${risk ? ` ${risk}` : ''}`;
+    if (sym.startsWith('xag') || has('prata', 'silver')) return `🥈${risk ? ` ${risk}` : ''}`;
+    if (has('cobre', 'copper', 'hg')) return `🧲${risk ? ` ${risk}` : ''}`;
+    if (has('café', 'coffee')) return `☕${risk ? ` ${risk}` : ''}`;
+    if (has('farelo de soja', 'soymeal')) return `🫘${risk ? ` ${risk}` : ''}`;
+    if (has('soja', 'soybean', 'soy')) return `🌱${risk ? ` ${risk}` : ''}`;
+    if (has('milho', 'corn')) return `🌽${risk ? ` ${risk}` : ''}`;
+    if (has('trigo', 'wheat')) return `🌾${risk ? ` ${risk}` : ''}`;
+    if (has('gasóleo', 'gasoil', 'diesel')) return `⛽${risk ? ` ${risk}` : ''}`;
+    if (has('fed fund', 'fed funds')) return `🏦${risk ? ` ${risk}` : ''}`;
 
     if (name.includes('brent') || name.includes('wti') || name.includes('crude') || sym.includes('wti') || sym.includes('brent')) return `🛢️${risk ? ` ${risk}` : ''}`;
     if (name.includes('gold') || name.includes('silver') || name.includes('copper') || cat.includes('metals')) return `🪙${risk ? ` ${risk}` : ''}`;
@@ -7906,6 +7920,21 @@ function renderZqCurveBriefing() {
     `;
 }
 
+function renderOperationalCompass(model) {
+    try {
+        const api = window.OperationalCompass;
+        if (api && typeof api.render === 'function') return api.render(model);
+    } catch { }
+}
+
+function buildOperationalCompassModel(input) {
+    try {
+        const api = window.OperationalCompass;
+        if (api && typeof api.buildModel === 'function') return api.buildModel(input);
+    } catch { }
+    return null;
+}
+
 function renderOperationalBriefing() {
     const el = document.getElementById('operationalBriefing');
     if (!el) return;
@@ -8094,6 +8123,22 @@ function renderOperationalBriefing() {
 
     const macroWdo = macroBiasFor('WDO');
     const macroWin = macroBiasFor('WIN');
+
+    try {
+        const model = buildOperationalCompassModel({
+            regime,
+            options,
+            web,
+            foreignFlow,
+            focus,
+            macroWin,
+            macroWdo,
+            fallbackBias: regimeBias,
+        });
+        renderOperationalCompass(model);
+    } catch {
+        try { renderOperationalCompass(null); } catch { }
+    }
 
     const diSignal = (() => {
         if (!data) return { ok: false };
@@ -13027,7 +13072,7 @@ function renderMarketPanorama(data) {
                                 <tr>
                                     <td>
                                         <div class="panorama-asset" title="${escapeHtml(r.symbol)}">
-                                            <span style="opacity:.9;">${escapeHtml(r.icon || '•')}</span>
+                                            <span class="panorama-asset__icon">${escapeHtml(r.icon || '•')}</span>
                                             <span class="panorama-asset__name">${escapeHtml(r.label)}</span>
                                         </div>
                                     </td>
