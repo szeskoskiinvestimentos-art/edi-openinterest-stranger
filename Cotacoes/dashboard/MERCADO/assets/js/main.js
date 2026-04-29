@@ -7920,6 +7920,217 @@ function renderZqCurveBriefing() {
     `;
 }
 
+function renderUsTreasuryFuturesBriefing() {
+    const el = document.getElementById('usTreasuryFuturesBriefing');
+    if (!el) return;
+
+    if (!window.__usTsyFuturesLoadStarted) {
+        try { window.__usTsyFuturesLoadStarted = false; } catch { }
+    }
+
+    const data = (() => {
+        try {
+            return window.US_TSY_FUTURES_DATA || null;
+        } catch {
+            return null;
+        }
+    })();
+
+    const badge = (tone, text) => {
+        const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
+        return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
+    };
+
+    if (!data) {
+        el.innerHTML = `
+            <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);opacity:.88;">
+                Carregando Treasuries (futuros)…
+            </div>
+        `;
+        try {
+            if (!window.__usTsyFuturesLoadStarted) {
+                window.__usTsyFuturesLoadStarted = true;
+                loadScriptFresh('assets/data/us_tsy_futures.js')
+                    .then(() => {
+                        try { renderUsTreasuryFuturesBriefing(); } catch { }
+                    })
+                    .catch(() => {
+                        fetchJsonWithTimeout(`assets/data/us_tsy_futures.json?ts=${Date.now()}`, 1600)
+                            .then((payload) => {
+                                try { window.US_TSY_FUTURES_DATA = payload; } catch { }
+                                try { renderUsTreasuryFuturesBriefing(); } catch { }
+                            })
+                            .catch(() => {
+                                try { window.US_TSY_FUTURES_DATA = null; } catch { }
+                                try {
+                                    el.innerHTML = `
+                                        <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);opacity:.88;">
+                                            Treasuries (futuros) indisponível (us_tsy_futures.json).
+                                        </div>
+                                    `;
+                                } catch { }
+                            });
+                    });
+            }
+        } catch { }
+        return;
+    }
+
+    const itemsAll = Array.isArray(data.items) ? data.items : [];
+    const items = itemsAll.slice(0, 20);
+    const extras = Array.isArray(data.extras) ? data.extras.slice(0, 24) : [];
+    const credit = data && data.creditVsTreasury ? data.creditVsTreasury : null;
+    if (!items.length && !extras.length) {
+        el.innerHTML = `
+            <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);opacity:.88;">
+                Treasuries (futuros) indisponível (us_tsy_futures).
+            </div>
+        `;
+        return;
+    }
+    const risk = String(data.riskMode || 'N/D');
+    const shape = String(data.shape || 'N/D');
+    const avg = typeof data.avgChangePct === 'number' && Number.isFinite(data.avgChangePct) ? data.avgChangePct : null;
+    const slope = typeof data.slopeChangePct === 'number' && Number.isFinite(data.slopeChangePct) ? data.slopeChangePct : null;
+    const riskTone = risk === 'RISK_OFF' ? 'negative' : risk === 'RISK_ON' ? 'positive' : 'neutral';
+
+    const headLine = (() => {
+        const a = avg !== null ? formatPercent(avg, 2) : '—';
+        const s = slope !== null ? formatPercent(slope, 2) : '—';
+        return `Movimento médio (dia): ${a} • Inclinação (30Y−2Y, Δ%): ${s} • Shape: ${shape}`;
+    })();
+
+    const rowsHtml = items.map(it => {
+        const tenor = it && it.tenor ? String(it.tenor) : '—';
+        const vertex = it && it.vertex ? String(it.vertex) : '—';
+        const exp = it && it.expirationFmt ? String(it.expirationFmt) : '—';
+        const px = it && typeof it.lastPrice === 'number' ? formatNumber(it.lastPrice, 4) : '—';
+        const dayPct = it && typeof it.dayChangePct === 'number' && Number.isFinite(it.dayChangePct) ? formatPercent(it.dayChangePct, 2) : '—';
+        return `
+            <tr>
+                <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(tenor)}</td>
+                <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Share Tech Mono',monospace;">${escapeHtml(vertex)}</td>
+                <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);opacity:.92;">${escapeHtml(exp)}</td>
+                <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;">${escapeHtml(px)}</td>
+                <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;">${escapeHtml(dayPct)}</td>
+            </tr>
+        `;
+    }).join('');
+
+    const futuresHtml = items.length ? `
+        <div style="margin-top:10px;border-top:1px solid rgba(255,255,255,.10);padding-top:10px;">
+            <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Tenor</th>
+                        <th style="text-align:left;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Contrato</th>
+                        <th style="text-align:left;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Venc.</th>
+                        <th style="text-align:right;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Preço</th>
+                        <th style="text-align:right;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Δ% dia</th>
+                    </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+        </div>
+    ` : `
+        <div style="margin-top:10px;border-top:1px solid rgba(255,255,255,.10);padding-top:10px;opacity:.78;font-size:12px;">
+            Futuros indisponíveis no momento.
+        </div>
+    `;
+
+    const extrasHtml = extras.length ? (() => {
+        const rows = extras.map(it => {
+            const label = it && it.label ? String(it.label) : (it && it.yahooSymbol ? String(it.yahooSymbol) : '—');
+            const sym = it && it.yahooSymbol ? String(it.yahooSymbol) : '—';
+            const px = it && typeof it.price === 'number' ? formatNumber(it.price, 4) : '—';
+            const dayPct = it && typeof it.dayChangePct === 'number' && Number.isFinite(it.dayChangePct) ? formatPercent(it.dayChangePct, 2) : '—';
+            const rangePct = it && typeof it.intradayRangePct === 'number' && Number.isFinite(it.intradayRangePct) ? formatPercent(it.intradayRangePct, 2) : '—';
+            return `
+                <tr>
+                    <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);opacity:.95;">${escapeHtml(label)}</td>
+                    <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);font-family:'Share Tech Mono',monospace;">${escapeHtml(sym)}</td>
+                    <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;">${escapeHtml(px)}</td>
+                    <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;">${escapeHtml(dayPct)}</td>
+                    <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;">${escapeHtml(rangePct)}</td>
+                </tr>
+            `;
+        }).join('');
+        return `
+            <div style="margin-top:10px;border-top:1px solid rgba(255,255,255,.10);padding-top:10px;">
+                <div style="opacity:.86;font-weight:900;letter-spacing:.6px;margin-bottom:6px;">Extras (Yahoo Quote)</div>
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Ativo</th>
+                            <th style="text-align:left;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Ticker</th>
+                            <th style="text-align:right;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Preço</th>
+                            <th style="text-align:right;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Δ% dia</th>
+                            <th style="text-align:right;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Range% intraday</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        `;
+    })() : '';
+
+    const creditHtml = credit && credit.ok ? (() => {
+        const mode = String(credit.mode || 'N/D');
+        const tone = mode === 'FLIGHT_TO_QUALITY' ? 'negative' : mode === 'RISK_ON' ? 'positive' : 'neutral';
+        const avgSpread = typeof credit.avgSpreadScore === 'number' && Number.isFinite(credit.avgSpreadScore) ? credit.avgSpreadScore : null;
+        const spreads = Array.isArray(credit.spreads) ? credit.spreads.slice(0, 8) : [];
+        const line = avgSpread !== null ? `Média spreads (score): ${formatNumber(avgSpread, 3)}` : 'Média spreads (score): —';
+        const pills = spreads.length
+            ? spreads.map(s => {
+                const k = s && s.key ? String(s.key) : '—';
+                const v = s && typeof s.spreadScore === 'number' && Number.isFinite(s.spreadScore) ? s.spreadScore : null;
+                const txt = v !== null ? `${k} ${formatNumber(v, 3)}` : `${k} —`;
+                const pillTone = v !== null && v > 0.18 ? 'positive' : v !== null && v < -0.18 ? 'negative' : 'neutral';
+                return badge(pillTone, txt);
+            }).join('')
+            : '';
+        return `
+            <div style="margin-top:10px;border-top:1px solid rgba(255,255,255,.10);padding-top:10px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <div style="opacity:.92;font-weight:900;letter-spacing:.6px;">Crédito vs Treasury (proxy)</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        ${badge(tone, `Modo: ${mode}`)}
+                    </div>
+                </div>
+                <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+                    ${escapeHtml(line)}
+                </div>
+                ${pills ? `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">${pills}</div>` : ''}
+                <div style="margin-top:8px;opacity:.72;font-size:12px;">
+                    Interpretação: score > 0 sugere crédito mais forte que TLT (mais RISK ON). Score < 0 sugere TLT mais forte (flight-to-quality). Score combina Δ% + range intraday.
+                </div>
+            </div>
+        `;
+    })() : '';
+
+    el.innerHTML = `
+        <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div style="font-weight:900;letter-spacing:1px;">Treasuries (futuros)</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    ${badge(riskTone, `Regime: ${risk}`)}
+                    ${badge('neutral', `Contratos: ${String(items.length)}`)}
+                    ${extras.length ? badge('neutral', `Extras: ${String(extras.length)}`) : ''}
+                </div>
+            </div>
+            <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+                ${escapeHtml(headLine)}
+            </div>
+            ${futuresHtml}
+            ${creditHtml}
+            ${extrasHtml}
+            <div style="margin-top:10px;opacity:.72;font-size:12px;">
+                Fonte: Yahoo (futuresChain + spark) • Atualizado em ${escapeHtml(formatDateTime(data.generatedAt || ''))}
+            </div>
+        </div>
+    `;
+}
+
 function renderOperationalCompass(model) {
     try {
         const api = window.OperationalCompass;
@@ -13197,6 +13408,7 @@ function renderAll(data) {
     safe(() => renderOverview(data));
     safe(() => renderOperationalBriefing());
     safe(() => renderZqCurveBriefing());
+    safe(() => renderUsTreasuryFuturesBriefing());
     safe(() => renderBtcOperationalBriefing());
     safe(() => renderHk50OperationalBriefing());
     safe(() => renderUsEquitiesOperationalBriefing());
