@@ -1007,7 +1007,7 @@ function renderRegimeConviction(data) {
         usdjpy: findAssetSymbol(data, /^USD\/JPY\b/i),
         usdchf: findAssetSymbol(data, /^USD\/CHF\b/i),
         usdsek: findAssetSymbol(data, /^USD\/SEK\b/i),
-        dxy: findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index)/i),
+        dxy: findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index)/i),
         brent: findAssetSymbol(data, /\bBrent\b/i),
         wti: findAssetSymbol(data, /\bWTI\b/i),
         usdbbrl: findAssetSymbol(data, /^USD\/BRL\b/i),
@@ -1199,7 +1199,7 @@ function renderRegimeConviction(data) {
         wdo: findAssetSymbol(data, /^WDO/i),
         win: findAssetSymbol(data, /^WIN/i),
         usdbrl: findAliasSymbol(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i),
-        dxy: findAliasSymbol(data, 'DXY') || findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index)/i),
+        dxy: findAliasSymbolBest(data, 'DXY') || findAliasSymbol(data, 'DXY') || findAssetSymbol(data, /(^USDX$|^\.DXY$|\bDXY\b|US Dollar Index|Dollar Index|Índice\s*Dólar|Indice\s*Dolar)/i),
         oil: findAliasSymbol(data, 'OIL') || findAssetSymbol(data, /\bBrent\b|\bWTI\b/i),
         iron: findAssetSymbol(data, /^DCE_I0$/i) || findAliasSymbol(data, 'IRON'),
         copper: findAliasSymbol(data, 'COPPER'),
@@ -10879,7 +10879,16 @@ function assetAliasMatchers(key) {
             /\bSpread\b.*\b(HK|HKG|Hong\s*Kong)\b.*\b10A\b.*\bEUA\b.*\b10A\b/i,
         ];
 
-    if (k === 'DXY') return [/^\.DXY$/i, /\bDXY\b/i, /US Dollar Index/i, /Indice Dolar/i];
+    if (k === 'DXY')
+        return [
+            /^USDX$/i,
+            /^\.DXY$/i,
+            /\bDXY\b/i,
+            /US Dollar Index/i,
+            /Dollar Index/i,
+            /\bÍndice\s*Dólar\b/i,
+            /\bIndice\s*Dolar\b/i,
+        ];
     if (k === 'VIX') return [/^\.?VIX(9D)?$/i, /\bVIX9D\b/i, /\bVIX\b/i, /Volatilidade/i];
     if (k === 'VIX9D') return [/^\.VIX9D$/i, /\bVIX9D\b/i, /\b9-Day Volatility\b/i];
     if (k === 'VIX30') return [/^VIX$/i, /^\.VIX$/i, /\bS&P\s*500\s*VIX\b/i];
@@ -11929,7 +11938,7 @@ function renderCarryIntel(data) {
         nzdusd: findAssetSymbol(data, /^NZD\/USD\b/i),
         usdjpy: findAssetSymbol(data, /^USD\/JPY\b/i),
         usdbrl: findAssetSymbol(data, /^USD\/BRL\b/i),
-        dxy: findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index)/i),
+        dxy: findAliasSymbolBest(data, 'DXY') || findAliasSymbol(data, 'DXY') || findAssetSymbol(data, /(^USDX$|^\.DXY$|\bDXY\b|US Dollar Index|Dollar Index|Índice\s*Dólar|Indice\s*Dolar)/i),
         br10y: findAssetSymbol(data, /^BR10YT=RR$/i),
         us10y: findAssetSymbol(data, /^US10YT=RR$/i),
         us10br10: findAssetSymbol(data, /^US10BR10=RR$/i),
