@@ -931,6 +931,16 @@ function renderRegimeConviction(data) {
 
     const dc = (typeof window !== 'undefined' && window.DecisionCore) ? window.DecisionCore : null;
     const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
+    const catDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps };
+    const rcKey = (key, fallbackMatcher) => {
+        const sym = catalog && typeof catalog.resolveRatesCreditByKey === 'function'
+            ? catalog.resolveRatesCreditByKey(catDeps, data, key)
+            : null;
+        if (sym) return sym;
+        if (fallbackMatcher instanceof RegExp) return findAssetSymbol(data, fallbackMatcher);
+        return null;
+    };
 
     const aliasSym = k => findAliasSymbolBest(data, k) || findAliasSymbol(data, k);
     const symOf = (aliasKey, matcher) => aliasSym(aliasKey) || (matcher ? findAssetSymbol(data, matcher) : null);
@@ -1148,13 +1158,15 @@ function renderRegimeConviction(data) {
         { k: 'Minério', a: 'IRON' },
         { k: 'Soja', a: 'SOY' },
         { k: 'Cobre', a: 'COPPER' },
-        { k: 'BR10Y', r: /^BR10YT=RR$/i },
+        { k: 'BR10Y', rc: 'BR_10Y', r: /^BR10YT=RR$/i },
     ];
 
     const criticalHits = criticalMatchers.map(m => {
-        const sym = m.a
-            ? (findAliasSymbolBest(data, m.a) || findAliasSymbol(data, m.a) || (m.r ? findAssetSymbol(data, m.r) : null))
-            : findAssetSymbol(data, m.r);
+        const sym = m.rc
+            ? rcKey(m.rc, m.r)
+            : m.a
+                ? (findAliasSymbolBest(data, m.a) || findAliasSymbol(data, m.a) || (m.r ? findAssetSymbol(data, m.r) : null))
+                : findAssetSymbol(data, m.r);
         if (!sym) return { ok: false, hasChg: false };
         const hasChg = dc ? dc.symbolHasChangePct(dcDeps, data, sym) : (getChangePct(data, sym) !== null);
         return { ok: true, hasChg };
@@ -1238,7 +1250,7 @@ function renderRegimeConviction(data) {
         dxy: findAliasSymbolBest(data, 'DXY') || findAliasSymbol(data, 'DXY') || findAssetSymbol(data, /(^USDX$|^\.DXY$|\bDXY\b|US Dollar Index|Dollar Index|Índice\s*Dólar|Indice\s*Dolar)/i),
         vix: sentinelSymbols.vix,
         oil: findAliasSymbolBest(data, 'OIL') || findAliasSymbol(data, 'OIL') || findAliasSymbolBest(data, 'BRENT') || findAliasSymbolBest(data, 'WTI') || findAssetSymbol(data, /\bBrent\b|\bWTI\b/i),
-        us10y: findAliasSymbolBest(data, 'US10Y') || findAliasSymbol(data, 'US10Y') || findAssetSymbol(data, /(^US10YT=RR$|^US10YT=X$|^\.TNX$|\^TNX)/i),
+        us10y: rcKey('US_10Y', /(^US10YT=RR$|^US10YT=X$|^\.TNX$|\^TNX)/i),
         gold: findAliasSymbolBest(data, 'GOLD') || findAliasSymbol(data, 'GOLD') || findAssetSymbol(data, /(^XAU\/USD\b|GC=F|\bouro\b)/i),
         usdcnh: sentinelSymbols.usdcnh,
         iron: ironSym || findAliasSymbol(data, 'IRON'),
@@ -1431,16 +1443,14 @@ function renderRegimeConviction(data) {
             const s = aliasSym(k);
             return s ? getChangePct(data, s) : null;
         };
+        const pctOfSym = s => (s ? getChangePct(data, s) : null);
         const dxyPct = pctOfAlias('DXY');
         const oilPct = pctOfAlias('OIL');
         const ironPct = pctOfAlias('IRON');
         const soyPct = pctOfAlias('SOY');
         const copperPct = pctOfAlias('COPPER');
-        const us10yPct = pctOfAlias('US10Y');
-        const br10yPct = (() => {
-            const s = findAssetSymbol(data, /^BR10YT=RR$/i);
-            return s ? getChangePct(data, s) : null;
-        })();
+        const us10yPct = pctOfSym(rcKey('US_10Y', /(^US10YT=RR$|^US10YT=X$|^\.TNX$|\^TNX)/i));
+        const br10yPct = pctOfSym(rcKey('BR_10Y', /^BR10YT=RR$/i));
         const weights = { iron: 0.28, soy: 0.20, oil: 0.18, copper: 0.12 };
         const basketParts = [
             { v: ironPct, w: weights.iron },
@@ -1450,7 +1460,7 @@ function renderRegimeConviction(data) {
         ].filter(x => typeof x.v === 'number' && Number.isFinite(x.v) && typeof x.w === 'number' && x.w > 0);
         const wSum = basketParts.reduce((s, x) => s + x.w, 0);
         const exportScore = wSum > 0 ? basketParts.reduce((s, x) => s + (x.v * x.w), 0) / wSum : null;
-        const tipsEtfPct = pctOfAlias('TIPS_ETF');
+        const tipsEtfPct = pctOfSym(rcKey('ETF_TIP', /^TIP$/i));
         const zqCurve = (() => {
             try {
                 return window.ZQ_CURVE_DATA || null;
@@ -2205,459 +2215,30 @@ function renderMetalsZone(data) {
 function renderRatesBuckets(data) {
     const el = document.getElementById('ratesBuckets');
     if (!el) return;
-
-    const seriesKeys = Object.keys((data && data.series) || {});
-    const diMatcher = /^DI1[FGHJKMNQUVXZ]\d{2}$/i;
-    const fmtRate = v => typeof v === 'number' && Number.isFinite(v) ? `${formatNumber(v, 2)}%` : '—';
-    const dc = (typeof window !== 'undefined' && window.DecisionCore) ? window.DecisionCore : null;
-    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
-    const pick = (candidates) => {
-        const list = Array.isArray(candidates) ? candidates : [];
-        if (dc && typeof dc.pickSymbol === 'function') {
-            return dc.pickSymbol(dcDeps, data, list);
+    const mod = (typeof window !== 'undefined' && window.RatesBucketsModule) ? window.RatesBucketsModule : null;
+    if (mod && typeof mod.render === 'function') {
+        try {
+            mod.render({
+                data,
+                el,
+                deps: {
+                    escapeHtml,
+                    formatNumber,
+                    formatPercent,
+                    toneBadgeHtmlFromTone,
+                    toneBadgeHtml,
+                    getMostRecentPointWithPrice,
+                    findAliasSymbolBest,
+                    findAliasSymbol,
+                    findAssetSymbol,
+                    dcDeps: { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint },
+                },
+            });
+            return;
+        } catch {
         }
-        for (const c of list) {
-            if (!c || typeof c !== 'object') continue;
-            if (c.aliasKey && typeof c.aliasKey === 'string') {
-                const sym = findAliasSymbolBest(data, c.aliasKey) || findAliasSymbol(data, c.aliasKey);
-                if (sym) return sym;
-            }
-            if (c.matcher instanceof RegExp) {
-                const sym = findAssetSymbol(data, c.matcher);
-                if (sym) return sym;
-            }
-        }
-        return null;
-    };
-
-    const kindOf = (label) => {
-        const l = String(label || '').toUpperCase();
-        if (l.startsWith('ETF ')) return 'price';
-        if (l.includes('CDS ')) return 'bp';
-        if (l.includes('SPREAD')) return 'spread';
-        return 'yield';
-    };
-
-    const takeBySymbol = (label, symbol) => {
-        const last = getMostRecentPointWithPrice(data, symbol);
-        const rate = last && typeof last.price === 'number' ? last.price : null;
-        const pct = last && typeof last.changePct === 'number' ? last.changePct : null;
-        const cls = pct === null ? 'neutral' : pct > 0 ? 'positive' : pct < 0 ? 'negative' : 'neutral';
-        return { label, symbol, rate, pct, cls, kind: kindOf(label) };
-    };
-
-    const take = (label, candidates) => {
-        const symbol = typeof candidates === 'string'
-            ? (findAliasSymbolBest(data, candidates) || findAliasSymbol(data, candidates))
-            : (candidates instanceof RegExp ? findAssetSymbol(data, candidates) : pick(candidates));
-        return takeBySymbol(label, symbol);
-    };
-
-    const gl = [
-        take('US 3M', [
-            { matcher: /(^US3MT=RR$|^\^IRX$|\b13-Week\b|\b3-Month\b|\bUS\s*3M\b)/i },
-        ]),
-        take('US 6M', [
-            { matcher: /(^US6MT=RR$|\b6-Month\b|\bUS\s*6M\b)/i },
-        ]),
-        take('US 1Y', [
-            { matcher: /(^US1YT=RR$|\bUnited States 1-Year\b|\bUS\s*1Y\b|^US1Y\b)/i },
-        ]),
-        take('US 2Y', [{ aliasKey: 'US2Y' }]),
-        take('US 5Y', [
-            { matcher: /(^US5YT=RR$|\bUnited States 5-Year\b|\bUS\s*5Y\b|^US5Y\b)/i },
-        ]),
-        take('US 10Y', [{ aliasKey: 'US10Y' }]),
-        take('US 20Y', [
-            { matcher: /(^US20YT=RR$|\bUnited States 20-Year\b|\bUS\s*20Y\b)/i },
-        ]),
-        take('US 30Y', [{ aliasKey: 'US30Y' }]),
-        take('TIPS (10Y)', [
-            { matcher: /(^US10YTIPT=RR$|\bTIPS\b.*\b10-Year\b|\bUS\s*TIPS\b)/i },
-        ]),
-        take('ETF SHY (1–3Y)', [{ matcher: /^SHY$/i }]),
-        take('ETF IEF (7–10Y)', [{ matcher: /^IEF$/i }]),
-        take('ETF TLT (20Y+)', [{ aliasKey: 'TLT' }, { matcher: /^TLT$/i }]),
-        take('ETF TIP (TIPS)', [{ aliasKey: 'TIPS_ETF' }, { matcher: /^TIP$/i }]),
-        take('ETF HYG (HY)', [{ aliasKey: 'HYG' }, { matcher: /^HYG$/i }]),
-        take('ETF LQD (IG)', [{ matcher: /^LQD$/i }]),
-        take('BR 10Y (proxy)', [{ aliasKey: 'BR10Y' }]),
-        take('DE 10Y', [{ matcher: /(^DE10YT=RR$|\bGermany 10-Year\b|^DE10Y\b)/i }]),
-        take('GB 10Y', [{ matcher: /(^GB10YT=RR$|\bUnited Kingdom 10-Year\b|^GB10Y\b)/i }]),
-        take('IT 10Y', [{ matcher: /(^IT10YT=RR$|\bItaly 10-Year\b|^IT10Y\b)/i }]),
-        take('JP 10Y', [{ aliasKey: 'JP10Y' }, { matcher: /(^JP10YT=RR$|\bJapan 10-Year\b|^JP10Y\b)/i }]),
-        take('CN 10Y', [{ aliasKey: 'CN10Y' }, { matcher: /(^CN10YT=RR$|\bChina 10-Year\b|^CN10Y\b)/i }]),
-        take('HK 3M', [{ aliasKey: 'HK3M' }]),
-        take('HK 10Y', [{ aliasKey: 'HK10Y' }]),
-        take('Spread HK10Y', [{ aliasKey: 'SPREAD_HK10Y' }]),
-        take('CDS BR 5Y', [{ aliasKey: 'CDS_BR5Y' }]),
-        take('CDS CN 5Y', [{ aliasKey: 'CDS_CN5Y' }]),
-    ].filter(x => x.symbol);
-
-    const discoverExtraRates = () => {
-        const assets = Array.isArray(data && data.assets ? data.assets : []) ? data.assets : [];
-        const allow = a => {
-            if (!a || typeof a !== 'object') return false;
-            const cat = String(a.category || '');
-            if (cat === 'rates' || cat === 'credit') return true;
-            const name = String(a.name || '');
-            return /\bYield\b/i.test(name) || /\bTreasury\b/i.test(name) || /\bBond\b/i.test(name) || /\bCDS\b/i.test(name);
-        };
-        const normalizeLabel = (a) => {
-            const name = String(a && a.name ? a.name : '').trim();
-            const sym = String(a && a.symbol ? a.symbol : '').trim();
-            const base = sym.split(' - ')[0] ? sym.split(' - ')[0].trim() : sym;
-            const n = name || base;
-            if (!n) return base || '—';
-            if (n.length <= 28) return n;
-            return n.slice(0, 28).trim() + '…';
-        };
-        const keep = [];
-        const already = new Set(gl.map(x => String(x && x.symbol ? x.symbol : '')).filter(Boolean));
-        for (const a of assets) {
-            if (!allow(a)) continue;
-            const sym = String(a && a.symbol ? a.symbol : '').trim();
-            if (!sym) continue;
-            if (already.has(sym)) continue;
-            const name = String(a && a.name ? a.name : '');
-            const isRateLike = /\bYield\b/i.test(name) || /\bTreasury\b/i.test(name) || /\bBond\b/i.test(name) || /\bCDS\b/i.test(name);
-            if (!isRateLike) continue;
-            const last = getMostRecentPointWithPrice(data, sym);
-            if (!last || typeof last.price !== 'number') continue;
-            keep.push({ label: normalizeLabel(a), symbol: sym });
-            if (keep.length >= 14) break;
-        }
-        return keep.map(x => takeBySymbol(x.label, x.symbol));
-    };
-
-    const extras = discoverExtraRates();
-    const glAll = (() => {
-        const out = [];
-        const seen = new Set();
-        for (const it of [...gl, ...extras]) {
-            const sym = String(it && it.symbol ? it.symbol : '');
-            if (!sym || seen.has(sym)) continue;
-            seen.add(sym);
-            out.push(it);
-        }
-        return out;
-    })();
-
-    const monthNum = code => {
-        const c = String(code || '').toUpperCase();
-        if (c === 'F') return 1;
-        if (c === 'G') return 2;
-        if (c === 'H') return 3;
-        if (c === 'J') return 4;
-        if (c === 'K') return 5;
-        if (c === 'M') return 6;
-        if (c === 'N') return 7;
-        if (c === 'Q') return 8;
-        if (c === 'U') return 9;
-        if (c === 'V') return 10;
-        if (c === 'X') return 11;
-        if (c === 'Z') return 12;
-        return null;
-    };
-
-    const diSymbolsFromSeries = seriesKeys.filter(sym => diMatcher.test(sym));
-    const diSymbolsFromAssets = (data.assets || [])
-        .map(a => String(a && a.symbol ? a.symbol : ''))
-        .filter(sym => diMatcher.test(sym));
-    const diSymbolsAll = Array.from(new Set([...diSymbolsFromSeries, ...diSymbolsFromAssets]));
-
-    const diList = diSymbolsAll
-        .map(symbol => {
-            const last = getMostRecentPointWithPrice(data, symbol);
-            const rate = last && typeof last.price === 'number' ? last.price : null;
-            const chgPct = last && typeof last.changePct === 'number' ? last.changePct : null;
-            const cls = chgPct === null ? 'neutral' : chgPct > 0 ? 'positive' : chgPct < 0 ? 'negative' : 'neutral';
-            const y = 2000 + Number(String(symbol).slice(-2));
-            const m = monthNum(String(symbol)[3]);
-            return { label: symbol, symbol, rate, chgPct, cls, year: Number.isFinite(y) ? y : null, month: m };
-        })
-        .filter(x => x.rate !== null && x.year !== null && x.month !== null)
-        .sort((a, b) => (a.year - b.year) || (a.month - b.month));
-
-    const renderGlobalTable = (title, list) => {
-        if (!list.length) {
-            return `<div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);opacity:.9;">
-                <div style="font-weight:900;letter-spacing:1px;margin-bottom:8px;">${escapeHtml(title)}</div>
-                <div style="opacity:.85;">Sem dados de juros/proxies disponíveis.</div>
-            </div>`;
-        }
-        const meta = glCoverage
-            ? `<div style="margin:-2px 0 10px;opacity:.75;font-size:12px;line-height:1.35;font-family:'Share Tech Mono',monospace;font-weight:900;">
-                Cobertura ${escapeHtml(String(glCoverage.counts.withChange))}/${escapeHtml(String(glCoverage.counts.expected))} • Fresh ${escapeHtml(formatNumber(glCoverage.ratios.freshness * 100, 0))}%
-            </div>`
-            : '';
-        return `<div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
-            <div style="font-weight:900;letter-spacing:1px;opacity:.95;margin-bottom:8px;">${escapeHtml(title)}</div>
-            ${meta}
-            ${list
-                .map(x => {
-                    const txt = x.pct === null ? '—' : formatPercent(x.pct, 2);
-                    const pctHtml = x.pct === null ? escapeHtml(txt) : toneBadgeHtmlFromTone(x.cls, x.pct, txt, { maxAbs: 1 });
-                    const rateTxt = (() => {
-                        if (x.rate === null) return '—';
-                        if (x.kind === 'yield') return fmtRate(x.rate);
-                        if (x.kind === 'bp') return `${formatNumber(x.rate, 0)}bp`;
-                        return formatNumber(x.rate, 2);
-                    })();
-                    return `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">
-                        <div style="opacity:.9;font-weight:900;letter-spacing:1px;">${escapeHtml(x.label)}</div>
-                        <div style="display:flex;gap:14px;align-items:center;">
-                            <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;">${escapeHtml(rateTxt)}</div>
-                            <div style="font-family:'Share Tech Mono',monospace;font-weight:900;min-width:72px;text-align:right;">${pctHtml}</div>
-                        </div>
-                    </div>`;
-                })
-                .join('')}
-        </div>`;
-    };
-
-    const renderDiTable = (list, { detectedCount, limit, title } = {}) => {
-        if (!list.length) {
-            const det = typeof detectedCount === 'number' && Number.isFinite(detectedCount) ? detectedCount : 0;
-            const msg = det
-                ? `DI detectado no histórico (${det} contratos), mas sem preços válidos no momento.`
-                : 'Sem DI disponível no histórico.';
-            return `<div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);opacity:.9;">
-                <div style="font-weight:900;letter-spacing:1px;margin-bottom:8px;">${escapeHtml(title || 'DI (B3)')}</div>
-                <div style="opacity:.85;">${escapeHtml(msg)}</div>
-            </div>`;
-        }
-        const meta = (diCoverage && title === 'DI (B3) • Principais')
-            ? `<div style="margin:-2px 0 10px;opacity:.75;font-size:12px;line-height:1.35;font-family:'Share Tech Mono',monospace;font-weight:900;">
-                Cobertura ${escapeHtml(String(diCoverage.counts.withChange))}/${escapeHtml(String(diCoverage.counts.expected))} • Fresh ${escapeHtml(formatNumber(diCoverage.ratios.freshness * 100, 0))}%
-            </div>`
-            : '';
-        return `<div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
-            <div style="font-weight:900;letter-spacing:1px;opacity:.95;margin-bottom:8px;">${escapeHtml(title || 'DI (B3)')}</div>
-            ${meta}
-            ${list
-                .slice(0, typeof limit === 'number' && Number.isFinite(limit) ? limit : 18)
-                .map(x => {
-                    const dTxt = x.chgPct === null ? '—' : `${x.chgPct > 0 ? '+' : ''}${formatNumber(x.chgPct, 2)}%`
-                    const dHtml = x.chgPct === null ? escapeHtml(dTxt) : toneBadgeHtml(x.chgPct, dTxt, { maxAbs: 1 });
-                    return `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);">
-                        <div style="opacity:.9;font-weight:900;letter-spacing:1px;">${escapeHtml(x.label)}</div>
-                        <div style="display:flex;gap:14px;align-items:center;">
-                            <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;">${escapeHtml(fmtRate(x.rate))}</div>
-                            <div style="font-family:'Share Tech Mono',monospace;font-weight:900;min-width:72px;text-align:right;">${dHtml}</div>
-                        </div>
-                    </div>`;
-                })
-                .join('')}
-        </div>`;
-    };
-
-    const bucketAvgRate = list => {
-        const vals = list
-            .filter(x => x && x.kind === 'yield')
-            .map(x => x.rate)
-            .filter(v => typeof v === 'number' && Number.isFinite(v));
-        return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-    };
-
-    const bucketAvgMove = (list, key) => {
-        const k = String(key || '');
-        const vals = (Array.isArray(list) ? list : [])
-            .map(x => x && typeof x === 'object' ? x[k] : null)
-            .filter(v => typeof v === 'number' && Number.isFinite(v));
-        return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-    };
-
-    const maturityYears = (y, m) => {
-        if (!Number.isFinite(y) || !Number.isFinite(m)) return null;
-        const now = new Date();
-        const t = new Date(y, m - 1, 1);
-        const months = (t.getFullYear() - now.getFullYear()) * 12 + (t.getMonth() - now.getMonth());
-        if (!Number.isFinite(months)) return null;
-        return months / 12;
-    };
-
-    const bucketOfYears = yrs => yrs < 2 ? 'Curto' : yrs <= 5 ? 'Médio' : 'Longo';
-    const diWithTenor = diList.map(x => ({ ...x, yrs: maturityYears(x.year, x.month) })).filter(x => typeof x.yrs === 'number' && x.yrs > 0);
-    const diShort = bucketAvgRate(diWithTenor.filter(x => bucketOfYears(x.yrs) === 'Curto'));
-    const diMid = bucketAvgRate(diWithTenor.filter(x => bucketOfYears(x.yrs) === 'Médio'));
-    const diLong = bucketAvgRate(diWithTenor.filter(x => bucketOfYears(x.yrs) === 'Longo'));
-    const diShortMove = bucketAvgMove(diWithTenor.filter(x => bucketOfYears(x.yrs) === 'Curto'), 'chgPct');
-    const diMidMove = bucketAvgMove(diWithTenor.filter(x => bucketOfYears(x.yrs) === 'Médio'), 'chgPct');
-    const diLongMove = bucketAvgMove(diWithTenor.filter(x => bucketOfYears(x.yrs) === 'Longo'), 'chgPct');
-    const slope = typeof diLong === 'number' && typeof diShort === 'number' ? diLong - diShort : null;
-    const shape = slope === null ? 'N/A' : slope > 0.15 ? 'STEEPEN' : slope < -0.15 ? 'FLATTEN' : '≈';
-
-    const glBy = (label) => glAll.find(x => String(x && x.label ? x.label : '') === String(label));
-    const usShort = bucketAvgRate([glBy('US 3M'), glBy('US 6M'), glBy('US 1Y'), glBy('US 2Y')].filter(Boolean));
-    const usMid = bucketAvgRate([glBy('US 5Y'), glBy('US 10Y')].filter(Boolean));
-    const usLong = bucketAvgRate([glBy('US 20Y'), glBy('US 30Y')].filter(Boolean));
-    const usShortMove = bucketAvgMove([glBy('US 3M'), glBy('US 6M'), glBy('US 1Y'), glBy('US 2Y')].filter(Boolean), 'pct');
-    const usMidMove = bucketAvgMove([glBy('US 5Y'), glBy('US 10Y')].filter(Boolean), 'pct');
-    const usLongMove = bucketAvgMove([glBy('US 20Y'), glBy('US 30Y')].filter(Boolean), 'pct');
-    const usSlope = typeof usLong === 'number' && typeof usShort === 'number' ? usLong - usShort : null;
-    const usShape = usSlope === null ? 'N/A' : usSlope > 0.15 ? 'STEEPEN' : usSlope < -0.15 ? 'FLATTEN' : '≈';
-
-    const etfShy = glBy('ETF SHY (1–3Y)');
-    const etfIef = glBy('ETF IEF (7–10Y)');
-    const etfTlt = glBy('ETF TLT (20Y+)');
-    const etfDurationTilt = (etfTlt && typeof etfTlt.pct === 'number' && etfShy && typeof etfShy.pct === 'number')
-        ? (etfTlt.pct - etfShy.pct)
-        : null;
-
-    const findGl = (label) => glAll.find(x => String(x && x.label ? x.label : '') === String(label));
-    const us2y = findGl('US 2Y');
-    const us5y = findGl('US 5Y');
-    const us10y = findGl('US 10Y');
-    const us30y = findGl('US 30Y');
-    const tips10y = findGl('TIPS (10Y)');
-    const de10y = findGl('DE 10Y');
-    const it10y = findGl('IT 10Y');
-
-    const spread_2s10s = (us10y && typeof us10y.rate === 'number' && us2y && typeof us2y.rate === 'number') ? (us10y.rate - us2y.rate) : null;
-    const spread_5s30s = (us30y && typeof us30y.rate === 'number' && us5y && typeof us5y.rate === 'number') ? (us30y.rate - us5y.rate) : null;
-    const breakeven10y = (us10y && typeof us10y.rate === 'number' && tips10y && typeof tips10y.rate === 'number') ? (us10y.rate - tips10y.rate) : null;
-    const btpBund = (it10y && typeof it10y.rate === 'number' && de10y && typeof de10y.rate === 'number') ? (it10y.rate - de10y.rate) : null;
-
-    const glCoverage = (() => {
-        if (!dc) return null;
-        const symbols = glAll.map(x => x.symbol).filter(Boolean);
-        if (!symbols.length) return null;
-        return dc.computeCoverage(dcDeps, data, symbols, { staleMs: 6 * 60 * 60 * 1000 });
-    })();
-
-    const diCoverage = (() => {
-        if (!dc) return null;
-        const symbols = diList.map(x => x.symbol).filter(Boolean);
-        if (!symbols.length) return null;
-        return dc.computeCoverage(dcDeps, data, symbols, { staleMs: 6 * 60 * 60 * 1000 });
-    })();
-
-    const diHeads = diList.filter(x => x.month === 1).sort((a, b) => (a.year - b.year));
-    const diAnchor = diHeads.find(x => x.symbol === 'DI1F35') || (diHeads.length ? diHeads[diHeads.length - 1] : null);
-    const diTopChanges = diList.filter(x => typeof x.chgPct === 'number' && Number.isFinite(x.chgPct)).slice().sort((a, b) => Math.abs(b.chgPct) - Math.abs(a.chgPct)).slice(0, 12);
-
-    const pill = (tone, label) => {
-        const t = tone === 'positive' ? 'rgba(39, 174, 96, .20)' : tone === 'negative' ? 'rgba(231, 76, 60, .20)' : tone === 'warn' ? 'rgba(241, 196, 15, .20)' : 'rgba(255,255,255,.08)';
-        const b = tone === 'positive' ? 'rgba(39, 174, 96, .35)' : tone === 'negative' ? 'rgba(231, 76, 60, .35)' : tone === 'warn' ? 'rgba(241, 196, 15, .35)' : 'rgba(255,255,255,.14)';
-        return `<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid ${b};background:${t};font-weight:900;font-size:12px;letter-spacing:.4px;opacity:.95;white-space:nowrap;">${escapeHtml(label)}</span>`;
-    };
-
-    const importedVsLocal = (() => {
-        if (usSlope === null || slope === null) return null;
-        const usDir = usSlope > 0.15 ? 1 : usSlope < -0.15 ? -1 : 0;
-        const brDir = slope > 0.15 ? 1 : slope < -0.15 ? -1 : 0;
-        if (usDir === 0 && brDir === 0) return { tone: 'neutral', txt: 'Stress: neutro' };
-        if (usDir !== 0 && brDir !== 0 && usDir === brDir) return { tone: 'warn', txt: 'Stress: importado + local' };
-        if (usDir !== 0 && brDir === 0) return { tone: 'warn', txt: 'Stress: importado' };
-        if (usDir === 0 && brDir !== 0) return { tone: 'warn', txt: 'Stress: local' };
-        return { tone: 'neutral', txt: 'Stress: misto' };
-    })();
-
-    const carryDiff = (() => {
-        if (diShort === null || usShort === null) return null;
-        return diShort - usShort;
-    })();
-
-    const summary = `
-        <div style="margin:0 0 14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
-            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                <div style="font-weight:900;letter-spacing:1px;opacity:.95;">${escapeHtml(diList.length ? 'DI Buckets' : 'BR Buckets (proxy)')}</div>
-                <div style="display:flex;gap:12px;align-items:center;font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;">
-                    <span>Shape: ${escapeHtml(shape)}</span>
-                    ${diAnchor ? `<span>Âncora: ${escapeHtml(diAnchor.symbol)}</span>` : ''}
-                </div>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:10px;">
-                <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
-                    <div style="opacity:.85;font-weight:800;">Curto</div>
-                    <div style="font-weight:900;">${escapeHtml(diShort === null ? '—' : fmtRate(diShort))}</div>
-                </div>
-                <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
-                    <div style="opacity:.85;font-weight:800;">Médio</div>
-                    <div style="font-weight:900;">${escapeHtml(diMid === null ? '—' : fmtRate(diMid))}</div>
-                </div>
-                <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
-                    <div style="opacity:.85;font-weight:800;">Longo</div>
-                    <div style="font-weight:900;">${escapeHtml(diLong === null ? '—' : fmtRate(diLong))}</div>
-                </div>
-            </div>
-            <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-                ${pill('neutral', `Slope BR ${slope === null ? '—' : `${slope > 0 ? '+' : ''}${formatNumber(slope, 2)}pp`}`)}
-                ${pill('neutral', `ΔBR C/M/L ${diShortMove === null ? '—' : formatPercent(diShortMove, 2)}/${diMidMove === null ? '—' : formatPercent(diMidMove, 2)}/${diLongMove === null ? '—' : formatPercent(diLongMove, 2)}`)}
-                ${pill('neutral', `US 2s10s ${spread_2s10s === null ? '—' : `${spread_2s10s > 0 ? '+' : ''}${formatNumber(spread_2s10s, 2)}pp`}`)}
-                ${pill('neutral', `US 5s30s ${spread_5s30s === null ? '—' : `${spread_5s30s > 0 ? '+' : ''}${formatNumber(spread_5s30s, 2)}pp`}`)}
-                ${pill('neutral', `ΔUS C/M/L ${usShortMove === null ? '—' : formatPercent(usShortMove, 2)}/${usMidMove === null ? '—' : formatPercent(usMidMove, 2)}/${usLongMove === null ? '—' : formatPercent(usLongMove, 2)}`)}
-                ${pill(breakeven10y !== null && breakeven10y > 0 ? 'positive' : 'neutral', `BE 10Y ${breakeven10y === null ? '—' : `${formatNumber(breakeven10y, 2)}pp`}`)}
-                ${pill(btpBund !== null && btpBund > 1.8 ? 'warn' : 'neutral', `BTP–Bund ${btpBund === null ? '—' : `${formatNumber(btpBund, 2)}pp`}`)}
-                ${pill(importedVsLocal ? importedVsLocal.tone : 'neutral', importedVsLocal ? importedVsLocal.txt : 'Stress: —')}
-                ${pill(carryDiff !== null && carryDiff > 6 ? 'warn' : 'neutral', `Carry BR–US ${carryDiff === null ? '—' : `${formatNumber(carryDiff, 2)}pp`}`)}
-            </div>
-            ${(usShort !== null || usMid !== null || usLong !== null) ? `
-                <div style="margin-top:10px;border-top:1px solid rgba(255,255,255,.10);padding-top:10px;opacity:.92;">
-                    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                        <div style="font-weight:900;letter-spacing:.8px;">US Buckets (proxy)</div>
-                        <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;">Shape: ${escapeHtml(usShape)}</div>
-                    </div>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:10px;">
-                        <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
-                            <div style="opacity:.85;font-weight:800;">Curto</div>
-                            <div style="font-weight:900;">${escapeHtml(usShort === null ? '—' : fmtRate(usShort))}</div>
-                        </div>
-                        <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
-                            <div style="opacity:.85;font-weight:800;">Médio</div>
-                            <div style="font-weight:900;">${escapeHtml(usMid === null ? '—' : fmtRate(usMid))}</div>
-                        </div>
-                        <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
-                            <div style="opacity:.85;font-weight:800;">Longo</div>
-                            <div style="font-weight:900;">${escapeHtml(usLong === null ? '—' : fmtRate(usLong))}</div>
-                        </div>
-                    </div>
-                </div>
-            ` : ((etfShy && etfIef && etfTlt) ? `
-                <div style="margin-top:10px;border-top:1px solid rgba(255,255,255,.10);padding-top:10px;opacity:.92;">
-                    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                        <div style="font-weight:900;letter-spacing:.8px;">Bond ETFs (proxy)</div>
-                        <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;">Tilt: ${escapeHtml(etfDurationTilt === null ? '—' : `${etfDurationTilt > 0 ? '+' : ''}${formatNumber(etfDurationTilt, 2)}pp`)}</div>
-                    </div>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:10px;">
-                        <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
-                            <div style="opacity:.85;font-weight:800;">SHY (curto)</div>
-                            <div style="font-weight:900;">${escapeHtml(etfShy.rate === null ? '—' : formatNumber(etfShy.rate, 2))}</div>
-                        </div>
-                        <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
-                            <div style="opacity:.85;font-weight:800;">IEF (médio)</div>
-                            <div style="font-weight:900;">${escapeHtml(etfIef.rate === null ? '—' : formatNumber(etfIef.rate, 2))}</div>
-                        </div>
-                        <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
-                            <div style="opacity:.85;font-weight:800;">TLT (longo)</div>
-                            <div style="font-weight:900;">${escapeHtml(etfTlt.rate === null ? '—' : formatNumber(etfTlt.rate, 2))}</div>
-                        </div>
-                    </div>
-                </div>
-            ` : ''))}
-            <div style="margin-top:10px;opacity:.86;line-height:1.35;">
-                <div style="font-weight:900;letter-spacing:1px;margin-bottom:4px;">Leitura rápida</div>
-                <div style="opacity:.9;">
-                    <b>STEEPEN</b> (curva abrindo): longos acima do curto. <b>Operacional</b>: tende a piorar condições financeiras → viés mais defensivo (reduz risco, aumenta proteção). Confirme com <b>DXY</b> e <b>yields globais</b>.
-                    <br><b>FLATTEN</b> (curva fechando): curto acima do longo. <b>Operacional</b>: mercado precificando aperto no curto e/ou desaceleração; se vier com <b>DXY forte</b>, costuma ser pior para emergentes; se vier com <b>DXY fraco</b>, pode ser alívio/normalização.
-                    <br><b>≈</b> (estável): sem mensagem clara na inclinação. <b>Operacional</b>: use o <b>nível</b> (curto/médio/longo) e valide com o bloco <b>Regime</b>.
-                </div>
-            </div>
-        </div>
-    `;
-
-    el.innerHTML = `
-        ${summary}
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
-            ${renderDiTable(diList, { detectedCount: diSymbolsAll.length, limit: 18, title: 'DI (B3) • Principais' })}
-            ${renderGlobalTable('Globais (yields/ETFs)', glAll)}
-        </div>
-        <div style="margin-top:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
-            ${renderDiTable(diHeads, { detectedCount: diHeads.length, limit: 9999, title: 'DI Cabeças de Ano (DI1F)' })}
-            ${renderDiTable(diTopChanges, { detectedCount: diList.length, limit: 12, title: 'Maiores variações (DI %)' })}
-        </div>
-    `;
+    }
+    el.innerHTML = '<div style="opacity:.86;font-weight:900;letter-spacing:.6px;">Falha ao renderizar curva por buckets.</div>';
 }
 
 function computeBrazilCdsHedgeSignal(data) {
@@ -5532,6 +5113,17 @@ function renderBrazilFixedIncomeFlow(data) {
     if (!el) return;
 
     const mk = (tone, txt) => toneBadgeHtmlFromTone(tone, 0, txt, { maxAbs: 1 });
+    const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
+    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const catDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps };
+    const rcKey = (key, fallbackMatcher) => {
+        const sym = catalog && typeof catalog.resolveRatesCreditByKey === 'function'
+            ? catalog.resolveRatesCreditByKey(catDeps, data, key)
+            : null;
+        if (sym) return sym;
+        if (fallbackMatcher instanceof RegExp) return findAssetSymbol(data, fallbackMatcher);
+        return null;
+    };
 
     const assets = data && Array.isArray(data.assets) ? data.assets : [];
     const rates = assets.filter(a => String(a && a.category ? a.category : '') === 'rates');
@@ -5687,8 +5279,8 @@ function renderBrazilFixedIncomeFlow(data) {
         }
     })();
 
-    const pick = (label, matcher) => {
-        const symbol = findAssetSymbol(data, matcher);
+    const pick = (label, { key, matcher } = {}) => {
+        const symbol = key ? rcKey(key, matcher) : (matcher ? findAssetSymbol(data, matcher) : null);
         const { last, prev } = lastAndPrev(symbol);
         if (!symbol || !last || !(typeof last.price === 'number' && Number.isFinite(last.price))) return null;
         const delta = typeof last.change === 'number' && Number.isFinite(last.change)
@@ -5699,15 +5291,15 @@ function renderBrazilFixedIncomeFlow(data) {
     };
 
     const essentials = [
-        pick('BR 3M', /^BR3MT=RR$/i),
-        pick('BR 1Y', /^BR1YT=RR$/i),
-        pick('BR 2Y', /^BR2YT=RR$/i),
-        pick('BR 5Y', /^BR5YT=RR$/i),
-        pick('BR 10Y', /^BR10YT=RR$/i),
-        pick('IPCA+ (real)', /^BRNB10YT=RR$/i),
-        pick('DAP 1 (real)', /^DAPc1$/i),
-        pick('DAP 2 (real)', /^DAPc2$/i),
-        pick('DAP 3 (real)', /^DAPc3$/i),
+        pick('BR 3M', { key: 'BR_3M', matcher: /^BR3MT=RR$/i }),
+        pick('BR 1Y', { key: 'BR_1Y', matcher: /^BR1YT=RR$/i }),
+        pick('BR 2Y', { key: 'BR_2Y', matcher: /^BR2YT=RR$/i }),
+        pick('BR 5Y', { key: 'BR_5Y', matcher: /^BR5YT=RR$/i }),
+        pick('BR 10Y', { key: 'BR_10Y', matcher: /^BR10YT=RR$/i }),
+        pick('IPCA+ (real)', { key: 'BR_IPCA_10Y', matcher: /^BRNB10YT=RR$/i }),
+        pick('DAP 1 (real)', { key: 'BR_DAPC1', matcher: /^DAPc1$/i }),
+        pick('DAP 2 (real)', { key: 'BR_DAPC2', matcher: /^DAPc2$/i }),
+        pick('DAP 3 (real)', { key: 'BR_DAPC3', matcher: /^DAPc3$/i }),
     ].filter(Boolean);
 
     const eByLabel = new Map(essentials.map(x => [x.label, x]));
@@ -6646,6 +6238,9 @@ function renderAssetsCatalog(data) {
     const assets = Array.isArray(data && data.assets) ? data.assets : [];
     const series = data && data.series ? data.series : {};
     const generatedAt = data && data.meta && data.meta.generatedAt ? String(data.meta.generatedAt) : '';
+    const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
+    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const catDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps };
 
     const getBestPoint = sym => getMostRecentPointWithPrice(data, sym);
     const getAnyPoint = sym => {
@@ -6695,6 +6290,21 @@ function renderAssetsCatalog(data) {
         noSeries: rowsAll.filter(r => !r.hasSeries).length,
         noPrice: rowsAll.filter(r => r.hasSeries && !r.hasPrice).length,
     };
+
+    const ratesCreditSummary = (() => {
+        if (!catalog) return { baseResolved: [], extras: [], extrasSymbols: [] };
+        const defs = typeof catalog.listRatesCredit === 'function' ? catalog.listRatesCredit() : [];
+        const baseResolved = typeof catalog.buildResolved === 'function'
+            ? defs.map(def => catalog.buildResolved(catDeps, data, def)).filter(Boolean)
+            : [];
+        const baseSymbols = new Set(baseResolved.map(x => String(x && x.symbol ? x.symbol : '')).filter(Boolean));
+        const discovered = typeof catalog.discoverRatesCredit === 'function'
+            ? catalog.discoverRatesCredit(data, { max: 80 })
+            : [];
+        const extras = (discovered || []).filter(x => x && x.symbol && !baseSymbols.has(String(x.symbol)));
+        const extrasSymbols = extras.map(x => String(x.symbol));
+        return { baseResolved, extras, extrasSymbols };
+    })();
 
     const mkCategoryCounts = () => {
         const map = new Map();
@@ -6905,6 +6515,37 @@ function renderAssetsCatalog(data) {
         });
     };
 
+    const onCopyRatesCreditExtras = () => {
+        const text = (ratesCreditSummary.extrasSymbols || []).join('\n');
+        if (!text) return;
+        const fallback = () => {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.setAttribute('readonly', 'true');
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                return true;
+            } catch {
+                return false;
+            }
+        };
+        const ok = navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(text).then(() => true).catch(() => fallback()) : Promise.resolve(fallback());
+        ok.then(() => {
+            const btn = document.getElementById('assetsCatalogCopyRatesCreditExtras');
+            if (!btn) return;
+            const prev = btn.textContent;
+            btn.textContent = 'Copiado';
+            setTimeout(() => {
+                btn.textContent = prev || 'Copiar rates/credit';
+            }, 900);
+        });
+    };
+
     el.innerHTML = `
         <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
@@ -6921,6 +6562,25 @@ function renderAssetsCatalog(data) {
             <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;opacity:.95;line-height:1.45;">
                 ${mkCategoryCounts()}
             </div>
+
+            ${(catalog && (ratesCreditSummary.baseResolved.length || ratesCreditSummary.extras.length)) ? `
+                <div style="margin-top:12px;border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;background:rgba(0,0,0,.16);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <div style="font-weight:900;letter-spacing:.6px;opacity:.92;">Rates/Credit (do Investing)</div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                            ${badge('neutral', `Catálogo: ${ratesCreditSummary.baseResolved.length}`)}
+                            ${ratesCreditSummary.extras.length ? badge('positive', `Extras: ${ratesCreditSummary.extras.length}`) : badge('neutral', 'Extras: 0')}
+                            ${ratesCreditSummary.extras.length ? `<button id="assetsCatalogCopyRatesCreditExtras" type="button" style="border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:7px 10px;background:#151515;color:#e0e0e0;font-weight:900;letter-spacing:.3px;cursor:pointer;">Copiar rates/credit</button>` : ''}
+                        </div>
+                    </div>
+                    ${ratesCreditSummary.extras.length ? `
+                        <div style="margin-top:8px;font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.9;line-height:1.5;white-space:pre-wrap;">${escapeHtml(ratesCreditSummary.extrasSymbols.slice(0, 60).join('  ') || '—')}${ratesCreditSummary.extrasSymbols.length > 60 ? `<span style="opacity:.75;"> …</span>` : ''}</div>
+                        <div style="margin-top:6px;opacity:.78;font-size:12px;line-height:1.35;">Esses símbolos existem no CSV como rates/credit mas não estão mapeados nas chaves do catálogo. Útil para completar o monitoramento e manter unidade/semântica.</div>
+                    ` : `
+                        <div style="margin-top:8px;opacity:.82;font-size:12px;line-height:1.35;">Sem rates/credit extras detectados fora do catálogo (ou sem dados suficientes).</div>
+                    `}
+                </div>
+            ` : ''}
 
             <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
                 <input id="assetsCatalogQuery" type="text" inputmode="search" autocomplete="off" placeholder="Buscar símbolo/nome/categoria..." style="flex:1;min-width:220px;background:#101010;color:#e0e0e0;border:1px solid rgba(255,255,255,.14);padding:8px 10px;border-radius:10px;font-weight:900;" />
@@ -7060,6 +6720,7 @@ function renderAssetsCatalog(data) {
     bind('assetsCatalogOnly', 'change', render);
     bind('assetsCatalogSort', 'change', render);
     bind('assetsCatalogCopy', 'click', onCopy);
+    bind('assetsCatalogCopyRatesCreditExtras', 'click', onCopyRatesCreditExtras);
     render();
 }
 
@@ -8393,6 +8054,16 @@ function renderOperationalBriefing() {
     })();
 
     const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
+    const catDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps };
+    const rcKey = (key, fallbackMatcher) => {
+        const sym = catalog && typeof catalog.resolveRatesCreditByKey === 'function'
+            ? catalog.resolveRatesCreditByKey(catDeps, data, key)
+            : null;
+        if (sym) return sym;
+        if (fallbackMatcher instanceof RegExp) return findAssetSymbol(data, fallbackMatcher);
+        return null;
+    };
     const agendaNext = agendaIntel && agendaIntel.next ? agendaIntel.next.any : null;
     const agendaIfThen = (dc && typeof dc.getMatrixIfThen === 'function' && agendaNext)
         ? dc.getMatrixIfThen({ currency: agendaNext.currency, matrixKey: agendaNext.matrixKey, eventText: agendaNext.event })
@@ -8406,15 +8077,30 @@ function renderOperationalBriefing() {
         const candFor = (k) => {
             const key = String(k || '').toUpperCase();
             if (key === 'DXY') return [{ aliasKey: 'DXY' }, { matcher: /(^\.DXY$|\bDXY\b)/i }];
-            if (key === 'US10Y') return [{ aliasKey: 'US10Y' }, { matcher: /(^US10YT=RR$|^\^TNX$|\bUS\s*10Y\b)/i }];
-            if (key === 'US2Y') return [{ aliasKey: 'US2Y' }, { matcher: /(^US2YT=RR$|\bUS\s*2Y\b)/i }];
+            if (key === 'US10Y') {
+                const sym = rcKey('US_10Y', /(^US10YT=RR$|^\^TNX$|\bUS\s*10Y\b|^\.TNX$)/i);
+                return sym ? [{ symbol: sym }] : [{ aliasKey: 'US10Y' }, { matcher: /(^US10YT=RR$|^\^TNX$|\bUS\s*10Y\b)/i }];
+            }
+            if (key === 'US2Y') {
+                const sym = rcKey('US_2Y', /(^US2YT=RR$|\bUS\s*2Y\b)/i);
+                return sym ? [{ symbol: sym }] : [{ aliasKey: 'US2Y' }, { matcher: /(^US2YT=RR$|\bUS\s*2Y\b)/i }];
+            }
             if (key === 'VIX') return [{ aliasKey: 'VIX9D' }, { aliasKey: 'VIX30' }, { aliasKey: 'VIX' }, { matcher: /^\.?VIX(9D)?$/i }];
             if (key === 'SPX') return [{ aliasKey: 'SPX' }, { matcher: /(^\^GSPC$|\bS&P\s*500\b|^SPX$)/i }];
-            if (key === 'HYG') return [{ aliasKey: 'HYG' }, { matcher: /^HYG$/i }];
-            if (key === 'LQD') return [{ aliasKey: 'LQD' }, { matcher: /^LQD$/i }];
+            if (key === 'HYG') {
+                const sym = rcKey('ETF_HYG', /^HYG$/i);
+                return sym ? [{ symbol: sym }] : [{ aliasKey: 'HYG' }, { matcher: /^HYG$/i }];
+            }
+            if (key === 'LQD') {
+                const sym = rcKey('ETF_LQD', /^LQD$/i);
+                return sym ? [{ symbol: sym }] : [{ aliasKey: 'LQD' }, { matcher: /^LQD$/i }];
+            }
 
             if (key === 'USD_BRL') return [{ aliasKey: 'USD_BRL' }, { matcher: /^USD\/BRL\b/i }];
-            if (key === 'BR10Y') return [{ aliasKey: 'BR10Y' }, { matcher: /^BR10YT=RR$/i }];
+            if (key === 'BR10Y') {
+                const sym = rcKey('BR_10Y', /^BR10YT=RR$/i);
+                return sym ? [{ symbol: sym }] : [{ aliasKey: 'BR10Y' }, { matcher: /^BR10YT=RR$/i }];
+            }
             if (key === 'IBOV') return [{ aliasKey: 'IBOV' }, { matcher: /(^\.BVSP$|\bIbovespa\b|\bIBOV\b)/i }];
             if (key === 'EWZ') return [{ aliasKey: 'EWZ' }, { matcher: /^EWZ$/i }];
 
@@ -9086,7 +8772,7 @@ function renderOperationalBriefing() {
     })();
 
     const newsLine = web
-        ? `News tilt (0–1): WDO ${fmt1(newsTilt.wdo.score)} • WIN ${fmt1(newsTilt.win.score)}`
+        ? `News tilt (-1..+1): WDO ${fmt1(newsTilt.wdo.score)} • WIN ${fmt1(newsTilt.win.score)}`
         : 'News tilt: —';
 
     const macroLine = (() => {
@@ -9120,7 +8806,7 @@ function renderOperationalBriefing() {
                 const symUsd = findAliasSymbolBest(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i);
                 const symIbov = findAliasSymbolBest(data, 'IBOV') || findAssetSymbol(data, /(^\.BVSP$|\bIbovespa\b|\bIBOV\b)/i);
                 const symEwz = findAliasSymbolBest(data, 'EWZ') || findAssetSymbol(data, /^EWZ$/i);
-                const symBr10y = findAssetSymbol(data, /^BR10YT=RR$/i) || findAssetSymbol(data, /\bBR10Y\b/i);
+                const symBr10y = rcKey('BR_10Y', /^BR10YT=RR$/i) || findAssetSymbol(data, /\bBR10Y\b/i);
                 const usd = symUsd ? getChangePct(data, symUsd) : null;
                 const ibov = symIbov ? getChangePct(data, symIbov) : null;
                 const ewz = symEwz ? getChangePct(data, symEwz) : null;
@@ -9270,13 +8956,13 @@ function renderOperationalBriefing() {
                 const b = points[i];
                 const pa = a && typeof a.price === 'number' && Number.isFinite(a.price) ? a.price : null;
                 const pb = b && typeof b.price === 'number' && Number.isFinite(b.price) ? b.price : null;
-                const ta = a && typeof a.tMs === 'number' && Number.isFinite(a.tMs) ? a.tMs : null;
-                const tb = b && typeof b.tMs === 'number' && Number.isFinite(b.tMs) ? b.tMs : null;
-                if (pa === null || pb === null || ta === null || tb === null) continue;
+                const tbRaw = b && b.t ? Date.parse(b.t) : NaN;
+                const tMs = Number.isFinite(tbRaw) ? tbRaw : null;
+                if (pa === null || pb === null || tMs === null) continue;
                 if (pa <= 0 || pb <= 0) continue;
                 const r = Math.log(pb / pa);
                 if (!Number.isFinite(r)) continue;
-                out.push({ tMs: tb, r });
+                out.push({ tMs: tMs, r });
             }
             return out;
         };
@@ -12270,6 +11956,18 @@ function renderCarryIntel(data) {
     const el = document.getElementById('carryIntel');
     if (!el) return;
 
+    const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
+    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const catDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps };
+    const rcKey = (key, fallbackMatcher) => {
+        const sym = catalog && typeof catalog.resolveRatesCreditByKey === 'function'
+            ? catalog.resolveRatesCreditByKey(catDeps, data, key)
+            : null;
+        if (sym) return sym;
+        if (fallbackMatcher instanceof RegExp) return findAssetSymbol(data, fallbackMatcher);
+        return null;
+    };
+
     const resolveJapan10yYield = () => {
         const yieldSymbol =
             findAssetSymbol(data, /^JP10YT=RR$/i)
@@ -12284,10 +11982,10 @@ function renderCarryIntel(data) {
         usdjpy: findAssetSymbol(data, /^USD\/JPY\b/i),
         usdbrl: findAssetSymbol(data, /^USD\/BRL\b/i),
         dxy: findAliasSymbolBest(data, 'DXY') || findAliasSymbol(data, 'DXY') || findAssetSymbol(data, /(^USDX$|^\.DXY$|\bDXY\b|US Dollar Index|Dollar Index|Índice\s*Dólar|Indice\s*Dolar)/i),
-        br10y: findAssetSymbol(data, /^BR10YT=RR$/i),
-        us10y: findAssetSymbol(data, /^US10YT=RR$/i),
-        us10br10: findAssetSymbol(data, /^US10BR10=RR$/i),
-        jp10y: resolveJapan10yYield(),
+        br10y: rcKey('BR_10Y', /^BR10YT=RR$/i),
+        us10y: rcKey('US_10Y', /^US10YT=RR$/i),
+        us10br10: rcKey('SPREAD_US10_BR10', /^US10BR10=RR$/i),
+        jp10y: rcKey('JP_10Y', /^JP10YT=RR$/i) || resolveJapan10yYield(),
         audjpy: findAssetSymbol(data, /^AUD\/JPY\b/i),
         nzdjpy: findAssetSymbol(data, /^NZD\/JPY\b/i),
     };
