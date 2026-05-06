@@ -929,6 +929,9 @@ function renderRegimeConviction(data) {
     const el = document.getElementById('regimeConviction');
     if (!el) return;
 
+    const aliasSym = k => findAliasSymbolBest(data, k) || findAliasSymbol(data, k);
+    const symOf = (aliasKey, matcher) => aliasSym(aliasKey) || (matcher ? findAssetSymbol(data, matcher) : null);
+
     const downgradeConvictionLabel = (label, steps) => {
         const s = Math.max(0, Math.floor(Number(steps) || 0));
         let out = String(label || '');
@@ -1007,10 +1010,12 @@ function renderRegimeConviction(data) {
         usdjpy: findAssetSymbol(data, /^USD\/JPY\b/i),
         usdchf: findAssetSymbol(data, /^USD\/CHF\b/i),
         usdsek: findAssetSymbol(data, /^USD\/SEK\b/i),
-        dxy: findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index)/i),
-        brent: findAssetSymbol(data, /\bBrent\b/i),
-        wti: findAssetSymbol(data, /\bWTI\b/i),
-        usdbbrl: findAssetSymbol(data, /^USD\/BRL\b/i),
+        dxy: symOf('DXY', /(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index)/i),
+        vix: symOf('VIX', /(^VIX$|^VIX1D$|\bCBOE Volatility\b|\bVolatility Index\b)/i),
+        vhsi: symOf('VHSI', /(^VHSI$|\bHang Seng Volatility\b)/i),
+        brent: symOf('BRENT', /\bBrent\b/i),
+        wti: symOf('WTI', /\bWTI\b/i),
+        usdbbrl: symOf('USD_BRL', /^USD\/BRL\b/i),
         usdmxn: findAssetSymbol(data, /^USD\/MXN\b/i),
         usdzar: findAssetSymbol(data, /^USD\/ZAR\b/i),
         usdclp: findAssetSymbol(data, /^USD\/CLP\b/i),
@@ -1029,6 +1034,8 @@ function renderRegimeConviction(data) {
         { label: 'USD/JPY', symbol: sentinelSymbols.usdjpy, sign: -1 },
         { label: 'USD/CHF', symbol: sentinelSymbols.usdchf, sign: -1 },
         { label: 'USD/SEK', symbol: sentinelSymbols.usdsek, sign: -1 },
+        { label: 'VIX', symbol: sentinelSymbols.vix, sign: +1 },
+        { label: 'VHSI', symbol: sentinelSymbols.vhsi, sign: +1 },
         { label: 'DXY', symbol: sentinelSymbols.dxy, sign: +1 },
     ].map(x => ({ ...x, raw: getChangePct(data, x.symbol) }))
         .map(x => ({ ...x, val: x.raw === null ? null : x.sign * x.raw }));
@@ -1051,7 +1058,8 @@ function renderRegimeConviction(data) {
 
     const wti = getChangePct(data, sentinelSymbols.wti);
     const brent = getChangePct(data, sentinelSymbols.brent);
-    const oilScore = [wti, brent].filter(v => typeof v === 'number' && Number.isFinite(v)).length ? Math.max(wti || -Infinity, brent || -Infinity) : null;
+    const oilVals = [wti, brent].filter(v => typeof v === 'number' && Number.isFinite(v));
+    const oilScore = oilVals.length ? Math.max(...oilVals) : null;
 
     const neutralThreshold = 0.12;
     const usdmxnPct = getChangePct(data, sentinelSymbols.usdmxn);
@@ -1139,11 +1147,24 @@ function renderRegimeConviction(data) {
         { k: 'BR10Y', r: /^BR10YT=RR$/i },
     ];
 
-    const criticalFound = criticalMatchers.filter(m => (m.a ? findAliasSymbol(data, m.a) : findAssetSymbol(data, m.r))).length;
-    const criticalRatio = criticalMatchers.length ? criticalFound / criticalMatchers.length : 0;
+    const criticalHits = criticalMatchers.map(m => {
+        const sym = m.a
+            ? (aliasSym(m.a) || (m.r ? findAssetSymbol(data, m.r) : null))
+            : findAssetSymbol(data, m.r);
+        if (!sym) return { ok: false, hasChg: false };
+        const last = getLastPoint(data, sym);
+        const hasChg = !!(last && typeof last.changePct === 'number' && Number.isFinite(last.changePct));
+        return { ok: true, hasChg };
+    });
+    const criticalUsable = criticalHits.filter(x => x.ok && x.hasChg).length;
+    const criticalRatio = criticalMatchers.length ? criticalUsable / criticalMatchers.length : 0;
 
     let convictionScore = 0.5 * coverageRatio + 0.3 * freshnessRatio + 0.2 * criticalRatio;
     const divergences = [];
+    if (withTime.length >= 10 && freshnessRatio < 0.65) {
+        convictionScore *= 0.9;
+        divergences.push('Muitos ativos com atualização antiga (>6h) → convicção reduzida');
+    }
     if (regimeLabel === 'Risk-On' && betaDelta < -0.15) divergences.push('Fluxo (risk-on) diverge do bloco de proteção (beta)');
     if (regimeLabel === 'Risk-Off' && betaDelta > 0.15) divergences.push('Fluxo (risk-off) diverge do bloco de apetite (beta)');
     if (typeof oilScore === 'number' && oilScore > 1.2) {
@@ -1161,12 +1182,12 @@ function renderRegimeConviction(data) {
         divergences.push(`Emergentes (${emGateLabel}) sugerem bid enquanto o regime aponta risk-off`);
     }
 
-    const hasFxi = !!findAliasSymbol(data, 'FXI');
-    const hasCsi = !!findAliasSymbol(data, 'CSI300');
+    const hasFxi = !!symOf('FXI', /^FXI$/i);
+    const hasCsi = !!symOf('CSI300', /^CSI300$/i);
     const hasChinaCore = hasFxi || hasCsi;
-    const hasIron = !!findAliasSymbol(data, 'IRON');
-    const hasSoy = !!findAliasSymbol(data, 'SOY');
-    const hasCopper = !!findAliasSymbol(data, 'COPPER');
+    const hasIron = !!symOf('IRON', /^DCE_I0$/i);
+    const hasSoy = !!symOf('SOY', /^ZS$/i);
+    const hasCopper = !!symOf('COPPER', /^HG$/i);
 
     let downgrade = 0;
     if (!hasChinaCore) {
@@ -1489,6 +1510,16 @@ function renderChinaBrazil(data) {
     const el = document.getElementById('chinaBrazil');
     if (!el) return;
 
+    const nowMs = Date.now();
+    const staleMs = 6 * 60 * 60 * 1000;
+    const isFreshSymbol = (symbol) => {
+        if (!symbol) return false;
+        const last = getLastPoint(data, symbol);
+        const tMs = last && last.t ? Date.parse(last.t) : NaN;
+        if (!Number.isFinite(tMs)) return false;
+        return nowMs - tMs <= staleMs;
+    };
+
     const sym = {
         fxi: findAliasSymbol(data, 'FXI'),
         csi: findAliasSymbol(data, 'CSI300'),
@@ -1551,7 +1582,15 @@ function renderChinaBrazil(data) {
     };
 
     const oilPct = getChangePct(data, sym.brent) ?? getChangePct(data, sym.wti);
-    const chinaAvg = avg([getChangePct(data, sym.fxi), getChangePct(data, sym.csi), getChangePct(data, sym.hsi)]);
+    const chinaProxyPcts = [
+        getChangePct(data, sym.fxi),
+        getChangePct(data, sym.csi),
+        getChangePct(data, sym.hsi),
+        getChangePct(data, sym.mchi),
+        getChangePct(data, sym.ashr),
+        getChangePct(data, sym.kweb),
+    ].filter(v => typeof v === 'number' && Number.isFinite(v));
+    const chinaAvg = avg(chinaProxyPcts);
     const usdbbrl = getChangePct(data, sym.usdbbrl);
 
     const brlImpulse = wAvg([
@@ -1569,12 +1608,12 @@ function renderChinaBrazil(data) {
         { symbol: sym.brent || sym.wti, w: 0.55 },
     ]);
 
-    const brlPressure = (typeof oilPct === 'number' && oilPct > 0 ? 0.65 * oilPct : 0)
-        + (typeof chinaAvg === 'number' && chinaAvg < 0 ? 0.55 * (-chinaAvg) : 0)
-        + (typeof usdbbrl === 'number' && usdbbrl > 0 ? 0.35 * usdbbrl : 0);
+    const brlPressure = (typeof oilPct === 'number' && oilPct > 0 ? 0.20 * oilPct : 0)
+        + (typeof chinaAvg === 'number' && chinaAvg < 0 ? 0.60 * (-chinaAvg) : 0)
+        + (typeof usdbbrl === 'number' && usdbbrl > 0 ? 0.45 * usdbbrl : 0);
 
-    const ibovPressure = (typeof oilPct === 'number' && oilPct > 0 ? 0.75 * oilPct : 0)
-        + (typeof chinaAvg === 'number' && chinaAvg < 0 ? 0.60 * (-chinaAvg) : 0);
+    const ibovPressure = (typeof oilPct === 'number' && oilPct > 0 ? 0.25 * oilPct : 0)
+        + (typeof chinaAvg === 'number' && chinaAvg < 0 ? 0.65 * (-chinaAvg) : 0);
 
     const netBrl = (typeof brlImpulse === 'number' ? brlImpulse : 0) - brlPressure;
     const netIbov = (typeof ibovImpulse === 'number' ? ibovImpulse : 0) - ibovPressure;
@@ -1617,23 +1656,34 @@ function renderChinaBrazil(data) {
         return { tone: 'neutral', label: 'China Mista', hint: 'Sinais divergentes entre proxies.' };
     };
 
-    const chinaPcts = [getChangePct(data, sym.fxi), getChangePct(data, sym.csi), getChangePct(data, sym.hsi), getChangePct(data, sym.mchi), getChangePct(data, sym.ashr), getChangePct(data, sym.kweb)]
-        .filter(v => typeof v === 'number' && Number.isFinite(v));
-    const chinaPos = chinaPcts.filter(v => v > 0.15).length;
-    const chinaNeg = chinaPcts.filter(v => v < -0.15).length;
-    const chinaCov = chinaPcts.length;
+    const chinaPos = chinaProxyPcts.filter(v => v > 0.15).length;
+    const chinaNeg = chinaProxyPcts.filter(v => v < -0.15).length;
+    const chinaCov = chinaProxyPcts.length;
     const chinaScenario = classifyChinaScenario({ avgPct: chinaAvg, pos: chinaPos, neg: chinaNeg, cov: chinaCov });
 
     const coverageChecks = (() => {
-        const hasFxi = !!sym.fxi;
-        const hasCsi = !!sym.csi;
-        const hasHsi = !!sym.hsi;
+        const hasPct = s => {
+            const v = getChangePct(data, s);
+            return typeof v === 'number' && Number.isFinite(v);
+        };
+
+        const hasFxi = hasPct(sym.fxi);
+        const hasCsi = hasPct(sym.csi);
+        const hasHsi = hasPct(sym.hsi);
         const hasChinaCore = hasFxi || hasCsi;
-        const hasIron = !!sym.iron;
-        const hasSoy = !!sym.soy;
-        const hasOil = !!(sym.brent || sym.wti);
-        const hasCopper = !!sym.copper;
-        const hasBci = !!sym.bci;
+        const hasIron = hasPct(sym.iron);
+        const hasSoy = hasPct(sym.soy);
+        const hasOil = hasPct(sym.brent) || hasPct(sym.wti);
+        const hasCopper = hasPct(sym.copper);
+        const hasBci = hasPct(sym.bci);
+
+        const freshCritical = [
+            (sym.fxi || sym.csi),
+            sym.iron,
+            sym.soy,
+            (sym.brent || sym.wti),
+        ].filter(Boolean).filter(s => isFreshSymbol(s)).length;
+
         const missingCritical = [];
         const missingOptional = [];
         if (!hasChinaCore) missingCritical.push('FXI/CSI300');
@@ -1644,9 +1694,13 @@ function renderChinaBrazil(data) {
         if (!hasBci) missingOptional.push('BCI (ETF commodities)');
 
         const status = missingCritical.length === 0 ? { tone: 'positive', label: 'OK' } : missingCritical.length === 1 ? { tone: 'neutral', label: 'Parcial' } : { tone: 'negative', label: 'Crítico' };
-        const conviction = missingCritical.length === 0 ? { tone: 'positive', label: 'Sem redução' } : { tone: 'negative', label: 'Convicção reduzida' };
+        const conviction = missingCritical.length === 0 && freshCritical >= 3 ? { tone: 'positive', label: 'Sem redução' } : { tone: 'negative', label: 'Convicção reduzida' };
         const missingTxt = [...missingCritical, ...missingOptional].filter(Boolean).join(', ');
-        const why = missingTxt ? `Faltando: ${missingTxt}` : 'Cobertura adequada para o módulo China↔Brasil.';
+        const why = missingTxt
+            ? `Faltando: ${missingTxt}`
+            : freshCritical >= 3
+                ? 'Cobertura adequada para o módulo China↔Brasil.'
+                : 'Dados presentes, mas atualização antiga em itens críticos.';
 
         return {
             status,
@@ -1718,6 +1772,9 @@ function renderChinaBrazil(data) {
     if (typeof csi === 'number' && typeof soy === 'number' && csi < -0.4 && soy > 0.4) divergences.push('Soja forte com China fraca (ver oferta/clima)');
     if (typeof fxi === 'number' && typeof copper === 'number' && fxi > 0.4 && copper < -0.4) divergences.push('China forte sem confirmação em Cobre');
     if (typeof oil === 'number' && typeof usdbbrl === 'number' && oil > 0.7 && usdbbrl > 0.2) divergences.push('Petróleo ajuda, mas USD/BRL não confirma (stress local)');
+    if (chinaScenario.label === 'China Forte' && typeof netIbov === 'number' && netIbov < -0.25) divergences.push('China forte, mas proxies do IBOV não confirmam (pressão local)');
+    if (chinaScenario.label === 'China Fraca' && typeof netIbov === 'number' && netIbov > 0.25) divergences.push('China fraca, mas proxies do IBOV resilientes (ver juros/Petro)');
+    if (coverageChecks.status.label !== 'OK') divergences.push('Cobertura do módulo incompleta (ver auditoria)');
 
     const ironConfirm = (() => {
         if (typeof iron !== 'number' || !Number.isFinite(iron)) return null;
