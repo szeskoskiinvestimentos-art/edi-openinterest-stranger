@@ -4049,6 +4049,12 @@ function computeCommoditiesPulseNow(data, web) {
             [/^CPER(\.\w+)?$/i, /\bCopper\b/i, /\bCobre\b/i],
             'COPPER'
         ),
+        gdx: pickPreferred([], [/^GDX(\.\w+)?$/i, /\bGold\s*Miners\b/i], null),
+        gdxj: pickPreferred([], [/^GDXJ(\.\w+)?$/i, /\bJunior\s*Gold\s*Miners\b/i], null),
+        minerNem: pickPreferred([], [/^NEM(\.\w+)?$/i, /\bNewmont\b/i], null),
+        minerAu: pickPreferred([], [/^AU(\.\w+)?$/i, /\bAngloGold\b/i], null),
+        minerFnv: pickPreferred([], [/^FNV(\.\w+)?$/i, /^FNV\.TO$/i, /\bFranco[-\s]?Nevada\b/i], null),
+        minerGold: pickPreferred([], [/^GOLD(\.\w+)?$/i, /\bBarrick\b/i], null),
         nickel: pickPreferred(
             [/^MNI\d$/i],
             [/\bNickel\b/i, /\bN[ií]quel\b/i],
@@ -4060,6 +4066,10 @@ function computeCommoditiesPulseNow(data, web) {
             null
         ),
         usdcad: findAliasSymbolBest(data, 'USD_CAD') || pickBest(byMatchers([/^USD\/CAD\b/i, /\bUSDCAD\b/i], { limit: 6 })),
+        audusd: findAliasSymbolBest(data, 'AUD_USD') || pickBest(byMatchers([/^AUD\/USD\b/i, /\bAUDUSD\b/i], { limit: 8 })),
+        usdzar: findAliasSymbolBest(data, 'USD_ZAR') || pickBest(byMatchers([/^USD\/ZAR\b/i, /\bUSDZAR\b/i], { limit: 8 })),
+        usdmxn: findAliasSymbolBest(data, 'USD_MXN') || pickBest(byMatchers([/^USD\/MXN\b/i, /\bUSDMXN\b/i], { limit: 8 })),
+        usdcnh: findAliasSymbolBest(data, 'USD_CNH') || pickBest(byMatchers([/^USD\/CNH\b/i, /\bUSDCNH\b/i], { limit: 8 })),
         usdrub: pickBest(byMatchers([/^USD\/RUB\b/i, /\bUSDRUB\b/i], { limit: 6 })),
         btc: findAliasSymbolBest(data, 'BTC') || pickBest(byMatchers([/^BTC\/USD$/i, /\bbitcoin\b/i], { limit: 6 })),
     };
@@ -4276,9 +4286,16 @@ function computeCommoditiesPulseNow(data, web) {
                 { key: 'dxy', group: 'driver', weight: 0.6, capAbs: 0.8, sign: -1 },
                 { key: 'us10y', group: 'driver', weight: 0.45, capAbs: 0.9, sign: -1 },
                 { key: 'tipsEtf', group: 'driver', weight: 0.28, capAbs: 1.2, sign: +0.6 },
+                { key: 'audusd', group: 'confirm', weight: 0.12, capAbs: 0.9, sign: +0.35 },
+                { key: 'usdzar', group: 'confirm', weight: 0.08, capAbs: 1.2, sign: -0.25 },
                 { key: 'tlt', group: 'confirm', weight: 0.25, capAbs: 1.3, sign: +1 },
                 { key: 'gld', group: 'confirm', weight: 0.18, capAbs: 1.6, sign: +1 },
                 { key: 'vix', group: 'confirm', weight: 0.25, capAbs: 4.5, sign: +0.6 },
+                { key: 'gdx', group: 'confirm', weight: 0.12, capAbs: 3.5, sign: +0.25 },
+                { key: 'minerNem', group: 'context', weight: 0.08, capAbs: 4.5, sign: +0.18 },
+                { key: 'minerAu', group: 'context', weight: 0.06, capAbs: 5.0, sign: +0.15 },
+                { key: 'minerFnv', group: 'context', weight: 0.06, capAbs: 4.0, sign: +0.15 },
+                { key: 'minerGold', group: 'context', weight: 0.06, capAbs: 4.5, sign: +0.15 },
                 { key: 'hyg', group: 'context', weight: 0.2, capAbs: 1.3, sign: -0.5 },
                 { key: 'spx', group: 'context', weight: 0.25, capAbs: 1.2, sign: -0.4 },
                 { key: 'eem', group: 'context', weight: 0.18, capAbs: 1.4, sign: -0.3 },
@@ -4427,6 +4444,9 @@ function computeCommoditiesPulseNow(data, web) {
                 corrPair('Ouro × DXY', sym.gold, sym.dxy),
                 corrPair('Ouro × US10Y', sym.gold, sym.us10y),
                 corrPair('Ouro × TIP', sym.gold, sym.tipsEtf),
+                corrPair('Ouro × AUD/USD', sym.gold, sym.audusd),
+                corrPair('Ouro × USD/ZAR', sym.gold, sym.usdzar),
+                corrPair('Ouro × GDX (miners)', sym.gold, sym.gdx),
                 corrPair('Ouro × SPX', sym.gold, sym.spx),
                 corrPair('Ouro × VIX', sym.gold, sym.vix),
             ].filter(Boolean),
@@ -4530,6 +4550,16 @@ function computeCommoditiesPulseNow(data, web) {
         gld: 'GLD (ETF ouro)',
         slv: 'SLV (ETF prata)',
         usdcad: 'USD/CAD',
+        audusd: 'AUD/USD',
+        usdzar: 'USD/ZAR',
+        usdmxn: 'USD/MXN',
+        usdcnh: 'USD/CNH',
+        gdx: 'GDX (miners ETF)',
+        gdxj: 'GDXJ (junior miners)',
+        minerNem: 'NEM (Newmont)',
+        minerAu: 'AU (AngloGold)',
+        minerFnv: 'FNV (Franco-Nevada)',
+        minerGold: 'GOLD (Barrick)',
         xle: 'XLE',
         xop: 'XOP',
         oih: 'OIH',
@@ -4557,6 +4587,11 @@ function computeCommoditiesPulseNow(data, web) {
             { label: 'GLD (ETF ouro)', matchers: [/^GLD(\.\w+)?$/i] },
             { label: 'BNO/USO (proxy petróleo)', matchers: [/^BNO(\.\w+)?$/i, /^USO(\.\w+)?$/i] },
             { label: 'XLE/XOP/OIH (energia)', matchers: [/^XLE(\.\w+)?$/i, /^XOP(\.\w+)?$/i, /^OIH(\.\w+)?$/i] },
+            { label: 'GDX/GDXJ (miners ETF)', matchers: [/^GDX(\.\w+)?$/i, /^GDXJ(\.\w+)?$/i] },
+            { label: 'NEM/AU/FNV/GOLD (miners)', matchers: [/^NEM(\.\w+)?$/i, /^AU(\.\w+)?$/i, /^FNV(\.\w+)?$/i, /^FNV\.TO$/i, /^GOLD(\.\w+)?$/i] },
+            { label: 'AUD/USD', matchers: [/^AUD\/USD\b/i, /\bAUDUSD\b/i] },
+            { label: 'USD/ZAR', matchers: [/^USD\/ZAR\b/i, /\bUSDZAR\b/i] },
+            { label: 'USD/CNH', matchers: [/^USD\/CNH\b/i, /\bUSDCNH\b/i] },
             { label: 'TTF (gás Europa)', matchers: [/^TFAc\d(=\$)?$/i, /\bTTF\b/i] },
             { label: 'Níquel (MNI3)', matchers: [/^MNI\d$/i, /\bN[ií]quel\b/i, /\bNickel\b/i] },
             { label: 'Zinco (MZN3)', matchers: [/^MZN\d$/i, /\bZinco\b/i, /\bZinc\b/i] },
@@ -5587,29 +5622,62 @@ function renderCommoditiesOperationalBriefing() {
 
     const scalperPanel = (() => {
         const sign = (v, th = 0.10) => (typeof v === 'number' && Number.isFinite(v) ? (v > th ? +1 : v < -th ? -1 : 0) : 0);
+        const signBp10 = (v, th = 0.35) => (typeof v === 'number' && Number.isFinite(v) ? (v > th ? +1 : v < -th ? -1 : 0) : 0);
         const ok = (a, b, inverse = false) => {
             const sa = sign(a);
             const sb = sign(b);
             if (!sa || !sb) return null;
             return inverse ? (sa === -sb) : (sa === sb);
         };
+        const okBp10 = (aPct, bBp10, inverse = false) => {
+            const sa = sign(aPct);
+            const sb = signBp10(bBp10);
+            if (!sa || !sb) return null;
+            return inverse ? (sa === -sb) : (sa === sb);
+        };
         const gold = cm.market ? cm.market.goldPct : null;
         const oil = (typeof cm.market?.brentPct === 'number' ? cm.market.brentPct : cm.market?.wtiPct) ?? null;
         const dxy = cm.sym && cm.sym.dxy ? getChangePct(data, cm.sym.dxy) : null;
-        const us10y = cm.sym && cm.sym.us10y ? getChangePct(data, cm.sym.us10y) : null;
+        const us10yBp10 = (() => {
+            const s = cm.sym && cm.sym.us10y ? cm.sym.us10y : null;
+            if (!s) return null;
+            const pt = getMostRecentPointWithPrice(data, s) || getLastPoint(data, s);
+            const chg = pt && typeof pt.change === 'number' && Number.isFinite(pt.change) ? pt.change : null;
+            if (!(typeof chg === 'number' && Number.isFinite(chg))) return null;
+            return (chg * 100) / 10;
+        })();
         const xle = cm.sym && cm.sym.xle ? getChangePct(data, cm.sym.xle) : null;
         const usdcad = cm.sym && cm.sym.usdcad ? getChangePct(data, cm.sym.usdcad) : null;
+        const audusd = cm.sym && cm.sym.audusd ? getChangePct(data, cm.sym.audusd) : null;
+        const usdzar = cm.sym && cm.sym.usdzar ? getChangePct(data, cm.sym.usdzar) : null;
+        const usdcnh = cm.sym && cm.sym.usdcnh ? getChangePct(data, cm.sym.usdcnh) : null;
+        const nem = cm.sym && cm.sym.minerNem ? getChangePct(data, cm.sym.minerNem) : null;
+        const au = cm.sym && cm.sym.minerAu ? getChangePct(data, cm.sym.minerAu) : null;
+        const fnv = cm.sym && cm.sym.minerFnv ? getChangePct(data, cm.sym.minerFnv) : null;
+        const gdx = cm.sym && cm.sym.gdx ? getChangePct(data, cm.sym.gdx) : null;
+        const miners = (() => {
+            const xs = [gdx, nem, au, fnv].filter(v => typeof v === 'number' && Number.isFinite(v));
+            if (!xs.length) return null;
+            return xs.reduce((a, b) => a + b, 0) / xs.length;
+        })();
         const copper = cm.sym && cm.sym.copper ? getChangePct(data, cm.sym.copper) : null;
         const spx = cm.sym && cm.sym.spx ? getChangePct(data, cm.sym.spx) : null;
         const hyg = cm.sym && cm.sym.hyg ? getChangePct(data, cm.sym.hyg) : null;
         const vix = cm.sym && cm.sym.vix ? getChangePct(data, cm.sym.vix) : null;
 
         const pGoldDxy = ok(gold, dxy, true);
-        const pGoldY = ok(gold, us10y, true);
+        const pGoldY = okBp10(gold, us10yBp10, true);
+        const pGoldAud = ok(gold, audusd, false);
+        const pGoldZar = ok(gold, usdzar, true);
+        const pGoldMiners = ok(gold, miners, false);
         const pOilXle = ok(oil, xle, false);
         const pOilCad = ok(oil, usdcad, true);
 
         const mk = (label, v) => `<span style="font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(label)} ${escapeHtml(typeof v === 'number' && Number.isFinite(v) ? formatPercent(v, 2) : '—')}</span>`;
+        const mkBp = (label, v) => {
+            const txt = typeof v === 'number' && Number.isFinite(v) ? `${(v * 10) > 0 ? '+' : ''}${formatNumber(v * 10, 1)}bp` : '—';
+            return `<span style="font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(label)} ${escapeHtml(txt)}</span>`;
+        };
         const parityBadge = (name, v) => badge(v === true ? 'positive' : v === false ? 'negative' : 'neutral', `${name}: ${v === true ? 'OK' : v === false ? 'DIVERGE' : '—'}`);
         const risk = (() => {
             const sHyg = sign(hyg, 0.06);
@@ -5629,12 +5697,15 @@ function renderCommoditiesOperationalBriefing() {
                         ${badge(risk.tone, risk.label)}
                         ${parityBadge('Ouro×DXY (inv)', pGoldDxy)}
                         ${parityBadge('Ouro×US10Y (inv)', pGoldY)}
+                        ${parityBadge('Ouro×AUD/USD', pGoldAud)}
+                        ${parityBadge('Ouro×USD/ZAR (inv)', pGoldZar)}
+                        ${parityBadge('Ouro×Miners', pGoldMiners)}
                         ${parityBadge('Petróleo×XLE', pOilXle)}
                         ${parityBadge('Petróleo×USD/CAD (inv)', pOilCad)}
                     </div>
                 </div>
                 <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
-                    ${mk('DXY', dxy)} • ${mk('US10Y', us10y)} • ${mk('HYG', hyg)} • ${mk('VIX', vix)} • ${mk('Cobre', copper)}
+                    ${mk('DXY', dxy)} • ${mkBp('US10Y Δ', us10yBp10)} • ${mk('AUD/USD', audusd)} • ${mk('USD/ZAR', usdzar)} • ${mk('USD/CNH', usdcnh)} • ${mk('Miners', miners)} • ${mk('HYG', hyg)} • ${mk('VIX', vix)} • ${mk('Cobre', copper)}
                 </div>
                 <div style="margin-top:8px;opacity:.78;font-size:12px;line-height:1.35;">
                     Regra de scalp: se paridade-chave divergir, reduzir agressividade e operar apenas com confirmação (rompimento + pullback curto).
@@ -6606,8 +6677,8 @@ let agendaAutoLoading = false;
 let operationalInputs = { regime: null, optionsGamma: null, webNews: null, foreignFlow: null, focusSummary: null, zqCurve: null, macro: null };
 
 const operationalTuning = {
-    threshold: { dxy: 0.12, em: 0.12, export: 0.25, yields: 0.12, foreignFlow: 0.25, zqSlope: 0.08, flowSentinel: 0.25 },
-    weight: { flow: 0.5, dxy: 0.4, export: 0.3, em: 0.4, yields: 0.25, foreignFlow: 0.22, zq: 0.22, flowSentinel: 0.18 },
+    threshold: { dxy: 0.12, em: 0.12, export: 0.25, yields: 0.12, foreignFlow: 0.25, brFlow: 0.22, zqSlope: 0.08, flowSentinel: 0.25 },
+    weight: { flow: 0.5, dxy: 0.4, export: 0.3, em: 0.4, yields: 0.25, foreignFlow: 0.22, brFlow: 0.28, zq: 0.22, flowSentinel: 0.18 },
 };
 
 function loadOperationalTuning() {
@@ -9242,6 +9313,7 @@ function renderOperationalBriefing() {
     if (!el) return;
 
     const data = getData();
+    const assets = data && Array.isArray(data.assets) ? data.assets : [];
     const rawRegime = operationalInputs.regime;
     const rawOptions = operationalInputs.optionsGamma || null;
     const rawWeb = operationalInputs.webNews || null;
@@ -9251,6 +9323,61 @@ function renderOperationalBriefing() {
     try { fetchAgendaAuto(); } catch { }
 
     const dc = (typeof window !== 'undefined' && window.DecisionCore) ? window.DecisionCore : null;
+    const nowMs = Date.now();
+    const mostRecentMs = (symbol) => {
+        if (!data || !symbol) return -Infinity;
+        const last = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol);
+        const t = last && last.t ? Date.parse(String(last.t)) : NaN;
+        return Number.isFinite(t) ? t : -Infinity;
+    };
+    const pickBestByMatchers = (matchers, { limit = 18 } = {}) => {
+        const out = [];
+        const seen = new Set();
+        for (const re of (matchers || [])) {
+            if (!(re instanceof RegExp)) continue;
+            for (const a of assets) {
+                const sym = a && a.symbol ? String(a.symbol) : '';
+                const name = a && a.name ? String(a.name) : '';
+                if (!sym || seen.has(sym)) continue;
+                if (re.test(sym) || re.test(name)) {
+                    out.push(sym);
+                    seen.add(sym);
+                    if (out.length >= limit) break;
+                }
+            }
+        }
+        out.sort((a, b) => mostRecentMs(b) - mostRecentMs(a));
+        return out.length ? out[0] : null;
+    };
+    const aliasSym = (k) => findAliasSymbolBest(data, k) || findAliasSymbol(data, k);
+    const pickFreshestCandidate = (candidates) => {
+        const list = Array.isArray(candidates) ? candidates : [];
+        const syms = [];
+        for (const c of list) {
+            if (!c) continue;
+            if (c.symbol) syms.push(String(c.symbol));
+            else if (c.aliasKey) {
+                const s = aliasSym(c.aliasKey);
+                if (s) syms.push(String(s));
+            } else if (c.matcher instanceof RegExp) {
+                const s = pickBestByMatchers([c.matcher]);
+                if (s) syms.push(String(s));
+            }
+        }
+        const uniq = Array.from(new Set(syms.filter(Boolean)));
+        const ok = uniq.filter(s => data && data.series && Array.isArray(data.series[s]) && data.series[s].length);
+        ok.sort((a, b) => mostRecentMs(b) - mostRecentMs(a));
+        return ok.length ? ok[0] : (uniq.length ? uniq[0] : null);
+    };
+    const yieldBp10FromSymbol = (symbol) => {
+        if (!data || !symbol) return null;
+        const pt = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol);
+        const chg = pt && typeof pt.change === 'number' && Number.isFinite(pt.change) ? pt.change : null;
+        if (!(typeof chg === 'number' && Number.isFinite(chg))) return null;
+        const bps = chg * 100;
+        if (!Number.isFinite(bps)) return null;
+        return bps / 10;
+    };
     const agendaIntel = (() => {
         const items = Array.isArray(agendaAutoCache) ? agendaAutoCache : (window.ECONOMIC_CALENDAR_DATA && Array.isArray(window.ECONOMIC_CALENDAR_DATA.items) ? window.ECONOMIC_CALENDAR_DATA.items : []);
         if (!dc || typeof dc.analyzeAgenda !== 'function') return { upcoming: [], next: { any: null, high: null, medium: null }, inWindow: [], risk: 'baixo' };
@@ -9265,7 +9392,7 @@ function renderOperationalBriefing() {
             ? catalog.resolveRatesCreditByKey(catDeps, data, key)
             : null;
         if (sym) return sym;
-        if (fallbackMatcher instanceof RegExp) return findAssetSymbol(data, fallbackMatcher);
+        if (fallbackMatcher instanceof RegExp) return pickBestByMatchers([fallbackMatcher]);
         return null;
     };
     const agendaNext = agendaIntel && agendaIntel.next ? agendaIntel.next.any : null;
@@ -9276,7 +9403,7 @@ function renderOperationalBriefing() {
     const agendaValidation = (() => {
         if (!dc || !data || !agendaNext) return { score: null, label: '—', detail: '', keys: [] };
         const cur = String(agendaNext.currency || '').toUpperCase();
-        const pick = (candidates) => dc.pickSymbol(dcDeps, data, candidates);
+        const pick = (candidates) => pickFreshestCandidate(candidates);
 
         const candFor = (k) => {
             const key = String(k || '').toUpperCase();
@@ -9435,6 +9562,95 @@ function renderOperationalBriefing() {
     };
 
     const macro = operationalInputs.macro || null;
+    const brFlowSignal = (() => {
+        if (!data) return { score: null, label: '—', confidence: null, detail: '', drivers: [] };
+        const symUsdBrl = aliasSym('USD_BRL') || pickBestByMatchers([/^USD\/BRL\b/i]);
+        const symDxy = aliasSym('DXY') || pickBestByMatchers([/(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index)/i]);
+        const symVix = findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX30') || aliasSym('VIX') || pickBestByMatchers([/^\.?VIX(9D)?$/i, /^VIX$/i]);
+        const symUs10 = rcKey('US_10Y', /(^US10YT=RR$|^\^TNX$|\bUS\s*10Y\b|^\.TNX$)/i) || aliasSym('US10Y') || pickBestByMatchers([/(^US10YT=RR$|^\^TNX$|\bUS\s*10Y\b|^\.TNX$)/i]);
+        const symBr10 = rcKey('BR_10Y', /^BR10YT=RR$/i) || aliasSym('BR10Y') || pickBestByMatchers([/^BR10YT=RR$/i]);
+        const symHyg = rcKey('ETF_HYG', /^HYG(\.\w+)?$/i) || aliasSym('HYG') || pickBestByMatchers([/^HYG(\.\w+)?$/i]);
+        const symEem = aliasSym('EEM') || pickBestByMatchers([/^EEM(\.\w+)?$/i, /^VWO(\.\w+)?$/i]);
+        const symCds = rcKey('CDS_BR_5Y', /^BRGV5YUSAC=R$/i) || aliasSym('CDS_BR5Y') || pickBestByMatchers([/^BRGV5YUSAC=R$/i, /^BRGV/i]);
+
+        const pct = (s) => {
+            const v = s ? getChangePct(data, s) : null;
+            return typeof v === 'number' && Number.isFinite(v) ? v : null;
+        };
+        const usdPct = pct(symUsdBrl);
+        const dxyPct = pct(symDxy);
+        const vixPct = pct(symVix);
+        const hygPct = pct(symHyg);
+        const eemPct = pct(symEem);
+        const cdsPct = pct(symCds);
+        const us10Bp10 = yieldBp10FromSymbol(symUs10);
+        const br10Bp10 = yieldBp10FromSymbol(symBr10);
+        const emPct = (macro && macro.em && typeof macro.em.pct === 'number' && Number.isFinite(macro.em.pct)) ? macro.em.pct : eemPct;
+        const exportScore = (macro && typeof macro.exportScore === 'number' && Number.isFinite(macro.exportScore)) ? macro.exportScore : null;
+        const flowScore = (foreignFlow && foreignFlow.signal && typeof foreignFlow.signal.score === 'number' && Number.isFinite(foreignFlow.signal.score)) ? foreignFlow.signal.score : null;
+
+        const toDir = (v, t) => {
+            if (!(typeof v === 'number' && Number.isFinite(v))) return 0;
+            if (v > t) return +1;
+            if (v < -t) return -1;
+            return 0;
+        };
+        const tFx = 0.12;
+        const tVol = 0.25;
+        const tCredit = 0.18;
+        const tRates = typeof operationalTuning.threshold.yields === 'number' && Number.isFinite(operationalTuning.threshold.yields) ? operationalTuning.threshold.yields : 0.12;
+        const tEm = typeof operationalTuning.threshold.em === 'number' && Number.isFinite(operationalTuning.threshold.em) ? operationalTuning.threshold.em : 0.12;
+        const tExport = typeof operationalTuning.threshold.export === 'number' && Number.isFinite(operationalTuning.threshold.export) ? operationalTuning.threshold.export : 0.25;
+        const tFlow = typeof operationalTuning.threshold.foreignFlow === 'number' && Number.isFinite(operationalTuning.threshold.foreignFlow) ? operationalTuning.threshold.foreignFlow : 0.25;
+
+        const parts = [];
+        const push = (label, dir, w) => {
+            if (!dir || !(w > 0)) return;
+            parts.push({ label, dir, w });
+        };
+        push('DXY (↓)', toDir(dxyPct !== null ? -dxyPct : null, tFx), 0.18);
+        push('VIX (↓)', toDir(vixPct !== null ? -vixPct : null, tVol), 0.12);
+        push('US10Y (Δbp ↓)', toDir(us10Bp10 !== null ? -us10Bp10 : null, tRates), 0.12);
+        push('BR10Y (Δbp ↓)', toDir(br10Bp10 !== null ? -br10Bp10 : null, tRates), 0.10);
+        push('HYG (↑)', toDir(hygPct, tCredit), 0.10);
+        push('EM (↑)', toDir(emPct, tEm), 0.12);
+        push('Export Basket (↑)', toDir(exportScore, tExport), 0.10);
+        push('USD/BRL (↓)', toDir(usdPct !== null ? -usdPct : null, tFx), 0.10);
+        push('Fluxo estrangeiro (↑)', toDir(flowScore, tFlow), 0.06);
+        push('CDS BR (↓)', toDir(cdsPct !== null ? -cdsPct : null, 0.12), 0.06);
+
+        const wSum = parts.reduce((acc, p) => acc + p.w, 0);
+        const score = wSum > 0 ? parts.reduce((acc, p) => acc + (p.dir * p.w), 0) / wSum : null;
+
+        const cov = (dc && typeof dc.computeCoverage === 'function')
+            ? dc.computeCoverage(dcDeps, data, [symUsdBrl, symDxy, symVix, symUs10, symBr10, symHyg, symEem].filter(Boolean), { nowMs, staleMs: 6 * 60 * 60 * 1000 })
+            : null;
+        const confidence = cov
+            ? Math.max(0, Math.min(1, (0.55 * cov.ratios.change) + (0.45 * cov.ratios.freshness)))
+            : null;
+
+        const label = (() => {
+            if (!(typeof score === 'number' && Number.isFinite(score))) return '—';
+            const abs = Math.abs(score);
+            const conf = typeof confidence === 'number' && Number.isFinite(confidence) ? confidence : 0.5;
+            if (abs >= 0.55 && conf >= 0.72) return score > 0 ? 'ENTRADA FORTE' : 'SAÍDA FORTE';
+            if (abs >= 0.38 && conf >= 0.62) return score > 0 ? 'ENTRADA' : 'SAÍDA';
+            return 'MISTO';
+        })();
+
+        const detail = cov
+            ? `validadores ${cov.counts.withChange}/${cov.counts.expected} • fresh ${formatNumber(cov.ratios.freshness * 100, 0)}%`
+            : '';
+
+        const drivers = parts
+            .slice()
+            .sort((a, b) => (b.w - a.w))
+            .slice(0, 6)
+            .map(p => p.label);
+
+        return { score: (typeof score === 'number' && Number.isFinite(score)) ? score : null, label, confidence, detail, drivers };
+    })();
+
     const macroBiasFor = symbol => {
         if (!macro) return { bias: 'neutral', score: 0, parts: [] };
         const neutral = t => String(t || '').toLowerCase().includes('neutro');
@@ -9472,17 +9688,31 @@ function renderOperationalBriefing() {
             const b = symbol === 'WDO' ? dir : -dir;
             push('Emergentes (EM)', b, operationalTuning.weight.em);
         }
-        if (macro.yields) {
-            const y = macro.yields;
-            if (typeof y.us10yPct === 'number' && Number.isFinite(y.us10yPct)) {
-                const dir = y.us10yPct > operationalTuning.threshold.yields ? +1 : y.us10yPct < -operationalTuning.threshold.yields ? -1 : 0;
+        if (brFlowSignal && typeof brFlowSignal.score === 'number' && Number.isFinite(brFlowSignal.score)) {
+            const t = typeof operationalTuning.threshold.brFlow === 'number' && Number.isFinite(operationalTuning.threshold.brFlow) ? operationalTuning.threshold.brFlow : 0.22;
+            const dir = brFlowSignal.score > t ? +1 : brFlowSignal.score < -t ? -1 : 0;
+            const b = symbol === 'WDO' ? -dir : +dir;
+            const wBr = typeof operationalTuning.weight.brFlow === 'number' && Number.isFinite(operationalTuning.weight.brFlow) ? operationalTuning.weight.brFlow : 0.28;
+            push(`Fluxo global→BR (${brFlowSignal.label})`, b, wBr);
+        }
+        if (data) {
+            const t = typeof operationalTuning.threshold.yields === 'number' && Number.isFinite(operationalTuning.threshold.yields)
+                ? operationalTuning.threshold.yields
+                : 0.12;
+            const symUs10 = rcKey('US_10Y', /(^US10YT=RR$|^\^TNX$|\bUS\s*10Y\b|^\.TNX$)/i) || aliasSym('US10Y') || pickBestByMatchers([/(^US10YT=RR$|^\^TNX$|\bUS\s*10Y\b|^\.TNX$)/i]);
+            const us10 = yieldBp10FromSymbol(symUs10);
+            if (typeof us10 === 'number' && Number.isFinite(us10)) {
+                const dir = us10 > t ? +1 : us10 < -t ? -1 : 0;
                 const b = symbol === 'WDO' ? dir : -dir;
-                push('US10Y', b, operationalTuning.weight.yields);
+                push('US10Y (Δbp)', b, operationalTuning.weight.yields);
             }
-            if (typeof y.br10yPct === 'number' && Number.isFinite(y.br10yPct)) {
-                const dir = y.br10yPct > operationalTuning.threshold.yields ? +1 : y.br10yPct < -operationalTuning.threshold.yields ? -1 : 0;
+
+            const symBr10 = rcKey('BR_10Y', /^BR10YT=RR$/i) || aliasSym('BR10Y') || pickBestByMatchers([/^BR10YT=RR$/i]);
+            const br10 = yieldBp10FromSymbol(symBr10);
+            if (typeof br10 === 'number' && Number.isFinite(br10)) {
+                const dir = br10 > t ? +1 : br10 < -t ? -1 : 0;
                 const b = symbol === 'WDO' ? dir : -dir;
-                push('BR10Y', b, operationalTuning.weight.yields * 0.8);
+                push('BR10Y (Δbp)', b, operationalTuning.weight.yields * 0.8);
             }
         }
         if (macro.zq && typeof macro.zq.slopePct === 'number' && Number.isFinite(macro.zq.slopePct)) {
@@ -9556,10 +9786,12 @@ function renderOperationalBriefing() {
             .map(symbol => {
                 const last = getMostRecentPointWithPrice(data, symbol);
                 const rate = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
+                const chg = last && typeof last.change === 'number' && Number.isFinite(last.change) ? last.change : null;
+                const chgBp10 = typeof chg === 'number' && Number.isFinite(chg) ? (chg * 100) / 10 : null;
                 const chgPct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
                 const y = 2000 + Number(String(symbol).slice(-2));
                 const m = monthNum(String(symbol)[3]);
-                return { symbol, rate, chgPct, year: Number.isFinite(y) ? y : null, month: m };
+                return { symbol, rate, chgBp10, chgPct, year: Number.isFinite(y) ? y : null, month: m };
             })
             .filter(x => x.rate !== null && x.year !== null && x.month !== null)
             .map(x => ({ ...x, yrs: maturityYears(x.year, x.month) }))
@@ -9601,16 +9833,16 @@ function renderOperationalBriefing() {
         const midRate = avg(mid.map(x => x.rate));
         const longRate = avg(long.map(x => x.rate));
 
-        const shortChg = avg(short.map(x => x.chgPct));
-        const midChg = avg(mid.map(x => x.chgPct));
-        const longChg = avg(long.map(x => x.chgPct));
+        const shortChg = avg(short.map(x => x.chgBp10));
+        const midChg = avg(mid.map(x => x.chgBp10));
+        const longChg = avg(long.map(x => x.chgBp10));
 
-        const avgChg = avg(list.map(x => x.chgPct));
-        const medChg = median(list.map(x => x.chgPct));
+        const avgChg = avg(list.map(x => x.chgBp10));
+        const medChg = median(list.map(x => x.chgBp10));
         const slope = typeof longRate === 'number' && typeof shortRate === 'number' ? (longRate - shortRate) : null;
         const shape = slope === null ? 'N/A' : slope > 0.15 ? 'STEEPEN' : slope < -0.15 ? 'FLATTEN' : '≈';
 
-        const th = 0.08;
+        const th = 0.35;
         const dirUsd = typeof medChg === 'number' && Number.isFinite(medChg) ? (medChg > th ? 1 : medChg < -th ? -1 : 0) : 0;
         const wdoBias = dirUsd > 0 ? 'buy' : dirUsd < 0 ? 'sell' : 'neutral';
         const winBias = dirUsd > 0 ? 'sell' : dirUsd < 0 ? 'buy' : 'neutral';
@@ -10048,11 +10280,11 @@ function renderOperationalBriefing() {
             if (diSignal && diSignal.ok) {
                 const a = diSignal.anchors || {};
                 const anchorShort = a && a.short ? a.short : null;
-                const d = anchorShort && typeof anchorShort.chgPct === 'number' && Number.isFinite(anchorShort.chgPct) ? `${formatNumber(anchorShort.chgPct, 2)}%` : '—';
+                const d = anchorShort && typeof anchorShort.chgPct === 'number' && Number.isFinite(anchorShort.chgPct) ? `${(anchorShort.chgPct * 10) > 0 ? '+' : ''}${formatNumber(anchorShort.chgPct * 10, 1)}bp` : '—';
                 const b = sym === 'WDO' ? diSignal.wdoBias : sym === 'WIN' ? diSignal.winBias : 'neutral';
                 const bt = b === 'buy' ? 'COMPRA' : b === 'sell' ? 'VENDA' : 'NEUTRO';
                 const lab = anchorShort && anchorShort.symbol ? `Curto ${anchorShort.symbol}` : 'Curto';
-                lines.push(`DI (B3): ${diSignal.shape} • ${lab} Δ% ${d} → ${bt}`);
+                lines.push(`DI (B3): ${diSignal.shape} • ${lab} Δ ${d} → ${bt}`);
             }
             const a = agendaIntel && agendaIntel.inWindow ? agendaIntel.inWindow : [];
             if (a && a.length) {
@@ -10183,11 +10415,11 @@ function renderOperationalBriefing() {
                 const symUsd = findAliasSymbolBest(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i);
                 const symIbov = findAliasSymbolBest(data, 'IBOV') || findAssetSymbol(data, /(^\.BVSP$|\bIbovespa\b|\bIBOV\b)/i);
                 const symEwz = findAliasSymbolBest(data, 'EWZ') || findAssetSymbol(data, /^EWZ$/i);
-                const symBr10y = rcKey('BR_10Y', /^BR10YT=RR$/i) || findAssetSymbol(data, /\bBR10Y\b/i);
+                const symBr10y = rcKey('BR_10Y', /^BR10YT=RR$/i) || aliasSym('BR10Y') || pickBestByMatchers([/^BR10YT=RR$/i]);
                 const usd = symUsd ? getChangePct(data, symUsd) : null;
                 const ibov = symIbov ? getChangePct(data, symIbov) : null;
                 const ewz = symEwz ? getChangePct(data, symEwz) : null;
-                const br10y = symBr10y ? getChangePct(data, symBr10y) : null;
+                const br10y = symBr10y ? yieldBp10FromSymbol(symBr10y) : null;
 
                 const hasUsd = typeof usd === 'number' && Number.isFinite(usd);
                 const hasIbov = typeof ibov === 'number' && Number.isFinite(ibov);
@@ -10205,8 +10437,8 @@ function renderOperationalBriefing() {
                 const brlWeaker = hasUsd && usd > 0.25;
                 const eqUp = hasEq && eq > 0.25;
                 const eqDown = hasEq && eq < -0.25;
-                const yieldsDown = hasBr10y && br10y < -0.12;
-                const yieldsUp = hasBr10y && br10y > 0.12;
+                const yieldsDown = hasBr10y && br10y < -0.35;
+                const yieldsUp = hasBr10y && br10y > 0.35;
 
                 let label = null;
                 if (dir === 'ENTRANDO') {
@@ -10248,8 +10480,12 @@ function renderOperationalBriefing() {
             if (!data) return '';
             const parts = [];
             const y = macro && macro.yields ? macro.yields : null;
-            if (y && typeof y.us10yPct === 'number' && Number.isFinite(y.us10yPct)) parts.push(`Juros US10Y ${formatPercent(y.us10yPct, 2)}`);
-            if (y && typeof y.br10yPct === 'number' && Number.isFinite(y.br10yPct)) parts.push(`Juros BR10Y ${formatPercent(y.br10yPct, 2)}`);
+            const symUs10 = rcKey('US_10Y', /(^US10YT=RR$|^\^TNX$|\bUS\s*10Y\b|^\.TNX$)/i) || aliasSym('US10Y') || pickBestByMatchers([/(^US10YT=RR$|^\^TNX$|\bUS\s*10Y\b|^\.TNX$)/i]);
+            const us10 = yieldBp10FromSymbol(symUs10);
+            if (typeof us10 === 'number' && Number.isFinite(us10)) parts.push(`US10Y Δ ${(us10 * 10) > 0 ? '+' : ''}${formatNumber(us10 * 10, 1)}bp`);
+            const symBr10 = rcKey('BR_10Y', /^BR10YT=RR$/i) || aliasSym('BR10Y') || pickBestByMatchers([/^BR10YT=RR$/i]);
+            const br10 = yieldBp10FromSymbol(symBr10);
+            if (typeof br10 === 'number' && Number.isFinite(br10)) parts.push(`BR10Y Δ ${(br10 * 10) > 0 ? '+' : ''}${formatNumber(br10 * 10, 1)}bp`);
             const zq = macro && macro.zq ? macro.zq : null;
             if (zq && typeof zq.slopePct === 'number' && Number.isFinite(zq.slopePct)) {
                 const rm = zq.riskMode ? String(zq.riskMode) : '';
@@ -10317,7 +10553,10 @@ function renderOperationalBriefing() {
             }
             return parts.length ? ` • ${parts.join(' • ')}` : '';
         })();
-        return `Flow ${String(macro.flow ? macro.flow.label : '—')} • ${foreignPart} • DXY ${typeof macro.dxyPct === 'number' ? formatPercent(macro.dxyPct, 2) : '—'} • Export ${typeof macro.exportScore === 'number' ? formatPercent(macro.exportScore, 2) : '—'} • EM ${typeof (macro.em && macro.em.pct) === 'number' ? formatPercent(macro.em.pct, 2) : '—'}${corrPart ? ` • ${corrPart}` : ''}${extras}${cdsSignal ? ` • CDS ${typeof cdsSignal.drivers.cds === 'number' ? formatPercent(cdsSignal.drivers.cds, 2) : '—'} (${cdsSignal.mode === 'hedge_on_risk_on' ? 'Hedge-on' : cdsSignal.mode === 'risk_off_classic' ? 'Risk-off' : cdsSignal.mode === 'relief_risk_on' ? 'Alívio' : 'Leitura'})` : ''}`;
+        const brFlowPart = (brFlowSignal && typeof brFlowSignal.score === 'number' && Number.isFinite(brFlowSignal.score))
+            ? `Fluxo→BR ${brFlowSignal.label} (${formatNumber(brFlowSignal.score, 2)}${brFlowSignal.detail ? ` • ${brFlowSignal.detail}` : ''})`
+            : 'Fluxo→BR: —';
+        return `Flow ${String(macro.flow ? macro.flow.label : '—')} • ${foreignPart} • ${brFlowPart} • DXY ${typeof macro.dxyPct === 'number' ? formatPercent(macro.dxyPct, 2) : '—'} • Export ${typeof macro.exportScore === 'number' ? formatPercent(macro.exportScore, 2) : '—'} • EM ${typeof (macro.em && macro.em.pct) === 'number' ? formatPercent(macro.em.pct, 2) : '—'}${corrPart ? ` • ${corrPart}` : ''}${extras}${cdsSignal ? ` • CDS ${typeof cdsSignal.drivers.cds === 'number' ? formatPercent(cdsSignal.drivers.cds, 2) : '—'} (${cdsSignal.mode === 'hedge_on_risk_on' ? 'Hedge-on' : cdsSignal.mode === 'risk_off_classic' ? 'Risk-off' : cdsSignal.mode === 'relief_risk_on' ? 'Alívio' : 'Leitura'})` : ''}`;
     })();
 
     const corrLine = (() => {
@@ -10702,18 +10941,26 @@ function renderOperationalBriefing() {
             const flowBias = side === 'win' ? (flowDir > 0 ? 'buy' : flowDir < 0 ? 'sell' : 'neutral') : (flowDir > 0 ? 'sell' : flowDir < 0 ? 'buy' : 'neutral');
             const flowStrong = typeof flowScore === 'number' && Math.abs(flowScore) >= tFlow;
 
+            const brScore = brFlowSignal && typeof brFlowSignal.score === 'number' && Number.isFinite(brFlowSignal.score) ? brFlowSignal.score : null;
+            const tBr = typeof operationalTuning.threshold.brFlow === 'number' && Number.isFinite(operationalTuning.threshold.brFlow) ? operationalTuning.threshold.brFlow : 0.22;
+            const brDir = typeof brScore === 'number' ? (brScore > tBr ? +1 : brScore < -tBr ? -1 : 0) : 0;
+            const brBias = side === 'win' ? (brDir > 0 ? 'buy' : brDir < 0 ? 'sell' : 'neutral') : (brDir > 0 ? 'sell' : brDir < 0 ? 'buy' : 'neutral');
+            const brStrong = typeof brScore === 'number' && Math.abs(brScore) >= Math.max(0.28, tBr) && (brFlowSignal && typeof brFlowSignal.confidence === 'number' ? brFlowSignal.confidence >= 0.62 : true);
+
             const conflictsWith = (a, b) => (a !== 'neutral' && b !== 'neutral' && a !== b);
             const hardBlock = conflictsWith(scalpBiasRaw, ctxBias) && ctxStrong;
             const flowBlock = conflictsWith(scalpBiasRaw, flowBias) && flowStrong;
+            const brFlowBlock = conflictsWith(scalpBiasRaw, brBias) && brStrong;
             const parityBlock = parity.ok === false && Math.abs(sign(selfPct)) > 0;
 
-            const scalpBias = (hardBlock || flowBlock || parityBlock) ? 'neutral' : scalpBiasRaw;
+            const scalpBias = (hardBlock || flowBlock || brFlowBlock || parityBlock) ? 'neutral' : scalpBiasRaw;
             const tone = scalpBias === 'buy' ? 'positive' : scalpBias === 'sell' ? 'negative' : 'neutral';
             const txt = scalpBias === 'buy' ? 'COMPRA' : scalpBias === 'sell' ? 'VENDA' : 'NEUTRO';
             const ctxTxt = ctxBias === 'buy' ? 'Compra' : ctxBias === 'sell' ? 'Venda' : 'Neutro';
             const flowTxt = typeof flowScore === 'number' ? `Fluxo ${formatNumber(flowScore, 2)} (${flowBias === 'buy' ? 'Compra' : flowBias === 'sell' ? 'Venda' : 'Neutro'})` : 'Fluxo: —';
+            const brTxt = typeof brScore === 'number' ? `Fluxo→BR ${brFlowSignal && brFlowSignal.label ? brFlowSignal.label : ''} ${formatNumber(brScore, 2)} (${brBias === 'buy' ? 'Compra' : brBias === 'sell' ? 'Venda' : 'Neutro'})` : 'Fluxo→BR: —';
             const ctxTone = conflictsWith(scalpBiasRaw, ctxBias) ? 'negative' : (ctxBias !== 'neutral' ? 'positive' : 'neutral');
-            const blockReason = hardBlock ? 'Bloqueado por risco/paridade (contexto forte)' : flowBlock ? 'Bloqueado por fluxo (forte)' : parityBlock ? 'Bloqueado por paridade' : '';
+            const blockReason = hardBlock ? 'Bloqueado por risco/paridade (contexto forte)' : flowBlock ? 'Bloqueado por fluxo estrangeiro (forte)' : brFlowBlock ? 'Bloqueado por fluxo global→BR (forte)' : parityBlock ? 'Bloqueado por paridade' : '';
 
             const winStats = (lookbackMs) => {
                 const s = String(sym || '');
@@ -10987,6 +11234,7 @@ function renderOperationalBriefing() {
                     <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                         ${badge(parity.ok === false ? 'negative' : parity.ok === true ? 'positive' : 'neutral', escapeHtml(parity.label))}
                         ${badge(flowStrong && conflictsWith(scalpBiasRaw, flowBias) ? 'negative' : flowBias !== 'neutral' ? 'neutral' : 'neutral', escapeHtml(flowTxt))}
+                        ${badge(brStrong && conflictsWith(scalpBiasRaw, brBias) ? 'negative' : brBias !== 'neutral' ? 'neutral' : 'neutral', escapeHtml(brTxt))}
                     </div>
                     <div style="margin-top:10px;border:1px dashed rgba(255,255,255,.16);border-radius:12px;padding:10px;background:rgba(0,0,0,.14);">
                         <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:6px;">Gatilhos (entrada)</div>
@@ -11004,15 +11252,17 @@ function renderOperationalBriefing() {
             `;
         };
 
-        const wdoCard = mk('WDO (Day Trade)', symWdo, 'WDO', { th5: 0.05, th15: 0.10 });
-        const winCard = mk('WIN (Day Trade)', symWin, 'WIN', { th5: 0.05, th15: 0.10 });
+        const amp = volAmp && typeof volAmp.amp === 'number' && Number.isFinite(volAmp.amp) ? volAmp.amp : 1;
+        const adj = amp >= 1.25 ? 1.25 : amp >= 1.12 ? 1.12 : amp <= 0.90 ? 0.85 : 1;
+        const wdoCard = mk('WDO (Day Trade)', symWdo, 'WDO', { th5: 0.05 * adj, th15: 0.10 * adj });
+        const winCard = mk('WIN (Day Trade)', symWin, 'WIN', { th5: 0.05 * adj, th15: 0.10 * adj });
         if (!wdoCard && !winCard) return '';
 
         return `
             <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
                     <div style="font-weight:900;letter-spacing:1px;opacity:.95;">⚡ Scalp (Day Trade) — WDO • WIN</div>
-                    <div style="opacity:.78;font-size:12px;">Sinal curto baseado em 5m×15m (microtendência) + Range30 (gestão).</div>
+                    <div style="opacity:.78;font-size:12px;">Sinal curto baseado em 5m×15m (microtendência) + Range30 (gestão) • thresholds ajustam por volAmp.</div>
                 </div>
                 <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;">
                     ${wdoCard}
@@ -11257,6 +11507,85 @@ function renderOperationalBriefing() {
         `;
     })();
 
+    const auditLine = (() => {
+        const now = Date.now();
+        const staleMs = 6 * 60 * 60 * 1000;
+        const ageText = (t) => {
+            const ms = t ? Date.parse(String(t)) : NaN;
+            if (!Number.isFinite(ms)) return '—';
+            const age = now - ms;
+            if (!Number.isFinite(age) || age < 0) return '—';
+            const m = Math.round(age / 60000);
+            if (m < 60) return `${m}m`;
+            const h = Math.round(m / 60);
+            return `${h}h`;
+        };
+        const toneFromAge = (t) => {
+            const ms = t ? Date.parse(String(t)) : NaN;
+            if (!Number.isFinite(ms)) return 'neutral';
+            const age = now - ms;
+            if (!Number.isFinite(age) || age < 0) return 'neutral';
+            if (age <= staleMs) return 'positive';
+            return 'neutral';
+        };
+        const pickTs = (x) => {
+            if (!x) return null;
+            if (x.generatedAt) return x.generatedAt;
+            if (x.source && x.source.updatedAt) return x.source.updatedAt;
+            if (x.source && x.source.publishedAt) return x.source.publishedAt;
+            return null;
+        };
+        const quotesTs = data && data.generatedAt ? data.generatedAt : null;
+        const regTs = regime && regime.updatedAt ? regime.updatedAt : null;
+        const optTs = pickTs(rawOptions);
+        const webTs = pickTs(rawWeb);
+        const flowTs = pickTs(rawForeign);
+        const focusTs = pickTs(rawFocus);
+        const zqTs = macro && macro.zq && macro.zq.generatedAt ? macro.zq.generatedAt : null;
+
+        const bits = [
+            badge(toneFromAge(quotesTs), `Quotes ${ageText(quotesTs)}`),
+            badge(regime ? 'neutral' : 'negative', `Regime ${regime ? 'OK' : '—'}`),
+            badge(rawOptions && rawOptions.ok === true ? toneFromAge(optTs) : 'neutral', `Opções ${rawOptions && rawOptions.ok === true ? ageText(optTs) : '—'}`),
+            badge(rawWeb && rawWeb.ok === true ? toneFromAge(webTs) : 'neutral', `News ${rawWeb && rawWeb.ok === true ? ageText(webTs) : '—'}`),
+            badge(rawForeign && rawForeign.ok === true ? toneFromAge(flowTs) : 'neutral', `Fluxo ${rawForeign && rawForeign.ok === true ? ageText(flowTs) : '—'}`),
+            badge(rawFocus && rawFocus.ok === true ? toneFromAge(focusTs) : 'neutral', `Focus ${rawFocus && rawFocus.ok === true ? ageText(focusTs) : '—'}`),
+            badge(zqTs ? toneFromAge(zqTs) : 'neutral', `ZQ ${zqTs ? ageText(zqTs) : '—'}`),
+        ];
+        return `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;opacity:.95;">${bits.join('')}</div>`;
+    })();
+
+    const brFlowModule = (() => {
+        if (!brFlowSignal || typeof brFlowSignal.score !== 'number' || !Number.isFinite(brFlowSignal.score)) return '';
+        const s = brFlowSignal.score;
+        const c = (typeof brFlowSignal.confidence === 'number' && Number.isFinite(brFlowSignal.confidence)) ? brFlowSignal.confidence : null;
+        const tone = (s >= 0.38 && (c === null || c >= 0.62)) ? 'positive' : (s <= -0.38 && (c === null || c >= 0.62)) ? 'negative' : 'neutral';
+        const bias = s > 0.22 ? 'Entrada em BR/EM' : s < -0.22 ? 'Saída de BR/EM' : 'Misto';
+        const confTxt = c === null ? '—' : `${formatNumber(c * 100, 0)}%`;
+        const drivers = Array.isArray(brFlowSignal.drivers) ? brFlowSignal.drivers.slice(0, 6) : [];
+        const driversTxt = drivers.length ? drivers.join(' • ') : '—';
+        const guide = s > 0.22
+            ? 'Tese: fluxo global favorecendo emergentes/Brasil → tende a WIN↑ e WDO↓ (buscar alvos curtos a favor, evitar vender WIN “no dedo”).'
+            : s < -0.22
+                ? 'Tese: fluxo global saindo de emergentes/Brasil → tende a WIN↓ e WDO↑ (buscar alvos curtos a favor, evitar comprar WIN “no dedo”).'
+                : 'Tese: misto → priorize scalp por níveis (range) e confirme em 5m×15m.';
+
+        return `
+            <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <div style="font-weight:900;letter-spacing:1px;opacity:.95;">📌 Fluxo Global → Brasil (sinal de alta prob.)</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        ${badge(tone, `${bias}`)}
+                        ${badge('neutral', `Score ${formatNumber(s, 2)}`)}
+                        ${badge('neutral', `Conf ${confTxt}`)}
+                    </div>
+                </div>
+                <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">Drivers: ${escapeHtml(driversTxt)}${brFlowSignal.detail ? ` • ${escapeHtml(brFlowSignal.detail)}` : ''}</div>
+                <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">${escapeHtml(guide)}</div>
+            </div>
+        `;
+    })();
+
     el.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
             <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Roteiro do momento</div>
@@ -11266,6 +11595,8 @@ function renderOperationalBriefing() {
                 <button type="button" id="opTuningToggle" style="border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:4px 10px;background:#151515;color:#e0e0e0;font-weight:900;letter-spacing:.6px;cursor:pointer;">Ajustes</button>
             </div>
         </div>
+        ${auditLine}
+        ${brFlowModule}
         <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
             ${escapeHtml(regimeLine)} • ${escapeHtml(agendaLine)} • ${escapeHtml(newsLine)} • ${escapeHtml(macroLine)}${corrLine ? ` • ${escapeHtml(corrLine)}` : ''}
         </div>
@@ -11288,8 +11619,12 @@ function renderOperationalBriefing() {
                     <input id="op-th-export" type="range" min="0" max="0.6" step="0.01" value="${operationalTuning.threshold.export}" />
                 </div>
                 <div>
-                    <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Threshold Juros (${formatNumber(operationalTuning.threshold.yields, 2)})</div>
-                    <input id="op-th-yields" type="range" min="0" max="0.5" step="0.01" value="${operationalTuning.threshold.yields}" />
+                    <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Threshold Juros (Δbp/10) (${formatNumber(operationalTuning.threshold.yields, 2)})</div>
+                    <input id="op-th-yields" type="range" min="0" max="2" step="0.01" value="${operationalTuning.threshold.yields}" />
+                </div>
+                <div>
+                    <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Threshold Fluxo→BR (${formatNumber(operationalTuning.threshold.brFlow, 2)})</div>
+                    <input id="op-th-brflow" type="range" min="0" max="0.8" step="0.01" value="${operationalTuning.threshold.brFlow}" />
                 </div>
                 <div>
                     <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Threshold ZQ slope (${formatNumber(operationalTuning.threshold.zqSlope, 2)}%)</div>
@@ -11316,6 +11651,10 @@ function renderOperationalBriefing() {
                 <div>
                     <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Peso Juros (${formatNumber(operationalTuning.weight.yields, 2)})</div>
                     <input id="op-w-yields" type="range" min="0" max="1" step="0.01" value="${operationalTuning.weight.yields}" />
+                </div>
+                <div>
+                    <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Peso Fluxo→BR (${formatNumber(operationalTuning.weight.brFlow, 2)})</div>
+                    <input id="op-w-brflow" type="range" min="0" max="1" step="0.01" value="${operationalTuning.weight.brFlow}" />
                 </div>
                 <div>
                     <div style="opacity:.85;font-size:12px;margin-bottom:4px;">Peso ZQ (${formatNumber(operationalTuning.weight.zq, 2)})</div>
@@ -11539,8 +11878,8 @@ function renderOperationalBriefing() {
                     const aL = diSignal.anchors && diSignal.anchors.long ? diSignal.anchors.long : null;
                     const shortLab = aS && aS.symbol ? String(aS.symbol) : '';
                     const longLab = aL && aL.symbol ? String(aL.symbol) : '';
-                    const shortChg = aS && typeof aS.chgPct === 'number' && Number.isFinite(aS.chgPct) ? `${formatNumber(aS.chgPct, 2)}%` : '—';
-                    const longChg = aL && typeof aL.chgPct === 'number' && Number.isFinite(aL.chgPct) ? `${formatNumber(aL.chgPct, 2)}%` : '—';
+                    const shortChg = aS && typeof aS.chgPct === 'number' && Number.isFinite(aS.chgPct) ? `${(aS.chgPct * 10) > 0 ? '+' : ''}${formatNumber(aS.chgPct * 10, 1)}bp` : '—';
+                    const longChg = aL && typeof aL.chgPct === 'number' && Number.isFinite(aL.chgPct) ? `${(aL.chgPct * 10) > 0 ? '+' : ''}${formatNumber(aL.chgPct * 10, 1)}bp` : '—';
                     const focusJuros = (() => {
                         const shortUp = typeof selicShortD === 'number' && selicShortD > 0.03;
                         const shortDown = typeof selicShortD === 'number' && selicShortD < -0.03;
@@ -11557,8 +11896,8 @@ function renderOperationalBriefing() {
                         return 'Focus sem choque claro de Selic no horizonte.';
                     })();
                     const parts = [];
-                    if (shortLab) parts.push(`${shortLab} Δ% ${shortChg}`);
-                    if (longLab) parts.push(`${longLab} Δ% ${longChg}`);
+                    if (shortLab) parts.push(`${shortLab} Δ ${shortChg}`);
+                    if (longLab) parts.push(`${longLab} Δ ${longChg}`);
                     return `Curva: DI (B3) ${shapeLab} • slope ${slope}. ${focusJuros}${parts.length ? ` ${parts.join(' • ')}` : ''}`;
                 })();
 
@@ -11900,7 +12239,7 @@ function renderOperationalBriefing() {
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
                                     if (!diSignal || !diSignal.ok) return mk('neutral', '—');
                                     const fmtRate = v => (typeof v === 'number' && Number.isFinite(v) ? `${formatNumber(v, 2)}%` : '—');
-                                    const fmtChg = v => (typeof v === 'number' && Number.isFinite(v) ? `${v > 0 ? '+' : ''}${formatNumber(v, 2)}%` : '—');
+                                    const fmtChg = v => (typeof v === 'number' && Number.isFinite(v) ? `${(v * 10) > 0 ? '+' : ''}${formatNumber(v * 10, 1)}bp` : '—');
                                     const a = diSignal.anchors || {};
                                     const s = a.short || null;
                                     const m = a.mid || null;
@@ -11993,12 +12332,14 @@ function renderOperationalBriefing() {
         bindRange('op-th-em', 'threshold', 'em');
         bindRange('op-th-export', 'threshold', 'export');
         bindRange('op-th-yields', 'threshold', 'yields');
+        bindRange('op-th-brflow', 'threshold', 'brFlow');
         bindRange('op-th-zq', 'threshold', 'zqSlope');
         bindRange('op-w-flow', 'weight', 'flow');
         bindRange('op-w-dxy', 'weight', 'dxy');
         bindRange('op-w-export', 'weight', 'export');
         bindRange('op-w-em', 'weight', 'em');
         bindRange('op-w-yields', 'weight', 'yields');
+        bindRange('op-w-brflow', 'weight', 'brFlow');
         bindRange('op-w-zq', 'weight', 'zq');
 
         const readWinProj = () => {
