@@ -768,12 +768,58 @@ function computeCategoryAverages(data, categoryGroups) {
 }
 
 function computeFlowScore(data) {
+    const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
+    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const catDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps };
+    const rcKey = (key, fallbackMatcher) => {
+        const sym = catalog && typeof catalog.resolveRatesCreditByKey === 'function'
+            ? catalog.resolveRatesCreditByKey(catDeps, data, key)
+            : null;
+        if (sym) return sym;
+        if (fallbackMatcher instanceof RegExp) return findAssetSymbol(data, fallbackMatcher);
+        return null;
+    };
+
+    const assets = data && Array.isArray(data.assets) ? data.assets : [];
+    const mostRecentMs = (symbol) => {
+        if (!symbol) return -Infinity;
+        const last = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol);
+        const t = last && last.t ? Date.parse(String(last.t)) : NaN;
+        return Number.isFinite(t) ? t : -Infinity;
+    };
+    const pickBestByMatchers = (matchers, { limit = 12 } = {}) => {
+        const out = [];
+        const seen = new Set();
+        for (const re of (matchers || [])) {
+            if (!(re instanceof RegExp)) continue;
+            for (const a of assets) {
+                const sym = a && a.symbol ? String(a.symbol) : '';
+                const name = a && a.name ? String(a.name) : '';
+                if (!sym || seen.has(sym)) continue;
+                if (re.test(sym) || re.test(name)) {
+                    out.push(sym);
+                    seen.add(sym);
+                    if (out.length >= limit) break;
+                }
+            }
+        }
+        out.sort((a, b) => mostRecentMs(b) - mostRecentMs(a));
+        return out.length ? out[0] : null;
+    };
+
     const pctOf = (matcherOrAlias, { invert = false } = {}) => {
-        const sym = typeof matcherOrAlias === 'string'
-            ? (findAliasSymbolBest(data, matcherOrAlias) || findAliasSymbol(data, matcherOrAlias))
-            : findAssetSymbol(data, matcherOrAlias);
+        const sym = (() => {
+            if (typeof matcherOrAlias === 'string') {
+                if (matcherOrAlias === 'US10Y') return rcKey('US_10Y', /(^US10YT=RR$|^US10YT=X$|^\.TNX$|\^TNX)/i) || (findAliasSymbolBest(data, matcherOrAlias) || findAliasSymbol(data, matcherOrAlias));
+                if (matcherOrAlias === 'VIX') return (findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX') || findAliasSymbol(data, 'VIX') || pickBestByMatchers([/^\.?VIX(9D)?$/i, /^VIX$/i]));
+                if (matcherOrAlias === 'DXY') return (findAliasSymbolBest(data, 'DXY') || findAliasSymbol(data, 'DXY') || pickBestByMatchers([/(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index)/i]));
+                return (findAliasSymbolBest(data, matcherOrAlias) || findAliasSymbol(data, matcherOrAlias));
+            }
+            if (matcherOrAlias instanceof RegExp) return pickBestByMatchers([matcherOrAlias], { limit: 8 }) || findAssetSymbol(data, matcherOrAlias);
+            return null;
+        })();
         if (!sym) return null;
-        const last = getLastPoint(data, sym);
+        const last = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, sym) : null) || getLastPoint(data, sym);
         const v = last && typeof last.changePct === 'number' ? last.changePct : null;
         if (v === null || v === undefined || !Number.isFinite(v)) return null;
         return invert ? -v : v;
@@ -793,8 +839,8 @@ function computeFlowScore(data) {
     const usdbRLInv = pctOf(/^USD\/BRL\b/i, { invert: true });
 
     const parts = [
-        { k: 'SPX', w: 0.18, v: pctOf('SPX') },
-        { k: 'NQ', w: 0.12, v: pctOf('NDX') },
+        { k: 'SPX', w: 0.18, v: pctOf('SPX') ?? pctOf(/(^\.SPX$|^\^GSPC$|^SPX$|^SPY(\b|$)|^IVV(\b|$)|^VOO(\b|$)|^ES[HMUZ]\d{1,2}(\b|=\$)?|S&P\s*500)/i) },
+        { k: 'NQ', w: 0.12, v: pctOf('NDX') ?? pctOf(/(^\.NDX$|^NDX$|^QQQ(\b|$)|^NQ[HMUZ]\d{1,2}(\b|=\$)?|Nasdaq\s*100)/i) },
         { k: 'EEM', w: 0.10, v: pctOf(/^EEM$/i) },
         { k: 'EWZ', w: 0.08, v: pctOf('EWZ') },
         { k: 'IBOV', w: 0.08, v: ibovPct ?? null },
@@ -836,73 +882,149 @@ function renderTopMovers(data) {
     const el = document.getElementById('topMovers');
     if (!el) return;
 
-    const rowsAll = (data.assets || [])
-        .map(a => ({ a, last: getLastPoint(data, a.symbol) }))
-        .filter(x => x.last && typeof x.last.changePct === 'number');
+    const nowMs = Date.now();
+    const assets = Array.isArray(data && data.assets ? data.assets : []) ? data.assets : [];
+    const lastOf = (symbol) => (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol);
+    const parseTms = (p) => {
+        const t = p && p.t ? Date.parse(String(p.t)) : NaN;
+        return Number.isFinite(t) ? t : null;
+    };
+    const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
-    const pickExtremes = list => {
-        if (!list.length) return { up: null, down: null };
-        let up = list[0];
-        let down = list[0];
-        for (const x of list) {
-            const v = x.last.changePct || 0;
-            if ((up.last.changePct || 0) < v) up = x;
-            if ((down.last.changePct || 0) > v) down = x;
+    const hardMaxAbs = 80;
+    const rowsAll = (() => {
+        const out = [];
+        const seen = new Set();
+        for (const a of assets) {
+            if (!a || typeof a !== 'object') continue;
+            const sym = a.symbol ? String(a.symbol) : '';
+            if (!sym) continue;
+            const key = symbolKey(sym) || sym;
+            if (seen.has(key)) continue;
+            const last = lastOf(sym);
+            if (!last) continue;
+            const pct = last && typeof last.changePct === 'number' ? last.changePct : null;
+            const price = last && typeof last.price === 'number' ? last.price : null;
+            if (!isNum(pct) || !isNum(price) || !(price > 0)) continue;
+            if (Math.abs(pct) > hardMaxAbs) continue;
+            const tMs = parseTms(last);
+            out.push({ a, last, pct, tMs, key });
+            seen.add(key);
         }
-        return { up, down };
+        return out;
+    })();
+
+    const staleMs = 4 * 60 * 60 * 1000;
+    const rowsFresh = rowsAll.filter(x => typeof x.tMs === 'number' && (nowMs - x.tMs) <= staleMs);
+
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const pickTopN = (list, dir, n) => {
+        const arr = Array.isArray(list) ? list.slice() : [];
+        arr.sort((a, b) => (dir === 'up' ? (b.pct - a.pct) : (a.pct - b.pct)));
+
+        const preferred = dir === 'up'
+            ? arr.filter(x => x.pct > 0)
+            : arr.filter(x => x.pct < 0);
+        const fallback = dir === 'up'
+            ? arr.filter(x => x.pct <= 0)
+            : arr.filter(x => x.pct >= 0);
+
+        const out = [];
+        const seen = new Set();
+        const takeFrom = (xs) => {
+            for (const x of xs) {
+                if (!x || !x.key || seen.has(x.key)) continue;
+                out.push(x);
+                seen.add(x.key);
+                if (out.length >= n) break;
+            }
+        };
+        takeFrom(preferred);
+        if (out.length < n) takeFrom(fallback);
+        return out;
     };
 
-    const groups = [
-        { key: 'commodities', label: 'Commodities', categories: ['commodities', 'energy', 'agriculture'], target: 'all-assets', tableKey: 'all' },
-        { key: 'metals', label: 'Metais', categories: ['metals'], target: 'all-assets', tableKey: 'all' },
-        { key: 'fx', label: 'FX', categories: ['fx_g10', 'fx_emerging'], target: 'all-assets', tableKey: 'all' },
-        { key: 'emerging', label: 'Emergentes', categories: ['emerging'], target: 'all-assets', tableKey: 'all' },
-        { key: 'rates', label: 'Juros', categories: ['rates'], target: 'all-assets', tableKey: 'all' },
-        { key: 'vol', label: 'Volatilidade', categories: ['volatility'], target: 'all-assets', tableKey: 'all' },
-        { key: 'br', label: 'Brasil', predicate: isBrazilRelated, target: 'brazil-market', tableKey: 'br' },
+    const groupDefs = [
+        { key: 'equities', label: 'Ações / Índices', categories: ['equities'], target: 'all-assets', tableKey: 'all', n: 3 },
+        { key: 'fx', label: 'FX', categories: ['fx_g10', 'fx_emerging', 'fx'], target: 'all-assets', tableKey: 'all', n: 3 },
+        { key: 'commodities', label: 'Commodities', categories: ['commodities', 'energy', 'agriculture'], target: 'all-assets', tableKey: 'all', n: 3 },
+        { key: 'metals', label: 'Metais', categories: ['metals'], target: 'all-assets', tableKey: 'all', n: 3 },
+        { key: 'crypto', label: 'Cripto', categories: ['crypto'], target: 'all-assets', tableKey: 'all', n: 3 },
+        { key: 'credit', label: 'Crédito', categories: ['credit'], target: 'all-assets', tableKey: 'all', n: 3 },
+        { key: 'rates', label: 'Juros', categories: ['rates'], target: 'all-assets', tableKey: 'all', n: 3 },
+        { key: 'vol', label: 'Volatilidade', categories: ['volatility'], target: 'all-assets', tableKey: 'all', n: 3 },
+        { key: 'emerging', label: 'Emergentes', categories: ['emerging'], target: 'all-assets', tableKey: 'all', n: 3 },
+        { key: 'other', label: 'Outros', categories: ['other'], target: 'all-assets', tableKey: 'all', n: 2 },
+        { key: 'br', label: 'Brasil', predicate: isBrazilRelated, target: 'brazil-market', tableKey: 'br', n: 3 },
     ];
 
-    const cards = groups
-        .map(g => {
-            const list = g.predicate
-                ? rowsAll.filter(x => g.predicate({ ...x.a, last: x.last }))
-                : rowsAll.filter(x => g.categories.includes(x.a.category));
-            const { up, down } = pickExtremes(list);
-            if (!up || !down) return null;
+    const groupHasAny = (g) => {
+        const base = (g.predicate ? rowsAll.filter(x => g.predicate({ ...x.a, last: x.last })) : rowsAll.filter(x => g.categories.includes(String(x.a && x.a.category ? x.a.category : '').toLowerCase())));
+        return base.length > 0;
+    };
+    const groups = groupDefs.filter(groupHasAny);
 
-            const upSym = symbolKey(up.a.symbol);
-            const downSym = symbolKey(down.a.symbol);
+    const cards = groups.map(g => {
+        const listAll = g.predicate
+            ? rowsAll.filter(x => g.predicate({ ...x.a, last: x.last }))
+            : rowsAll.filter(x => g.categories.includes(String(x.a && x.a.category ? x.a.category : '').toLowerCase()));
+        const listFresh = g.predicate
+            ? rowsFresh.filter(x => g.predicate({ ...x.a, last: x.last }))
+            : rowsFresh.filter(x => g.categories.includes(String(x.a && x.a.category ? x.a.category : '').toLowerCase()));
 
-            const line = (x, dir) => {
-                const pct = x.last.changePct || 0;
-                const arrow = dir === 'up' ? '▲' : '▼';
-                const abs = Math.abs(pct);
-                const a = Math.max(0.18, Math.min(0.85, abs / 5));
-                const tone = pct > 0 ? 'tm-item--pos' : pct < 0 ? 'tm-item--neg' : 'tm-item--neu';
-                const badge = toneBadgeHtml(pct, formatPercent(pct), { maxAbs: 5 });
-                return `
-                    <div class="tm-item ${tone}" data-tm="${escapeHtml(g.tableKey)}" data-target="${escapeHtml(g.target)}" data-symbol="${escapeHtml(x.a.symbol)}" style="--tm-a:${String(a)};">
-                        <div style="min-width:0;">
-                            <div style="font-weight:900;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${arrow} ${escapeHtml(symbolKey(x.a.symbol) || x.a.symbol)}</div>
-                            <div style="opacity:.82;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(x.a.name || '')}</div>
-                        </div>
-                        <div style="text-align:right;min-width:90px;font-weight:900;align-self:center;">${badge}</div>
-                    </div>
-                `;
-            };
+        const n = Math.max(1, Math.floor(Number(g.n) || 2));
+        const baseList = listFresh.length >= Math.min(2, n) ? listFresh : listAll;
 
+        if (!baseList.length) return '';
+
+        const ups = pickTopN(baseList, 'up', n);
+        const downs = pickTopN(baseList, 'down', n);
+        const used = [...ups, ...downs].filter(Boolean);
+        const absSorted = used.map(x => Math.abs(x.pct)).filter(isNum).sort((a, b) => a - b);
+        const p90 = absSorted.length ? absSorted[Math.max(0, Math.floor(absSorted.length * 0.9) - 1)] : 5;
+        const scaleAbs = clamp(isNum(p90) ? p90 : 5, 1.5, 12);
+
+        const ageLabel = (x) => {
+            if (!x || typeof x.tMs !== 'number') return '';
+            const age = nowMs - x.tMs;
+            if (!Number.isFinite(age) || age < 0) return '';
+            if (age <= staleMs) return '';
+            const mins = Math.round(age / 60000);
+            if (!(mins > 0)) return '';
+            return `<span style="opacity:.62;font-size:11px;margin-left:8px;">(${escapeHtml(`${mins}m`)})</span>`;
+        };
+
+        const line = (x, dir) => {
+            if (!x) return '';
+            const pct = x.pct;
+            const arrow = dir === 'up' ? '▲' : '▼';
+            const abs = Math.abs(pct);
+            const a = clamp(abs / scaleAbs, 0.18, 0.85);
+            const tone = pct > 0 ? 'tm-item--pos' : pct < 0 ? 'tm-item--neg' : 'tm-item--neu';
+            const badge = toneBadgeHtml(pct, formatPercent(pct), { maxAbs: scaleAbs });
             return `
-                <div class="tm-card">
-                    <div class="tm-card__title">${escapeHtml(g.label)}</div>
-                    <div class="tm-card__list">
-                        ${line(up, 'up')}
-                        ${line(down, 'down')}
+                <div class="tm-item ${tone}" data-tm="${escapeHtml(g.tableKey)}" data-target="${escapeHtml(g.target)}" data-symbol="${escapeHtml(x.a.symbol)}" style="--tm-a:${String(a)};">
+                    <div style="min-width:0;">
+                        <div style="font-weight:900;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${arrow} ${escapeHtml(symbolKey(x.a.symbol) || x.a.symbol)}</div>
+                        <div style="opacity:.82;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(x.a.name || '')}${ageLabel(x)}</div>
                     </div>
+                    <div style="text-align:right;min-width:90px;font-weight:900;align-self:center;">${badge}</div>
                 </div>
             `;
-        })
-        .filter(Boolean)
-        .join('');
+        };
+
+        const titleMeta = `<span style="opacity:.72;font-size:11px;margin-left:8px;">${escapeHtml(`${ups.length}↑/${downs.length}↓`)}</span>`;
+
+        return `
+            <div class="tm-card">
+                <div class="tm-card__title">${escapeHtml(g.label)}${titleMeta}</div>
+                <div class="tm-card__list">
+                    ${ups.map(x => line(x, 'up')).join('')}
+                    ${downs.map(x => line(x, 'down')).join('')}
+                </div>
+            </div>
+        `;
+    }).filter(Boolean).join('');
 
     el.innerHTML = `<div class="tm-grid">${cards}</div>`;
 
@@ -944,6 +1066,34 @@ function renderRegimeConviction(data) {
 
     const aliasSym = k => findAliasSymbolBest(data, k) || findAliasSymbol(data, k);
     const symOf = (aliasKey, matcher) => aliasSym(aliasKey) || (matcher ? findAssetSymbol(data, matcher) : null);
+
+    const assets = data && Array.isArray(data.assets) ? data.assets : [];
+    const mostRecentMs = (symbol) => {
+        if (!symbol) return -Infinity;
+        const last = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol);
+        const t = last && last.t ? Date.parse(String(last.t)) : NaN;
+        return Number.isFinite(t) ? t : -Infinity;
+    };
+    const pickBestByMatchers = (matchers, { limit = 12 } = {}) => {
+        const out = [];
+        const seen = new Set();
+        for (const re of (matchers || [])) {
+            if (!(re instanceof RegExp)) continue;
+            for (const a of assets) {
+                const sym = a && a.symbol ? String(a.symbol) : '';
+                const name = a && a.name ? String(a.name) : '';
+                if (!sym || seen.has(sym)) continue;
+                if (re.test(sym) || re.test(name)) {
+                    out.push(sym);
+                    seen.add(sym);
+                    if (out.length >= limit) break;
+                }
+            }
+        }
+        out.sort((a, b) => mostRecentMs(b) - mostRecentMs(a));
+        return out.length ? out[0] : null;
+    };
+    const symBest = (aliasKey, matchers) => aliasSym(aliasKey) || pickBestByMatchers(matchers);
 
     const downgradeConvictionLabel = (label, steps) => {
         const s = Math.max(0, Math.floor(Number(steps) || 0));
@@ -1016,51 +1166,76 @@ function renderRegimeConviction(data) {
     };
 
     const sentinelSymbols = {
-        audusd: findAssetSymbol(data, /^AUD\/USD\b/i),
-        nzdusd: findAssetSymbol(data, /^NZD\/USD\b/i),
-        usdcad: findAssetSymbol(data, /^USD\/CAD\b/i),
-        usdrub: findAssetSymbol(data, /^USD\/RUB\b/i),
-        usdjpy: findAssetSymbol(data, /^USD\/JPY\b/i),
-        usdchf: findAssetSymbol(data, /^USD\/CHF\b/i),
-        usdsek: findAssetSymbol(data, /^USD\/SEK\b/i),
-        dxy: findAliasSymbolBest(data, 'DXY') || findAliasSymbol(data, 'DXY') || findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index)/i),
-        vix: findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX30') || findAliasSymbolBest(data, 'VIX') || findAliasSymbol(data, 'VIX') || findAssetSymbol(data, /^\.?VIX(9D)?$/i),
-        vhsi: findAliasSymbol(data, 'VHSI') || findAssetSymbol(data, /^\.?VHSI/i),
-        brent: findAliasSymbolBest(data, 'BRENT') || findAliasSymbol(data, 'BRENT') || findAssetSymbol(data, /\bBrent\b/i),
-        wti: findAliasSymbolBest(data, 'WTI') || findAliasSymbol(data, 'WTI') || findAssetSymbol(data, /\bWTI\b/i),
+        audusd: pickBestByMatchers([/^AUD\/USD\b/i]) || findAssetSymbol(data, /^AUD\/USD\b/i),
+        nzdusd: pickBestByMatchers([/^NZD\/USD\b/i]) || findAssetSymbol(data, /^NZD\/USD\b/i),
+        usdcad: pickBestByMatchers([/^USD\/CAD\b/i]) || findAssetSymbol(data, /^USD\/CAD\b/i),
+        usdrub: pickBestByMatchers([/^USD\/RUB\b/i]) || findAssetSymbol(data, /^USD\/RUB\b/i),
+        usdjpy: pickBestByMatchers([/^USD\/JPY\b/i]) || findAssetSymbol(data, /^USD\/JPY\b/i),
+        usdchf: pickBestByMatchers([/^USD\/CHF\b/i]) || findAssetSymbol(data, /^USD\/CHF\b/i),
+        usdsek: pickBestByMatchers([/^USD\/SEK\b/i]) || findAssetSymbol(data, /^USD\/SEK\b/i),
+        dxy: aliasSym('DXY') || pickBestByMatchers([/(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index)/i]) || findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index)/i),
+        vix: findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX30') || aliasSym('VIX') || pickBestByMatchers([/^\.?VIX(9D)?$/i, /^VIX$/i]) || findAssetSymbol(data, /^\.?VIX(9D)?$/i),
+        vhsi: aliasSym('VHSI') || pickBestByMatchers([/^\.?VHSI/i, /\bHang\s*Seng\b.*Vol/i]) || findAssetSymbol(data, /^\.?VHSI/i),
+        brent: aliasSym('BRENT') || pickBestByMatchers([/\bBrent\b/i, /^(LCO|BRN)c\d/i, /^BZ=F$/i]) || findAssetSymbol(data, /\bBrent\b/i),
+        wti: aliasSym('WTI') || pickBestByMatchers([/\bWTI\b/i, /^CL=F$/i, /^CLc\d/i]) || findAssetSymbol(data, /\bWTI\b/i),
         usdbbrl: symOf('USD_BRL', /^USD\/BRL\b/i),
-        usdcnh: findAssetSymbol(data, /^USD\/CNH\b/i) || findAssetSymbol(data, /^USD\/CNY\b/i),
-        usdmxn: findAssetSymbol(data, /^USD\/MXN\b/i),
-        usdzar: findAssetSymbol(data, /^USD\/ZAR\b/i),
-        usdclp: findAssetSymbol(data, /^USD\/CLP\b/i),
-        usdtry: findAssetSymbol(data, /^USD\/TRY\b/i),
+        usdcnh: pickBestByMatchers([/^USD\/CNH\b/i, /^USD\/CNY\b/i]) || findAssetSymbol(data, /^USD\/CNH\b/i) || findAssetSymbol(data, /^USD\/CNY\b/i),
+        usdmxn: pickBestByMatchers([/^USD\/MXN\b/i]) || findAssetSymbol(data, /^USD\/MXN\b/i),
+        usdzar: pickBestByMatchers([/^USD\/ZAR\b/i]) || findAssetSymbol(data, /^USD\/ZAR\b/i),
+        usdclp: pickBestByMatchers([/^USD\/CLP\b/i]) || findAssetSymbol(data, /^USD\/CLP\b/i),
+        usdtry: pickBestByMatchers([/^USD\/TRY\b/i]) || findAssetSymbol(data, /^USD\/TRY\b/i),
+        spx: symBest('SPX', [/(^\.SPX$|^\^GSPC$|^SPX$|^SPY(\b|$)|^IVV(\b|$)|^VOO(\b|$)|^ES[HMUZ]\d{1,2}(\b|=\$)?|S&P\s*500)/i]),
+        ndx: symBest('NDX', [/(^\.NDX$|^NDX$|^QQQ(\b|$)|^NQ[HMUZ]\d{1,2}(\b|=\$)?|Nasdaq\s*100)/i]),
+        hyg: rcKey('ETF_HYG', /^HYG(\.\w+)?$/i) || symBest('HYG', [/^HYG(\.\w+)?$/i]),
+        eem: symBest('EEM', [/^EEM(\.\w+)?$/i]) || symBest('VWO', [/^VWO(\.\w+)?$/i]),
+        btc: symBest('BTC', [/^BTC\/USD$/i, /\bbitcoin\b/i]),
+    };
+
+    const weightedAvg = (items) => {
+        const pairs = (items || [])
+            .map(x => ({ v: x && typeof x.val === 'number' && Number.isFinite(x.val) ? x.val : null, w: x && typeof x.weight === 'number' && Number.isFinite(x.weight) ? x.weight : 1 }))
+            .filter(x => typeof x.v === 'number' && Number.isFinite(x.v) && typeof x.w === 'number' && Number.isFinite(x.w) && x.w > 0);
+        const wsum = pairs.reduce((a, b) => a + b.w, 0);
+        if (!(wsum > 0)) return null;
+        const s = pairs.reduce((a, b) => a + b.v * b.w, 0);
+        const score = s / wsum;
+        return Number.isFinite(score) ? score : null;
     };
 
     const betaPosItems = [
-        { label: 'AUD/USD', symbol: sentinelSymbols.audusd, sign: +1 },
-        { label: 'NZD/USD', symbol: sentinelSymbols.nzdusd, sign: +1 },
-        { label: 'USD/CAD', symbol: sentinelSymbols.usdcad, sign: -1 },
-        { label: 'USD/RUB', symbol: sentinelSymbols.usdrub, sign: -1 },
+        { label: 'AUD/USD', symbol: sentinelSymbols.audusd, sign: +1, weight: 1.0 },
+        { label: 'NZD/USD', symbol: sentinelSymbols.nzdusd, sign: +1, weight: 1.0 },
+        { label: 'USD/CAD', symbol: sentinelSymbols.usdcad, sign: -1, weight: 1.0 },
+        { label: 'USD/RUB', symbol: sentinelSymbols.usdrub, sign: -1, weight: 1.0 },
+        { label: 'SPX', symbol: sentinelSymbols.spx, sign: +1, weight: 0.55 },
+        { label: 'NDX', symbol: sentinelSymbols.ndx, sign: +1, weight: 0.55 },
+        { label: 'HYG', symbol: sentinelSymbols.hyg, sign: +1, weight: 0.45 },
+        { label: 'EEM/VWO', symbol: sentinelSymbols.eem, sign: +1, weight: 0.35 },
+        { label: 'Cobre', symbol: symOf('COPPER', /(^HG=F$|^HGc\d(=\$)?$|^HG$|Copper|\bCobre\b|^CPER(\b|$))/i), sign: +1, weight: 0.25 },
+        { label: 'BTC', symbol: sentinelSymbols.btc, sign: +1, weight: 0.20 },
     ].map(x => ({ ...x, raw: getChangePct(data, x.symbol) }))
         .map(x => ({ ...x, val: x.raw === null ? null : x.sign * x.raw }));
 
     const betaNegItems = [
-        { label: 'USD/JPY', symbol: sentinelSymbols.usdjpy, sign: -1 },
-        { label: 'USD/CHF', symbol: sentinelSymbols.usdchf, sign: -1 },
-        { label: 'USD/SEK', symbol: sentinelSymbols.usdsek, sign: -1 },
-        { label: 'VIX', symbol: sentinelSymbols.vix, sign: +1 },
-        { label: 'VHSI', symbol: sentinelSymbols.vhsi, sign: +1 },
-        { label: 'DXY', symbol: sentinelSymbols.dxy, sign: +1 },
+        { label: 'USD/JPY', symbol: sentinelSymbols.usdjpy, sign: -1, weight: 0.90 },
+        { label: 'USD/CHF', symbol: sentinelSymbols.usdchf, sign: -1, weight: 0.90 },
+        { label: 'USD/SEK', symbol: sentinelSymbols.usdsek, sign: -1, weight: 0.90 },
+        { label: 'USD/CNH', symbol: sentinelSymbols.usdcnh, sign: +1, weight: 0.50 },
+        { label: 'USD/MXN', symbol: sentinelSymbols.usdmxn, sign: +1, weight: 0.35 },
+        { label: 'USD/ZAR', symbol: sentinelSymbols.usdzar, sign: +1, weight: 0.35 },
+        { label: 'USD/CLP', symbol: sentinelSymbols.usdclp, sign: +1, weight: 0.25 },
+        { label: 'USD/TRY', symbol: sentinelSymbols.usdtry, sign: +1, weight: 0.25 },
+        { label: 'DXY', symbol: sentinelSymbols.dxy, sign: +1, weight: 1.0 },
+        { label: 'VIX', symbol: sentinelSymbols.vix, sign: +1, weight: 1.0 },
+        { label: 'VHSI', symbol: sentinelSymbols.vhsi, sign: +1, weight: 0.80 },
     ].map(x => ({ ...x, raw: getChangePct(data, x.symbol) }))
         .map(x => ({ ...x, val: x.raw === null ? null : x.sign * x.raw }));
 
-    const betaPosScore = avg(betaPosItems.map(x => x.val));
+    const betaPosScore = weightedAvg(betaPosItems);
     const betaNegScore = (() => {
-        const pairs = betaNegItems.filter(x => x.val !== null).map(x => ({ v: x.val, w: (typeof x.weight === 'number' ? x.weight : 1) }));
-        const wsum = pairs.reduce((a, b) => a + b.w, 0);
-        const s = pairs.reduce((a, b) => a + b.v * b.w, 0);
-        if (!wsum) return null;
-        let score = s / wsum;
+        const scoreBase = weightedAvg(betaNegItems);
+        if (!(typeof scoreBase === 'number' && Number.isFinite(scoreBase))) return null;
+        let score = scoreBase;
         const vixItem = betaNegItems.find(x => x.label === 'VIX');
         const vhsiItem = betaNegItems.find(x => x.label === 'VHSI');
         const vixUp = vixItem && typeof vixItem.raw === 'number' && vixItem.raw >= 1.5;
@@ -1128,7 +1303,6 @@ function renderRegimeConviction(data) {
                 ? { wdo: 'COMPRA', win: 'VENDA', hint: 'Risk-off tende a WDO↑ / WIN↓ (filtro, não gatilho).' }
                 : { wdo: '—', win: '—', hint: 'Regime indefinido (filtro, não gatilho).' };
 
-    const assets = data.assets || [];
     const nowMs = Date.now();
     const rows = assets.map(a => ({ a, last: getLastPoint(data, a.symbol) }));
     const withPrice = rows.filter(x => x.last && typeof x.last.price === 'number');
@@ -1152,6 +1326,7 @@ function renderRegimeConviction(data) {
         { k: 'EWZ', r: /^EWZ$/i },
         { k: 'BOVA11', r: /^BOVA11\.SA$/i },
         { k: 'DXY', a: 'DXY' },
+        { k: 'VIX', a: 'VIX', r: /(^\.(VIX|VIX9D)$|\bVIX\b|CBOE Volatility Index)/i },
         { k: 'Brent/WTI', a: 'OIL' },
         { k: 'FXI', a: 'FXI' },
         { k: 'CSI300', a: 'CSI300' },
@@ -1159,6 +1334,16 @@ function renderRegimeConviction(data) {
         { k: 'Soja', a: 'SOY' },
         { k: 'Cobre', a: 'COPPER' },
         { k: 'BR10Y', rc: 'BR_10Y', r: /^BR10YT=RR$/i },
+    ];
+    const suggestionMatchers = [
+        { k: 'SPX', a: 'SPX', r: /(^\.SPX$|^\^GSPC$|^SPX$|^SPY(\b|$)|^IVV(\b|$)|^VOO(\b|$)|^ES[HMUZ]\d{1,2}(\b|=\$)?|S&P\s*500)/i },
+        { k: 'NDX', a: 'NDX', r: /(^\.NDX$|^NDX$|^QQQ(\b|$)|^NQ[HMUZ]\d{1,2}(\b|=\$)?|Nasdaq\s*100)/i },
+        { k: 'HYG', rc: 'ETF_HYG', r: /^HYG(\.\w+)?$/i },
+        { k: 'TLT', rc: 'ETF_TLT', r: /^TLT(\.\w+)?$/i },
+        { k: 'EEM/VWO', a: 'EEM', r: /^EEM(\.\w+)?$/i },
+        { k: 'BTC', a: 'BTC', r: /^BTC\/USD$/i },
+        { k: 'US2Y', rc: 'US_2Y', r: /^US2YT=RR$/i },
+        { k: 'US10Y', rc: 'US_10Y', r: /^US10YT=RR$/i },
     ];
 
     const criticalHits = criticalMatchers.map(m => {
@@ -1171,8 +1356,26 @@ function renderRegimeConviction(data) {
         const hasChg = dc ? dc.symbolHasChangePct(dcDeps, data, sym) : (getChangePct(data, sym) !== null);
         return { ok: true, hasChg };
     });
+    const suggestionHits = suggestionMatchers.map(m => {
+        const sym = m.rc
+            ? rcKey(m.rc, m.r)
+            : m.a
+                ? (findAliasSymbolBest(data, m.a) || findAliasSymbol(data, m.a) || (m.r ? findAssetSymbol(data, m.r) : null))
+                : findAssetSymbol(data, m.r);
+        if (!sym) return { ok: false, hasChg: false };
+        const hasChg = dc ? dc.symbolHasChangePct(dcDeps, data, sym) : (getChangePct(data, sym) !== null);
+        return { ok: true, hasChg };
+    });
     const criticalUsable = criticalHits.filter(x => x.ok && x.hasChg).length;
     const criticalRatio = criticalMatchers.length ? criticalUsable / criticalMatchers.length : 0;
+    const criticalMissing = criticalMatchers
+        .map((m, i) => ({ k: m.k, ok: !!(criticalHits[i] && criticalHits[i].ok && criticalHits[i].hasChg) }))
+        .filter(x => !x.ok)
+        .map(x => x.k);
+    const suggestionMissing = suggestionMatchers
+        .map((m, i) => ({ k: m.k, ok: !!(suggestionHits[i] && suggestionHits[i].ok && suggestionHits[i].hasChg) }))
+        .filter(x => !x.ok)
+        .map(x => x.k);
 
     let convictionScore = 0.5 * coverageRatio + 0.3 * freshnessRatio + 0.2 * criticalRatio;
     const divergences = [];
@@ -1251,8 +1454,13 @@ function renderRegimeConviction(data) {
         vix: sentinelSymbols.vix,
         oil: findAliasSymbolBest(data, 'OIL') || findAliasSymbol(data, 'OIL') || findAliasSymbolBest(data, 'BRENT') || findAliasSymbolBest(data, 'WTI') || findAssetSymbol(data, /\bBrent\b|\bWTI\b/i),
         us10y: rcKey('US_10Y', /(^US10YT=RR$|^US10YT=X$|^\.TNX$|\^TNX)/i),
+        spx: sentinelSymbols.spx,
+        ndx: sentinelSymbols.ndx,
+        hyg: sentinelSymbols.hyg,
         gold: findAliasSymbolBest(data, 'GOLD') || findAliasSymbol(data, 'GOLD') || findAssetSymbol(data, /(^XAU\/USD\b|GC=F|\bouro\b)/i),
         usdcnh: sentinelSymbols.usdcnh,
+        eem: sentinelSymbols.eem,
+        btc: sentinelSymbols.btc,
         iron: ironSym || findAliasSymbol(data, 'IRON'),
         copper: copperSym || findAliasSymbol(data, 'COPPER'),
     };
@@ -1260,6 +1468,8 @@ function renderRegimeConviction(data) {
     const drivers = [];
     drivers.push({ k: 'Risco (tags)', v: regimeScore, fmt: x => formatNumber(x, 2), tone: regimeScore > 0.35 ? 'positive' : regimeScore < -0.35 ? 'negative' : 'neutral' });
     drivers.push({ k: 'Beta Δ', v: betaDelta, fmt: x => formatNumber(x, 3), tone: betaDelta > 0.25 ? 'positive' : betaDelta < -0.25 ? 'negative' : 'neutral' });
+    drivers.push({ k: 'Apetite (beta)', v: betaPosScore, fmt: x => formatNumber(x, 3), tone: betaPosScore === null ? 'neutral' : betaPosScore > 0.15 ? 'positive' : betaPosScore < -0.15 ? 'negative' : 'neutral' });
+    drivers.push({ k: 'Proteção (beta)', v: betaNegScore, fmt: x => formatNumber(x, 3), tone: betaNegScore === null ? 'neutral' : betaNegScore > 0.15 ? 'negative' : betaNegScore < -0.15 ? 'positive' : 'neutral' });
     if (sentinelSymbols.dxy) {
         const dxy = getChangePct(data, sentinelSymbols.dxy);
         drivers.push({ k: 'DXY', v: dxy, fmt: x => formatPercent(x, 2), tone: dxy === null ? 'neutral' : dxy > 0 ? 'positive' : dxy < 0 ? 'negative' : 'neutral' });
@@ -1409,7 +1619,9 @@ function renderRegimeConviction(data) {
                 <div class="metric-change">${toneBadgeHtmlFromTone(convictionTone, convictionScore * 100, `${formatNumber(convictionScore * 100, 0)}%`, { maxAbs: 100 })}</div>
                 <div style="margin-top:8px;opacity:.88;font-size:12px;line-height:1.25;">
                     <div style="opacity:.85;">Base: ${escapeHtml(convictionAssets.wdo || 'WDO N/A')} • ${escapeHtml(convictionAssets.win || 'WIN N/A')}</div>
-                    <div style="opacity:.80;">Chaves: ${escapeHtml([convictionAssets.usdbrl, convictionAssets.dxy, convictionAssets.vix, convictionAssets.us10y, convictionAssets.usdcnh, convictionAssets.gold, convictionAssets.iron, convictionAssets.copper, convictionAssets.oil].filter(Boolean).join(' • ') || '—')}</div>
+                    <div style="opacity:.80;">Chaves: ${escapeHtml([convictionAssets.usdbrl, convictionAssets.dxy, convictionAssets.vix, convictionAssets.us10y, convictionAssets.spx, convictionAssets.ndx, convictionAssets.hyg, convictionAssets.eem, convictionAssets.usdcnh, convictionAssets.btc, convictionAssets.gold, convictionAssets.iron, convictionAssets.copper, convictionAssets.oil].filter(Boolean).join(' • ') || '—')}</div>
+                    ${criticalMissing.length ? `<div style="margin-top:6px;opacity:.78;">Faltando (core): ${escapeHtml(criticalMissing.slice(0, 10).join(' • '))}${criticalMissing.length > 10 ? `… +${escapeHtml(String(criticalMissing.length - 10))}` : ''}</div>` : ''}
+                    ${suggestionMissing.length ? `<div style="margin-top:4px;opacity:.72;">Sugestões p/ carteira: ${escapeHtml(suggestionMissing.slice(0, 10).join(' • '))}${suggestionMissing.length > 10 ? `… +${escapeHtml(String(suggestionMissing.length - 10))}` : ''}</div>` : ''}
                 </div>
             </div>
             <div class="metric-card">
@@ -2242,9 +2454,21 @@ function renderRatesBuckets(data) {
 }
 
 function computeBrazilCdsHedgeSignal(data) {
+    const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
+    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const catDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps };
+    const rcKey = (key, fallbackMatcher) => {
+        const sym = catalog && typeof catalog.resolveRatesCreditByKey === 'function'
+            ? catalog.resolveRatesCreditByKey(catDeps, data, key)
+            : null;
+        if (sym) return sym;
+        if (fallbackMatcher instanceof RegExp) return findAssetSymbol(data, fallbackMatcher);
+        return null;
+    };
+
     const symCds =
-        findAliasSymbolBest(data, 'CDS_BR5Y')
-        || findAssetSymbol(data, /^BRGV5YUSAC=R$/i)
+        rcKey('CDS_BR_5Y', /^BRGV5YUSAC=R$/i)
+        || findAliasSymbolBest(data, 'CDS_BR5Y')
         || findAssetSymbol(data, /^BRGV/i)
         || findAssetSymbol(data, /\bBrazil\b.*\bCDS\b|\bCDS\b.*\bBrazil\b/i);
     const symFx = findAliasSymbolBest(data, 'USD_BRL') || findAliasSymbol(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i);
@@ -2352,6 +2576,18 @@ function computeOperationalPulseNow(data) {
     const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
     const signDir = (v, th) => (isNum(v) ? (v > th ? 1 : v < -th ? -1 : 0) : 0);
 
+    const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
+    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const catDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps };
+    const rcKey = (key, fallbackMatcher) => {
+        const sym = catalog && typeof catalog.resolveRatesCreditByKey === 'function'
+            ? catalog.resolveRatesCreditByKey(catDeps, data, key)
+            : null;
+        if (sym) return sym;
+        if (fallbackMatcher instanceof RegExp) return findAssetSymbol(data, fallbackMatcher);
+        return null;
+    };
+
     const pick = patterns => patterns.map(re => findAssetSymbol(data, re)).find(Boolean) || null;
     const vix9d = pick([/^\.VIX9D$/i, /\bVIX9D\b/i, /\b9-Day Volatility\b/i]);
     const vix30 = pick([/^VIX$/i, /^\.VIX$/i, /\bS&P\s*500\s*VIX\b/i]);
@@ -2377,13 +2613,13 @@ function computeOperationalPulseNow(data) {
         vxeem,
         vxewz,
         vxbr,
-        br10y: findAliasSymbolBest(data, 'BR10Y') || pick([/^BR10YT=RR$/i]),
-        cds: findAliasSymbolBest(data, 'CDS_BR5Y') || pick([/^BRGV5YUSAC=R$/i, /^BRGV/i]),
+        br10y: rcKey('BR_10Y', /^BR10YT=RR$/i) || findAliasSymbolBest(data, 'BR10Y') || pick([/^BR10YT=RR$/i]),
+        cds: rcKey('CDS_BR_5Y', /^BRGV5YUSAC=R$/i) || findAliasSymbolBest(data, 'CDS_BR5Y') || pick([/^BRGV5YUSAC=R$/i, /^BRGV/i]),
         spx: findAliasSymbolBest(data, 'SPX') || findAliasSymbol(data, 'SPX') || pick([/(^SPX$|^\.SPX$|^\^GSPC$|\bS&P\s*500\b)/i]),
-        us10y: findAliasSymbolBest(data, 'US10Y') || findAliasSymbol(data, 'US10Y') || pick([/^US10YT=RR$/i, /(^\^TNX$|\bUS\s*10Y\b|\bUST\s*10Y\b)/i]),
-        us2y: findAliasSymbolBest(data, 'US2Y') || findAliasSymbol(data, 'US2Y') || pick([/^US2YT=RR$/i, /(^\^IRX$|\bUS\s*2Y\b|\bUST\s*2Y\b)/i]),
-        hyg: findAliasSymbolBest(data, 'HYG') || pick([/^HYG(\.\w+)?$/i, /\bhigh\s*yield\b/i, /\biboxx\b/i, /\balto\s*rendimento\b/i]),
-        tlt: findAliasSymbolBest(data, 'TLT') || pick([/^TLT(\.\w+)?$/i, /\bTLT\b/i, /\b20\+\s*Year\b.*\bTreasury\b/i, /\bTreasury\b.*\bBond\b/i, /\btreasuries\b/i]),
+        us10y: rcKey('US_10Y', /^US10YT=RR$/i) || findAliasSymbolBest(data, 'US10Y') || findAliasSymbol(data, 'US10Y') || pick([/^US10YT=RR$/i, /(^\^TNX$|\bUS\s*10Y\b|\bUST\s*10Y\b)/i]),
+        us2y: rcKey('US_2Y', /^US2YT=RR$/i) || findAliasSymbolBest(data, 'US2Y') || findAliasSymbol(data, 'US2Y') || pick([/^US2YT=RR$/i, /(^\^IRX$|\bUS\s*2Y\b|\bUST\s*2Y\b)/i]),
+        hyg: rcKey('ETF_HYG', /^HYG(\.\w+)?$/i) || findAliasSymbolBest(data, 'HYG') || pick([/^HYG(\.\w+)?$/i, /\bhigh\s*yield\b/i, /\biboxx\b/i, /\balto\s*rendimento\b/i]),
+        tlt: rcKey('ETF_TLT', /^TLT(\.\w+)?$/i) || findAliasSymbolBest(data, 'TLT') || pick([/^TLT(\.\w+)?$/i, /\bTLT\b/i, /\b20\+\s*Year\b.*\bTreasury\b/i, /\bTreasury\b.*\bBond\b/i, /\btreasuries\b/i]),
         eem: findAliasSymbolBest(data, 'EEM') || findAliasSymbolBest(data, 'VWO') || pick([/^EEM$/i, /^VWO$/i, /\bMSCI\b.*\bEmerging\b.*\bMarkets\b/i, /\bmercados\s*emergentes\b/i]),
         brent: findAliasSymbolBest(data, 'BRENT') || pick([/^BNO$/i, /^LCO\b/i, /^LRBc1-LCOc1$/i, /\bBrent\b/i, /\bcrude\b.*\bbrent\b/i, /BRENT/i]),
         copper: findAliasSymbolBest(data, 'COPPER') || pick([/(^HG$|HG=F|COPPER|\bcobre\b)/i]),
@@ -2605,8 +2841,55 @@ function computeHk50PulseNow(data, web) {
     const isNum = v => typeof v === 'number' && Number.isFinite(v);
     const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
-    const pick = patterns => patterns.map(re => findAssetSymbol(data, re)).find(Boolean) || null;
     const get = s => (s ? getChangePct(data, s) : null);
+
+    const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
+    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const catDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps };
+    const rcKey = (key, fallbackMatcher) => {
+        const sym = catalog && typeof catalog.resolveRatesCreditByKey === 'function'
+            ? catalog.resolveRatesCreditByKey(catDeps, data, key)
+            : null;
+        if (sym) return sym;
+        if (fallbackMatcher instanceof RegExp) return findAssetSymbol(data, fallbackMatcher);
+        return null;
+    };
+
+    const assets = data && Array.isArray(data.assets) ? data.assets : [];
+    const mostRecentMs = (symbol) => {
+        if (!symbol) return -Infinity;
+        const last = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol);
+        const t = last && last.t ? Date.parse(String(last.t)) : NaN;
+        return Number.isFinite(t) ? t : -Infinity;
+    };
+    const byMatchers = (matchers, { limit = 10 } = {}) => {
+        const out = [];
+        const seen = new Set();
+        for (const re of (matchers || [])) {
+            if (!(re instanceof RegExp)) continue;
+            for (const a of assets) {
+                const sym = a && a.symbol ? String(a.symbol) : '';
+                const name = a && a.name ? String(a.name) : '';
+                if (!sym || seen.has(sym)) continue;
+                if (re.test(sym) || re.test(name)) {
+                    out.push(sym);
+                    seen.add(sym);
+                    if (out.length >= limit) break;
+                }
+            }
+        }
+        out.sort((a, b) => mostRecentMs(b) - mostRecentMs(a));
+        return out;
+    };
+    const pickBest = (cands) => (Array.isArray(cands) && cands.length ? cands[0] : null);
+    const aliasSym = k => findAliasSymbolBest(data, k) || findAliasSymbol(data, k);
+    const symBest = (aliasKey, matchers) => aliasSym(aliasKey) || pickBest(byMatchers(matchers, { limit: 12 }));
+    const pickFreshest = (symbols) => {
+        const list = (symbols || []).filter(Boolean).map(s => String(s)).filter(Boolean);
+        if (!list.length) return null;
+        list.sort((a, b) => mostRecentMs(b) - mostRecentMs(a));
+        return list[0] || null;
+    };
     const buildReturnSeries = (symbol, maxPoints) => {
         if (!symbol) return [];
         const pts = (data && data.series && data.series[symbol]) ? data.series[symbol] : [];
@@ -2682,48 +2965,104 @@ function computeHk50PulseNow(data, web) {
         return deltaBp * 0.1;
     };
 
-    const sym = {
-        hk50: findAliasSymbolBest(data, 'HK50') || pick([/\bHang\s*Seng\b/i]),
-        hstech: findAliasSymbolBest(data, 'HSTECH') || pick([/^\.(HSTECH)\b/i]),
-        hsfin: findAliasSymbolBest(data, 'HSI_FIN') || pick([/^\.(HSNF|HSHFI)\b/i, /\bHSI-?Finance\b/i, /\bHang\s*Seng\b.*\bFinance\b/i]),
-        hshares: pick([/^HCEI/i, /\bH-Shares\b/i, /\bH\s*Shares\b/i, /\bChina H-Shares\b/i]),
-        ewh: findAliasSymbolBest(data, 'EWH') || pick([/^EWH$/i]),
-        fxChina: findAliasSymbolBest(data, 'CHINA') || findAliasSymbolBest(data, 'FXI') || findAliasSymbolBest(data, 'MCHI') || findAliasSymbolBest(data, 'CSI300') || pick([/\bChina\b/i]),
-        cn50: findAliasSymbolBest(data, 'CN50') || pick([/^CHINA50$/i, /\bChina\s*A50\b/i]),
-        usdCnh: findAliasSymbolBest(data, 'USD_CNH') || pick([/^USD\/CNH\b/i]),
-        usdCny: findAliasSymbolBest(data, 'USD_CNY') || pick([/^USD\/CNY\b/i]),
-        usdHkd: findAliasSymbolBest(data, 'USD_HKD') || pick([/^USD\/HKD\b/i]),
-        audusd: pick([/^AUD\/USD\b/i]),
-        dxy: findAliasSymbolBest(data, 'DXY') || findAliasSymbol(data, 'DXY'),
-        spx: findAliasSymbolBest(data, 'SPX') || findAliasSymbol(data, 'SPX'),
-        ndx: findAliasSymbolBest(data, 'NDX') || pick([/(^\.NDX$|\bNasdaq 100\b)/i]),
-        us10y: findAliasSymbolBest(data, 'US10Y') || findAliasSymbol(data, 'US10Y'),
-        us2y: findAliasSymbolBest(data, 'US2Y') || findAliasSymbol(data, 'US2Y'),
-        hk10y: findAliasSymbolBest(data, 'HK10Y') || pick([/^HK10YT=RR$/i]),
-        hk1m: findAliasSymbolBest(data, 'HK1M') || pick([/^HK1MT=RR$/i, /\bHong\s*Kong\b.*\b1\b.*\bm[eê]s\b/i]),
-        hk3m: findAliasSymbolBest(data, 'HK3M') || pick([/^HK3MT=RR$/i, /\bHong\s*Kong\b.*\b3\b.*\bmeses\b/i]),
-        cn10y: findAliasSymbolBest(data, 'CN10Y') || pick([/^CN10YT=RR$/i]),
-        us10hk10: findAliasSymbolBest(data, 'SPREAD_HK10Y') || pick([
+    const sym = (() => {
+        const hk50 = symBest('HK50', [/^HSIQ/i, /^HK50$/i, /^\.HSI$/i, /^HSI$/i, /\bHang\s*Seng\b/i, /\bHK\s*50\b/i]);
+        const hstech = symBest('HSTECH', [/^HSTECH$/i, /^\.HSTECH$/i, /\bHang\s*Seng\s*TECH\b/i, /\bHang\s*Seng\b.*\bTECH\b/i]);
+        const hsfin = symBest('HSI_FIN', [/^\.(HSNF|HSHFI)\b/i, /\bHSI-?Finance\b/i, /\bHang\s*Seng\b.*\bFinance\b/i, /\bHang\s*Seng\b.*\bHFI\b/i]);
+        const hshares = symBest('HSHARES', [/^HCEI/i, /\bH-?Shares\b/i, /\bChina\b.*\bH-?Shares\b/i, /\bHCEI\b/i]);
+        const ewh = symBest('EWH', [/^EWH$/i, /\biShares\b.*\bHong\s*Kong\b/i]);
+
+        const fxi = symBest('FXI', [/^FXI(\.\w+)?$/i, /\bChina\b.*\bLarge\b.*\bCap\b/i]);
+        const mchi = symBest('MCHI', [/^MCHI(\.\w+)?$/i, /\bMSCI\b.*\bChina\b/i]);
+        const ashr = symBest('ASHR', [/^ASHR(\.\w+)?$/i, /\bChina\b.*\bA-?Shares\b/i]);
+        const kweb = symBest('KWEB', [/^KWEB(\.\w+)?$/i, /\bChina\b.*\bInternet\b/i]);
+        const csi300 = symBest('CSI300', [/^CSI300$/i, /\bCSI\s*300\b/i]);
+        const cn50 = symBest('CN50', [/^CHINA50$/i, /^CN50$/i, /\bChina\s*A50\b/i, /\bFTSE\b.*\bChina\b.*\bA50\b/i]);
+        const fxChina = pickFreshest([fxi, mchi, ashr, kweb, csi300, cn50, symBest('CHINA', [/^CHINA50$/i, /\bHang\s*Seng\b.*\bChina\b.*\b50\b/i, /\bChina\b.*\bETF\b/i])]);
+
+        const usdCnh = symBest('USD_CNH', [/^USD\/CNH\b/i]);
+        const usdCny = symBest('USD_CNY', [/^USD\/CNY\b/i]);
+        const usdHkd = symBest('USD_HKD', [/^USD\/HKD\b/i]);
+        const audusd = pickBest(byMatchers([/^AUD\/USD\b/i], { limit: 6 }));
+
+        const dxy = symBest('DXY', [/(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index)/i]);
+        const spx = symBest('SPX', [/(^\.SPX$|^\^GSPC$|^SPX$|^SPY(\b|$)|^IVV(\b|$)|^VOO(\b|$)|^ES[HMUZ]\d{1,2}(\b|=\$)?|S&P\s*500)/i]);
+        const ndx = symBest('NDX', [/(^\.NDX$|^NDX$|^QQQ(\b|$)|^NQ[HMUZ]\d{1,2}(\b|=\$)?|Nasdaq\s*100)/i]);
+
+        const us10y = rcKey('US_10Y', /(^US10YT=RR$|^US10YT=X$|^\.TNX$|\^TNX)/i) || symBest('US10Y', [/^US10YT=RR$/i, /^USGV10YUSAB=R$/i, /^TNc\d=\$?$/i, /^TYc\d=\$?$/i, /^\^TNX$/i]);
+        const us2y = rcKey('US_2Y', /^US2YT=RR$/i) || symBest('US2Y', [/^US2YT=RR$/i, /^TUc\d=\$?$/i, /^\^IRX$/i]);
+
+        const hk10y = symBest('HK10Y', [/^HK10YT=RR$/i, /\bHong\s*Kong\b.*\b10\b.*\b(Year|anos|anos?)\b/i]);
+        const hk1m = symBest('HK1M', [/^HK1MT=RR$/i, /\bHong\s*Kong\b.*\b1\b.*\b(m[eê]s|month)\b/i]);
+        const hk3m = symBest('HK3M', [/^HK3MT=RR$/i, /\bHong\s*Kong\b.*\b3\b.*\b(meses|months)\b/i]);
+        const cn10y = symBest('CN10Y', [/^CN10YT=RR$/i, /\bChina\b.*\b10\b.*\b(Year|anos|anos?)\b/i]);
+        const us10hk10 = symBest('SPREAD_HK10Y', [
             /^US10HK10=RR$/i,
             /Spread.*Hong\s*Kong.*10.*(EUA|US|China|CHI).*10/i,
             /Spread.*(EUA|US|China|CHI).*10.*Hong\s*Kong.*10/i,
             /Spread.*EUA.*10A.*(HK|HKG|Hong\s*Kong).*10A/i,
             /Spread.*(HK|HKG|Hong\s*Kong).*10A.*EUA.*10A/i,
-        ]),
-        cdsCn5y: findAliasSymbolBest(data, 'CDS_CN5Y') || pick([/^CNGV5YUSAC=R$/i, /^CNGV/i]),
-        vix9d: findAliasSymbolBest(data, 'VIX9D') || pick([/^\.VIX9D$/i]),
-        vix30: findAliasSymbolBest(data, 'VIX30') || pick([/^VIX$/i, /^\.VIX$/i]),
-        vvix: findAliasSymbolBest(data, 'VVIX') || pick([/^\.VVIX$/i]),
-        vhsi: findAliasSymbolBest(data, 'VHSI') || pick([/^\.VHSI$/i, /^VHSI(c\d+)?$/i]),
-        eem: findAliasSymbolBest(data, 'EEM') || findAliasSymbolBest(data, 'VWO'),
-        hyg: findAliasSymbolBest(data, 'HYG'),
-        tlt: findAliasSymbolBest(data, 'TLT'),
-        brent: findAliasSymbolBest(data, 'BRENT'),
-        copper: findAliasSymbolBest(data, 'COPPER'),
-        iron: findAliasSymbolBest(data, 'IRON'),
-        gold: findAliasSymbolBest(data, 'GOLD'),
-        btc: findAliasSymbolBest(data, 'BTC'),
-    };
+        ]);
+        const cdsCn5y = symBest('CDS_CN5Y', [/^CNGV5YUSAC=R$/i, /^CNGV/i, /\bCDS\b.*\bChina\b/i, /\bChina\b.*\bCDS\b/i]);
+
+        const vix9d = symBest('VIX9D', [/^\.?VIX9D$/i]);
+        const vix30 = symBest('VIX30', [/^VIX$/i, /^\.VIX$/i, /^\.?VIX$/i, /^\.?VIX30$/i]);
+        const vix = symBest('VIX', [/^VIX$/i, /^\.VIX$/i, /^\.?VIX(9D)?$/i]) || vix30 || vix9d;
+        const vvix = symBest('VVIX', [/^\.VVIX$/i, /\bVVIX\b/i]);
+        const vhsi = symBest('VHSI', [/^\.VHSI$/i, /^VHSI(c\d+)?$/i, /\bHSI\s*Volatility\b/i, /\bHang\s*Seng\b.*Vol/i]);
+
+        const eem = symBest('EEM', [/^EEM(\.\w+)?$/i]) || symBest('VWO', [/^VWO(\.\w+)?$/i]);
+        const hyg = rcKey('ETF_HYG', /^HYG(\.\w+)?$/i) || symBest('HYG', [/^HYG(\.\w+)?$/i]);
+        const tlt = rcKey('ETF_TLT', /^TLT(\.\w+)?$/i) || symBest('TLT', [/^TLT(\.\w+)?$/i]);
+        const brent = symBest('BRENT', [/\bBrent\b/i, /^(LCO|BRN)c\d/i, /^BZ=F$/i]);
+        const copper = symBest('COPPER', [/^HG=F$/i, /^HGc\d(=\$)?$/i, /^HG$/i, /^CPER(\.\w+)?$/i, /\bCopper\b/i, /\bCobre\b/i]);
+        const iron = symBest('IRON', [/^DCE_I0$/i, /\bIron\s*Ore\b/i, /\bMin[eê]rio\b/i, /\bTIO\b/i, /\bSM58F\b/i]);
+        const gold = symBest('GOLD', [/^GC=F$/i, /^GCc\d(=\$)?$/i, /^XAU(USD)?$/i, /^GLD(\.\w+)?$/i, /\bGold\b/i, /\bOuro\b/i]);
+        const btc = symBest('BTC', [/^BTC\/USD$/i, /\bbitcoin\b/i]);
+
+        return {
+            hk50,
+            hstech,
+            hsfin,
+            hshares,
+            ewh,
+            fxi,
+            mchi,
+            ashr,
+            kweb,
+            csi300,
+            cn50,
+            fxChina,
+            usdCnh,
+            usdCny,
+            usdHkd,
+            audusd,
+            dxy,
+            spx,
+            ndx,
+            us10y,
+            us2y,
+            hk10y,
+            hk1m,
+            hk3m,
+            cn10y,
+            us10hk10,
+            cdsCn5y,
+            vix9d,
+            vix30,
+            vix,
+            vvix,
+            vhsi,
+            eem,
+            hyg,
+            tlt,
+            brent,
+            copper,
+            iron,
+            gold,
+            btc,
+        };
+    })();
 
     const hkVol = sym.vhsi ? get(sym.vhsi) : null;
     const vixPulso = sym.vix9d ? get(sym.vix9d) : null;
@@ -2732,12 +3071,29 @@ function computeHk50PulseNow(data, web) {
     const usdHkd = get(sym.usdHkd);
     const hk50Pct = get(sym.hk50);
 
+    const volAmp = (() => {
+        const spot = (s) => {
+            const pt = s ? ((typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, s) : null) || getLastPoint(data, s)) : null;
+            return pt && typeof pt.price === 'number' && Number.isFinite(pt.price) ? pt.price : null;
+        };
+        const vix = spot(sym.vix) ?? spot(sym.vix30) ?? spot(sym.vix9d);
+        const vhsi = spot(sym.vhsi);
+        const vixRel = isNum(vix) ? clamp(vix / 20, 0.75, 1.6) : null;
+        const vhsiRel = isNum(vhsi) ? clamp(vhsi / 20, 0.75, 1.6) : null;
+        const amp = (vixRel !== null && vhsiRel !== null) ? ((vixRel + vhsiRel) / 2) : (vixRel !== null ? vixRel : (vhsiRel !== null ? vhsiRel : 1));
+        return { amp: isNum(amp) ? amp : 1, vix: isNum(vix) ? vix : null, vhsi: isNum(vhsi) ? vhsi : null };
+    })();
+
     const driversCfg = [
         { key: 'hstech', group: 'driver', weight: 0.7, capAbs: 1.8, sign: +1 },
         { key: 'hsfin', group: 'driver', weight: 0.45, capAbs: 1.8, sign: +1 },
         { key: 'hshares', group: 'driver', weight: 0.35, capAbs: 1.8, sign: +1 },
-        { key: 'fxChina', group: 'driver', weight: 0.55, capAbs: 1.6, sign: +1 },
-        { key: 'cn50', group: 'driver', weight: 0.35, capAbs: 1.8, sign: +1 },
+        { key: 'fxi', group: 'driver', weight: 0.35, capAbs: 1.6, sign: +1 },
+        { key: 'mchi', group: 'driver', weight: 0.20, capAbs: 1.6, sign: +1 },
+        { key: 'kweb', group: 'driver', weight: 0.18, capAbs: 1.8, sign: +1 },
+        { key: 'ashr', group: 'driver', weight: 0.15, capAbs: 1.6, sign: +1 },
+        { key: 'csi300', group: 'driver', weight: 0.12, capAbs: 1.6, sign: +1 },
+        { key: 'cn50', group: 'driver', weight: 0.15, capAbs: 1.8, sign: +1 },
         { key: 'usdChina', group: 'driver', weight: 0.55, capAbs: 0.6, sign: -1 },
         { key: 'usdHkd', group: 'driver', weight: 0.2, capAbs: 0.35, sign: -1 },
         { key: 'dxy', group: 'driver', weight: 0.45, capAbs: 0.6, sign: -1 },
@@ -2775,7 +3131,11 @@ function computeHk50PulseNow(data, web) {
         hsfin: { label: 'HSI Finance', pct: get(sym.hsfin), sym: sym.hsfin },
         hshares: { label: 'H-Shares', pct: get(sym.hshares), sym: sym.hshares },
         ewh: { label: 'EWH', pct: get(sym.ewh), sym: sym.ewh },
-        fxChina: { label: 'China (FXI/MCHI/CSI300)', pct: get(sym.fxChina), sym: sym.fxChina },
+        fxi: { label: 'FXI', pct: get(sym.fxi), sym: sym.fxi },
+        mchi: { label: 'MCHI', pct: get(sym.mchi), sym: sym.mchi },
+        ashr: { label: 'ASHR', pct: get(sym.ashr), sym: sym.ashr },
+        kweb: { label: 'KWEB', pct: get(sym.kweb), sym: sym.kweb },
+        csi300: { label: 'CSI300', pct: get(sym.csi300), sym: sym.csi300 },
         cn50: { label: 'CN50 (China A50)', pct: get(sym.cn50), sym: sym.cn50 },
         usdChina: { label: 'USD/CNH (ou CNY)', pct: usdChina, sym: sym.usdCnh || sym.usdCny },
         usdHkd: { label: 'USD/HKD', pct: usdHkd, sym: sym.usdHkd },
@@ -2902,6 +3262,68 @@ function computeHk50PulseNow(data, web) {
         return m;
     })();
 
+    const parity = (() => {
+        const sign = (v, th = 0.10) => (typeof v === 'number' && Number.isFinite(v) ? (v > th ? +1 : v < -th ? -1 : 0) : 0);
+        const ok = (a, b, inverse = false) => {
+            const sa = sign(a);
+            const sb = sign(b);
+            if (!sa || !sb) return null;
+            return inverse ? (sa === -sb) : (sa === sb);
+        };
+
+        const usdCnhPct = sym.usdCnh || sym.usdCny ? getChangePct(data, sym.usdCnh || sym.usdCny) : null;
+        const spxPct = sym.spx ? getChangePct(data, sym.spx) : null;
+        const chinaPct = (() => {
+            const list = [sym.fxi, sym.mchi, sym.ashr, sym.kweb, sym.csi300, sym.cn50].filter(Boolean);
+            const vals = list.map(s => getChangePct(data, s)).filter(v => typeof v === 'number' && Number.isFinite(v));
+            if (!vals.length) return null;
+            return vals.reduce((a, b) => a + b, 0) / vals.length;
+        })();
+
+        return {
+            hk50_usdcnh_inv: ok(hk50Pct, usdCnhPct, true),
+            hk50_spx: ok(hk50Pct, spxPct, false),
+            hk50_china: ok(hk50Pct, chinaPct, false),
+        };
+    })();
+
+    const conviction = (() => {
+        const clamp01 = (v) => Math.max(0, Math.min(1, typeof v === 'number' && Number.isFinite(v) ? v : 0));
+        const cov = expectedKeys.length ? (rows.length / expectedKeys.length) : 0;
+        const strength = clamp01(Math.abs(net) / 0.9);
+        const hkAgeMin = (() => {
+            const t = mostRecentMs(sym.hk50);
+            if (!Number.isFinite(t) || !(t > 0)) return null;
+            return (Date.now() - t) / 60000;
+        })();
+        const freshFactor = (typeof hkAgeMin === 'number' && Number.isFinite(hkAgeMin))
+            ? (hkAgeMin <= 15 ? 1 : hkAgeMin <= 30 ? 0.88 : hkAgeMin <= 60 ? 0.74 : 0.6)
+            : 0.78;
+
+        let score = clamp01((0.55 * cov + 0.45 * strength) * freshFactor);
+        const divs = [];
+
+        const amp = volAmp && typeof volAmp.amp === 'number' && Number.isFinite(volAmp.amp) ? volAmp.amp : 1;
+        const stress = amp >= 1.18;
+        const p1 = parity.hk50_usdcnh_inv;
+        const p2 = parity.hk50_spx;
+        const p3 = parity.hk50_china;
+        const bad = [p1, p2, p3].filter(v => v === false).length;
+
+        if (stress && bad) {
+            const penalty = Math.max(0.65, 1 - (0.10 * bad) - (amp >= 1.30 ? 0.06 : 0));
+            score = clamp01(score * penalty);
+            if (p1 === false) divs.push('Paridade divergente: HK50×USD/CNH (inv)');
+            if (p2 === false) divs.push('Paridade divergente: HK50×SPX');
+            if (p3 === false) divs.push('Paridade divergente: HK50×China');
+            divs.push(`Vol alta (volAmp ${formatNumber(amp, 2)}) → convicção reduzida`);
+        }
+
+        const label = score >= 0.74 ? 'ALTA' : score >= 0.56 ? 'MÉDIA' : 'BAIXA';
+        const tone = label === 'ALTA' ? 'positive' : label === 'MÉDIA' ? 'neutral' : 'negative';
+        return { score, label, tone, divergences: divs };
+    })();
+
     const suggest = (() => {
         const want = [
             { label: 'HK50/HSI (Hang Seng)', key: 'HK50' },
@@ -2912,12 +3334,16 @@ function computeHk50PulseNow(data, web) {
             { label: 'VHSI (vol HK)', key: 'VHSI' },
             { label: 'China A50 / CN50', key: 'CN50' },
             { label: 'H-Shares (HCEI)', key: 'HSHARES' },
+            { label: 'FXI', key: 'FXI' },
+            { label: 'MCHI', key: 'MCHI' },
+            { label: 'KWEB', key: 'KWEB' },
+            { label: 'ASHR', key: 'ASHR' },
+            { label: 'CSI300', key: 'CSI300' },
             { label: 'HK10Y (yield)', key: 'HK10Y' },
             { label: 'HK 1M (liquidez)', key: 'HK1M' },
             { label: 'HK 3M (liquidez)', key: 'HK3M' },
             { label: 'Spread HK10Y vs US/China 10Y', key: 'SPREAD_HK10Y' },
             { label: 'China CDS 5Y (USD)', key: 'CDS_CN5Y' },
-            { label: 'China ETF (MCHI)', key: 'MCHI' },
             { label: 'AUD/USD (beta China)', key: 'AUD/USD' },
         ];
         const out = [];
@@ -2927,7 +3353,7 @@ function computeHk50PulseNow(data, web) {
                     ? sym.hshares
                     : w.key === 'AUD/USD'
                         ? sym.audusd
-                        : findAliasSymbolBest(data, w.key);
+                        : (findAliasSymbolBest(data, w.key) || aliasSym(w.key) || pickBest(byMatchers(getMatchersForKey(w.key), { limit: 6 })));
             if (!has) out.push(w.label);
         }
         return out;
@@ -2982,51 +3408,118 @@ function computeHk50PulseNow(data, web) {
         missingAssetsSuggestion: suggest,
         news: geoNews,
         flowCorr,
+        volAmp,
+        parity,
+        conviction,
     };
 }
 
 function computeUsEquitiesPulseNow(data, web) {
     const isNum = v => typeof v === 'number' && Number.isFinite(v);
     const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-    const pick = patterns => patterns.map(re => findAssetSymbol(data, re)).find(Boolean) || null;
     const get = s => (s ? getChangePct(data, s) : null);
+
+    const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
+    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const catDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps };
+    const rcKey = (key, fallbackMatcher) => {
+        const sym = catalog && typeof catalog.resolveRatesCreditByKey === 'function'
+            ? catalog.resolveRatesCreditByKey(catDeps, data, key)
+            : null;
+        if (sym) return sym;
+        if (fallbackMatcher instanceof RegExp) return findAssetSymbol(data, fallbackMatcher);
+        return null;
+    };
+
+    const assets = data && Array.isArray(data.assets) ? data.assets : [];
+    const byMatchers = (matchers, { limit = 10 } = {}) => {
+        const out = [];
+        const seen = new Set();
+        const ms = (s) => {
+            const last = s ? (getMostRecentPointWithPrice(data, s) || getLastPoint(data, s)) : null;
+            const t = last && last.t ? Date.parse(String(last.t)) : NaN;
+            return Number.isFinite(t) ? t : -Infinity;
+        };
+        for (const re of (matchers || [])) {
+            if (!(re instanceof RegExp)) continue;
+            for (const a of assets) {
+                const sym = a && a.symbol ? String(a.symbol) : '';
+                const name = a && a.name ? String(a.name) : '';
+                if (!sym || seen.has(sym)) continue;
+                if (re.test(sym) || re.test(name)) {
+                    out.push(sym);
+                    seen.add(sym);
+                    if (out.length >= limit) break;
+                }
+            }
+        }
+        out.sort((a, b) => ms(b) - ms(a));
+        return out;
+    };
+    const pickBest = (cands) => (Array.isArray(cands) && cands.length ? cands[0] : null);
+    const pickPreferred = (futurePatterns, fallbackPatterns, aliasKey = null) => {
+        const fut = pickBest(byMatchers(futurePatterns || [], { limit: 12 }));
+        if (fut) return fut;
+        const ali = aliasKey ? findAliasSymbolBest(data, aliasKey) : null;
+        if (ali) return ali;
+        return pickBest(byMatchers(fallbackPatterns || [], { limit: 12 }));
+    };
     const asSource = (symbol, futurePatterns = []) => {
         const s = String(symbol || '');
         if (!s) return 'missing';
         for (const re of futurePatterns) if (re.test(s)) return 'future';
         return 'proxy';
     };
-    const pickPreferred = (futurePatterns, fallbackPatterns, aliasKey = null) => {
-        const fut = pick(futurePatterns || []);
-        if (fut) return fut;
-        const ali = aliasKey ? findAliasSymbolBest(data, aliasKey) : null;
-        if (ali) return ali;
-        return pick(fallbackPatterns || []);
-    };
 
     const sym = {
-        spx: pickPreferred([/^ES[HMUZ]\d{2}$/i], [/^\.SPX$/i, /^SPX$/i, /^SPY(\.\w+)?$/i, /\bS&P\s*500\b/i, /\bS\s*&\s*P\s*500\b/i], 'SPX'),
-        ndx: pickPreferred([/^NQ[HMUZ]\d{2}$/i], [/^\.NDX$/i, /^NDX$/i, /^QQQ(\.\w+)?$/i, /\bNasdaq\s*100\b/i], 'NDX'),
-        dow: pickPreferred([/^YM[HMUZ]\d{2}$/i], [/^\.DJI$/i, /\bDow\s*Jones\b/i, /^DIA(\.\w+)?$/i], 'DOW'),
-        dxy: findAliasSymbolBest(data, 'DXY') || pick([/^\.DXY$/i, /^DXY$/i, /^DX=F$/i, /^DXc\d$/i, /\bUS\s*Dollar\s*Index\b/i]),
-        vix: findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX') || pick([/^\.?VIX(9D)?$/i]),
-        vvix: findAliasSymbolBest(data, 'VVIX') || pick([/^\.VVIX$/i]),
-        vxn: findAliasSymbolBest(data, 'VXN') || pick([/^\.VXN$/i]),
-        rvx: pick([/^\.?RVX$/i, /\bRussell\s*2000\s*Vol/i]),
-        us2y: findAliasSymbolBest(data, 'US2Y') || pick([/^US2YT=RR$/i, /^TUc\d=\$?$/i, /\bUS2Y\b/i, /\bUnited States 2-Year\b/i]),
-        us10y: findAliasSymbolBest(data, 'US10Y') || pick([/^US10YT=RR$/i, /^USGV10YUSAB=R$/i, /^TNc\d=\$?$/i, /^TYc\d=\$?$/i, /\bUS10Y\b/i, /\bUnited States 10-Year\b/i]),
-        us30y: findAliasSymbolBest(data, 'US30Y') || pick([/^US30YT=RR$/i, /^WNc\d=\$?$/i, /\bUS30Y\b/i, /\bUnited States 30-Year\b/i]),
-        tlt: findAliasSymbolBest(data, 'TLT') || pick([/^TLT(\.\w+)?$/i]),
-        hyg: findAliasSymbolBest(data, 'HYG') || pick([/^HYG(\.\w+)?$/i]),
-        eem: findAliasSymbolBest(data, 'EEM') || findAliasSymbolBest(data, 'VWO') || pick([/^EEM(\.\w+)?$/i, /^VWO(\.\w+)?$/i]),
-        iwm: pick([/^IWM(\.\w+)?$/i, /\bRussell\s*2000\b/i]),
-        xlf: pick([/^XLF(\.\w+)?$/i, /\bFinancial\s*Select\s*Sector\b/i]),
-        xlk: pick([/^XLK(\.\w+)?$/i, /\bTechnology\s*Select\s*Sector\b/i]),
-        oil: findAliasSymbolBest(data, 'BRENT') || findAliasSymbolBest(data, 'WTI') || pick([/^BZ=F$/i, /^LCOc\d$/i, /^BRNc\d$/i, /^CL=F$/i, /^CLc\d$/i, /\bBrent\b/i, /\bWTI\b/i]),
-        gold: findAliasSymbolBest(data, 'GOLD') || pick([/^GC=F$/i, /^GCc\d$/i, /^XAU(USD)?$/i, /^GLD(\.\w+)?$/i, /\bGold\b/i, /\bOuro\b/i]),
-        copper: findAliasSymbolBest(data, 'COPPER') || pick([/^HG=F$/i, /^HGc\d$/i, /^CPER(\.\w+)?$/i, /\bCopper\b/i, /\bCobre\b/i]),
-        btc: findAliasSymbolBest(data, 'BTC') || pick([/^BTC\/USD$/i, /\bbitcoin\b/i]),
+        spx: pickPreferred(
+            [/^ES[HMUZ]\d{1,2}(=\$)?$/i],
+            [/^\.SPX$/i, /^SPX$/i, /^\^GSPC$/i, /^SPY(\.\w+)?$/i, /^IVV(\.\w+)?$/i, /^VOO(\.\w+)?$/i, /\bS&P\s*500\b(?![\s\S]*\bVIX\b)(?![\s\S]*Volatil)/i],
+            'SPX'
+        ),
+        ndx: pickPreferred(
+            [/^NQ[HMUZ]\d{1,2}(=\$)?$/i],
+            [/^\.NDX$/i, /^NDX$/i, /^QQQ(\.\w+)?$/i, /\bNasdaq\s*100\b(?![\s\S]*Volatil)/i],
+            'NDX'
+        ),
+        dow: pickPreferred(
+            [/^YM[HMUZ]\d{1,2}(=\$)?$/i],
+            [/^\.DJI$/i, /^\^DJI$/i, /\bDow\s*Jones\b/i, /^DIA(\.\w+)?$/i],
+            'DOW'
+        ),
+        dxy: findAliasSymbolBest(data, 'DXY') || pickBest(byMatchers([/^\.DXY$/i, /^DXY$/i, /^DX=F$/i, /^DXc\d(=\$)?$/i, /\bUS\s*Dollar\s*Index\b/i], { limit: 10 })),
+        vix: findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX') || pickBest(byMatchers([/^\.?VIX(9D)?$/i, /^VIX$/i, /^\.VIX$/i], { limit: 10 })),
+        vvix: findAliasSymbolBest(data, 'VVIX') || pickBest(byMatchers([/^\.VVIX$/i, /\bVVIX\b/i], { limit: 8 })),
+        vxn: findAliasSymbolBest(data, 'VXN') || pickBest(byMatchers([/^\.VXN$/i, /\bVXN\b/i], { limit: 8 })),
+        rvx: pickBest(byMatchers([/^\.?RVX$/i, /\bRussell\s*2000\s*Vol/i], { limit: 8 })),
+        us2y: rcKey('US_2Y', /^US2YT=RR$/i) || findAliasSymbolBest(data, 'US2Y') || pickBest(byMatchers([/^US2YT=RR$/i, /^TUc\d=\$?$/i, /\bUnited States 2-Year\b/i, /\bUS2Y\b/i], { limit: 10 })),
+        us10y: rcKey('US_10Y', /^US10YT=RR$/i) || findAliasSymbolBest(data, 'US10Y') || pickBest(byMatchers([/^US10YT=RR$/i, /^USGV10YUSAB=R$/i, /^TNc\d=\$?$/i, /^TYc\d=\$?$/i, /\bUnited States 10-Year\b/i, /\bUS10Y\b/i], { limit: 10 })),
+        us30y: rcKey('US_30Y', /^US30YT=RR$/i) || findAliasSymbolBest(data, 'US30Y') || pickBest(byMatchers([/^US30YT=RR$/i, /^WNc\d=\$?$/i, /\bUnited States 30-Year\b/i, /\bUS30Y\b/i], { limit: 10 })),
+        tlt: rcKey('ETF_TLT', /^TLT(\.\w+)?$/i) || findAliasSymbolBest(data, 'TLT') || pickBest(byMatchers([/^TLT(\.\w+)?$/i], { limit: 10 })),
+        hyg: rcKey('ETF_HYG', /^HYG(\.\w+)?$/i) || findAliasSymbolBest(data, 'HYG') || pickBest(byMatchers([/^HYG(\.\w+)?$/i], { limit: 10 })),
+        eem: findAliasSymbolBest(data, 'EEM') || findAliasSymbolBest(data, 'VWO') || pickBest(byMatchers([/^EEM(\.\w+)?$/i, /^VWO(\.\w+)?$/i, /\bEmerging\b.*\bMarkets\b/i], { limit: 10 })),
+        iwm: pickBest(byMatchers([/^IWM(\.\w+)?$/i, /\bRussell\s*2000\b/i], { limit: 10 })),
+        xlf: pickBest(byMatchers([/^XLF(\.\w+)?$/i, /\bFinancial\s*Select\s*Sector\b/i], { limit: 10 })),
+        xlk: pickBest(byMatchers([/^XLK(\.\w+)?$/i, /\bTechnology\s*Select\s*Sector\b/i], { limit: 10 })),
+        oil: findAliasSymbolBest(data, 'BRENT') || findAliasSymbolBest(data, 'WTI') || pickBest(byMatchers([/^BZ=F$/i, /^(LCO|BRN)c\d(=\$)?$/i, /^CL=F$/i, /^CLc\d(=\$)?$/i, /\bBrent\b/i, /\bWTI\b/i], { limit: 10 })),
+        gold: findAliasSymbolBest(data, 'GOLD') || pickBest(byMatchers([/^GC=F$/i, /^GCc\d(=\$)?$/i, /^XAU(USD)?$/i, /^GLD(\.\w+)?$/i, /\bGold\b/i, /\bOuro\b/i], { limit: 10 })),
+        copper: findAliasSymbolBest(data, 'COPPER') || pickBest(byMatchers([/^HG=F$/i, /^HGc\d(=\$)?$/i, /^CPER(\.\w+)?$/i, /\bCopper\b/i, /\bCobre\b/i], { limit: 10 })),
+        btc: findAliasSymbolBest(data, 'BTC') || pickBest(byMatchers([/^BTC\/USD$/i, /\bbitcoin\b/i], { limit: 10 })),
     };
+
+    const volAmp = (() => {
+        const spot = (s) => {
+            const pt = s ? (getMostRecentPointWithPrice(data, s) || getLastPoint(data, s)) : null;
+            const px = pt && typeof pt.price === 'number' && Number.isFinite(pt.price) ? pt.price : null;
+            return px;
+        };
+        const vix = spot(sym.vix);
+        const vxn = spot(sym.vxn);
+        const vixRel = isNum(vix) ? clamp(vix / 20, 0.75, 1.5) : null;
+        const vxnRel = isNum(vxn) ? clamp(vxn / 25, 0.75, 1.6) : null;
+        const amp = (vixRel !== null && vxnRel !== null) ? ((vixRel + vxnRel) / 2) : (vixRel !== null ? vixRel : (vxnRel !== null ? vxnRel : 1));
+        return { amp: isNum(amp) ? amp : 1, vix: isNum(vix) ? vix : null, vxn: isNum(vxn) ? vxn : null };
+    })();
 
     const computeNews = (() => {
         const items = web && Array.isArray(web.items) ? web.items : [];
@@ -3213,8 +3706,9 @@ function computeUsEquitiesPulseNow(data, web) {
         })();
 
         const scalp = (() => {
-            const th5 = 0.08;
-            const th15 = 0.14;
+            const amp = volAmp && typeof volAmp.amp === 'number' && Number.isFinite(volAmp.amp) ? volAmp.amp : 1;
+            const th5 = 0.08 * amp;
+            const th15 = 0.14 * amp;
             const s5 = typeof ret5 === 'number' && Number.isFinite(ret5) ? ret5 : null;
             const s15 = typeof ret15 === 'number' && Number.isFinite(ret15) ? ret15 : null;
             if (s5 === null || s15 === null) return { signal: 'neutral', strength: 0, label: 'n/d' };
@@ -3361,7 +3855,7 @@ function computeUsEquitiesPulseNow(data, web) {
         },
     };
 
-    const expected = ['spx', 'ndx', 'dow', 'dxy', 'vix', 'us10y', 'hyg', 'tlt', 'eem'];
+    const expected = ['spx', 'ndx', 'dow', 'dxy', 'vix', 'vxn', 'us2y', 'us10y', 'us30y', 'hyg', 'tlt', 'eem', 'xlf', 'xlk', 'iwm'];
     const missing = expected.filter(k => !sym[k]);
     const execution = {
         spx: sym.spx,
@@ -3379,11 +3873,48 @@ function computeUsEquitiesPulseNow(data, web) {
         dow: 'US30/Dow (DIA/.DJI/YM)',
         dxy: 'DXY',
         vix: 'VIX',
+        vxn: 'VXN',
         us10y: 'US10Y',
+        us2y: 'US2Y',
+        us30y: 'US30Y',
         hyg: 'HYG',
         tlt: 'TLT',
         eem: 'EEM/VWO',
+        xlf: 'XLF',
+        xlk: 'XLK',
+        iwm: 'IWM',
     };
+
+    const missingAssetsSuggestion = (() => {
+        const hasAny = matchers => {
+            for (const a of assets) {
+                const sym = String(a && a.symbol ? a.symbol : '');
+                const name = String(a && a.name ? a.name : '');
+                for (const re of (matchers || [])) {
+                    if (!(re instanceof RegExp)) continue;
+                    if (re.test(sym) || re.test(name)) return true;
+                }
+            }
+            return false;
+        };
+        const wants = [
+            { label: 'ES (futuro SPX)', matchers: [/^ES[HMUZ]\d{1,2}(=\$)?$/i] },
+            { label: 'NQ (futuro NDX)', matchers: [/^NQ[HMUZ]\d{1,2}(=\$)?$/i] },
+            { label: 'YM (futuro DOW)', matchers: [/^YM[HMUZ]\d{1,2}(=\$)?$/i] },
+            { label: 'VIX/VIX9D', matchers: [/^\.?VIX(9D)?$/i, /^VIX$/i, /^\.VIX$/i] },
+            { label: 'VXN', matchers: [/^\.VXN$/i, /\bVXN\b/i] },
+            { label: 'DXY', matchers: [/^\.DXY$/i, /\bDXY\b/i] },
+            { label: 'US10Y', matchers: [/^US10YT=RR$/i, /^\^TNX$/i, /^TNc\d=\$?$/i] },
+            { label: 'US2Y', matchers: [/^US2YT=RR$/i, /^\^IRX$/i, /^TUc\d=\$?$/i] },
+            { label: 'HYG', matchers: [/^HYG(\.\w+)?$/i] },
+            { label: 'TLT', matchers: [/^TLT(\.\w+)?$/i] },
+            { label: 'XLF/XLK', matchers: [/^XLF(\.\w+)?$/i, /^XLK(\.\w+)?$/i] },
+            { label: 'IWM', matchers: [/^IWM(\.\w+)?$/i] },
+        ];
+        const out = [];
+        for (const w of wants) if (!hasAny(w.matchers)) out.push(w.label);
+        return out;
+    })();
 
     return {
         sym,
@@ -3398,6 +3929,8 @@ function computeUsEquitiesPulseNow(data, web) {
         execution,
         source,
         coverage: { expected: expected.length, missing, keyLabels },
+        volAmp,
+        missingAssetsSuggestion,
         news: computeNews.top || [],
         newsMeta: { used: computeNews.used, matched: computeNews.matched, score: computeNews.score },
     };
@@ -3406,8 +3939,46 @@ function computeUsEquitiesPulseNow(data, web) {
 function computeCommoditiesPulseNow(data, web) {
     const isNum = v => typeof v === 'number' && Number.isFinite(v);
     const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-    const pick = patterns => patterns.map(re => findAssetSymbol(data, re)).find(Boolean) || null;
     const get = s => (s ? getChangePct(data, s) : null);
+    const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
+    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const catDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps };
+    const rcKey = (key, fallbackMatcher) => {
+        const sym = catalog && typeof catalog.resolveRatesCreditByKey === 'function'
+            ? catalog.resolveRatesCreditByKey(catDeps, data, key)
+            : null;
+        if (sym) return sym;
+        if (fallbackMatcher instanceof RegExp) return findAssetSymbol(data, fallbackMatcher);
+        return null;
+    };
+
+    const assets = data && Array.isArray(data.assets) ? data.assets : [];
+    const byMatchers = (matchers, { limit = 10 } = {}) => {
+        const out = [];
+        const seen = new Set();
+        const ms = (s) => {
+            const last = s ? (getMostRecentPointWithPrice(data, s) || getLastPoint(data, s)) : null;
+            const t = last && last.t ? Date.parse(String(last.t)) : NaN;
+            return Number.isFinite(t) ? t : -Infinity;
+        };
+        for (const re of (matchers || [])) {
+            if (!(re instanceof RegExp)) continue;
+            for (const a of assets) {
+                const sym = a && a.symbol ? String(a.symbol) : '';
+                const name = a && a.name ? String(a.name) : '';
+                if (!sym || seen.has(sym)) continue;
+                if (re.test(sym) || re.test(name)) {
+                    out.push(sym);
+                    seen.add(sym);
+                    if (out.length >= limit) break;
+                }
+            }
+        }
+        out.sort((a, b) => ms(b) - ms(a));
+        return out;
+    };
+    const pickBest = (cands) => (Array.isArray(cands) && cands.length ? cands[0] : null);
+
     const asSource = (symbol, futurePatterns = []) => {
         const s = String(symbol || '');
         if (!s) return 'missing';
@@ -3415,30 +3986,82 @@ function computeCommoditiesPulseNow(data, web) {
         return 'proxy';
     };
     const pickPreferred = (futurePatterns, fallbackPatterns, aliasKey = null) => {
-        const fut = pick(futurePatterns || []);
+        const futCands = byMatchers(futurePatterns || [], { limit: 10 });
+        const fut = pickBest(futCands);
         if (fut) return fut;
+
         const ali = aliasKey ? findAliasSymbolBest(data, aliasKey) : null;
         if (ali) return ali;
-        return pick(fallbackPatterns || []);
+
+        const cands = byMatchers(fallbackPatterns || [], { limit: 10 });
+        return pickBest(cands);
     };
 
     const sym = {
-        gold: pickPreferred([/^GCc\d$/i, /^GC=F$/i], [/^XAU(USD)?$/i, /^GLD(\.\w+)?$/i, /\bGold\b/i, /\bOuro\b/i], 'GOLD'),
-        brent: pickPreferred([/^LCOc\d$/i, /^BRNc\d$/i, /^BZ=F$/i], [/^BNO(\.\w+)?$/i, /\bBrent\b/i], 'BRENT'),
-        wti: pickPreferred([/^CLc\d$/i, /^CL=F$/i], [/^USO(\.\w+)?$/i, /\bWTI\b/i], 'WTI'),
-        dxy: findAliasSymbolBest(data, 'DXY') || pick([/^\.DXY$/i, /^DXY$/i, /^DX=F$/i, /^DXc\d$/i, /\bUS\s*Dollar\s*Index\b/i]),
-        vix: findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX') || pick([/^\.?VIX(9D)?$/i]),
-        us2y: findAliasSymbolBest(data, 'US2Y') || pick([/^US2YT=RR$/i, /^TUc\d=\$?$/i, /\bUS2Y\b/i, /\bUnited States 2-Year\b/i]),
-        us10y: findAliasSymbolBest(data, 'US10Y') || pick([/^US10YT=RR$/i, /^USGV10YUSAB=R$/i, /^TNc\d=\$?$/i, /^TYc\d=\$?$/i, /\bUS10Y\b/i, /\bUnited States 10-Year\b/i]),
-        tlt: findAliasSymbolBest(data, 'TLT') || pick([/^TLT(\.\w+)?$/i]),
-        hyg: findAliasSymbolBest(data, 'HYG') || pick([/^HYG(\.\w+)?$/i]),
-        eem: findAliasSymbolBest(data, 'EEM') || findAliasSymbolBest(data, 'VWO') || pick([/^EEM(\.\w+)?$/i, /^VWO(\.\w+)?$/i]),
-        spx: findAliasSymbolBest(data, 'SPX') || pick([/^\.SPX$/i, /^SPX$/i, /^SPY(\.\w+)?$/i, /\bS&P\s*500\b/i, /\bS\s*&\s*P\s*500\b/i]),
-        copper: findAliasSymbolBest(data, 'COPPER') || pick([/^HG=F$/i, /^HGc\d$/i, /^CPER(\.\w+)?$/i, /\bCopper\b/i, /\bCobre\b/i]),
-        usdcad: findAliasSymbolBest(data, 'USD_CAD') || pick([/^USD\/CAD\b/i, /\bUSDCAD\b/i]),
-        usdrub: pick([/^USD\/RUB\b/i, /\bUSDRUB\b/i]),
-        xle: pick([/^XLE(\.\w+)?$/i, /\bEnergy\s*Select\s*Sector\b/i]),
-        btc: findAliasSymbolBest(data, 'BTC') || pick([/^BTC\/USD$/i, /\bbitcoin\b/i]),
+        gold: pickPreferred(
+            [/^GCc\d(=\$)?$/i, /^MGCc\d(=\$)?$/i, /^GC=F$/i],
+            [/^XAU\/?USD\b/i, /\bXAU\/?USD\b/i, /^GLD(\.\w+)?$/i, /^\.TRCCRBGC$/i, /\bGold\b/i, /\bOuro\b/i],
+            'GOLD'
+        ),
+        brent: pickPreferred(
+            [/^(LCO|BRN)c\d(=\$)?$/i, /^BZ=F$/i],
+            [/^BNO(\.\w+)?$/i, /^\.TRCCRBCL$/i, /\bBrent\b/i],
+            'BRENT'
+        ),
+        wti: pickPreferred(
+            [/^CLc\d(=\$)?$/i, /^MWCLc\d(=\$)?$/i, /^CL=F$/i],
+            [/^USO(\.\w+)?$/i, /^\.TRCCRBCL$/i, /\bWTI\b/i],
+            'WTI'
+        ),
+        gld: pickPreferred([], [/^GLD(\.\w+)?$/i, /\bSPDR Gold\b/i], null),
+        slv: pickPreferred([], [/^SLV(\.\w+)?$/i, /\biShares Silver\b/i], null),
+        silver: pickPreferred(
+            [/^SILc\d(=\$)?$/i, /^SI$/i, /^SIc\d(=\$)?$/i],
+            [/^SLV(\.\w+)?$/i, /\bSilver\b/i, /\bPrata\b/i],
+            null
+        ),
+        gas: pickPreferred(
+            [/^MNDc\d(=\$)?$/i, /^NGc\d(=\$)?$/i, /^NG$/i, /^NATURAL\s*GAS$/i],
+            [/^\.TRCCRBNG$/i, /\bNatural\s*Gas\b/i, /\bG[aá]s\s*Natural\b/i, /\bTTF\b.*\bGas\b/i],
+            null
+        ),
+        ttfGas: pickPreferred(
+            [/^TFAc\d(=\$)?$/i],
+            [/\bDutch\b.*\bTTF\b.*\bGas\b/i, /\bTTF\b.*\bGas\b/i, /\bTTF\b/i],
+            null
+        ),
+        uso: pickPreferred([], [/^USO(\.\w+)?$/i], null),
+        xle: pickPreferred([], [/^XLE(\.\w+)?$/i, /\bEnergy\s*Select\s*Sector\b/i], null),
+        xop: pickPreferred([], [/^XOP(\.\w+)?$/i], null),
+        oih: pickPreferred([], [/^OIH(\.\w+)?$/i], null),
+
+        dxy: findAliasSymbolBest(data, 'DXY') || pickBest(byMatchers([/^\.DXY$/i, /^DXY$/i, /^DX=F$/i, /^DXc\d(=\$)?$/i, /\bUS\s*Dollar\s*Index\b/i], { limit: 8 })),
+        vix: findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX') || pickBest(byMatchers([/^\.?VIX(9D)?$/i], { limit: 6 })),
+        us2y: rcKey('US_2Y', /^US2YT=RR$/i) || findAliasSymbolBest(data, 'US2Y') || pickBest(byMatchers([/^US2YT=RR$/i, /^TUc\d=\$?$/i, /\bUS2Y\b/i, /\bUnited States 2-Year\b/i], { limit: 8 })),
+        us10y: rcKey('US_10Y', /^US10YT=RR$/i) || findAliasSymbolBest(data, 'US10Y') || pickBest(byMatchers([/^US10YT=RR$/i, /^USGV10YUSAB=R$/i, /^TNc\d=\$?$/i, /^TYc\d=\$?$/i, /\bUS10Y\b/i, /\bUnited States 10-Year\b/i], { limit: 10 })),
+        tipsEtf: rcKey('ETF_TIP', /^TIP(\.\w+)?$/i) || findAliasSymbolBest(data, 'TIPS_ETF') || pickBest(byMatchers([/^TIP(\.\w+)?$/i, /\bTIPS\b/i], { limit: 6 })),
+        tlt: rcKey('ETF_TLT', /^TLT(\.\w+)?$/i) || findAliasSymbolBest(data, 'TLT') || pickBest(byMatchers([/^TLT(\.\w+)?$/i], { limit: 6 })),
+        hyg: rcKey('ETF_HYG', /^HYG(\.\w+)?$/i) || findAliasSymbolBest(data, 'HYG') || pickBest(byMatchers([/^HYG(\.\w+)?$/i], { limit: 6 })),
+        eem: findAliasSymbolBest(data, 'EEM') || findAliasSymbolBest(data, 'VWO') || pickBest(byMatchers([/^EEM(\.\w+)?$/i, /^VWO(\.\w+)?$/i], { limit: 6 })),
+        spx: findAliasSymbolBest(data, 'SPX') || pickBest(byMatchers([/^\.SPX$/i, /^SPX$/i, /^SPY(\.\w+)?$/i, /\bS&P\s*500\b/i, /\bS\s*&\s*P\s*500\b/i], { limit: 10 })),
+        copper: pickPreferred(
+            [/^HGc\d(=\$)?$/i, /^HG=F$/i, /^MCU$/i],
+            [/^CPER(\.\w+)?$/i, /\bCopper\b/i, /\bCobre\b/i],
+            'COPPER'
+        ),
+        nickel: pickPreferred(
+            [/^MNI\d$/i],
+            [/\bNickel\b/i, /\bN[ií]quel\b/i],
+            null
+        ),
+        zinc: pickPreferred(
+            [/^MZN\d$/i],
+            [/\bZinc\b/i, /\bZinco\b/i],
+            null
+        ),
+        usdcad: findAliasSymbolBest(data, 'USD_CAD') || pickBest(byMatchers([/^USD\/CAD\b/i, /\bUSDCAD\b/i], { limit: 6 })),
+        usdrub: pickBest(byMatchers([/^USD\/RUB\b/i, /\bUSDRUB\b/i], { limit: 6 })),
+        btc: findAliasSymbolBest(data, 'BTC') || pickBest(byMatchers([/^BTC\/USD$/i, /\bbitcoin\b/i], { limit: 6 })),
     };
 
     const computeNews = (() => {
@@ -3450,8 +4073,8 @@ function computeCommoditiesPulseNow(data, web) {
             if (s.includes('low') || s.includes('baixa')) return 0.55;
             return 0.7;
         };
-        const kwGoldOil = s =>
-            /\bgold\b|\bouro\b|\bxau\b|\bcentral\s*bank\b|\breserves\b|\binflation\b|\bcpi\b|\breal\s*yields?\b|\btreasury\b|\brate\s*cut\b|\brate\s*hike\b|\boil\b|\bcrude\b|\bbrent\b|\bwti\b|\bopec\b|\bpec\b|\boutput\b|\brefiner\w*\b|\bstockpile\w*\b|\binventory\b|\bshipping\b|\bred\s*sea\b|\bhormuz\b|\bsanction\w*\b|\bwar\b|\biran\b|\bisrael\b|\brussia\b|\bukraine\b|\bmiddle\s*east\b|\bchina\b|\btaiwan\b/i.test(s);
+        const kwCommodities = s =>
+            /\bgold\b|\bouro\b|\bxau\b|\bsilver\b|\bprata\b|\bcopper\b|\bcobre\b|\bnatural\s*gas\b|\bg[aá]s\s*natural\b|\blng\b|\bttf\b|\bcentral\s*bank\b|\breserves\b|\binflation\b|\bcpi\b|\breal\s*yields?\b|\btreasury\b|\brate\s*cut\b|\brate\s*hike\b|\boil\b|\bcrude\b|\bbrent\b|\bwti\b|\bopec\b|\bpec\b|\boutput\b|\brefiner\w*\b|\bstockpile\w*\b|\binventory\b|\bshipping\b|\bred\s*sea\b|\bhormuz\b|\bsanction\w*\b|\bwar\b|\biran\b|\bisrael\b|\brussia\b|\bukraine\b|\bmiddle\s*east\b|\bchina\b|\btaiwan\b/i.test(s);
         const pos = [
             /\bde[-\s]?escalat\w*\b/i,
             /\bceasefire\b/i,
@@ -3481,7 +4104,7 @@ function computeCommoditiesPulseNow(data, web) {
         for (const it of items.slice(0, 80)) {
             const title = it && it.title ? String(it.title) : '';
             if (!title) continue;
-            if (!kwGoldOil(title)) continue;
+            if (!kwCommodities(title)) continue;
             if (top.length < 6) top.push(it);
             matched++;
             const w = confW(it && it.confidence);
@@ -3646,31 +4269,96 @@ function computeCommoditiesPulseNow(data, web) {
     };
 
     const buildPulse = (baseKey) => {
-        const cfg = baseKey === 'gold'
-            ? [
+        let cfg = [];
+        if (baseKey === 'gold') {
+            cfg = [
                 { key: 'gold', group: 'driver', weight: 0.9, capAbs: 1.2, sign: +1 },
                 { key: 'dxy', group: 'driver', weight: 0.6, capAbs: 0.8, sign: -1 },
                 { key: 'us10y', group: 'driver', weight: 0.45, capAbs: 0.9, sign: -1 },
+                { key: 'tipsEtf', group: 'driver', weight: 0.28, capAbs: 1.2, sign: +0.6 },
                 { key: 'tlt', group: 'confirm', weight: 0.25, capAbs: 1.3, sign: +1 },
+                { key: 'gld', group: 'confirm', weight: 0.18, capAbs: 1.6, sign: +1 },
                 { key: 'vix', group: 'confirm', weight: 0.25, capAbs: 4.5, sign: +0.6 },
                 { key: 'hyg', group: 'context', weight: 0.2, capAbs: 1.3, sign: -0.5 },
                 { key: 'spx', group: 'context', weight: 0.25, capAbs: 1.2, sign: -0.4 },
                 { key: 'eem', group: 'context', weight: 0.18, capAbs: 1.4, sign: -0.3 },
                 { key: 'btc', group: 'context', weight: 0.12, capAbs: 2.0, sign: -0.2 },
-            ]
-            : [
+                { key: 'slv', group: 'context', weight: 0.08, capAbs: 2.2, sign: +0.25 },
+            ];
+        } else if (baseKey === 'oil') {
+            cfg = [
                 { key: 'brent', group: 'driver', weight: 0.55, capAbs: 2.0, sign: +1 },
                 { key: 'wti', group: 'driver', weight: 0.45, capAbs: 2.0, sign: +1 },
                 { key: 'dxy', group: 'driver', weight: 0.35, capAbs: 0.8, sign: -0.6 },
                 { key: 'spx', group: 'confirm', weight: 0.25, capAbs: 1.2, sign: +0.4 },
                 { key: 'hyg', group: 'confirm', weight: 0.25, capAbs: 1.3, sign: +0.4 },
                 { key: 'vix', group: 'confirm', weight: 0.25, capAbs: 4.5, sign: -0.5 },
+                { key: 'xop', group: 'confirm', weight: 0.14, capAbs: 1.8, sign: +0.35 },
+                { key: 'oih', group: 'confirm', weight: 0.12, capAbs: 2.0, sign: +0.3 },
                 { key: 'us10y', group: 'context', weight: 0.2, capAbs: 0.9, sign: -0.25 },
                 { key: 'copper', group: 'context', weight: 0.18, capAbs: 1.8, sign: +0.35 },
                 { key: 'xle', group: 'context', weight: 0.18, capAbs: 1.6, sign: +0.35 },
+                { key: 'uso', group: 'context', weight: 0.12, capAbs: 2.0, sign: +0.35 },
                 { key: 'usdcad', group: 'context', weight: 0.15, capAbs: 0.8, sign: -0.35 },
                 { key: 'usdrub', group: 'context', weight: 0.12, capAbs: 1.0, sign: +0.15 },
             ];
+        } else if (baseKey === 'gas') {
+            cfg = [
+                { key: 'gas', group: 'driver', weight: 0.85, capAbs: 3.0, sign: +1 },
+                { key: 'dxy', group: 'driver', weight: 0.35, capAbs: 0.8, sign: -0.5 },
+                { key: 'brent', group: 'confirm', weight: 0.2, capAbs: 2.0, sign: +0.25 },
+                { key: 'wti', group: 'confirm', weight: 0.2, capAbs: 2.0, sign: +0.25 },
+                { key: 'xle', group: 'context', weight: 0.18, capAbs: 1.6, sign: +0.25 },
+                { key: 'spx', group: 'context', weight: 0.15, capAbs: 1.2, sign: +0.1 },
+                { key: 'vix', group: 'context', weight: 0.12, capAbs: 4.5, sign: -0.2 },
+            ];
+        } else if (baseKey === 'ttfGas') {
+            cfg = [
+                { key: 'ttfGas', group: 'driver', weight: 0.85, capAbs: 3.0, sign: +1 },
+                { key: 'dxy', group: 'driver', weight: 0.25, capAbs: 0.8, sign: -0.45 },
+                { key: 'brent', group: 'confirm', weight: 0.22, capAbs: 2.0, sign: +0.25 },
+                { key: 'wti', group: 'confirm', weight: 0.18, capAbs: 2.0, sign: +0.2 },
+                { key: 'xle', group: 'context', weight: 0.15, capAbs: 1.6, sign: +0.2 },
+                { key: 'spx', group: 'context', weight: 0.12, capAbs: 1.2, sign: +0.1 },
+                { key: 'vix', group: 'context', weight: 0.1, capAbs: 4.5, sign: -0.15 },
+            ];
+        } else if (baseKey === 'silver') {
+            cfg = [
+                { key: 'silver', group: 'driver', weight: 0.85, capAbs: 2.2, sign: +1 },
+                { key: 'dxy', group: 'driver', weight: 0.4, capAbs: 0.8, sign: -0.6 },
+                { key: 'us10y', group: 'driver', weight: 0.3, capAbs: 0.9, sign: -0.35 },
+                { key: 'gold', group: 'confirm', weight: 0.25, capAbs: 1.2, sign: +0.35 },
+                { key: 'slv', group: 'confirm', weight: 0.18, capAbs: 2.2, sign: +1 },
+                { key: 'vix', group: 'context', weight: 0.12, capAbs: 4.5, sign: +0.15 },
+                { key: 'spx', group: 'context', weight: 0.12, capAbs: 1.2, sign: -0.15 },
+            ];
+        } else if (baseKey === 'copper') {
+            cfg = [
+                { key: 'copper', group: 'driver', weight: 0.85, capAbs: 1.8, sign: +1 },
+                { key: 'dxy', group: 'driver', weight: 0.35, capAbs: 0.8, sign: -0.5 },
+                { key: 'spx', group: 'confirm', weight: 0.25, capAbs: 1.2, sign: +0.25 },
+                { key: 'brent', group: 'context', weight: 0.18, capAbs: 2.0, sign: +0.15 },
+                { key: 'vix', group: 'context', weight: 0.12, capAbs: 4.5, sign: -0.25 },
+            ];
+        } else if (baseKey === 'nickel') {
+            cfg = [
+                { key: 'nickel', group: 'driver', weight: 0.85, capAbs: 2.4, sign: +1 },
+                { key: 'dxy', group: 'driver', weight: 0.3, capAbs: 0.8, sign: -0.5 },
+                { key: 'copper', group: 'confirm', weight: 0.22, capAbs: 1.8, sign: +0.25 },
+                { key: 'spx', group: 'confirm', weight: 0.18, capAbs: 1.2, sign: +0.2 },
+                { key: 'brent', group: 'context', weight: 0.12, capAbs: 2.0, sign: +0.1 },
+                { key: 'vix', group: 'context', weight: 0.12, capAbs: 4.5, sign: -0.2 },
+            ];
+        } else if (baseKey === 'zinc') {
+            cfg = [
+                { key: 'zinc', group: 'driver', weight: 0.85, capAbs: 2.2, sign: +1 },
+                { key: 'dxy', group: 'driver', weight: 0.3, capAbs: 0.8, sign: -0.5 },
+                { key: 'copper', group: 'confirm', weight: 0.22, capAbs: 1.8, sign: +0.25 },
+                { key: 'spx', group: 'confirm', weight: 0.18, capAbs: 1.2, sign: +0.2 },
+                { key: 'brent', group: 'context', weight: 0.12, capAbs: 2.0, sign: +0.1 },
+                { key: 'vix', group: 'context', weight: 0.12, capAbs: 4.5, sign: -0.2 },
+            ];
+        }
 
         const rows = [];
         const groups = {
@@ -3716,9 +4404,21 @@ function computeCommoditiesPulseNow(data, web) {
 
     const goldPulse = buildPulse('gold');
     const oilPulse = buildPulse('oil');
+    const gasPulse = sym.gas ? buildPulse('gas') : null;
+    const ttfGasPulse = sym.ttfGas ? buildPulse('ttfGas') : null;
+    const silverPulse = sym.silver ? buildPulse('silver') : null;
+    const copperPulse = sym.copper ? buildPulse('copper') : null;
+    const nickelPulse = sym.nickel ? buildPulse('nickel') : null;
+    const zincPulse = sym.zinc ? buildPulse('zinc') : null;
     const micro = {
         gold: microStats(sym.gold),
         oil: microStats(sym.brent || sym.wti || null),
+        gas: microStats(sym.gas),
+        ttfGas: microStats(sym.ttfGas),
+        silver: microStats(sym.silver),
+        copper: microStats(sym.copper),
+        nickel: microStats(sym.nickel),
+        zinc: microStats(sym.zinc),
     };
 
     const corr = {
@@ -3726,6 +4426,7 @@ function computeCommoditiesPulseNow(data, web) {
             items: [
                 corrPair('Ouro × DXY', sym.gold, sym.dxy),
                 corrPair('Ouro × US10Y', sym.gold, sym.us10y),
+                corrPair('Ouro × TIP', sym.gold, sym.tipsEtf),
                 corrPair('Ouro × SPX', sym.gold, sym.spx),
                 corrPair('Ouro × VIX', sym.gold, sym.vix),
             ].filter(Boolean),
@@ -3737,21 +4438,84 @@ function computeCommoditiesPulseNow(data, web) {
                 corrPair('Brent × SPX', sym.brent, sym.spx),
                 corrPair('Brent × Cobre', sym.brent, sym.copper),
                 corrPair('Brent × USD/CAD', sym.brent, sym.usdcad),
+                corrPair('Brent × XOP', sym.brent, sym.xop),
+                corrPair('Brent × OIH', sym.brent, sym.oih),
+            ].filter(Boolean),
+        },
+        gas: {
+            items: [
+                corrPair('Gás × DXY', sym.gas, sym.dxy),
+                corrPair('Gás × Brent', sym.gas, sym.brent),
+                corrPair('Gás × US10Y', sym.gas, sym.us10y),
+                corrPair('Gás × SPX', sym.gas, sym.spx),
+            ].filter(Boolean),
+        },
+        ttfGas: {
+            items: [
+                corrPair('TTF × DXY', sym.ttfGas, sym.dxy),
+                corrPair('TTF × Brent', sym.ttfGas, sym.brent),
+                corrPair('TTF × US10Y', sym.ttfGas, sym.us10y),
+                corrPair('TTF × SPX', sym.ttfGas, sym.spx),
+            ].filter(Boolean),
+        },
+        silver: {
+            items: [
+                corrPair('Prata × Ouro', sym.silver, sym.gold),
+                corrPair('Prata × DXY', sym.silver, sym.dxy),
+                corrPair('Prata × US10Y', sym.silver, sym.us10y),
+                corrPair('Prata × SPX', sym.silver, sym.spx),
+            ].filter(Boolean),
+        },
+        copper: {
+            items: [
+                corrPair('Cobre × DXY', sym.copper, sym.dxy),
+                corrPair('Cobre × SPX', sym.copper, sym.spx),
+                corrPair('Cobre × Brent', sym.copper, sym.brent),
+                corrPair('Cobre × US10Y', sym.copper, sym.us10y),
+            ].filter(Boolean),
+        },
+        nickel: {
+            items: [
+                corrPair('Níquel × DXY', sym.nickel, sym.dxy),
+                corrPair('Níquel × Cobre', sym.nickel, sym.copper),
+                corrPair('Níquel × SPX', sym.nickel, sym.spx),
+                corrPair('Níquel × Brent', sym.nickel, sym.brent),
+            ].filter(Boolean),
+        },
+        zinc: {
+            items: [
+                corrPair('Zinco × DXY', sym.zinc, sym.dxy),
+                corrPair('Zinco × Cobre', sym.zinc, sym.copper),
+                corrPair('Zinco × SPX', sym.zinc, sym.spx),
+                corrPair('Zinco × Brent', sym.zinc, sym.brent),
             ].filter(Boolean),
         },
     };
 
-    const expected = ['gold', 'brent', 'wti', 'dxy', 'us10y', 'vix', 'hyg'];
+    const expected = ['gold', 'brent', 'wti', 'gas', 'ttfGas', 'silver', 'copper', 'nickel', 'zinc', 'dxy', 'us10y', 'vix', 'hyg', 'tlt', 'tipsEtf', 'gld', 'slv', 'usdcad', 'xle', 'xop', 'oih', 'uso'];
     const missing = expected.filter(k => !sym[k]);
-    const execution = {
-        gold: sym.gold,
-        oil: sym.brent || sym.wti || null,
-    };
+    const execution = (() => {
+        const gold = sym.gold;
+        const oil = sym.wti || sym.brent || sym.uso || null;
+        const gas = sym.gas || null;
+        const ttfGas = sym.ttfGas || null;
+        const silver = sym.silver || sym.slv || null;
+        const copper = sym.copper || null;
+        const nickel = sym.nickel || null;
+        const zinc = sym.zinc || null;
+        return { gold, oil, gas, ttfGas, silver, copper, nickel, zinc };
+    })();
     const source = {
-        gold: asSource(sym.gold, [/^GCc\d$/i, /^GC=F$/i]),
-        brent: asSource(sym.brent, [/^LCOc\d$/i, /^BRNc\d$/i, /^BZ=F$/i]),
-        wti: asSource(sym.wti, [/^CLc\d$/i, /^CL=F$/i]),
-        oil: asSource(sym.brent || sym.wti || null, [/^LCOc\d$/i, /^BRNc\d$/i, /^BZ=F$/i, /^CLc\d$/i, /^CL=F$/i]),
+        gold: asSource(sym.gold, [/^GCc\d(=\$)?$/i, /^MGCc\d(=\$)?$/i, /^GC=F$/i]),
+        brent: asSource(sym.brent, [/^(LCO|BRN)c\d(=\$)?$/i, /^BZ=F$/i]),
+        wti: asSource(sym.wti, [/^CLc\d(=\$)?$/i, /^MWCLc\d(=\$)?$/i, /^CL=F$/i]),
+        oil: asSource(execution.oil || null, [/^(LCO|BRN)c\d(=\$)?$/i, /^BZ=F$/i, /^CLc\d(=\$)?$/i, /^MWCLc\d(=\$)?$/i, /^CL=F$/i]),
+        gas: asSource(execution.gas || null, [/^MNDc\d(=\$)?$/i, /^NGc\d(=\$)?$/i, /^NG$/i]),
+        ttfGas: asSource(execution.ttfGas || null, [/^TFAc\d(=\$)?$/i]),
+        silver: asSource(execution.silver || null, [/^SILc\d(=\$)?$/i, /^SI$/i, /^SIc\d(=\$)?$/i]),
+        copper: asSource(execution.copper || null, [/^HGc\d(=\$)?$/i, /^HG=F$/i, /^MCU$/i]),
+        nickel: asSource(execution.nickel || null, [/^MNI\d$/i]),
+        zinc: asSource(execution.zinc || null, [/^MZN\d$/i]),
     };
     const keyLabels = {
         gold: 'Ouro (GC/XAU/GLD)',
@@ -3761,7 +4525,53 @@ function computeCommoditiesPulseNow(data, web) {
         us10y: 'US10Y',
         vix: 'VIX',
         hyg: 'HYG',
+        tlt: 'TLT',
+        tipsEtf: 'TIP (TIPS)',
+        gld: 'GLD (ETF ouro)',
+        slv: 'SLV (ETF prata)',
+        usdcad: 'USD/CAD',
+        xle: 'XLE',
+        xop: 'XOP',
+        oih: 'OIH',
+        uso: 'USO',
+        ttfGas: 'TTF (Gás Europa)',
+        nickel: 'Níquel',
+        zinc: 'Zinco',
     };
+
+    const missingAssetsSuggestion = (() => {
+        const hasAny = matchers => {
+            for (const a of assets) {
+                const sym = String(a && a.symbol ? a.symbol : '');
+                const name = String(a && a.name ? a.name : '');
+                for (const re of (matchers || [])) {
+                    if (!(re instanceof RegExp)) continue;
+                    if (re.test(sym) || re.test(name)) return true;
+                }
+            }
+            return false;
+        };
+        const wants = [
+            { label: 'MGCc1/MGCc2 (futuro ouro)', matchers: [/^MGCc\d(=\$)?$/i] },
+            { label: 'MWCLc1 (futuro petróleo)', matchers: [/^MWCLc\d(=\$)?$/i] },
+            { label: 'GLD (ETF ouro)', matchers: [/^GLD(\.\w+)?$/i] },
+            { label: 'BNO/USO (proxy petróleo)', matchers: [/^BNO(\.\w+)?$/i, /^USO(\.\w+)?$/i] },
+            { label: 'XLE/XOP/OIH (energia)', matchers: [/^XLE(\.\w+)?$/i, /^XOP(\.\w+)?$/i, /^OIH(\.\w+)?$/i] },
+            { label: 'TTF (gás Europa)', matchers: [/^TFAc\d(=\$)?$/i, /\bTTF\b/i] },
+            { label: 'Níquel (MNI3)', matchers: [/^MNI\d$/i, /\bN[ií]quel\b/i, /\bNickel\b/i] },
+            { label: 'Zinco (MZN3)', matchers: [/^MZN\d$/i, /\bZinco\b/i, /\bZinc\b/i] },
+            { label: 'DXY', matchers: [/^\.DXY$/i, /\bDXY\b/i] },
+            { label: 'VIX', matchers: [/^\.?VIX(9D)?$/i, /\bVIX\b/i] },
+            { label: 'US10Y', matchers: [/^US10YT=RR$/i, /^\.TNX$/i, /^\^TNX$/i] },
+            { label: 'TIP (TIPS)', matchers: [/^TIP(\.\w+)?$/i, /\bTIPS\b/i] },
+            { label: 'HYG', matchers: [/^HYG(\.\w+)?$/i] },
+            { label: 'TLT', matchers: [/^TLT(\.\w+)?$/i] },
+            { label: 'USD/CAD', matchers: [/^USD\/CAD\b/i, /\bUSDCAD\b/i] },
+        ];
+        const out = [];
+        for (const w of wants) if (!hasAny(w.matchers)) out.push(w.label);
+        return out;
+    })();
 
     return {
         sym,
@@ -3770,12 +4580,13 @@ function computeCommoditiesPulseNow(data, web) {
             brentPct: get(sym.brent),
             wtiPct: get(sym.wti),
         },
-        pulse: { gold: goldPulse, oil: oilPulse },
+        pulse: { gold: goldPulse, oil: oilPulse, gas: gasPulse, ttfGas: ttfGasPulse, silver: silverPulse, copper: copperPulse, nickel: nickelPulse, zinc: zincPulse },
         corr,
         micro,
         execution,
         source,
         coverage: { expected: expected.length, missing, keyLabels },
+        missingAssetsSuggestion,
         news: computeNews.top || [],
         newsMeta: { used: computeNews.used, matched: computeNews.matched, score: computeNews.score },
     };
@@ -3784,7 +4595,47 @@ function computeCommoditiesPulseNow(data, web) {
 function computeBtcPulseNow(data, web) {
     const isNum = v => typeof v === 'number' && Number.isFinite(v);
     const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-    const pick = patterns => patterns.map(re => findAssetSymbol(data, re)).find(Boolean) || null;
+    const dc = (typeof window !== 'undefined' && window.DecisionCore) ? window.DecisionCore : null;
+    const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
+    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const catDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps };
+    const rcKey = (key, fallbackMatcher) => {
+        const sym = catalog && typeof catalog.resolveRatesCreditByKey === 'function'
+            ? catalog.resolveRatesCreditByKey(catDeps, data, key)
+            : null;
+        if (sym) return sym;
+        if (fallbackMatcher instanceof RegExp) return findAssetSymbol(data, fallbackMatcher);
+        return null;
+    };
+    const aliasSym = (k) => findAliasSymbolBest(data, k) || findAliasSymbol(data, k);
+
+    const assets = data && Array.isArray(data.assets) ? data.assets : [];
+    const mostRecentMs = (symbol) => {
+        if (!symbol) return -Infinity;
+        const last = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol);
+        const t = last && last.t ? Date.parse(String(last.t)) : NaN;
+        return Number.isFinite(t) ? t : -Infinity;
+    };
+    const pickBestByMatchers = (matchers, { limit = 14 } = {}) => {
+        const out = [];
+        const seen = new Set();
+        for (const re of (matchers || [])) {
+            if (!(re instanceof RegExp)) continue;
+            for (const a of assets) {
+                const sym = a && a.symbol ? String(a.symbol) : '';
+                const name = a && a.name ? String(a.name) : '';
+                if (!sym || seen.has(sym)) continue;
+                if (re.test(sym) || re.test(name)) {
+                    out.push(sym);
+                    seen.add(sym);
+                    if (out.length >= limit) break;
+                }
+            }
+        }
+        out.sort((a, b) => mostRecentMs(b) - mostRecentMs(a));
+        return out.length ? out[0] : null;
+    };
+    const pick = patterns => pickBestByMatchers(patterns, { limit: 10 }) || patterns.map(re => findAssetSymbol(data, re)).find(Boolean) || null;
     const get = s => (s ? getChangePct(data, s) : null);
     const getRatesMoveProxy = s => {
         if (!s) return null;
@@ -3800,24 +4651,34 @@ function computeBtcPulseNow(data, web) {
             : (lastPrice !== null && prevPrice !== null ? (lastPrice - prevPrice) : null);
         if (deltaRaw === null || !Number.isFinite(deltaRaw)) return null;
         const absPrice = lastPrice !== null ? Math.abs(lastPrice) : 0;
-        const deltaBp = absPrice > 20 ? deltaRaw : (deltaRaw * 100);
-        return deltaBp * 0.1;
+        const looksYield =
+            /YT=RR$/i.test(String(s))
+            || /^\.TNX$|^\^TNX$/i.test(String(s))
+            || absPrice <= 15
+            || (absPrice <= 40 && Math.abs(deltaRaw) <= 0.25);
+        const deltaBp = looksYield ? (deltaRaw * 100) : (absPrice > 20 ? deltaRaw : (deltaRaw * 100));
+        return deltaBp / 10;
     };
 
     const sym = {
-        btc: findAliasSymbolBest(data, 'BTC') || pick([/^BTC\/USD$/i, /\bbitcoin\b/i]),
-        eth: findAliasSymbolBest(data, 'ETH') || pick([/\bETH\/USD\b/i, /\bEthereum\b/i]),
-        sol: findAliasSymbolBest(data, 'SOL') || pick([/^SOL\/USD$/i, /\bSolana\b/i]),
-        doge: findAliasSymbolBest(data, 'DOGE') || pick([/^DOGE\/USD$/i, /\bDogecoin\b/i]),
-        spx: findAliasSymbolBest(data, 'SPX') || pick([/^\.SPX$/i, /^SPX$/i, /^SPY(\.\w+)?$/i, /\bS&P 500\b/i]),
-        ndx: findAliasSymbolBest(data, 'NDX') || pick([/^\.NDX$/i, /^NDX$/i, /^QQQ(\.\w+)?$/i, /\bNasdaq 100\b/i]),
-        dxy: findAliasSymbolBest(data, 'DXY') || pick([/^\.DXY$/i, /^DXY$/i, /^DX=F$/i, /^DXc\d$/i, /\bUS\s*Dollar\s*Index\b/i]),
-        vix: findAliasSymbolBest(data, 'VIX') || pick([/^\.?VIX(9D)?$/i]),
-        vvix: findAliasSymbolBest(data, 'VVIX') || pick([/^\.VVIX$/i]),
-        us2y: findAliasSymbolBest(data, 'US2Y') || pick([/^US2YT=RR$/i, /^TUc\d=\$?$/i, /\bUS2Y\b/i, /\bUnited States 2-Year\b/i]),
-        us10y: findAliasSymbolBest(data, 'US10Y') || pick([/^US10YT=RR$/i, /^USGV10YUSAB=R$/i, /^TNc\d=\$?$/i, /^TYc\d=\$?$/i, /\bUS10Y\b/i, /\bUnited States 10-Year\b/i]),
-        tlt: findAliasSymbolBest(data, 'TLT'),
-        hyg: findAliasSymbolBest(data, 'HYG'),
+        btc: aliasSym('BTC') || pick([/^BTC\/USD$/i, /\bbitcoin\b/i]),
+        eth: aliasSym('ETH') || pick([/\bETH\/USD\b/i, /\bEthereum\b/i]),
+        sol: aliasSym('SOL') || pick([/^SOL\/USD$/i, /\bSolana\b/i]),
+        doge: aliasSym('DOGE') || pick([/^DOGE\/USD$/i, /\bDogecoin\b/i]),
+        xrp: aliasSym('XRP') || pick([/^XRP\/USD$/i, /\bRipple\b/i, /\bXRP\b/i]),
+        spx: aliasSym('SPX') || pick([/^\.SPX$/i, /^SPX$/i, /^SPY(\.\w+)?$/i, /\bS&P 500\b/i]),
+        ndx: aliasSym('NDX') || pick([/^\.NDX$/i, /^NDX$/i, /^QQQ(\.\w+)?$/i, /\bNasdaq 100\b/i]),
+        dxy: aliasSym('DXY') || pick([/^\.DXY$/i, /^DXY$/i, /^DX=F$/i, /^DXc\d$/i, /\bUS\s*Dollar\s*Index\b/i]),
+        vix: findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX30') || aliasSym('VIX') || pick([/^\.?VIX(9D)?$/i, /^VIX$/i]),
+        vxn: aliasSym('VXN') || pick([/^\.VXN$/i, /\bNASDAQ\s*100 Volatility\b/i, /\bVXN\b/i]),
+        vvix: aliasSym('VVIX') || pick([/^\.VVIX$/i]),
+        us2y: rcKey('US_2Y', /^US2YT=RR$/i) || aliasSym('US2Y') || pick([/^US2YT=RR$/i, /^TUc\d=\$?$/i, /\bUS2Y\b/i, /\bUnited States 2-Year\b/i]),
+        us10y: rcKey('US_10Y', /(^US10YT=RR$|^US10YT=X$|^\.TNX$|\^TNX)/i) || aliasSym('US10Y') || pick([/^US10YT=RR$/i, /^USGV10YUSAB=R$/i, /^TNc\d=\$?$/i, /^TYc\d=\$?$/i, /\bUS10Y\b/i, /\bUnited States 10-Year\b/i]),
+        tlt: rcKey('ETF_TLT', /^TLT(\.\w+)?$/i) || aliasSym('TLT') || pick([/^TLT(\.\w+)?$/i]),
+        hyg: rcKey('ETF_HYG', /^HYG(\.\w+)?$/i) || aliasSym('HYG') || pick([/^HYG(\.\w+)?$/i]),
+        lqd: rcKey('ETF_LQD', /^LQD(\.\w+)?$/i) || aliasSym('LQD') || pick([/^LQD(\.\w+)?$/i]),
+        tips10y: rcKey('US_TIPS_10Y', /(^US10YTIPT=RR$|\bTIPS\b.*\b10\b.*\bYear\b|\bUS\s*TIPS\b)/i) || null,
+        tip: rcKey('ETF_TIP', /^TIP(\.\w+)?$/i) || aliasSym('TIPS_ETF') || pick([/^TIP(\.\w+)?$/i]),
         eem: findAliasSymbolBest(data, 'EEM') || findAliasSymbolBest(data, 'VWO') || pick([/^EEM(\.\w+)?$/i, /^VWO(\.\w+)?$/i]),
         gold: findAliasSymbolBest(data, 'GOLD') || pick([/^GC=F$/i, /^GCc\d$/i, /^XAU(USD)?$/i, /^GLD(\.\w+)?$/i, /\bGold\b/i]),
         copper: findAliasSymbolBest(data, 'COPPER') || pick([/^HG=F$/i, /^HGc\d$/i, /^CPER(\.\w+)?$/i, /\bCopper\b/i]),
@@ -3920,20 +4781,31 @@ function computeBtcPulseNow(data, web) {
     const btcEtfBasket = avgPctFor([sym.ibit, sym.fbtc, sym.arkb, sym.bitb]);
     const cryptoEqBasket = avgPctFor([sym.mstr, sym.coin, sym.mara, sym.riot]);
     const emFxBasket = avgPctFor([sym.usdmxn, sym.usdzar, sym.usdclp, sym.usdtry]);
+    const relPct = (aPct, bPct) => {
+        if (!isNum(aPct) || !isNum(bPct)) return null;
+        const v = ((1 + aPct / 100) / Math.max(1e-9, (1 + bPct / 100)) - 1) * 100;
+        return Number.isFinite(v) ? Math.max(-99, Math.min(99, v)) : null;
+    };
+    const ethBtcRel = relPct(get(sym.eth), get(sym.btc));
 
     const driversCfg = [
         { key: 'ndx', group: 'driver', weight: 0.75, capAbs: 1.4, sign: +1 },
         { key: 'spx', group: 'driver', weight: 0.45, capAbs: 1.2, sign: +1 },
         { key: 'dxy', group: 'driver', weight: 0.7, capAbs: 0.7, sign: -1 },
         { key: 'vix', group: 'driver', weight: 0.55, capAbs: 4.0, sign: -1 },
+        { key: 'vxn', group: 'driver', weight: 0.25, capAbs: 4.0, sign: -1 },
         { key: 'us2y', group: 'driver', weight: 0.35, capAbs: 0.7, sign: -1 },
         { key: 'us10y', group: 'driver', weight: 0.25, capAbs: 0.7, sign: -1 },
         { key: 'hyg', group: 'driver', weight: 0.35, capAbs: 1.3, sign: +1 },
+        { key: 'lqd', group: 'driver', weight: 0.18, capAbs: 1.1, sign: +1 },
         { key: 'tlt', group: 'driver', weight: 0.2, capAbs: 1.2, sign: +1 },
+        { key: 'tips', group: 'driver', weight: 0.18, capAbs: 0.7, sign: -1 },
 
         { key: 'eth', group: 'confirm', weight: 0.6, capAbs: 4.0, sign: +1 },
         { key: 'sol', group: 'confirm', weight: 0.35, capAbs: 6.0, sign: +1 },
         { key: 'doge', group: 'confirm', weight: 0.15, capAbs: 9.0, sign: +1 },
+        { key: 'xrp', group: 'confirm', weight: 0.12, capAbs: 9.0, sign: +1 },
+        { key: 'ethBtc', group: 'confirm', weight: 0.22, capAbs: 1.2, sign: +1 },
         { key: 'btcEtf', group: 'confirm', weight: 0.35, capAbs: 2.8, sign: +1 },
         { key: 'cryptoEq', group: 'confirm', weight: 0.25, capAbs: 4.5, sign: +1 },
 
@@ -3971,11 +4843,14 @@ function computeBtcPulseNow(data, web) {
         ndx: { label: 'NDX', pct: get(sym.ndx), sym: sym.ndx, unit: '%' },
         dxy: { label: 'DXY', pct: get(sym.dxy), sym: sym.dxy, unit: '%' },
         vix: { label: 'VIX', pct: get(sym.vix), sym: sym.vix, unit: '%' },
+        vxn: { label: 'VXN', pct: get(sym.vxn), sym: sym.vxn, unit: '%' },
         vvix: { label: 'VVIX', pct: get(sym.vvix), sym: sym.vvix, unit: '%' },
         us2y: { label: 'US2Y (proxy Δ)', pct: getRatesMoveProxy(sym.us2y), sym: sym.us2y, unit: '%' },
         us10y: { label: 'US10Y (proxy Δ)', pct: getRatesMoveProxy(sym.us10y), sym: sym.us10y, unit: '%' },
         tlt: { label: 'TLT', pct: get(sym.tlt), sym: sym.tlt, unit: '%' },
         hyg: { label: 'HYG', pct: get(sym.hyg), sym: sym.hyg, unit: '%' },
+        lqd: { label: 'LQD', pct: get(sym.lqd), sym: sym.lqd, unit: '%' },
+        tips: { label: sym.tips10y ? 'TIPS 10Y (proxy Δ)' : 'TIP (TIPS ETF)', pct: sym.tips10y ? getRatesMoveProxy(sym.tips10y) : get(sym.tip), sym: sym.tips10y || sym.tip, unit: '%' },
         eem: { label: 'EEM/VWO', pct: get(sym.eem), sym: sym.eem, unit: '%' },
         gold: { label: 'Ouro', pct: get(sym.gold), sym: sym.gold, unit: '%' },
         copper: { label: 'Cobre', pct: get(sym.copper), sym: sym.copper, unit: '%' },
@@ -3985,6 +4860,7 @@ function computeBtcPulseNow(data, web) {
         cnh: { label: 'USD/CNH', pct: get(sym.usdcnh), sym: sym.usdcnh, unit: '%' },
         hkd: { label: 'USD/HKD', pct: get(sym.usdhkd), sym: sym.usdhkd, unit: '%' },
         iron: { label: 'Minério (SGX/DCE)', pct: get(sym.iron), sym: sym.iron, unit: '%' },
+        ethBtc: { label: 'ETH/BTC (rel)', pct: ethBtcRel, sym: sym.eth || null, unit: '%' },
         news: { label: 'Notícias (macro/cripto)', pct: computeNews.used ? computeNews.score : null, sym: null, unit: 'score' },
     };
 
@@ -4038,10 +4914,26 @@ function computeBtcPulseNow(data, web) {
         });
     }
 
-    const net = clamp(contribution.net, -3, 3);
+    const staleCore = (() => {
+        if (!dc || typeof dc.symbolAgeMs !== 'function') return false;
+        const staleMs = 4 * 60 * 60 * 1000;
+        const core = [sym.btc, sym.ndx, sym.dxy, sym.vix, sym.us10y, sym.hyg].filter(Boolean);
+        if (!core.length) return false;
+        for (const s of core) {
+            const age = dc.symbolAgeMs(dcDeps, data, s);
+            if (typeof age === 'number' && Number.isFinite(age) && age > staleMs) return true;
+        }
+        return false;
+    })();
+
+    const netRaw = contribution.net;
+    const net = clamp(staleCore ? (netRaw * 0.85) : netRaw, -3, 3);
     let bias = net > 0.25 ? 'buy' : net < -0.25 ? 'sell' : 'neutral';
     let nowLabel = 'AGORA';
     const tapePct = drv.btc && isNum(drv.btc.pct) ? drv.btc.pct : null;
+    if (staleCore) {
+        nowLabel = `${nowLabel} • STALE`;
+    }
     if (isNum(tapePct) && Math.abs(tapePct) >= 0.9) {
         const tapeBias = tapePct > 0 ? 'buy' : 'sell';
         if (bias === 'neutral' || bias === tapeBias) {
@@ -4105,6 +4997,7 @@ function computeBtcPulseNow(data, web) {
             { label: 'BTC/USD', matchers: [/^BTC\/USD$/i, /\bbitcoin\b/i] },
             { label: 'ETH/USD', matchers: [/\bETH\/USD\b/i, /\bEthereum\b/i] },
             { label: 'SOL/USD', matchers: [/^SOL\/USD$/i, /\bSolana\b/i] },
+            { label: 'XRP/USD', matchers: [/^XRP\/USD$/i, /\bXRP\b/i, /\bRipple\b/i] },
             { label: 'USD/MXN', matchers: [/^USD\/MXN\b/i, /\bUSDMXN\b/i] },
             { label: 'USD/ZAR', matchers: [/^USD\/ZAR\b/i, /\bUSDZAR\b/i] },
             { label: 'USD/CLP', matchers: [/^USD\/CLP\b/i, /\bUSDCLP\b/i] },
@@ -4121,11 +5014,14 @@ function computeBtcPulseNow(data, web) {
             { label: 'MARA', matchers: [/^MARA(\.\w+)?$/i, /\bMarathon\b/i] },
             { label: 'RIOT', matchers: [/^RIOT(\.\w+)?$/i, /\bRiot\b/i] },
             { label: 'VIX', matchers: [/^\.?VIX(9D)?$/i, /\bVIX\b/i] },
+            { label: 'VXN', matchers: [/^\.VXN$/i, /\bVXN\b/i] },
             { label: 'DXY', matchers: [/^DX$|^\.DXY$/i, /\bDXY\b/i] },
             { label: 'US10Y', matchers: [/^US10YT=RR$/i, /^USGV10YUSAB=R$/i, /^TNc\d=\$?$/i, /\bUS10Y\b/i, /\bUnited States 10-Year\b/i] },
             { label: 'US2Y', matchers: [/^US2YT=RR$/i, /^TUc\d=\$?$/i, /\bUS2Y\b/i, /\bUnited States 2-Year\b/i] },
             { label: 'TLT', matchers: [/^TLT(\.\w+)?$/i] },
             { label: 'HYG', matchers: [/^HYG(\.\w+)?$/i] },
+            { label: 'LQD', matchers: [/^LQD(\.\w+)?$/i] },
+            { label: 'TIPS 10Y / TIP', matchers: [/^US10YTIPT=RR$/i, /^TIP(\.\w+)?$/i, /\bTIPS\b/i] },
             { label: 'SPY (proxy SPX)', matchers: [/^SPY$/i, /^\.SPX$/i, /\bS&P 500\b/i] },
             { label: 'QQQ (proxy NDX)', matchers: [/^QQQ$/i, /^\.NDX$/i, /\bNasdaq 100\b/i] },
             { label: 'Ouro (GC/XAU)', matchers: [/^GC\b/i, /^XAU(USD)?$/i, /\bouro\b/i, /\bgold\b/i] },
@@ -4145,7 +5041,7 @@ function computeBtcPulseNow(data, web) {
         phase: { nowLabel },
         market: { btcPct: drv.btc ? drv.btc.pct : null },
         pulse: { bias, net, breadth, contribution, pnlLike, groups, rows },
-        coverage: { expected: expectedKeys.length, observed: rows.length, missing, keyLabels, missingDetails },
+        coverage: { expected: expectedKeys.length, observed: rows.length, missing, keyLabels, missingDetails, staleCore },
         missingAssetsSuggestion: suggest,
         news: computeNews.top || [],
         newsMeta: { used: computeNews.used, matched: computeNews.matched, score: computeNews.score },
@@ -4281,8 +5177,12 @@ function renderBtcOperationalBriefing() {
             return { pct: ((hi / lo) - 1) * 100 };
         })();
 
-        const th5 = 0.12;
-        const th15 = 0.22;
+        const vixNow = btcNow.sym && btcNow.sym.vix ? getChangePct(data, btcNow.sym.vix) : null;
+        const vvixNow = btcNow.sym && btcNow.sym.vvix ? getChangePct(data, btcNow.sym.vvix) : null;
+        const vxnNow = btcNow.sym && btcNow.sym.vxn ? getChangePct(data, btcNow.sym.vxn) : null;
+        const volStress = (typeof vixNow === 'number' && vixNow >= 1.0) || (typeof vvixNow === 'number' && vvixNow >= 1.0) || (typeof vxnNow === 'number' && vxnNow >= 1.0);
+        const th5 = volStress ? 0.16 : 0.12;
+        const th15 = volStress ? 0.28 : 0.22;
         const s5 = typeof r5 === 'number' && Number.isFinite(r5) ? r5 : null;
         const s15 = typeof r15 === 'number' && Number.isFinite(r15) ? r15 : null;
         const microBias = (s5 !== null && s15 !== null && s5 >= th5 && s15 >= th15)
@@ -4308,11 +5208,14 @@ function renderBtcOperationalBriefing() {
         const sol = btcNow.sym && btcNow.sym.sol ? getChangePct(data, btcNow.sym.sol) : null;
         const hyg = btcNow.sym && btcNow.sym.hyg ? getChangePct(data, btcNow.sym.hyg) : null;
         const tlt = btcNow.sym && btcNow.sym.tlt ? getChangePct(data, btcNow.sym.tlt) : null;
+        const lqd = btcNow.sym && btcNow.sym.lqd ? getChangePct(data, btcNow.sym.lqd) : null;
+        const tip = btcNow.sym && btcNow.sym.tip ? getChangePct(data, btcNow.sym.tip) : null;
         const mstr = btcNow.sym && btcNow.sym.mstr ? getChangePct(data, btcNow.sym.mstr) : null;
         const coin = btcNow.sym && btcNow.sym.coin ? getChangePct(data, btcNow.sym.coin) : null;
 
         const pBtcNdx = ok(btcNow.market ? btcNow.market.btcPct : null, ndx, true) === null ? ok(btcNow.market ? btcNow.market.btcPct : null, ndx, false) : ok(btcNow.market ? btcNow.market.btcPct : null, ndx, false);
         const pBtcDxy = ok(btcNow.market ? btcNow.market.btcPct : null, dxy, true);
+        const pEthBtc = ok(eth, btcNow.market ? btcNow.market.btcPct : null, false);
 
         const parityBadge = (name, v) => badge(v === true ? 'positive' : v === false ? 'negative' : 'neutral', `${name}: ${v === true ? 'OK' : v === false ? 'DIVERGE' : '—'}`);
         const fmtMicro = (label, v) => `${label} ${typeof v === 'number' && Number.isFinite(v) ? formatPercent(v, 2) : '—'}`;
@@ -4336,13 +5239,14 @@ function renderBtcOperationalBriefing() {
                         ${badge('neutral', `Macro: ${biasLabel(ctxBias)} (${formatNumber(p.net, 2)})`)}
                         ${parityBadge('BTC×NDX', pBtcNdx)}
                         ${parityBadge('BTC×DXY (inv)', pBtcDxy)}
+                        ${parityBadge('ETH×BTC', pEthBtc)}
                     </div>
                 </div>
                 <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
                     Micro: ${escapeHtml(fmtMicro('5m', r5))} • ${escapeHtml(fmtMicro('15m', r15))} • ${escapeHtml(fmtMicro('60m', r60))} • Range30 ${escapeHtml(range30 ? formatPercent(range30.pct, 2) : '—')}
                 </div>
                 <div style="margin-top:8px;opacity:.84;font-size:12px;line-height:1.35;">
-                    Fluxo/risco: HYG ${escapeHtml(fmtP(hyg))} • TLT ${escapeHtml(fmtP(tlt))} • ETH ${escapeHtml(fmtP(eth))} • SOL ${escapeHtml(fmtP(sol))}
+                    Fluxo/risco: HYG ${escapeHtml(fmtP(hyg))} • LQD ${escapeHtml(fmtP(lqd))} • TLT ${escapeHtml(fmtP(tlt))} • TIP ${escapeHtml(fmtP(tip))} • ETH ${escapeHtml(fmtP(eth))} • SOL ${escapeHtml(fmtP(sol))}
                 </div>
                 <div style="margin-top:8px;opacity:.84;font-size:12px;line-height:1.35;">
                     Empresas/setor: MSTR ${escapeHtml(fmtP(mstr))} • COIN ${escapeHtml(fmtP(coin))}
@@ -4395,6 +5299,7 @@ function renderBtcOperationalBriefing() {
     })();
     const missingLabel = missingPretty.length ? `Faltando (dados): ${missingPretty.slice(0, 10).join(', ')}${missingPretty.length > 10 ? `… +${missingPretty.length - 10}` : ''}` : 'Drivers: completos';
     const missingBadge = badge(missing.length ? 'neutral' : 'positive', missingLabel);
+    const staleBadge = (btcNow.coverage && btcNow.coverage.staleCore) ? badge('warn', 'Dados: STALE (>4h)') : '';
 
     const sugg = btcNow.missingAssetsSuggestion || [];
     const suggestLine = sugg.length ? `Sugestões p/ carteira (Investing): ${sugg.join(' • ')}` : '';
@@ -4430,6 +5335,7 @@ function renderBtcOperationalBriefing() {
             </div>
             <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                 ${missingBadge}
+                ${staleBadge}
             </div>
             ${suggestLine ? `<div style="margin-top:8px;opacity:.82;font-size:12px;line-height:1.35;">${escapeHtml(suggestLine)}</div>` : ''}
         </div>
@@ -4602,6 +5508,8 @@ function renderCommoditiesOperationalBriefing() {
         const msg = [txt ? `Faltando (dados): ${txt}${miss.length > 6 ? `… +${miss.length - 6}` : ''}` : '', futTxt].filter(Boolean).join(' | ');
         return badge('neutral', msg || 'Cobertura parcial');
     })();
+    const sugg = Array.isArray(cm.missingAssetsSuggestion) ? cm.missingAssetsSuggestion : [];
+    const suggestLine = sugg.length ? `Sugestões p/ carteira (Investing): ${sugg.slice(0, 10).join(' • ')}${sugg.length > 10 ? `… +${sugg.length - 10}` : ''}` : '';
 
     const goldSpot = spotOf(cm.sym.gold);
     const brentSpot = spotOf(cm.sym.brent);
@@ -4622,6 +5530,40 @@ function renderCommoditiesOperationalBriefing() {
         return parts.length ? parts.join(' • ') : '—';
     })();
     const oilExtras = `${oilSpotTxt} • ${oilBench} • ${corrLine(cm.corr && cm.corr.oil ? cm.corr.oil.items : [])}`;
+
+    const extraCardsHtml = (() => {
+        const cards = [];
+        const mkCard = (title, key, note) => {
+            const p = cm.pulse && cm.pulse[key] ? cm.pulse[key] : null;
+            const execSym = cm.execution ? cm.execution[key] : null;
+            const src = cm.source ? cm.source[key] : null;
+            const micro = cm.micro ? cm.micro[key] : null;
+            const sym = cm.sym ? cm.sym[key] : null;
+            if (!p || !execSym || !sym) return '';
+            const hasRows = p && Array.isArray(p.rows) ? p.rows.length >= 3 : false;
+            if (!hasRows) return '';
+            const spot = spotOf(sym);
+            const pct = getChangePct(data, sym);
+            const extras = `${sym} • ${spot.spot !== null ? fmt0(spot.spot) : '—'} • ${fmtP(pct)} • ${corrLine(cm.corr && cm.corr[key] ? cm.corr[key].items : [])}`;
+            return planFor(title, p, extras, note, execSym, src, micro);
+        };
+        const gas = mkCard('Gás Natural', 'gas', 'Leitura típica: gás responde a clima/estoques/LNG e pode amplificar movimentos de energia.');
+        if (gas) cards.push(gas);
+        const ttf = mkCard('Gás TTF (Europa)', 'ttfGas', 'Leitura típica: TTF reage a clima/armazenagem/LNG e pode divergir do Henry Hub.');
+        if (ttf) cards.push(ttf);
+        const silver = mkCard('Prata', 'silver', 'Leitura típica: prata mistura metal monetário (ouro) e ciclo (industrial).');
+        if (silver) cards.push(silver);
+        const copper = mkCard('Cobre', 'copper', 'Leitura típica: cobre tende a reagir a ciclo/China e dólar, com correlação com risco em certos regimes.');
+        if (copper) cards.push(copper);
+        const nickel = mkCard('Níquel', 'nickel', 'Leitura típica: níquel tende a responder a ciclo industrial e cadeias (energia/baterias).');
+        if (nickel) cards.push(nickel);
+        const zinc = mkCard('Zinco', 'zinc', 'Leitura típica: zinco é metal industrial e costuma acompanhar ciclo/atividade.');
+        if (zinc) cards.push(zinc);
+        if (!cards.length) return '';
+        return `<div style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">
+            ${cards.join('')}
+        </div>`;
+    })();
 
     const news = Array.isArray(cm.news) ? cm.news : [];
     const newsHtml = (() => {
@@ -4715,6 +5657,7 @@ function renderCommoditiesOperationalBriefing() {
                 ${planFor('Ouro', cm.pulse.gold, goldExtras, 'Leitura típica: ouro responde a dólar/juros reais e busca por proteção.', cm.execution ? cm.execution.gold : null, cm.source ? cm.source.gold : null, cm.micro ? cm.micro.gold : null)}
                 ${planFor('Petróleo', cm.pulse.oil, oilExtras, 'Leitura típica: petróleo responde a risco global, dólar e choque de oferta (geo/OPEC).', cm.execution ? cm.execution.oil : null, cm.source ? cm.source.oil : null, cm.micro ? cm.micro.oil : null)}
             </div>
+            ${extraCardsHtml}
         </div>
         ${scalperPanel}
         <div style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;">
@@ -4726,6 +5669,7 @@ function renderCommoditiesOperationalBriefing() {
                 <div style="opacity:.84;font-size:12px;line-height:1.35;">${newsHtml}</div>
             </div>
         </div>
+        ${suggestLine ? `<div style="margin-top:10px;opacity:.82;font-size:12px;line-height:1.35;">${escapeHtml(suggestLine)}</div>` : ''}
     `;
 }
 
@@ -4771,6 +5715,10 @@ function renderHk50OperationalBriefing() {
     const netBadge = toneBadgeHtmlFromTone(tone, Math.abs(p.net), `${formatNumber(p.net, 2)}`, { maxAbs: 3 });
     const biasLabel = b => (b === 'buy' ? 'COMPRA' : b === 'sell' ? 'VENDA' : 'NEUTRO');
     const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+    const conv = hkNow.conviction || null;
+    const convBadge = conv && conv.label
+        ? badge(conv.tone || 'neutral', `Conv: ${String(conv.label)}`)
+        : badge('neutral', 'Conv: —');
 
     const gaugeHtml = (() => {
         const maxAbs = 3;
@@ -4867,8 +5815,9 @@ function renderHk50OperationalBriefing() {
             return { pct: ((hi / lo) - 1) * 100 };
         })();
 
-        const th5 = 0.10;
-        const th15 = 0.18;
+        const amp = hkNow && hkNow.volAmp && typeof hkNow.volAmp.amp === 'number' && Number.isFinite(hkNow.volAmp.amp) ? hkNow.volAmp.amp : 1;
+        const th5 = 0.10 * amp;
+        const th15 = 0.18 * amp;
         const s5 = typeof r5 === 'number' && Number.isFinite(r5) ? r5 : null;
         const s15 = typeof r15 === 'number' && Number.isFinite(r15) ? r15 : null;
         const microBias = (s5 !== null && s15 !== null && s5 >= th5 && s15 >= th15)
@@ -4894,7 +5843,7 @@ function renderHk50OperationalBriefing() {
         const spx = hkNow.sym && hkNow.sym.spx ? getChangePct(data, hkNow.sym.spx) : null;
         const dxy = hkNow.sym && hkNow.sym.dxy ? getChangePct(data, hkNow.sym.dxy) : null;
         const vix = hkNow.sym && hkNow.sym.vix ? getChangePct(data, hkNow.sym.vix) : null;
-        const fxi = hkNow.sym && hkNow.sym.fxChina ? getChangePct(data, hkNow.sym.fxChina) : null;
+        const fxi = hkNow.sym && hkNow.sym.fxi ? getChangePct(data, hkNow.sym.fxi) : (hkNow.sym && hkNow.sym.fxChina ? getChangePct(data, hkNow.sym.fxChina) : null);
         const hstech = hkNow.sym && hkNow.sym.hstech ? getChangePct(data, hkNow.sym.hstech) : null;
         const iron = hkNow.sym && hkNow.sym.iron ? getChangePct(data, hkNow.sym.iron) : null;
         const copper = hkNow.sym && hkNow.sym.copper ? getChangePct(data, hkNow.sym.copper) : null;
@@ -4904,13 +5853,20 @@ function renderHk50OperationalBriefing() {
         const pChina = ok(hkNow.market.hk50Pct, fxi, false);
 
         const parityBadge = (name, v) => badge(v === true ? 'positive' : v === false ? 'negative' : 'neutral', `${name}: ${v === true ? 'OK' : v === false ? 'DIVERGE' : '—'}`);
-        const stop = range30 && typeof range30.pct === 'number' ? Math.max(0.20, range30.pct * 0.25) : null;
-        const alvo = range30 && typeof range30.pct === 'number' ? Math.max(0.35, range30.pct * 0.5) : null;
+        const ampAdj = clamp(0.6 + 0.4 * amp, 0.85, 1.35);
+        const stopBase = range30 && typeof range30.pct === 'number' ? Math.max(0.20, range30.pct * 0.25) : null;
+        const alvoBase = range30 && typeof range30.pct === 'number' ? Math.max(0.35, range30.pct * 0.5) : null;
+        const stop = stopBase !== null ? clamp(stopBase * ampAdj, 0.18, 2.50) : null;
+        const alvo = alvoBase !== null ? clamp(alvoBase * ampAdj, 0.30, 4.00) : null;
+        const r = (stop !== null && alvo !== null && stop > 1e-9) ? (alvo / stop) : null;
         const plan = finalBias === 'buy'
-            ? `Comprar (scalp) • Stop ~${stop !== null ? formatPercent(stop, 2) : '—'} • Alvo ~${alvo !== null ? formatPercent(alvo, 2) : '—'}`
+            ? `Comprar (scalp) • Stop ~${stop !== null ? formatPercent(stop, 2) : '—'} • Alvo ~${alvo !== null ? formatPercent(alvo, 2) : '—'}${r !== null ? ` • R~${formatNumber(r, 1)}` : ''} • volAmp ${formatNumber(amp, 2)}`
             : finalBias === 'sell'
-                ? `Vender (scalp) • Stop ~${stop !== null ? formatPercent(stop, 2) : '—'} • Alvo ~${alvo !== null ? formatPercent(alvo, 2) : '—'}`
+                ? `Vender (scalp) • Stop ~${stop !== null ? formatPercent(stop, 2) : '—'} • Alvo ~${alvo !== null ? formatPercent(alvo, 2) : '—'}${r !== null ? ` • R~${formatNumber(r, 1)}` : ''} • volAmp ${formatNumber(amp, 2)}`
                 : 'Neutro (scalp) • aguarde alinhamento 5m×15m e paridades.';
+        const convWarn = (conv && Array.isArray(conv.divergences) && conv.divergences.length)
+            ? ` • ${conv.divergences[0]}`
+            : '';
 
         return `
             <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
@@ -4933,7 +5889,7 @@ function renderHk50OperationalBriefing() {
                 <div style="margin-top:8px;opacity:.84;font-size:12px;line-height:1.35;">
                     Setores/proxies: HSTECH ${escapeHtml(fmtP(hstech))} • FXI/MCHI ${escapeHtml(fmtP(fxi))} • Minério ${escapeHtml(fmtP(iron))} • Cobre ${escapeHtml(fmtP(copper))}
                 </div>
-                <div style="margin-top:10px;opacity:.86;font-size:12px;line-height:1.35;">${escapeHtml(plan)}</div>
+                <div style="margin-top:10px;opacity:.86;font-size:12px;line-height:1.35;">${escapeHtml(plan)}${escapeHtml(convWarn)}</div>
             </div>
         `;
     })();
@@ -5071,6 +6027,7 @@ function renderHk50OperationalBriefing() {
                 <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                     ${badge(p.bias === 'buy' ? 'positive' : p.bias === 'sell' ? 'negative' : 'neutral', `Viés: ${biasLabel(p.bias)}`)}
                     ${badge('neutral', 'Drivers net')} ${netBadge}
+                    ${convBadge}
                     ${gaugeHtml}
                 </div>
             </div>
@@ -5114,6 +6071,7 @@ function renderBrazilFixedIncomeFlow(data) {
 
     const mk = (tone, txt) => toneBadgeHtmlFromTone(tone, 0, txt, { maxAbs: 1 });
     const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
+    const dc = (typeof window !== 'undefined' && window.DecisionCore) ? window.DecisionCore : null;
     const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
     const catDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps };
     const rcKey = (key, fallbackMatcher) => {
@@ -5126,17 +6084,43 @@ function renderBrazilFixedIncomeFlow(data) {
     };
 
     const assets = data && Array.isArray(data.assets) ? data.assets : [];
-    const rates = assets.filter(a => String(a && a.category ? a.category : '') === 'rates');
+    const mostRecentMs = (symbol) => {
+        if (!symbol) return -Infinity;
+        const last = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol);
+        const t = last && last.t ? Date.parse(String(last.t)) : NaN;
+        return Number.isFinite(t) ? t : -Infinity;
+    };
+    const pickBestByMatchers = (matchers, { limit = 18 } = {}) => {
+        const out = [];
+        const seen = new Set();
+        for (const re of (matchers || [])) {
+            if (!(re instanceof RegExp)) continue;
+            for (const a of assets) {
+                const sym = a && a.symbol ? String(a.symbol) : '';
+                const name = a && a.name ? String(a.name) : '';
+                if (!sym || seen.has(sym)) continue;
+                if (re.test(sym) || re.test(name)) {
+                    out.push(sym);
+                    seen.add(sym);
+                    if (out.length >= limit) break;
+                }
+            }
+        }
+        out.sort((a, b) => mostRecentMs(b) - mostRecentMs(a));
+        return out.length ? out[0] : null;
+    };
+    const aliasSym = (k) => findAliasSymbolBest(data, k) || findAliasSymbol(data, k);
 
     const looksLikeBrazilFixedIncome = a => {
         const name = String(a && a.name ? a.name : '');
         const sym = symbolKey(a && a.symbol ? a.symbol : '');
         if (!name && !sym) return false;
         if (isBrazilRelated({ symbol: sym, name, category: 'rates' })) return true;
-        if (/\btesouro\b|\btesouro direto\b|\bntn\b|\bltn\b|\blft\b|\bipca\b|\bselic\b|\bcupom\b|\bprefixad|\bpre[-\s]?fixad/i.test(name)) return true;
-        if (/^BR\d+(YT|MT)=RR$/i.test(sym) || /^US10BR10=RR$/i.test(sym) || /^DAPC\d+$/i.test(sym) || /^DDIC/i.test(sym)) return true;
+        if (/\btesouro\b|\btesouro direto\b|\bntn\b|\bntn-?b\b|\bltn\b|\blft\b|\bipca\b|\bselic\b|\bcupom\b|\bdi\b|\bjuros?\s*futuros?\b|\bima[-\s]?b\b|\birf[-\s]?m\b|\bprefixad|\bpre[-\s]?fixad/i.test(name)) return true;
+        if (/^BR\d+(YT|MT)=RR$/i.test(sym) || /^BRNB\d+(YT|MT)=RR$/i.test(sym) || /^US10BR10=RR$/i.test(sym) || /^DAPC\d+$/i.test(sym) || /^DDIC/i.test(sym) || /^DI1\b/i.test(sym) || /^DI[A-Z]\d$/i.test(sym)) return true;
         return false;
     };
+    const rates = assets;
 
     const fmtRate = v => typeof v === 'number' && Number.isFinite(v) ? `${formatNumber(v, 2)}%` : '—';
     const fmtMoney = v => typeof v === 'number' && Number.isFinite(v) ? `R$ ${formatNumber(v, 2)}` : '—';
@@ -5280,7 +6264,9 @@ function renderBrazilFixedIncomeFlow(data) {
     })();
 
     const pick = (label, { key, matcher } = {}) => {
-        const symbol = key ? rcKey(key, matcher) : (matcher ? findAssetSymbol(data, matcher) : null);
+        const symbol = key
+            ? (rcKey(key, matcher) || (matcher ? pickBestByMatchers([matcher]) : null))
+            : (matcher ? (pickBestByMatchers([matcher]) || findAssetSymbol(data, matcher)) : null);
         const { last, prev } = lastAndPrev(symbol);
         if (!symbol || !last || !(typeof last.price === 'number' && Number.isFinite(last.price))) return null;
         const delta = typeof last.change === 'number' && Number.isFinite(last.change)
@@ -5300,6 +6286,7 @@ function renderBrazilFixedIncomeFlow(data) {
         pick('DAP 1 (real)', { key: 'BR_DAPC1', matcher: /^DAPc1$/i }),
         pick('DAP 2 (real)', { key: 'BR_DAPC2', matcher: /^DAPc2$/i }),
         pick('DAP 3 (real)', { key: 'BR_DAPC3', matcher: /^DAPc3$/i }),
+        pick('DI 1 (DDI)', { key: 'BR_DDI1', matcher: /^DDIC1$/i }),
     ].filter(Boolean);
 
     const eByLabel = new Map(essentials.map(x => [x.label, x]));
@@ -5376,30 +6363,92 @@ function renderBrazilFixedIncomeFlow(data) {
         };
     })();
 
-    const symEwz = findAssetSymbol(data, /^EWZ$/i);
-    const symUsdbbrl = findAliasSymbol(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i);
-    const symBrCds = findAssetSymbol(data, /^BRGV/i) || findAssetSymbol(data, /\bBrazil\b.*\bCDS\b|\bCDS\b.*\bBrazil\b/i);
+    const symEwz = aliasSym('EWZ') || pickBestByMatchers([/^EWZ$/i, /^EWZ(\.\w+)?$/i, /\bEWZ\b/i]) || findAssetSymbol(data, /^EWZ$/i);
+    const symIbov = aliasSym('IBOV') || pickBestByMatchers([/^\.BVSP$/i, /\bIbovespa\b/i, /^BOVA11\.SA$/i, /^EWZ$/i]) || findAssetSymbol(data, /^\.BVSP$/i);
+    const symUsdbbrl = aliasSym('USD_BRL') || pickBestByMatchers([/^USD\/BRL\b/i]) || findAssetSymbol(data, /^USD\/BRL\b/i);
+    const symBrCds = pickBestByMatchers([/^BRGV/i, /\bBrazil\b.*\bCDS\b|\bCDS\b.*\bBrazil\b/i]) || findAssetSymbol(data, /^BRGV/i) || findAssetSymbol(data, /\bBrazil\b.*\bCDS\b|\bCDS\b.*\bBrazil\b/i);
+    const symVix = findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX30') || aliasSym('VIX') || pickBestByMatchers([/^\.?VIX(9D)?$/i, /^VIX$/i]) || findAssetSymbol(data, /^\.?VIX(9D)?$/i);
+    const symDxy = aliasSym('DXY') || pickBestByMatchers([/(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index|Índice\s*Dólar|Indice\s*Dolar)/i]) || findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index|Índice\s*Dólar|Indice\s*Dolar)/i);
+    const symUs10y = rcKey('US_10Y', /(^US10YT=RR$|^US10YT=X$|^\.TNX$|\^TNX)/i) || aliasSym('US10Y') || pickBestByMatchers([/^US10YT=RR$/i, /^\.TNX$/i, /^\^TNX$/i]);
 
     const ewz = getChangePct(data, symEwz);
+    const ibov = getChangePct(data, symIbov);
     const usdbbrl = getChangePct(data, symUsdbbrl);
     const cds = getChangePct(data, symBrCds);
+    const vix = getChangePct(data, symVix);
+    const dxy = getChangePct(data, symDxy);
+    const us10y = symUs10y ? (() => {
+        const last = getMostRecentPointWithPrice(data, symUs10y) || getLastPoint(data, symUs10y);
+        const chg = last && typeof last.change === 'number' && Number.isFinite(last.change) ? last.change : null;
+        return typeof chg === 'number' ? (chg * 100) / 10 : null;
+    })() : null;
     const cdsSignal = computeBrazilCdsHedgeSignal(data);
+
+    const rfCoverage = (() => {
+        if (!dc || typeof dc.computeCoverage !== 'function') return null;
+        const syms = [
+            ...essentials.map(x => x && x.symbol ? String(x.symbol) : '').filter(Boolean),
+            symUsdbbrl,
+            symEwz,
+            symIbov,
+            symBrCds,
+            symVix,
+            symDxy,
+            symUs10y,
+        ].filter(Boolean);
+        if (!syms.length) return null;
+        return dc.computeCoverage(dcDeps, data, syms, { staleMs: 6 * 60 * 60 * 1000 });
+    })();
 
     const flowBr = (() => {
         const cdsAdj = (() => {
             if (cdsSignal && cdsSignal.mode === 'hedge_on_risk_on') return null;
             return typeof cds === 'number' && Number.isFinite(cds) ? -cds : null;
         })();
-        const parts = [
-            typeof ewz === 'number' && Number.isFinite(ewz) ? ewz : null,
-            typeof usdbbrl === 'number' && Number.isFinite(usdbbrl) ? -usdbbrl : null,
-            cdsAdj,
-        ].filter(x => typeof x === 'number' && Number.isFinite(x));
-        const score = parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : null;
+        const weightedAvg = (pairs) => {
+            const xs = (pairs || [])
+                .filter(p => p && typeof p.v === 'number' && Number.isFinite(p.v) && typeof p.w === 'number' && Number.isFinite(p.w) && p.w > 0);
+            const wSum = xs.reduce((s, p) => s + p.w, 0);
+            if (!(wSum > 0)) return null;
+            const s = xs.reduce((acc, p) => acc + p.v * p.w, 0) / wSum;
+            return Number.isFinite(s) ? s : null;
+        };
+        const score = weightedAvg([
+            { v: typeof ewz === 'number' && Number.isFinite(ewz) ? ewz : null, w: 0.28 },
+            { v: typeof ibov === 'number' && Number.isFinite(ibov) ? ibov : null, w: 0.22 },
+            { v: typeof usdbbrl === 'number' && Number.isFinite(usdbbrl) ? -usdbbrl : null, w: 0.30 },
+            { v: typeof vix === 'number' && Number.isFinite(vix) ? -vix : null, w: 0.10 },
+            { v: typeof dxy === 'number' && Number.isFinite(dxy) ? -dxy : null, w: 0.10 },
+            { v: typeof us10y === 'number' && Number.isFinite(us10y) ? -us10y : null, w: 0.08 },
+            { v: cdsAdj, w: 0.32 },
+        ]);
         if (!(typeof score === 'number' && Number.isFinite(score))) return { tone: 'neutral', label: 'n/d', detail: 'sem confirmação' };
         if (score > 0.25) return { tone: 'positive', label: 'Entrada', detail: `score ${formatNumber(score, 2)}` };
         if (score < -0.25) return { tone: 'negative', label: 'Saída', detail: `score ${formatNumber(score, 2)}` };
         return { tone: 'neutral', label: 'Neutro', detail: `score ${formatNumber(score, 2)}` };
+    })();
+
+    const suggestLine = (() => {
+        const hasAny = (matchers) => {
+            for (const a of assets) {
+                const sym = String(a && a.symbol ? a.symbol : '');
+                const name = String(a && a.name ? a.name : '');
+                for (const re of matchers) if (re.test(sym) || re.test(name)) return true;
+            }
+            return false;
+        };
+        const wants = [
+            { label: 'BR 3M/1Y/2Y/5Y/10Y (yields)', matchers: [/^BR(3M|1Y|2Y|5Y|10Y)T=RR$/i] },
+            { label: 'IPCA+ (BRNB10Y)', matchers: [/^BRNB10YT=RR$/i, /\bIPCA\+\b/i] },
+            { label: 'DAPc1/DAPc2/DAPc3', matchers: [/^DAPc[123]$/i] },
+            { label: 'DDIC1 (DI 1)', matchers: [/^DDIC1$/i] },
+            { label: 'USD/BRL', matchers: [/^USD\/BRL\b/i, /\bUSD_BRL\b/i] },
+            { label: 'CDS Brasil', matchers: [/\bBrazil\b.*\bCDS\b|\bCDS\b.*\bBrazil\b/i, /^BRGV/i] },
+            { label: 'IBOV/EWZ', matchers: [/^\.BVSP$/i, /\bIbovespa\b/i, /^EWZ(\.\w+)?$/i] },
+            { label: 'VIX/DXY/US10Y', matchers: [/^\.?VIX(9D)?$/i, /(^\.DXY$|\bDXY\b)/i, /(^US10YT=RR$|^\.TNX$|\^TNX)/i] },
+        ];
+        const missing = wants.filter(w => !hasAny(w.matchers)).map(w => w.label);
+        return missing.length ? `Sugestões p/ carteira (Investing): ${missing.slice(0, 6).join(' • ')}${missing.length > 6 ? `… +${missing.length - 6}` : ''}` : '';
     })();
 
     const summary = `
@@ -5408,6 +6457,9 @@ function renderBrazilFixedIncomeFlow(data) {
                 <div style="font-weight:900;letter-spacing:1px;opacity:.95;">🇧🇷 Renda Fixa Brasil &amp; Fluxo</div>
                 <div style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.95;">Shape: ${escapeHtml(shape)}${latestUpdate ? ` • Atualização: ${escapeHtml(latestUpdate)}` : ''}</div>
             </div>
+            ${rfCoverage ? `<div style="margin-top:6px;opacity:.75;font-size:12px;line-height:1.35;font-family:'Share Tech Mono',monospace;font-weight:900;">
+                Cobertura ${escapeHtml(String(rfCoverage.counts.withChange))}/${escapeHtml(String(rfCoverage.counts.expected))} • Fresh ${escapeHtml(formatNumber(rfCoverage.ratios.freshness * 100, 0))}%
+            </div>` : ''}
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:10px;">
                 <div style="border:1px solid rgba(255,255,255,.10);border-radius:10px;padding:10px;background:rgba(0,0,0,.22);">
                     <div style="opacity:.85;font-weight:800;">Curto</div>
@@ -5454,6 +6506,7 @@ function renderBrazilFixedIncomeFlow(data) {
             <div style="margin-top:10px;opacity:.82;font-size:12px;line-height:1.35;">
                 Operacional: <b>yield ↓</b> costuma indicar <b>demanda por renda fixa</b> (entrada/compra); <b>yield ↑</b> costuma indicar <b>redução de posição</b> (saída/venda). Separe <b>nominal</b> (prefixado/curva) de <b>real</b> (IPCA+/cupom) quando houver divergência. Se a <b>Referência</b> estiver <b>fraca</b> (taxas travadas), trate o sinal como <b>baixo peso</b> (ex.: dias de leilão/cancelamento/feriado).
             </div>
+            ${suggestLine ? `<div style="margin-top:8px;opacity:.82;font-size:12px;line-height:1.35;">${escapeHtml(suggestLine)}</div>` : ''}
         </div>
     `;
 
@@ -6238,6 +7291,7 @@ function renderAssetsCatalog(data) {
     const assets = Array.isArray(data && data.assets) ? data.assets : [];
     const series = data && data.series ? data.series : {};
     const generatedAt = data && data.meta && data.meta.generatedAt ? String(data.meta.generatedAt) : '';
+    const portfolioStats = data && data.meta && data.meta.portfolioStats ? data.meta.portfolioStats : null;
     const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
     const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
     const catDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps };
@@ -6559,6 +7613,18 @@ function renderAssetsCatalog(data) {
                 </div>
             </div>
 
+            ${portfolioStats ? `
+                <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;opacity:.95;line-height:1.45;">
+                    ${badge('neutral', `CSV linhas: ${Number(portfolioStats.rowsTotal || 0)}`)}
+                    ${badge('neutral', `Símbolos únicos: ${Number(portfolioStats.uniqueSymbols || 0)}`)}
+                    ${Number(portfolioStats.rowsMissingPrice || 0) ? badge('negative', `Sem preço (linha): ${Number(portfolioStats.rowsMissingPrice || 0)}`) : badge('positive', 'Sem preço (linha): 0')}
+                    ${Number(portfolioStats.duplicateSymbols || 0) ? badge('neutral', `Duplicados: ${Number(portfolioStats.duplicateSymbols || 0)}`) : badge('neutral', 'Duplicados: 0')}
+                    ${Number(portfolioStats.rowsSkippedByPriority || 0) ? badge('neutral', `Ignorados (prioridade): ${Number(portfolioStats.rowsSkippedByPriority || 0)}`) : badge('neutral', 'Ignorados (prioridade): 0')}
+                    ${Number(portfolioStats.rowsInvalidSymbol || 0) ? badge('neutral', `Símbolo inválido: ${Number(portfolioStats.rowsInvalidSymbol || 0)}`) : badge('neutral', 'Símbolo inválido: 0')}
+                    ${Number(portfolioStats.rowsMissingSymbolOrName || 0) ? badge('neutral', `Sem símbolo/nome: ${Number(portfolioStats.rowsMissingSymbolOrName || 0)}`) : badge('neutral', 'Sem símbolo/nome: 0')}
+                </div>
+            ` : ''}
+
             <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;opacity:.95;line-height:1.45;">
                 ${mkCategoryCounts()}
             </div>
@@ -6728,27 +7794,123 @@ function renderSectorHeatmap(data) {
     const el = document.getElementById('sectorHeatmap');
     if (!el) return;
 
-    const sectors = [
-        { code: 'XLF', name: 'Financeiro', profile: 'cíclico / value', r: /^XLF$/i },
-        { code: 'XLK', name: 'Tecnologia', profile: 'growth', r: /^XLK$/i },
-        { code: 'XLE', name: 'Energia', profile: 'cíclico', r: /^XLE$/i },
-        { code: 'XLV', name: 'Saúde', profile: 'defensivo', r: /^XLV$/i },
-        { code: 'XLY', name: 'Consumo discricionário', profile: 'cíclico', r: /^XLY$/i },
-        { code: 'XLI', name: 'Industriais', profile: 'cíclico', r: /^XLI$/i },
-        { code: 'XLP', name: 'Consumo básico', profile: 'defensivo', r: /^XLP$/i },
-        { code: 'XLU', name: 'Utilities', profile: 'defensivo', r: /^XLU$/i },
-        { code: 'XLB', name: 'Materiais', profile: 'cíclico', r: /^XLB$/i },
-        { code: 'XLC', name: 'Comunicação', profile: 'growth / defensivo', r: /^XLC$/i },
-        { code: 'XLRE', name: 'Imobiliário', profile: 'sensível a juros', r: /^XLRE/i },
-    ].map(s => ({ ...s, symbol: findAssetSymbol(data, s.r) }))
+    const dc = (typeof window !== 'undefined' && window.DecisionCore) ? window.DecisionCore : null;
+    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const assets = data && Array.isArray(data.assets) ? data.assets : [];
+    const mostRecentMs = (symbol) => {
+        if (!symbol) return -Infinity;
+        const last = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol);
+        const t = last && last.t ? Date.parse(String(last.t)) : NaN;
+        return Number.isFinite(t) ? t : -Infinity;
+    };
+    const pickBestByMatchers = (matchers, { limit = 14 } = {}) => {
+        const out = [];
+        const seen = new Set();
+        for (const re of (matchers || [])) {
+            if (!(re instanceof RegExp)) continue;
+            for (const a of assets) {
+                const sym = a && a.symbol ? String(a.symbol) : '';
+                const name = a && a.name ? String(a.name) : '';
+                if (!sym || seen.has(sym)) continue;
+                if (re.test(sym) || re.test(name)) {
+                    out.push(sym);
+                    seen.add(sym);
+                    if (out.length >= limit) break;
+                }
+            }
+        }
+        out.sort((a, b) => mostRecentMs(b) - mostRecentMs(a));
+        return out.length ? out[0] : null;
+    };
+    const aliasSym = (k) => findAliasSymbolBest(data, k) || findAliasSymbol(data, k);
+
+    const defs = [
+        { code: 'XLF', name: 'Financeiro', profile: 'cíclico / value', matchers: [/^XLF(\.\w+)?$/i, /\bFinancial\s*Select\s*Sector\b/i] },
+        { code: 'XLK', name: 'Tecnologia', profile: 'growth', matchers: [/^XLK(\.\w+)?$/i, /\bTechnology\s*Select\s*Sector\b/i] },
+        { code: 'XLE', name: 'Energia', profile: 'cíclico', matchers: [/^XLE(\.\w+)?$/i, /\bEnergy\s*Select\s*Sector\b/i] },
+        { code: 'XLV', name: 'Saúde', profile: 'defensivo', matchers: [/^XLV(\.\w+)?$/i, /\bHealth\s*Care\s*Select\s*Sector\b/i] },
+        { code: 'XLY', name: 'Consumo discricionário', profile: 'cíclico', matchers: [/^XLY(\.\w+)?$/i, /\bConsumer\s*Discretionary\s*Select\s*Sector\b/i] },
+        { code: 'XLI', name: 'Industriais', profile: 'cíclico', matchers: [/^XLI(\.\w+)?$/i, /\bIndustrial\s*Select\s*Sector\b/i] },
+        { code: 'XLP', name: 'Consumo básico', profile: 'defensivo', matchers: [/^XLP(\.\w+)?$/i, /\bConsumer\s*Staples\s*Select\s*Sector\b/i] },
+        { code: 'XLU', name: 'Utilities', profile: 'defensivo', matchers: [/^XLU(\.\w+)?$/i, /\bUtilities\s*Select\s*Sector\b/i] },
+        { code: 'XLB', name: 'Materiais', profile: 'cíclico', matchers: [/^XLB(\.\w+)?$/i, /\bMaterials\s*Select\s*Sector\b/i] },
+        { code: 'XLC', name: 'Comunicação', profile: 'growth / defensivo', matchers: [/^XLC(\.\w+)?$/i, /\bCommunication\s*Services\s*Select\s*Sector\b/i] },
+        { code: 'XLRE', name: 'Imobiliário', profile: 'sensível a juros', matchers: [/^XLRE(\.\w+)?$/i, /\bReal\s*Estate\s*Select\s*Sector\b/i] },
+
+        { code: 'SMH', name: 'Semiconductors', profile: 'growth / beta', matchers: [/^SMH(\.\w+)?$/i, /\bSemiconductor\b/i] },
+        { code: 'SOXX', name: 'Semiconductors', profile: 'growth / beta', matchers: [/^SOXX(\.\w+)?$/i] },
+        { code: 'XBI', name: 'Biotech', profile: 'risk / beta', matchers: [/^XBI(\.\w+)?$/i, /\bBiotech\b/i] },
+        { code: 'KRE', name: 'Bancos regionais', profile: 'value / rates', matchers: [/^KRE(\.\w+)?$/i, /\bRegional\s*Banks\b/i] },
+        { code: 'IYT', name: 'Transportes', profile: 'cíclico', matchers: [/^IYT(\.\w+)?$/i, /\bTransportation\b/i] },
+        { code: 'XHB', name: 'Homebuilders', profile: 'sensível a juros', matchers: [/^XHB(\.\w+)?$/i, /\bHome\s*Builders\b/i] },
+        { code: 'XOP', name: 'Oil & Gas (E&P)', profile: 'cíclico', matchers: [/^XOP(\.\w+)?$/i] },
+        { code: 'XME', name: 'Metals & Mining', profile: 'cíclico', matchers: [/^XME(\.\w+)?$/i, /\bMetals\b.*\bMining\b/i] },
+    ];
+
+    const resolved = defs
+        .map(s => {
+            const sym = aliasSym(s.code) || pickBestByMatchers(s.matchers) || null;
+            return { ...s, symbol: sym };
+        })
         .filter(s => s.symbol);
+
+    const sectors = (() => {
+        const core = new Set(['XLF', 'XLK', 'XLE', 'XLV', 'XLY', 'XLI', 'XLP', 'XLU', 'XLB', 'XLC', 'XLRE']);
+        const out = [];
+        const used = new Set();
+        for (const s of resolved) {
+            if (core.has(s.code)) {
+                const k = symbolKey(s.symbol) || s.symbol;
+                if (used.has(k)) continue;
+                used.add(k);
+                out.push(s);
+            }
+        }
+        const extras = [];
+        for (const s of resolved) {
+            if (core.has(s.code)) continue;
+            const k = symbolKey(s.symbol) || s.symbol;
+            if (used.has(k)) continue;
+            used.add(k);
+            extras.push(s);
+        }
+        extras.sort((a, b) => String(a.code).localeCompare(String(b.code)));
+        return out.concat(extras.slice(0, 6));
+    })();
 
     if (!sectors.length) {
         el.innerHTML = '<p style="opacity:.85">Setoriais não encontrados no monitoramento.</p>';
         return;
     }
 
-    const maxAbs = 3;
+    const staleMs = 4 * 60 * 60 * 1000;
+    const ageOf = (symbol) => {
+        if (!symbol) return null;
+        if (dc && typeof dc.symbolAgeMs === 'function') {
+            const age = dc.symbolAgeMs(dcDeps, data, symbol);
+            return typeof age === 'number' && Number.isFinite(age) ? age : null;
+        }
+        const ms = mostRecentMs(symbol);
+        if (!Number.isFinite(ms) || ms <= 0) return null;
+        const age = Date.now() - ms;
+        return Number.isFinite(age) ? age : null;
+    };
+    const calc = sectors.map(s => {
+        const pct = getChangePct(data, s.symbol);
+        const val = typeof pct === 'number' && Number.isFinite(pct) ? pct : null;
+        const ageMs = ageOf(s.symbol);
+        const stale = typeof ageMs === 'number' && Number.isFinite(ageMs) ? ageMs > staleMs : false;
+        return { ...s, pct: val, ageMs, stale };
+    });
+    const absVals = calc.map(s => Math.abs(s.pct || 0)).filter(v => typeof v === 'number' && Number.isFinite(v) && v > 0);
+    const maxAbs = (() => {
+        if (!absVals.length) return 3;
+        const sorted = absVals.slice().sort((a, b) => a - b);
+        const idx = Math.max(0, Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9)));
+        const p90 = sorted[idx];
+        const v = Math.max(1.6, Math.min(4.2, p90 * 1.25));
+        return Number.isFinite(v) ? v : 3;
+    })();
     const toneCardStyleFromValue = (pct) => {
         if (pct === null || pct === undefined || !Number.isFinite(pct)) {
             return 'border:1px solid rgba(255,255,255,.12);background:rgba(0,0,0,.18);box-shadow:none;';
@@ -6761,21 +7923,21 @@ function renderSectorHeatmap(data) {
         return `--tone-a:${String(t.a)};border:1px solid rgba(${rgb},var(--tone-a, .35));background:linear-gradient(135deg, rgba(${rgb}, calc(var(--tone-a, .25) * .30)), rgba(0,0,0,.22));box-shadow:0 0 calc(28px * var(--tone-a, .25)) rgba(${rgb}, calc(var(--tone-a, .25) * .55));`;
     };
 
-    const calc = sectors.map(s => {
-        const pct = getChangePct(data, s.symbol);
-        const val = typeof pct === 'number' && Number.isFinite(pct) ? pct : null;
-        return { ...s, pct: val };
-    });
-
     const ranked = calc.filter(s => typeof s.pct === 'number' && Number.isFinite(s.pct)).slice().sort((a, b) => (b.pct || 0) - (a.pct || 0));
     const top = ranked.slice(0, 3);
     const bottom = ranked.slice(-3).slice().reverse();
     const defensiveSet = new Set(['XLU', 'XLP', 'XLV', 'XLRE']);
     const cyclicalSet = new Set(['XLY', 'XLI', 'XLB', 'XLE', 'XLF']);
+    const growthSet = new Set(['XLK', 'XLC', 'SMH', 'SOXX', 'XBI']);
+    const valueSet = new Set(['XLF', 'KRE', 'XLE', 'XLI', 'XLB', 'IYT', 'XME']);
+    const ratesSensitiveSet = new Set(['XLRE', 'XLU', 'XHB']);
 
     const countIn = (list, set) => list.reduce((acc, x) => acc + (set.has(x.code) ? 1 : 0), 0);
     const topDef = countIn(top, defensiveSet);
     const topCyc = countIn(top, cyclicalSet);
+    const topGrowth = countIn(top, growthSet);
+    const topValue = countIn(top, valueSet);
+    const topRates = countIn(top, ratesSensitiveSet);
     const lead = top.length ? top[0] : null;
     const leadTxt = lead ? `${lead.code} ${formatPercent(lead.pct, 2)} (${lead.name})` : '—';
     const tail = bottom.length ? bottom[0] : null;
@@ -6789,16 +7951,54 @@ function renderSectorHeatmap(data) {
     } else if (topCyc >= 2) {
         bias = 'Viés risk-on';
         biasWhy = 'Cíclicos liderando (típico de apetite ao risco).';
-    } else if (lead && lead.code === 'XLK') {
+    } else if (topGrowth >= 2) {
         bias = 'Risk-on (growth-led)';
-        biasWhy = 'Tecnologia liderando sugere rotação para growth.';
-    } else if (lead && lead.code === 'XLF') {
+        biasWhy = 'Growth liderando (tech/comms/semis) sugere rotação pró-beta.';
+    } else if (topValue >= 2) {
         bias = 'Rotação para value';
-        biasWhy = 'Financeiro na liderança costuma indicar rotação para value (checar yields).';
+        biasWhy = 'Value/cíclicos “hard” liderando (finance/energia/industriais).';
+    } else if (topRates >= 2) {
+        bias = 'Rotação sensível a juros';
+        biasWhy = 'Setores “duration” (real estate/utilities/homebuilders) dominando.';
+    } else if (lead && (lead.code === 'XLK' || lead.code === 'SMH' || lead.code === 'SOXX')) {
+        bias = 'Risk-on (growth-led)';
+        biasWhy = 'Tech/semis liderando sugere rotação para growth.';
+    } else if (lead && (lead.code === 'XLF' || lead.code === 'KRE')) {
+        bias = 'Rotação para value';
+        biasWhy = 'Financeiro/bancos na liderança costuma indicar rotação para value (checar yields).';
     }
 
     const biasPct = lead && typeof lead.pct === 'number' ? lead.pct : null;
     const biasBadge = biasPct === null ? escapeHtml('—') : toneBadgeHtml(biasPct, bias, { maxAbs });
+
+    const macroLine = (() => {
+        const vixSym = findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX30') || findAliasSymbolBest(data, 'VIX') || pickBestByMatchers([/^\.?VIX(9D)?$/i, /^VIX$/i]) || null;
+        const dxySym = findAliasSymbolBest(data, 'DXY') || pickBestByMatchers([/(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index|Índice\s*Dólar|Indice\s*Dolar)/i]) || null;
+        const us10Sym = (window.InstrumentsCatalog && typeof window.InstrumentsCatalog.resolveRatesCreditByKey === 'function')
+            ? window.InstrumentsCatalog.resolveRatesCreditByKey({ findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps }, data, 'US_10Y')
+            : (findAliasSymbolBest(data, 'US10Y') || pickBestByMatchers([/^US10YT=RR$/i, /^\.TNX$/i, /^\^TNX$/i]));
+        const vix = vixSym ? getChangePct(data, vixSym) : null;
+        const dxy = dxySym ? getChangePct(data, dxySym) : null;
+        const us10y = (() => {
+            if (!us10Sym) return null;
+            const pt = getMostRecentPointWithPrice(data, us10Sym) || getLastPoint(data, us10Sym);
+            const chg = pt && typeof pt.change === 'number' && Number.isFinite(pt.change) ? pt.change : null;
+            if (typeof chg === 'number' && Number.isFinite(chg)) return (chg * 100) / 10;
+            return null;
+        })();
+        const parts = [];
+        if (typeof us10y === 'number' && Number.isFinite(us10y)) parts.push(`US10Y Δ ${us10y > 0 ? '+' : ''}${formatNumber(us10y, 2)} (proxy)`);
+        if (typeof dxy === 'number' && Number.isFinite(dxy)) parts.push(`DXY ${formatPercent(dxy, 2)}`);
+        if (typeof vix === 'number' && Number.isFinite(vix)) parts.push(`VIX ${formatPercent(vix, 2)}`);
+        return parts.length ? `Macro: ${parts.join(' • ')}` : '';
+    })();
+
+    const heatCoverage = (() => {
+        if (!dc || typeof dc.computeCoverage !== 'function') return null;
+        const syms = calc.map(x => x && x.symbol ? String(x.symbol) : '').filter(Boolean);
+        if (!syms.length) return null;
+        return dc.computeCoverage(dcDeps, data, syms, { staleMs });
+    })();
 
     const chips = top
         .map(x => `<span style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.12);background:rgba(0,0,0,.18);border-radius:999px;padding:6px 10px;">
@@ -6813,9 +8013,13 @@ function renderSectorHeatmap(data) {
                 <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Resumo do dia</div>
                 <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${biasBadge}</div>
             </div>
+            ${heatCoverage ? `<div style="margin-top:6px;opacity:.75;font-size:12px;line-height:1.35;font-family:'Share Tech Mono',monospace;font-weight:900;">
+                Cobertura ${escapeHtml(String(heatCoverage.counts.withChange))}/${escapeHtml(String(heatCoverage.counts.expected))} • Fresh ${escapeHtml(formatNumber(heatCoverage.ratios.freshness * 100, 0))}%
+            </div>` : ''}
             <div style="margin-top:8px;opacity:.92;line-height:1.4;">
                 <div><b>Líder</b>: ${escapeHtml(leadTxt)} • <b>Pior</b>: ${escapeHtml(tailTxt)}</div>
                 <div style="margin-top:6px;"><b>Interpretação</b>: ${escapeHtml(biasWhy)}</div>
+                ${macroLine ? `<div style="margin-top:6px;opacity:.9;">${escapeHtml(macroLine)}</div>` : ''}
             </div>
             ${chips ? `<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;">${chips}</div>` : ''}
         </div>
@@ -6828,7 +8032,7 @@ function renderSectorHeatmap(data) {
             const badge = val === null ? escapeHtml(txt) : toneBadgeHtml(val, txt, { maxAbs });
             const style = toneCardStyleFromValue(val);
             const title = `${s.name} (${s.code}) • ${s.profile}`;
-            const subtitle = `${s.name} • ${s.profile}`;
+            const subtitle = `${s.name} • ${s.profile}${s.stale ? ' • stale' : ''}`;
             return `<div data-sector="${escapeHtml(s.symbol)}" title="${escapeHtml(title)}" style="${style}border-radius:14px;padding:12px;cursor:pointer;">
                 <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
                     <div style="font-weight:900;letter-spacing:1px;">${escapeHtml(s.code)}</div>
@@ -8310,22 +9514,6 @@ function renderOperationalBriefing() {
     const macroWdo = macroBiasFor('WDO');
     const macroWin = macroBiasFor('WIN');
 
-    try {
-        const model = buildOperationalCompassModel({
-            regime,
-            options,
-            web,
-            foreignFlow,
-            focus,
-            macroWin,
-            macroWdo,
-            fallbackBias: regimeBias,
-        });
-        renderOperationalCompass(model);
-    } catch {
-        try { renderOperationalCompass(null); } catch { }
-    }
-
     const diSignal = (() => {
         if (!data) return { ok: false };
         const seriesKeys = Object.keys((data && data.series) || {});
@@ -8459,26 +9647,165 @@ function renderOperationalBriefing() {
         WIN: { bias: combined.win.conflict ? macroWin.bias : combined.win.bias, source: combined.win.conflict ? 'MACRO' : 'REGIME+NEWS' },
     };
 
+    const pulseNow = data ? (typeof computeOperationalPulseNow === 'function' ? computeOperationalPulseNow(data) : null) : null;
+    const volAmp = (() => {
+        const isNum = v => typeof v === 'number' && Number.isFinite(v);
+        if (!data || !pulseNow || !pulseNow.sym) return { amp: 1, vix: null, vxbr: null };
+        const spot = (s) => {
+            if (!s) return null;
+            const p = (getMostRecentPointWithPrice(data, s) || getLastPoint(data, s));
+            const px = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+            return px;
+        };
+        const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+        const vixSym = pulseNow.sym.vix || pulseNow.sym.vix30 || pulseNow.sym.vix9d || null;
+        const vxbrSym = pulseNow.sym.vxbr || null;
+        const vix = spot(vixSym);
+        const vxbr = spot(vxbrSym);
+        const vixRel = isNum(vix) ? clamp(vix / 20, 0.75, 1.4) : null;
+        const vxbrRel = isNum(vxbr) ? clamp(vxbr / 18, 0.75, 1.5) : null;
+        const amp = (vixRel !== null && vxbrRel !== null)
+            ? ((vixRel + vxbrRel) / 2)
+            : (vixRel !== null ? vixRel : (vxbrRel !== null ? vxbrRel : 1));
+        return { amp: isNum(amp) ? amp : 1, vix: isNum(vix) ? vix : null, vxbr: isNum(vxbr) ? vxbr : null };
+    })();
+
     const priceLead = (() => {
         if (!data) return { active: false, reason: '' };
-        const pulse = typeof computeOperationalPulseNow === 'function' ? computeOperationalPulseNow(data) : null;
-        const winPct = pulse && pulse.market ? pulse.market.winPct : null;
-        const wdoPct = pulse && pulse.market ? pulse.market.wdoPct : null;
-        const usdSym = findAliasSymbolBest(data, 'USD_BRL') || findAliasSymbol(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i);
+        const winPct = pulseNow && pulseNow.market ? pulseNow.market.winPct : null;
+        const wdoPct = pulseNow && pulseNow.market ? pulseNow.market.wdoPct : null;
+        const usdSym = (pulseNow && pulseNow.sym && pulseNow.sym.usdbrl)
+            || findAliasSymbolBest(data, 'USD_BRL')
+            || findAliasSymbol(data, 'USD_BRL')
+            || findAssetSymbol(data, /^USD\/BRL\b/i);
         const usdPct = usdSym ? getChangePct(data, usdSym) : null;
-        const thWin = 0.25;
-        const thWdo = 0.25;
-        const ok = typeof winPct === 'number' && Number.isFinite(winPct) && typeof wdoPct === 'number' && Number.isFinite(wdoPct)
-            ? (winPct >= thWin && wdoPct <= -thWdo)
-            : false;
-        const okUsd = typeof usdPct === 'number' && Number.isFinite(usdPct) ? usdPct <= -0.04 : true;
-        if (!ok || !okUsd) return { active: false, reason: '' };
-        return { active: true, reason: `WIN ${formatPercent(winPct, 2)} • WDO ${formatPercent(wdoPct, 2)} • USD/BRL ${typeof usdPct === 'number' && Number.isFinite(usdPct) ? formatPercent(usdPct, 2) : '—'}` };
+        const amp = volAmp && typeof volAmp.amp === 'number' && Number.isFinite(volAmp.amp) ? volAmp.amp : 1;
+        const thWin = 0.25 / amp;
+        const thWdo = 0.25 / amp;
+        const okWinWdo = typeof winPct === 'number' && Number.isFinite(winPct) && typeof wdoPct === 'number' && Number.isFinite(wdoPct);
+        if (!okWinWdo) return { active: false, reason: '' };
+
+        const riskOn = (winPct >= thWin && wdoPct <= -thWdo);
+        const riskOff = (winPct <= -thWin && wdoPct >= thWdo);
+        const usdTh = 0.04 / amp;
+        const okUsdOn = typeof usdPct === 'number' && Number.isFinite(usdPct) ? (usdPct <= -usdTh) : true;
+        const okUsdOff = typeof usdPct === 'number' && Number.isFinite(usdPct) ? (usdPct >= usdTh) : true;
+
+        const volTxt = volAmp && (volAmp.vix !== null || volAmp.vxbr !== null) ? ` • volAmp ${formatNumber(amp, 2)}` : '';
+        if (riskOn && okUsdOn) return { active: true, mode: 'risk_on', reason: `WIN ${formatPercent(winPct, 2)} • WDO ${formatPercent(wdoPct, 2)} • USD/BRL ${typeof usdPct === 'number' && Number.isFinite(usdPct) ? formatPercent(usdPct, 2) : '—'}${volTxt}` };
+        if (riskOff && okUsdOff) return { active: true, mode: 'risk_off', reason: `WIN ${formatPercent(winPct, 2)} • WDO ${formatPercent(wdoPct, 2)} • USD/BRL ${typeof usdPct === 'number' && Number.isFinite(usdPct) ? formatPercent(usdPct, 2) : '—'}${volTxt}` };
+        return { active: false, reason: '' };
     })();
 
     if (priceLead.active) {
-        finalBias.WIN = { bias: 'buy', source: 'PREÇO' };
-        finalBias.WDO = { bias: 'sell', source: 'PREÇO' };
+        if (priceLead.mode === 'risk_off') {
+            finalBias.WIN = { bias: 'sell', source: 'PREÇO' };
+            finalBias.WDO = { bias: 'buy', source: 'PREÇO' };
+        } else {
+            finalBias.WIN = { bias: 'buy', source: 'PREÇO' };
+            finalBias.WDO = { bias: 'sell', source: 'PREÇO' };
+        }
+    }
+
+    const trendLead = (() => {
+        if (!data || !pulseNow || !pulseNow.sym) return { active: false, mode: '', reason: '' };
+        const symWin = pulseNow.sym.win;
+        const symWdo = pulseNow.sym.wdo;
+        const pctAt = (symbol, minutes) => {
+            if (!symbol) return null;
+            const s = String(symbol || '');
+            const series = (data && data.series && Array.isArray(data.series[s])) ? data.series[s] : [];
+            if (!series.length) return null;
+            const last = series[series.length - 1];
+            const lastT = last && last.t ? Date.parse(String(last.t)) : NaN;
+            const lastP = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
+            if (!Number.isFinite(lastT) || lastP === null || !(lastP > 0)) return null;
+            const target = lastT - (Number(minutes) * 60 * 1000);
+            let prev = null;
+            for (let i = series.length - 1; i >= 0; i -= 1) {
+                const p = series[i];
+                const t = p && p.t ? Date.parse(String(p.t)) : NaN;
+                const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                if (!Number.isFinite(t) || price === null || !(price > 0)) continue;
+                if (t <= target) { prev = { t, price }; break; }
+            }
+            if (!prev) return null;
+            return ((lastP / prev.price) - 1) * 100;
+        };
+        const win60 = pctAt(symWin, 60);
+        const wdo60 = pctAt(symWdo, 60);
+        const win15 = pctAt(symWin, 15);
+        const wdo15 = pctAt(symWdo, 15);
+        const win5 = pctAt(symWin, 5);
+        const wdo5 = pctAt(symWdo, 5);
+        const ok = (x) => (typeof x === 'number' && Number.isFinite(x));
+        if (!ok(win60) || !ok(wdo60) || !ok(win15) || !ok(wdo15)) return { active: false, mode: '', reason: '' };
+
+        const amp = volAmp && typeof volAmp.amp === 'number' && Number.isFinite(volAmp.amp) ? volAmp.amp : 1;
+        const th60 = 0.22 / amp;
+        const th15 = 0.10 / amp;
+        const th5 = 0.06 / amp;
+
+        const riskOn60 = (win60 >= th60 && win15 >= th15 && wdo60 <= -th60 && wdo15 <= -th15);
+        const riskOff60 = (win60 <= -th60 && win15 <= -th15 && wdo60 >= th60 && wdo15 >= th15);
+
+        const ok5 = ok(win5) && ok(wdo5);
+        const microConflict = ok5 && (
+            (riskOn60 && (win5 <= -th5 || wdo5 >= th5))
+            || (riskOff60 && (win5 >= th5 || wdo5 <= -th5))
+        );
+        if (microConflict) return { active: false, mode: '', reason: '' };
+
+        const fastAllowed = amp >= 1.12 && ok5;
+        const fastOn = fastAllowed
+            && (win15 >= th15 && win5 >= th5 && wdo15 <= -th15 && wdo5 <= -th5)
+            && (win60 > -th60 * 0.6 && wdo60 < th60 * 0.6);
+        const fastOff = fastAllowed
+            && (win15 <= -th15 && win5 <= -th5 && wdo15 >= th15 && wdo5 >= th5)
+            && (win60 < th60 * 0.6 && wdo60 > -th60 * 0.6);
+
+        const riskOn = riskOn60 || (!riskOff60 && fastOn);
+        const riskOff = riskOff60 || (!riskOn60 && fastOff);
+        if (!riskOn && !riskOff) return { active: false, mode: '', reason: '' };
+
+        const fast = !riskOn60 && !riskOff60;
+        const sfx5 = ok5 ? ` / ${formatPercent(win5, 2)}` : '';
+        const sfxW5 = ok5 ? ` / ${formatPercent(wdo5, 2)}` : '';
+        const tag = fast ? 'Tendência 15m/5m' : 'Tendência 60m/15m';
+        const volTxt = volAmp && (volAmp.vix !== null || volAmp.vxbr !== null) ? ` • volAmp ${formatNumber(amp, 2)}` : '';
+        const reason = `${tag}: WIN ${formatPercent(win60, 2)} / ${formatPercent(win15, 2)}${sfx5} • WDO ${formatPercent(wdo60, 2)} / ${formatPercent(wdo15, 2)}${sfxW5}${volTxt}`;
+        return { active: true, mode: riskOff ? 'risk_off' : 'risk_on', reason };
+    })();
+
+    if (!priceLead.active && trendLead.active) {
+        if (trendLead.mode === 'risk_off') {
+            finalBias.WIN = { bias: 'sell', source: 'TENDÊNCIA' };
+            finalBias.WDO = { bias: 'buy', source: 'TENDÊNCIA' };
+        } else {
+            finalBias.WIN = { bias: 'buy', source: 'TENDÊNCIA' };
+            finalBias.WDO = { bias: 'sell', source: 'TENDÊNCIA' };
+        }
+    }
+
+    const pulseLead = (() => {
+        if (!pulseNow || !pulseNow.pulse) return { active: false, wdo: null, win: null, reason: '' };
+        const w = pulseNow.pulse.wdo;
+        const i = pulseNow.pulse.win;
+        const strong = x => x && typeof x.net === 'number' && Number.isFinite(x.net) && Math.abs(x.net) >= 0.95;
+        if (!strong(w) || !strong(i)) return { active: false, wdo: null, win: null, reason: '' };
+        const wb = w && w.bias ? w.bias : 'neutral';
+        const ib = i && i.bias ? i.bias : 'neutral';
+        const coherent =
+            (wb === 'buy' && ib === 'sell')
+            || (wb === 'sell' && ib === 'buy');
+        if (!coherent) return { active: false, wdo: null, win: null, reason: '' };
+        const reason = `WDO net ${formatNumber(w.net, 2)} • WIN net ${formatNumber(i.net, 2)}`;
+        return { active: true, wdo: wb, win: ib, reason };
+    })();
+
+    if (!priceLead.active && pulseLead.active) {
+        finalBias.WDO = { bias: pulseLead.wdo, source: 'PULSO' };
+        finalBias.WIN = { bias: pulseLead.win, source: 'PULSO' };
     }
 
     const confidence = (() => {
@@ -8509,10 +9836,42 @@ function renderOperationalBriefing() {
             return adj;
         })();
         const priceAdj = priceLead.active ? 0.06 : 0;
-        const out = Math.max(0, Math.min(1, base + newsAdj + agendaAdj + macroAdj + priceAdj - conflicts * 0.10));
+        const trendAdj = (!priceLead.active && trendLead.active) ? 0.04 : 0;
+        const pulseAdj = (!priceLead.active && !trendLead.active && pulseLead.active) ? 0.05 : 0;
+        const alignAdj = (() => {
+            if (!pulseNow || !pulseNow.align) return 0;
+            const a = pulseNow.align.wdo_usdbrl;
+            if (!a || a.ok === null || a.ok === true) return 0;
+            const strong = typeof a.a === 'number' && Number.isFinite(a.a) && Math.abs(a.a) >= 0.12
+                && typeof a.b === 'number' && Number.isFinite(a.b) && Math.abs(a.b) >= 0.12;
+            return strong ? -0.06 : 0;
+        })();
+        const out = Math.max(0, Math.min(1, base + newsAdj + agendaAdj + macroAdj + priceAdj + trendAdj + pulseAdj + alignAdj - conflicts * 0.10));
         const label = out >= 0.72 ? 'ALTA' : out >= 0.56 ? 'MÉDIA' : 'BAIXA';
         return { score: out, label };
     })();
+
+    try {
+        const forced = finalBias && (finalBias.WDO || finalBias.WIN)
+            ? (finalBias.WDO.source === 'PREÇO' || finalBias.WDO.source === 'TENDÊNCIA' || finalBias.WDO.source === 'PULSO'
+                || finalBias.WIN.source === 'PREÇO' || finalBias.WIN.source === 'TENDÊNCIA' || finalBias.WIN.source === 'PULSO')
+            : false;
+        const macroWinCompass = forced ? { ...macroWin, bias: 'neutral' } : macroWin;
+        const macroWdoCompass = forced ? { ...macroWdo, bias: 'neutral' } : macroWdo;
+        const model = buildOperationalCompassModel({
+            regime,
+            options,
+            web,
+            foreignFlow,
+            focus,
+            macroWin: macroWinCompass,
+            macroWdo: macroWdoCompass,
+            fallbackBias: { win: finalBias.WIN.bias, wdo: finalBias.WDO.bias },
+        });
+        renderOperationalCompass(model);
+    } catch {
+        try { renderOperationalCompass(null); } catch { }
+    }
 
     const badge = (tone, text) => {
         const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
@@ -8527,13 +9886,19 @@ function renderOperationalBriefing() {
     };
 
     const finalScoreFor = symbol => {
-        const rb = symbol === 'WDO' ? regimeBias.wdo : regimeBias.win;
         const nb = symbol === 'WDO' ? newsTilt.wdo.score : newsTilt.win.score;
         const mb = symbol === 'WDO' ? macroWdo.score : macroWin.score;
+        const fb = symbol === 'WDO' ? finalBias.WDO : finalBias.WIN;
+        const bDir = fb && fb.bias === 'buy' ? 1 : fb && fb.bias === 'sell' ? -1 : 0;
+        const src = fb && fb.source ? String(fb.source) : '';
+        const clamp = (x) => Math.max(-1, Math.min(1, x));
+        if (bDir !== 0 && (src === 'PREÇO' || src === 'TENDÊNCIA' || src === 'PULSO')) {
+            const w = src === 'PREÇO' ? 0.9 : src === 'TENDÊNCIA' ? 0.8 : 0.75;
+            return clamp((w * bDir) + (0.15 * nb) + (0.10 * mb));
+        }
+        const rb = symbol === 'WDO' ? regimeBias.wdo : regimeBias.win;
         const dir = rb === 'buy' ? 1 : rb === 'sell' ? -1 : 0;
-        const s = (0.5 * dir) + (0.4 * nb) + (0.3 * mb);
-        const c = Math.max(-1, Math.min(1, s));
-        return c;
+        return clamp((0.5 * dir) + (0.4 * nb) + (0.3 * mb));
     };
 
     const gaugeHtml = (label, score) => {
@@ -8654,6 +10019,18 @@ function renderOperationalBriefing() {
             }
             if (priceLead.active && fb.source === 'PREÇO') {
                 lines.push(`Preço liderando: ${priceLead.reason}`);
+            }
+            if (!priceLead.active && trendLead.active && fb.source === 'TENDÊNCIA') {
+                lines.push(trendLead.reason);
+            }
+            if (!priceLead.active && pulseLead.active && fb.source === 'PULSO') {
+                lines.push(`Pulso (drivers+preço): ${pulseLead.reason}`);
+            }
+            if (pulseNow && pulseNow.align && pulseNow.align.wdo_usdbrl && pulseNow.align.wdo_usdbrl.ok === false) {
+                const a = pulseNow.align.wdo_usdbrl;
+                const ax = (typeof a.a === 'number' && Number.isFinite(a.a)) ? formatPercent(a.a, 2) : '—';
+                const bx = (typeof a.b === 'number' && Number.isFinite(a.b)) ? formatPercent(a.b, 2) : '—';
+                lines.push(`Alerta: WDO vs USD/BRL desalinhados (WDO ${ax} vs USD/BRL ${bx})`);
             }
             if (combined && ((sym === 'WDO' && combined.wdo && combined.wdo.conflict) || (sym === 'WIN' && combined.win && combined.win.conflict))) {
                 lines.push('Regime x News em conflito → decisão por Macro');
@@ -9064,7 +10441,6 @@ function renderOperationalBriefing() {
         return `Correlações (janela curta): ${parts.join(' • ')}`;
     })();
 
-    const pulseNow = data ? computeOperationalPulseNow(data) : null;
     const pulseCard = (() => {
         if (!pulseNow) return '';
 
@@ -9892,6 +11268,9 @@ function renderOperationalBriefing() {
         </div>
         <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
             ${escapeHtml(regimeLine)} • ${escapeHtml(agendaLine)} • ${escapeHtml(newsLine)} • ${escapeHtml(macroLine)}${corrLine ? ` • ${escapeHtml(corrLine)}` : ''}
+        </div>
+        <div style="margin-top:6px;opacity:.72;font-size:11px;line-height:1.35;">
+            Escalas: scores -1..+1 (sinal + = compra do ativo; sinal - = venda). Regime é discreto (buy/sell/neutral) e entra como direção.
         </div>
         <div id="opTuningPanel" style="display:none;margin-top:10px;border:1px dashed rgba(255,255,255,.20);border-radius:12px;padding:10px;background:rgba(0,0,0,.18);">
             <div style="font-weight:900;letter-spacing:.8px;margin-bottom:8px;opacity:.92;">Calibração rápida</div>
@@ -11175,9 +12554,11 @@ function renderFlowSentinel(data) {
         setDot('fs-beta-neg-dot', betaNegAction.state, betaNegAction.state === 'sell-usd');
 
         setMetric('fs-beta-pos-score', betaPosScore === null ? '—' : formatNumber(betaPosScore, 3));
-        setMetric('fs-beta-pos-detail', betaPosCount ? `${betaPosCount}/4 • ${betaPosAction.label}` : '—');
+        const betaPosDen = pre && pre.riskBlock && Array.isArray(pre.riskBlock.items) ? pre.riskBlock.items.length : 4;
+        setMetric('fs-beta-pos-detail', betaPosCount ? `${betaPosCount}/${betaPosDen} • ${betaPosAction.label}` : '—');
         setMetric('fs-beta-neg-score', betaNegScore === null ? '—' : formatNumber(betaNegScore, 3));
-        setMetric('fs-beta-neg-detail', betaNegCount ? `${betaNegCount}/4 • ${betaNegAction.label}` : '—');
+        const betaNegDen = pre && pre.protectionBlock && Array.isArray(pre.protectionBlock.items) ? pre.protectionBlock.items.length : 4;
+        setMetric('fs-beta-neg-detail', betaNegCount ? `${betaNegCount}/${betaNegDen} • ${betaNegAction.label}` : '—');
         setMetric('fs-oil-score', oilScore === null ? '—' : formatPercent(oilScore, 2));
         setMetric('fs-oil-detail', pre.oil && typeof pre.oil.intel === 'string' ? pre.oil.intel : '—');
         setMetric('fs-signal', pre.regime && typeof pre.regime.label === 'string' ? pre.regime.label : '—');
@@ -11382,9 +12763,9 @@ function renderFlowSentinel(data) {
     setDot('fs-beta-neg-dot', betaNegAction.state, betaNegAction.state === 'sell-usd');
 
     setMetric('fs-beta-pos-score', betaPosScore === null ? '—' : formatNumber(betaPosScore, 3));
-    setMetric('fs-beta-pos-detail', betaPosCount ? `${betaPosCount}/4 • ${betaPosAction.label}` : '—');
+    setMetric('fs-beta-pos-detail', betaPosCount ? `${betaPosCount}/${betaPosItems.length} • ${betaPosAction.label}` : '—');
     setMetric('fs-beta-neg-score', betaNegScore === null ? '—' : formatNumber(betaNegScore, 3));
-    setMetric('fs-beta-neg-detail', betaNegCount ? `${betaNegCount}/4 • ${betaNegAction.label}` : '—');
+    setMetric('fs-beta-neg-detail', betaNegCount ? `${betaNegCount}/${betaNegItems.length} • ${betaNegAction.label}` : '—');
     setMetric('fs-oil-score', oilScore === null ? '—' : formatPercent(oilScore, 2));
     setMetric('fs-oil-detail', oilBias);
     setMetric('fs-signal', signal);
@@ -11548,33 +12929,88 @@ function renderFlowSentinel(data) {
 }
 
 function renderCarryTradeMonitor(data) {
+    const dc = (typeof window !== 'undefined' && window.DecisionCore) ? window.DecisionCore : null;
+    const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
+    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const catDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps };
+    const rcKey = (key, fallbackMatcher) => {
+        const sym = catalog && typeof catalog.resolveRatesCreditByKey === 'function'
+            ? catalog.resolveRatesCreditByKey(catDeps, data, key)
+            : null;
+        if (sym) return sym;
+        if (fallbackMatcher instanceof RegExp) return findAssetSymbol(data, fallbackMatcher);
+        return null;
+    };
+
+    const aliasSym = (k) => findAliasSymbolBest(data, k) || findAliasSymbol(data, k);
+
+    const assets = data && Array.isArray(data.assets) ? data.assets : [];
+    const mostRecentMs = (symbol) => {
+        if (!symbol) return -Infinity;
+        const last = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol);
+        const t = last && last.t ? Date.parse(String(last.t)) : NaN;
+        return Number.isFinite(t) ? t : -Infinity;
+    };
+    const pickBestByMatchers = (matchers, { limit = 14 } = {}) => {
+        const out = [];
+        const seen = new Set();
+        for (const re of (matchers || [])) {
+            if (!(re instanceof RegExp)) continue;
+            for (const a of assets) {
+                const sym = a && a.symbol ? String(a.symbol) : '';
+                const name = a && a.name ? String(a.name) : '';
+                if (!sym || seen.has(sym)) continue;
+                if (re.test(sym) || re.test(name)) {
+                    out.push(sym);
+                    seen.add(sym);
+                    if (out.length >= limit) break;
+                }
+            }
+        }
+        out.sort((a, b) => mostRecentMs(b) - mostRecentMs(a));
+        return out.length ? out[0] : null;
+    };
+
     const resolveJapan10yYield = () => {
-        const yieldSymbol =
-            findAssetSymbol(data, /^JP10YT=RR$/i)
-            || findAssetSymbol(data, /\bJapan\b(?!.*\b(CDS|Future|Futures)\b).*?\b10\b.*?\bYear\b.*?\bYield\b/i)
-            || findAssetSymbol(data, /\bJapan\b(?!.*\b(CDS|Future|Futures)\b).*?\b10\b.*?\bYear\b/i);
-        return yieldSymbol || null;
+        return rcKey('JP_10Y', /^JP10YT=RR$/i)
+            || aliasSym('JP10Y')
+            || pickBestByMatchers([/^JP10YT=RR$/i, /\bJapan\b(?!.*\b(CDS|Future|Futures)\b).*?\b10\b.*?\bYear\b.*?\bYield\b/i, /\bJapan\b(?!.*\b(CDS|Future|Futures)\b).*?\b10\b.*?\bYear\b/i])
+            || null;
     };
 
     const symbols = {
-        audusd: findAssetSymbol(data, /^AUD\/USD\b/i),
-        nzdusd: findAssetSymbol(data, /^NZD\/USD\b/i),
-        usdjpy: findAssetSymbol(data, /^USD\/JPY\b/i),
-        usdbrl: findAliasSymbol(data, 'USD_BRL'),
-        dxy: findAliasSymbol(data, 'DXY'),
-        br10y: findAssetSymbol(data, /^BR10YT=RR$/i),
-        us10y: findAliasSymbol(data, 'US10Y'),
-        us10br10: findAssetSymbol(data, /^US10BR10=RR$/i),
-        us10jp10: findAssetSymbol(data, /^US10JP10=RR$/i),
+        audusd: pickBestByMatchers([/^AUD\/USD\b/i]) || findAssetSymbol(data, /^AUD\/USD\b/i),
+        nzdusd: pickBestByMatchers([/^NZD\/USD\b/i]) || findAssetSymbol(data, /^NZD\/USD\b/i),
+        eurusd: pickBestByMatchers([/^EUR\/USD\b/i]) || findAssetSymbol(data, /^EUR\/USD\b/i),
+        gbpusd: pickBestByMatchers([/^GBP\/USD\b/i]) || findAssetSymbol(data, /^GBP\/USD\b/i),
+        usdcad: pickBestByMatchers([/^USD\/CAD\b/i, /\bUSDCAD\b/i]) || findAssetSymbol(data, /^USD\/CAD\b/i),
+        usdchf: pickBestByMatchers([/^USD\/CHF\b/i, /\bUSDCHF\b/i]) || findAssetSymbol(data, /^USD\/CHF\b/i),
+        usdjpy: pickBestByMatchers([/^USD\/JPY\b/i]) || findAssetSymbol(data, /^USD\/JPY\b/i),
+        usdbrl: aliasSym('USD_BRL') || pickBestByMatchers([/^USD\/BRL\b/i]) || findAssetSymbol(data, /^USD\/BRL\b/i),
+        usdcnh: aliasSym('USD_CNH') || pickBestByMatchers([/^USD\/CNH\b/i]) || findAssetSymbol(data, /^USD\/CNH\b/i),
+        dxy: aliasSym('DXY') || pickBestByMatchers([/(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index|Índice\s*Dólar|Indice\s*Dolar)/i]) || findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index|Índice\s*Dólar|Indice\s*Dolar)/i),
+        vix: findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX30') || aliasSym('VIX') || pickBestByMatchers([/^\.?VIX(9D)?$/i, /^VIX$/i]) || findAssetSymbol(data, /^\.?VIX(9D)?$/i),
+        hyg: rcKey('ETF_HYG', /^HYG(\.\w+)?$/i) || aliasSym('HYG') || pickBestByMatchers([/^HYG(\.\w+)?$/i]),
+        br10y: rcKey('BR_10Y', /^BR10YT=RR$/i),
+        us10y: rcKey('US_10Y', /(^US10YT=RR$|^US10YT=X$|^\.TNX$|\^TNX)/i) || aliasSym('US10Y'),
+        us10br10: rcKey('SPREAD_US10_BR10', /^US10BR10=RR$/i),
+        us10jp10: pickBestByMatchers([/^US10JP10=RR$/i, /\bUS10\b.*\bJP10\b.*\bspread\b/i]) || findAssetSymbol(data, /^US10JP10=RR$/i),
         jp10y: resolveJapan10yYield(),
-        jp1y: findAliasSymbol(data, 'JP1Y') || findAssetSymbol(data, /^JP1YT=(RR|XX)$/i),
-        jp5y: findAliasSymbol(data, 'JP5Y') || findAssetSymbol(data, /^JP5YT=(RR|XX)$/i),
-        hk10y: findAliasSymbol(data, 'HK10Y'),
-        hsi: findAssetSymbol(data, /\bHang\s*Seng\b/i),
-        hstech: findAliasSymbol(data, 'HSTECH') || findAssetSymbol(data, /^HSTECH$/i),
-        ewh: findAliasSymbol(data, 'EWH'),
-        audjpy: findAssetSymbol(data, /^AUD\/JPY\b/i),
-        nzdjpy: findAssetSymbol(data, /^NZD\/JPY\b/i),
+        jp1y: rcKey('JP_1Y', /^JP1YT=(RR|XX)$/i) || aliasSym('JP1Y') || findAssetSymbol(data, /^JP1YT=(RR|XX)$/i),
+        jp5y: rcKey('JP_5Y', /^JP5YT=(RR|XX)$/i) || aliasSym('JP5Y') || findAssetSymbol(data, /^JP5YT=(RR|XX)$/i),
+        hk10y: rcKey('HK_10Y', /^HK10YT=RR$/i) || aliasSym('HK10Y'),
+        hsi: aliasSym('HSI') || pickBestByMatchers([/\bHang\s*Seng\b/i, /^HSI$/i]) || findAssetSymbol(data, /\bHang\s*Seng\b/i),
+        hstech: aliasSym('HSTECH') || pickBestByMatchers([/^HSTECH$/i, /\bHang\s*Seng\b.*\bTech\b/i]) || findAssetSymbol(data, /^HSTECH$/i),
+        ewh: aliasSym('EWH') || pickBestByMatchers([/^EWH(\.\w+)?$/i]) || findAssetSymbol(data, /^EWH(\.\w+)?$/i),
+        audjpy: pickBestByMatchers([/^AUD\/JPY\b/i]) || findAssetSymbol(data, /^AUD\/JPY\b/i),
+        nzdjpy: pickBestByMatchers([/^NZD\/JPY\b/i]) || findAssetSymbol(data, /^NZD\/JPY\b/i),
+        mxnjpy: pickBestByMatchers([/^MXN\/JPY\b/i]) || findAssetSymbol(data, /^MXN\/JPY\b/i),
+        zarjpy: pickBestByMatchers([/^ZAR\/JPY\b/i]) || findAssetSymbol(data, /^ZAR\/JPY\b/i),
+        brljpy: pickBestByMatchers([/^BRL\/JPY\b/i]) || findAssetSymbol(data, /^BRL\/JPY\b/i),
+        usdmxn: pickBestByMatchers([/^USD\/MXN\b/i]) || findAssetSymbol(data, /^USD\/MXN\b/i),
+        usdzar: pickBestByMatchers([/^USD\/ZAR\b/i]) || findAssetSymbol(data, /^USD\/ZAR\b/i),
+        usdtry: pickBestByMatchers([/^USD\/TRY\b/i]) || findAssetSymbol(data, /^USD\/TRY\b/i),
+        usdclp: pickBestByMatchers([/^USD\/CLP\b/i]) || findAssetSymbol(data, /^USD\/CLP\b/i),
     };
 
     const lastOf = symbol => {
@@ -11585,14 +13021,22 @@ function renderCarryTradeMonitor(data) {
         const change = typeof p.change === 'number' && Number.isFinite(p.change) ? p.change : null;
         const changePct = typeof p.changePct === 'number' && Number.isFinite(p.changePct) ? p.changePct : null;
         const t = p.t ? String(p.t) : '';
-        return { price, change, changePct, t };
+        const tMs = t ? Date.parse(t) : NaN;
+        return { price, change, changePct, t, tMs: Number.isFinite(tMs) ? tMs : null };
     };
 
     const audusd = lastOf(symbols.audusd);
     const nzdusd = lastOf(symbols.nzdusd);
+    const eurusd = lastOf(symbols.eurusd);
+    const gbpusd = lastOf(symbols.gbpusd);
+    const usdcad = lastOf(symbols.usdcad);
+    const usdchf = lastOf(symbols.usdchf);
     const usdjpy = lastOf(symbols.usdjpy);
     const usdbrl = lastOf(symbols.usdbrl);
+    const usdcnh = lastOf(symbols.usdcnh);
     const dxy = lastOf(symbols.dxy);
+    const vix = lastOf(symbols.vix);
+    const hyg = lastOf(symbols.hyg);
     const br10y = lastOf(symbols.br10y);
     const us10y = lastOf(symbols.us10y);
     const us10br10 = lastOf(symbols.us10br10);
@@ -11602,6 +13046,13 @@ function renderCarryTradeMonitor(data) {
     const jp5y = lastOf(symbols.jp5y);
     const audjpyDirect = lastOf(symbols.audjpy);
     const nzdjpyDirect = lastOf(symbols.nzdjpy);
+    const mxnjpyDirect = lastOf(symbols.mxnjpy);
+    const zarjpyDirect = lastOf(symbols.zarjpy);
+    const brljpyDirect = lastOf(symbols.brljpy);
+    const usdmxn = lastOf(symbols.usdmxn);
+    const usdzar = lastOf(symbols.usdzar);
+    const usdtry = lastOf(symbols.usdtry);
+    const usdclp = lastOf(symbols.usdclp);
     const hk10y = lastOf(symbols.hk10y);
     const hsi = lastOf(symbols.hsi);
     const hstech = lastOf(symbols.hstech);
@@ -11613,9 +13064,16 @@ function renderCarryTradeMonitor(data) {
 
     const audusdPct = pctOf(audusd);
     const nzdusdPct = pctOf(nzdusd);
+    const eurusdPct = pctOf(eurusd);
+    const gbpusdPct = pctOf(gbpusd);
+    const usdcadPct = pctOf(usdcad);
+    const usdchfPct = pctOf(usdchf);
     const usdjpyPct = pctOf(usdjpy);
     const usdbrlPct = pctOf(usdbrl);
+    const usdcnhPct = pctOf(usdcnh);
     const dxyPct = pctOf(dxy);
+    const vixPct = pctOf(vix);
+    const hygPct = pctOf(hyg);
     const jp10yLevel = priceOf(jp10y);
     const jp10yDelta = changeOf(jp10y);
     const jp10yBps = typeof jp10yDelta === 'number' && Number.isFinite(jp10yDelta) ? jp10yDelta * 100 : null;
@@ -11664,6 +13122,33 @@ function renderCarryTradeMonitor(data) {
                 ? (Math.max(-99, Math.min(99, ((1 + nzdusdPct / 100) * (1 + usdjpyPct / 100) - 1) * 100)))
                 : null;
 
+    const synthCross = (quote, base) => {
+        const qPct = pctOf(quote);
+        const bPct = pctOf(base);
+        if (qPct === null || bPct === null) return null;
+        const v = ((1 + qPct / 100) / Math.max(1e-9, (1 + bPct / 100)) - 1) * 100;
+        return Math.max(-99, Math.min(99, v));
+    };
+    const synthCrossLevel = (quote, base) => {
+        const q = priceOf(quote);
+        const b = priceOf(base);
+        if (q === null || b === null) return null;
+        if (!(b > 0)) return null;
+        const v = q / b;
+        return Number.isFinite(v) ? v : null;
+    };
+
+    const mxnjpyPct = pctOf(mxnjpyDirect) !== null ? pctOf(mxnjpyDirect) : (usdjpyPct !== null ? synthCross(usdjpy, usdmxn) : null);
+    const zarjpyPct = pctOf(zarjpyDirect) !== null ? pctOf(zarjpyDirect) : (usdjpyPct !== null ? synthCross(usdjpy, usdzar) : null);
+    const brljpyPct = pctOf(brljpyDirect) !== null ? pctOf(brljpyDirect) : (usdjpyPct !== null ? synthCross(usdjpy, usdbrl) : null);
+    const usdcnhJpyPct = (usdjpyPct !== null && usdcnhPct !== null)
+        ? (Math.max(-99, Math.min(99, ((1 + usdjpyPct / 100) / Math.max(1e-9, (1 + usdcnhPct / 100)) - 1) * 100)))
+        : null;
+
+    const mxnjpyLevel = priceOf(mxnjpyDirect) !== null ? priceOf(mxnjpyDirect) : (priceOf(usdjpy) !== null ? synthCrossLevel(usdjpy, usdmxn) : null);
+    const zarjpyLevel = priceOf(zarjpyDirect) !== null ? priceOf(zarjpyDirect) : (priceOf(usdjpy) !== null ? synthCrossLevel(usdjpy, usdzar) : null);
+    const brljpyLevel = priceOf(brljpyDirect) !== null ? priceOf(brljpyDirect) : (priceOf(usdjpy) !== null ? synthCrossLevel(usdjpy, usdbrl) : null);
+
     let premiumBps = null;
     let premiumPct = null;
     let premiumSource = '';
@@ -11681,7 +13166,28 @@ function renderCarryTradeMonitor(data) {
         premiumSource = 'BR10Y';
     }
 
-    const hasCore = [audusdPct, usdjpyPct].filter(v => typeof v === 'number').length >= 2;
+    const carryCrosses = [
+        { label: 'AUD/JPY*', pct: audjpyPct, level: audjpyLevel, w: 0.36 },
+        { label: 'NZD/JPY*', pct: nzdjpyPct, level: null, w: 0.22 },
+        { label: 'MXN/JPY*', pct: mxnjpyPct, level: mxnjpyLevel, w: 0.18 },
+        { label: 'ZAR/JPY*', pct: zarjpyPct, level: zarjpyLevel, w: 0.14 },
+        { label: 'BRL/JPY*', pct: brljpyPct, level: brljpyLevel, w: 0.10 },
+    ];
+    const weightedAvg = (items) => {
+        const pairs = (items || [])
+            .map(x => ({ v: typeof x.pct === 'number' && Number.isFinite(x.pct) ? x.pct : null, w: typeof x.w === 'number' && Number.isFinite(x.w) ? x.w : 0 }))
+            .filter(x => typeof x.v === 'number' && Number.isFinite(x.v) && typeof x.w === 'number' && Number.isFinite(x.w) && x.w > 0);
+        const wSum = pairs.reduce((s, x) => s + x.w, 0);
+        if (!(wSum > 0)) return null;
+        const s = pairs.reduce((acc, x) => acc + x.v * x.w, 0) / wSum;
+        return Number.isFinite(s) ? s : null;
+    };
+    const carryBasketPct = weightedAvg(carryCrosses);
+    const g10BetaPct = avg([audusdPct, nzdusdPct, eurusdPct, gbpusdPct]);
+    const emUsdPct = avg([usdmxn ? pctOf(usdmxn) : null, usdzar ? pctOf(usdzar) : null, usdclp ? pctOf(usdclp) : null, usdtry ? pctOf(usdtry) : null, usdcnhPct]);
+
+    const hasCore = (carryCrosses.filter(x => typeof x.pct === 'number' && Number.isFinite(x.pct)).length >= 2)
+        || ([audusdPct, usdjpyPct].filter(v => typeof v === 'number').length >= 2);
     const hasPremium = typeof premiumBps === 'number' && Number.isFinite(premiumBps);
 
     const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -11694,40 +13200,45 @@ function renderCarryTradeMonitor(data) {
     let carryStatusDetail = '—';
     if (!hasCore) {
         carryStatus = 'Dados insuficientes';
-        carryStatusDetail = 'AUD/USD e USD/JPY';
-    } else if (typeof audjpyPct === 'number') {
-        const severe = typeof usdjpyPct === 'number' && typeof audusdPct === 'number' && usdjpyPct <= -0.8 && audusdPct <= -0.6;
-        if (audjpyPct <= -1.0 && severe) {
-            carryStatus = 'Unwinding (severo)';
-        } else if (audjpyPct <= -1.0) {
-            carryStatus = 'Unwinding';
-        } else if (audjpyPct >= 1.0) {
-            carryStatus = 'Building';
-        } else {
-            carryStatus = 'Neutro';
+        carryStatusDetail = 'Crosses JPY (AUD/NZD/MXN/ZAR/BRL)';
+    } else {
+        const base = typeof carryBasketPct === 'number' ? carryBasketPct : audjpyPct;
+        const riskOff = (typeof vixPct === 'number' && vixPct >= 1.0) || (typeof dxyPct === 'number' && dxyPct >= 0.35);
+        const severeFx = (typeof usdjpyPct === 'number' && usdjpyPct <= -0.7) || (typeof audusdPct === 'number' && audusdPct <= -0.6);
+
+        if (typeof base === 'number') {
+            if (base <= -0.85 && (riskOff || severeFx)) carryStatus = 'Unwinding (severo)';
+            else if (base <= -0.65) carryStatus = 'Unwinding';
+            else if (base >= 0.65 && !riskOff) carryStatus = 'Building';
+            else carryStatus = 'Neutro';
         }
+
         const parts = [];
+        if (typeof carryBasketPct === 'number') parts.push(`Basket ${formatPercent(carryBasketPct, 2)}`);
         if (typeof audjpyPct === 'number') parts.push(`AUD/JPY ${formatPercent(audjpyPct, 2)}`);
         if (typeof usdjpyPct === 'number') parts.push(`USD/JPY ${formatPercent(usdjpyPct, 2)}`);
-        if (typeof audusdPct === 'number') parts.push(`AUD/USD ${formatPercent(audusdPct, 2)}`);
+        if (typeof vixPct === 'number') parts.push(`VIX ${formatPercent(vixPct, 2)}`);
         carryStatusDetail = parts.join(' • ') || '—';
     }
 
     let flowLabel = 'Neutro';
-    if (typeof audjpyPct === 'number' && typeof premiumPct === 'number') {
-        const entering = premiumPct < -0.4 && audjpyPct > 0.4 && (typeof dxyPct !== 'number' || dxyPct <= 0.1);
-        const leaving = premiumPct > 0.4 && audjpyPct < -0.4 && (typeof dxyPct !== 'number' || dxyPct >= -0.1);
+    const corePct = typeof carryBasketPct === 'number' ? carryBasketPct : audjpyPct;
+    if (typeof corePct === 'number' && typeof premiumPct === 'number') {
+        const entering = premiumPct < -0.4 && corePct > 0.4 && (typeof dxyPct !== 'number' || dxyPct <= 0.1) && (typeof vixPct !== 'number' || vixPct <= 0.25);
+        const leaving = premiumPct > 0.4 && corePct < -0.4 && (typeof dxyPct !== 'number' || dxyPct >= -0.1) && (typeof vixPct !== 'number' || vixPct >= -0.1);
         flowLabel = entering ? 'Entrando' : leaving ? 'Saindo' : 'Neutro';
-    } else if (typeof audjpyPct === 'number') {
-        if (audjpyPct > 0.6 && (typeof dxyPct !== 'number' || dxyPct < 0.1) && (typeof usdbrlPct !== 'number' || usdbrlPct < 0.1)) flowLabel = 'Entrando';
-        if (audjpyPct < -0.6 && (typeof dxyPct !== 'number' || dxyPct > -0.1) && (typeof usdbrlPct !== 'number' || usdbrlPct > -0.1)) flowLabel = 'Saindo';
+    } else if (typeof corePct === 'number') {
+        if (corePct > 0.6 && (typeof dxyPct !== 'number' || dxyPct < 0.1) && (typeof vixPct !== 'number' || vixPct <= 0.25) && (typeof usdbrlPct !== 'number' || usdbrlPct < 0.1)) flowLabel = 'Entrando';
+        if (corePct < -0.6 && (typeof dxyPct !== 'number' || dxyPct > -0.1) && (typeof vixPct !== 'number' || vixPct >= -0.1) && (typeof usdbrlPct !== 'number' || usdbrlPct > -0.1)) flowLabel = 'Saindo';
     }
 
     let score = 5;
-    score += 1.8 * norm(audjpyPct || 0, 1.0);
+    score += 2.0 * norm(corePct || 0, 0.9);
     score += 1.2 * norm(-(premiumPct || 0), 0.8);
     score += 1.0 * norm(-(dxyPct || 0), 0.7);
+    score += 0.9 * norm(-(vixPct || 0), 0.9);
     score += 1.2 * norm(-(usdbrlPct || 0), 0.7);
+    score += 0.8 * norm(hygPct || 0, 0.8);
     if (typeof jp10yCarryV === 'number' && Number.isFinite(jp10yCarryV)) {
         score += 0.8 * norm(jp10yCarryV, 6);
     }
@@ -11735,6 +13246,29 @@ function renderCarryTradeMonitor(data) {
     if (typeof nzdusdPct === 'number' && typeof audusdPct === 'number' && Math.abs(nzdusdPct) > Math.abs(audusdPct) + 0.4) {
         score += nzdusdPct < 0 ? -0.6 : +0.2;
     }
+
+    const staleMs = 4 * 60 * 60 * 1000;
+    const ageOf = (sym) => {
+        if (!sym) return null;
+        if (dc && typeof dc.symbolAgeMs === 'function') {
+            const age = dc.symbolAgeMs(dcDeps, data, sym);
+            return typeof age === 'number' && Number.isFinite(age) ? age : null;
+        }
+        const p = lastOf(sym);
+        if (!p || typeof p.tMs !== 'number') return null;
+        const age = Date.now() - p.tMs;
+        return Number.isFinite(age) ? age : null;
+    };
+    const coreAges = [
+        ageOf(symbols.audjpy) ?? ageOf(symbols.audusd),
+        ageOf(symbols.usdjpy),
+        ageOf(symbols.usdmxn),
+        ageOf(symbols.usdzar),
+        ageOf(symbols.vix),
+        ageOf(symbols.hyg),
+    ].filter(x => typeof x === 'number' && Number.isFinite(x));
+    const staleCore = coreAges.length ? (coreAges.some(ms => ms > staleMs)) : false;
+    if (staleCore) score -= 0.9;
 
     const score10 = clamp(Math.round(score), 0, 10);
     const scoreTone = score10 >= 7 ? 'positive' : score10 <= 3 ? 'negative' : 'neutral';
@@ -11762,24 +13296,50 @@ function renderCarryTradeMonitor(data) {
     };
 
     const rows = [
+        { sep: true, label: 'Macro / Liquidez' },
+        { label: 'Basket Carry (crosses JPY)', v: corePct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'Prêmio BR vs US (bps)', v: hasPremium ? premiumBps : null, fmt: x => formatNumber(x, 1), maxAbs: 1200 },
         { label: 'DXY', v: dxyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
-        { label: 'USD/BRL', v: usdbrlPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
-        { label: 'AUD/USD', v: audusdPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
-        { label: 'NZD/USD', v: nzdusdPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
-        { label: 'USD/JPY', v: usdjpyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
-        { label: 'AUD/JPY*', v: audjpyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
-        { label: 'NZD/JPY*', v: nzdjpyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'VIX', v: vixPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'HYG', v: hygPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
         { label: 'JP10Y (Δ bp)', v: jp10yCarryV, fmt: () => fmtSignedBp(jp10yBps), maxAbs: 35 },
         { label: 'Spread US10–JP10 (bps)', v: usjpBps, fmt: x => formatNumber(x, 1), maxAbs: 800 },
-        { label: 'Prêmio BR vs US (bps)', v: hasPremium ? premiumBps : null, fmt: x => formatNumber(x, 1), maxAbs: 1200 },
+
+        { sep: true, label: 'FX G10 (beta + funding)' },
+        { label: 'G10 beta (AUD/NZD/EUR/GBP)', v: g10BetaPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'AUD/USD', v: audusdPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'NZD/USD', v: nzdusdPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'EUR/USD', v: eurusdPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'GBP/USD', v: gbpusdPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'USD/JPY', v: usdjpyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'USD/CAD', v: usdcadPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'USD/CHF', v: usdchfPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'AUD/JPY*', v: audjpyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'NZD/JPY*', v: nzdjpyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+
+        { sep: true, label: 'FX Emergentes (USD/EM)' },
+        { label: 'USD/EM Basket', v: emUsdPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'USD/CNH', v: usdcnhPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'USD/BRL', v: usdbrlPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'USD/MXN', v: pctOf(usdmxn), fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'USD/ZAR', v: pctOf(usdzar), fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'USD/CLP', v: pctOf(usdclp), fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'USD/TRY', v: pctOf(usdtry), fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'MXN/JPY*', v: mxnjpyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'ZAR/JPY*', v: zarjpyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'BRL/JPY*', v: brljpyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
+        { label: 'CNH/JPY*', v: usdcnhJpyPct, fmt: x => formatPercent(x, 2), maxAbs: 5 },
     ];
 
     const listHtml = `
         <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
             <div style="font-weight:900;letter-spacing:1px;opacity:.95;margin-bottom:8px;">Componentes</div>
             ${rows
-                .filter(r => r.v !== null && r.v !== undefined)
+                .filter(r => (r && r.sep) || (r && r.v !== null && r.v !== undefined))
                 .map(r => {
+                    if (r && r.sep) {
+                        return `<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.8px;opacity:.9;">${escapeHtml(r.label || '')}</div>`;
+                    }
                     const txt = r.v === null ? '—' : r.fmt(r.v);
                     const badge = r.v === null ? '—' : toneBadgeHtml(r.v, txt, { maxAbs: r.maxAbs });
                     const note = /\*$/.test(String(r.label)) ? `<span style="opacity:.7;font-size:12px;">(sintético)</span>` : '';
@@ -11932,15 +13492,21 @@ function renderCarryTradeMonitor(data) {
     `);
 
     const alerts = [];
+    if (typeof corePct === 'number' && Math.abs(corePct) >= 0.9) alerts.push(`Basket Carry ${formatPercent(corePct, 2)}: movimento significativo nos crosses JPY.`);
     if (typeof audjpyPct === 'number' && Math.abs(audjpyPct) >= 1.0) alerts.push(`AUD/JPY (sintético) ${formatPercent(audjpyPct, 2)}: movimento significativo.`);
     if (typeof usdjpyPct === 'number' && Math.abs(usdjpyPct) >= 0.8) alerts.push(`USD/JPY ${formatPercent(usdjpyPct, 2)}: funding mexendo forte.`);
     if (typeof nzdjpyPct === 'number' && Math.abs(nzdjpyPct) >= 1.0) alerts.push(`NZD/JPY (sintético) ${formatPercent(nzdjpyPct, 2)}: early warning possível.`);
+    if (typeof mxnjpyPct === 'number' && Math.abs(mxnjpyPct) >= 1.0) alerts.push(`MXN/JPY (sintético) ${formatPercent(mxnjpyPct, 2)}: stress EM/JPY (carry sensível).`);
+    if (typeof zarjpyPct === 'number' && Math.abs(zarjpyPct) >= 1.0) alerts.push(`ZAR/JPY (sintético) ${formatPercent(zarjpyPct, 2)}: stress EM/JPY (carry sensível).`);
     if (typeof premiumPct === 'number' && Math.abs(premiumPct) >= 0.6) alerts.push(`Prêmio BR vs US ${formatPercent(premiumPct, 2)}: compressão/abertura relevante.`);
+    if (typeof vixPct === 'number' && Math.abs(vixPct) >= 2.0) alerts.push(`VIX ${formatPercent(vixPct, 2)}: risco/volatilidade mexendo forte (confirma/nega carry).`);
+    if (typeof hygPct === 'number' && Math.abs(hygPct) >= 1.2) alerts.push(`HYG ${formatPercent(hygPct, 2)}: crédito HY mexendo forte (confirmador de risk-on/off).`);
     if (typeof jp10yLevel === 'number' && Number.isFinite(jp10yLevel) && jp10yLevel > 0 && typeof jp10yBps === 'number' && Number.isFinite(jp10yBps) && jp10yBps >= 4) {
         alerts.push(`JP10Y ${formatNumber(jp10yLevel, 2)}% com alta de ~${formatNumber(jp10yBps, 0)}bp: juros do Japão abrindo → risco de carry voltar para JPY (pressão em FX beta).`);
     }
     if (carryStatus === 'Unwinding (severo)') alerts.push('Duplo unwinding: USD/JPY e AUD/USD caindo com força.');
     if (!hasPremium) alerts.push('Prêmio BR vs US não disponível (US10BR10 ou US10Y/BR10Y ausentes).');
+    if (staleCore) alerts.push('Parte do core está “stale” (idade > 4h) → score penalizado para evitar falso sinal.');
 
     setHtml('carry-alerts', alerts.length
         ? `
@@ -11956,6 +13522,7 @@ function renderCarryIntel(data) {
     const el = document.getElementById('carryIntel');
     if (!el) return;
 
+    const dc = (typeof window !== 'undefined' && window.DecisionCore) ? window.DecisionCore : null;
     const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
     const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
     const catDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, dcDeps };
@@ -11968,26 +13535,61 @@ function renderCarryIntel(data) {
         return null;
     };
 
+    const aliasSym = (k) => findAliasSymbolBest(data, k) || findAliasSymbol(data, k);
+
+    const assets = data && Array.isArray(data.assets) ? data.assets : [];
+    const mostRecentMs = (symbol) => {
+        if (!symbol) return -Infinity;
+        const last = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol);
+        const t = last && last.t ? Date.parse(String(last.t)) : NaN;
+        return Number.isFinite(t) ? t : -Infinity;
+    };
+    const pickBestByMatchers = (matchers, { limit = 14 } = {}) => {
+        const out = [];
+        const seen = new Set();
+        for (const re of (matchers || [])) {
+            if (!(re instanceof RegExp)) continue;
+            for (const a of assets) {
+                const sym = a && a.symbol ? String(a.symbol) : '';
+                const name = a && a.name ? String(a.name) : '';
+                if (!sym || seen.has(sym)) continue;
+                if (re.test(sym) || re.test(name)) {
+                    out.push(sym);
+                    seen.add(sym);
+                    if (out.length >= limit) break;
+                }
+            }
+        }
+        out.sort((a, b) => mostRecentMs(b) - mostRecentMs(a));
+        return out.length ? out[0] : null;
+    };
+
     const resolveJapan10yYield = () => {
-        const yieldSymbol =
-            findAssetSymbol(data, /^JP10YT=RR$/i)
-            || findAssetSymbol(data, /\bJapan\b(?!.*\b(CDS|Future|Futures)\b).*?\b10\b.*?\bYear\b.*?\bYield\b/i)
-            || findAssetSymbol(data, /\bJapan\b(?!.*\b(CDS|Future|Futures)\b).*?\b10\b.*?\bYear\b/i);
-        return yieldSymbol || null;
+        return rcKey('JP_10Y', /^JP10YT=RR$/i)
+            || aliasSym('JP10Y')
+            || pickBestByMatchers([/^JP10YT=RR$/i, /\bJapan\b(?!.*\b(CDS|Future|Futures)\b).*?\b10\b.*?\bYear\b.*?\bYield\b/i, /\bJapan\b(?!.*\b(CDS|Future|Futures)\b).*?\b10\b.*?\bYear\b/i])
+            || null;
     };
 
     const symbols = {
-        audusd: findAssetSymbol(data, /^AUD\/USD\b/i),
-        nzdusd: findAssetSymbol(data, /^NZD\/USD\b/i),
-        usdjpy: findAssetSymbol(data, /^USD\/JPY\b/i),
-        usdbrl: findAssetSymbol(data, /^USD\/BRL\b/i),
-        dxy: findAliasSymbolBest(data, 'DXY') || findAliasSymbol(data, 'DXY') || findAssetSymbol(data, /(^USDX$|^\.DXY$|\bDXY\b|US Dollar Index|Dollar Index|Índice\s*Dólar|Indice\s*Dolar)/i),
+        audusd: pickBestByMatchers([/^AUD\/USD\b/i]) || findAssetSymbol(data, /^AUD\/USD\b/i),
+        nzdusd: pickBestByMatchers([/^NZD\/USD\b/i]) || findAssetSymbol(data, /^NZD\/USD\b/i),
+        usdjpy: pickBestByMatchers([/^USD\/JPY\b/i]) || findAssetSymbol(data, /^USD\/JPY\b/i),
+        usdbrl: aliasSym('USD_BRL') || pickBestByMatchers([/^USD\/BRL\b/i]) || findAssetSymbol(data, /^USD\/BRL\b/i),
+        dxy: aliasSym('DXY') || pickBestByMatchers([/(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index|Índice\s*Dólar|Indice\s*Dolar)/i]) || findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index|Índice\s*Dólar|Indice\s*Dolar)/i),
+        vix: findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX30') || aliasSym('VIX') || pickBestByMatchers([/^\.?VIX(9D)?$/i, /^VIX$/i]) || findAssetSymbol(data, /^\.?VIX(9D)?$/i),
+        hyg: rcKey('ETF_HYG', /^HYG(\.\w+)?$/i) || aliasSym('HYG') || pickBestByMatchers([/^HYG(\.\w+)?$/i]),
         br10y: rcKey('BR_10Y', /^BR10YT=RR$/i),
-        us10y: rcKey('US_10Y', /^US10YT=RR$/i),
+        us10y: rcKey('US_10Y', /(^US10YT=RR$|^US10YT=X$|^\.TNX$|\^TNX)/i) || aliasSym('US10Y'),
         us10br10: rcKey('SPREAD_US10_BR10', /^US10BR10=RR$/i),
         jp10y: rcKey('JP_10Y', /^JP10YT=RR$/i) || resolveJapan10yYield(),
-        audjpy: findAssetSymbol(data, /^AUD\/JPY\b/i),
-        nzdjpy: findAssetSymbol(data, /^NZD\/JPY\b/i),
+        audjpy: pickBestByMatchers([/^AUD\/JPY\b/i]) || findAssetSymbol(data, /^AUD\/JPY\b/i),
+        nzdjpy: pickBestByMatchers([/^NZD\/JPY\b/i]) || findAssetSymbol(data, /^NZD\/JPY\b/i),
+        mxnjpy: pickBestByMatchers([/^MXN\/JPY\b/i]) || findAssetSymbol(data, /^MXN\/JPY\b/i),
+        zarjpy: pickBestByMatchers([/^ZAR\/JPY\b/i]) || findAssetSymbol(data, /^ZAR\/JPY\b/i),
+        brljpy: pickBestByMatchers([/^BRL\/JPY\b/i]) || findAssetSymbol(data, /^BRL\/JPY\b/i),
+        usdmxn: pickBestByMatchers([/^USD\/MXN\b/i]) || findAssetSymbol(data, /^USD\/MXN\b/i),
+        usdzar: pickBestByMatchers([/^USD\/ZAR\b/i]) || findAssetSymbol(data, /^USD\/ZAR\b/i),
     };
 
     const lastOf = symbol => {
@@ -12005,12 +13607,19 @@ function renderCarryIntel(data) {
     const usdjpy = lastOf(symbols.usdjpy);
     const usdbrl = lastOf(symbols.usdbrl);
     const dxy = lastOf(symbols.dxy);
+    const vix = lastOf(symbols.vix);
+    const hyg = lastOf(symbols.hyg);
     const br10y = lastOf(symbols.br10y);
     const us10y = lastOf(symbols.us10y);
     const us10br10 = lastOf(symbols.us10br10);
     const jp10y = lastOf(symbols.jp10y);
     const audjpyDirect = lastOf(symbols.audjpy);
     const nzdjpyDirect = lastOf(symbols.nzdjpy);
+    const mxnjpyDirect = lastOf(symbols.mxnjpy);
+    const zarjpyDirect = lastOf(symbols.zarjpy);
+    const brljpyDirect = lastOf(symbols.brljpy);
+    const usdmxn = lastOf(symbols.usdmxn);
+    const usdzar = lastOf(symbols.usdzar);
 
     const pctOf = x => (x && typeof x.changePct === 'number' ? x.changePct : null);
 
@@ -12019,6 +13628,8 @@ function renderCarryIntel(data) {
     const usdjpyPct = pctOf(usdjpy);
     const usdbrlPct = pctOf(usdbrl);
     const dxyPct = pctOf(dxy);
+    const vixPct = pctOf(vix);
+    const hygPct = pctOf(hyg);
     const jp10yPct = pctOf(jp10y);
     const jp10yBps = jp10y && typeof jp10y.change === 'number' && Number.isFinite(jp10y.change) ? jp10y.change * 100 : null;
 
@@ -12035,6 +13646,35 @@ function renderCarryIntel(data) {
             : nzdusdPct !== null && usdjpyPct !== null
                 ? (Math.max(-99, Math.min(99, ((1 + nzdusdPct / 100) * (1 + usdjpyPct / 100) - 1) * 100)))
                 : null;
+
+    const synthCross = (quote, base) => {
+        const qPct = pctOf(quote);
+        const bPct = pctOf(base);
+        if (qPct === null || bPct === null) return null;
+        const v = ((1 + qPct / 100) / Math.max(1e-9, (1 + bPct / 100)) - 1) * 100;
+        return Math.max(-99, Math.min(99, v));
+    };
+    const mxnjpyPct = pctOf(mxnjpyDirect) !== null ? pctOf(mxnjpyDirect) : (usdjpyPct !== null ? synthCross(usdjpy, usdmxn) : null);
+    const zarjpyPct = pctOf(zarjpyDirect) !== null ? pctOf(zarjpyDirect) : (usdjpyPct !== null ? synthCross(usdjpy, usdzar) : null);
+    const brljpyPct = pctOf(brljpyDirect) !== null ? pctOf(brljpyDirect) : (usdjpyPct !== null ? synthCross(usdjpy, usdbrl) : null);
+
+    const carryCrosses = [
+        { label: 'AUD/JPY', pct: audjpyPct, w: 0.36 },
+        { label: 'NZD/JPY', pct: nzdjpyPct, w: 0.22 },
+        { label: 'MXN/JPY', pct: mxnjpyPct, w: 0.18 },
+        { label: 'ZAR/JPY', pct: zarjpyPct, w: 0.14 },
+        { label: 'BRL/JPY', pct: brljpyPct, w: 0.10 },
+    ];
+    const weightedAvg = (items) => {
+        const pairs = (items || [])
+            .map(x => ({ v: typeof x.pct === 'number' && Number.isFinite(x.pct) ? x.pct : null, w: typeof x.w === 'number' && Number.isFinite(x.w) ? x.w : 0 }))
+            .filter(x => typeof x.v === 'number' && Number.isFinite(x.v) && typeof x.w === 'number' && Number.isFinite(x.w) && x.w > 0);
+        const wSum = pairs.reduce((s, x) => s + x.w, 0);
+        if (!(wSum > 0)) return null;
+        const s = pairs.reduce((acc, x) => acc + x.v * x.w, 0) / wSum;
+        return Number.isFinite(s) ? s : null;
+    };
+    const carryBasketPct = weightedAvg(carryCrosses);
 
     const premiumPct = pctOf(us10br10) !== null ? pctOf(us10br10) : null;
     const hasPremium = premiumPct !== null || pctOf(br10y) !== null || pctOf(us10y) !== null;
@@ -12057,29 +13697,32 @@ function renderCarryIntel(data) {
 
     const mk = (tone, txt) => toneBadgeHtmlFromTone(tone, 0, txt, { maxAbs: 1 });
 
-    const coreOk = [audusdPct, usdjpyPct].filter(v => typeof v === 'number').length >= 2;
+    const coreOk = (carryCrosses.filter(x => typeof x.pct === 'number' && Number.isFinite(x.pct)).length >= 2)
+        || ([audusdPct, usdjpyPct].filter(v => typeof v === 'number').length >= 2);
     let carryState = 'Inconclusivo';
-    if (coreOk && typeof audjpyPct === 'number') {
-        const severe = typeof usdjpyPct === 'number' && typeof audusdPct === 'number' && usdjpyPct <= -0.8 && audusdPct <= -0.6;
-        if (audjpyPct <= -1.0 && severe) carryState = 'Unwinding (severo)';
-        else if (audjpyPct <= -1.0) carryState = 'Unwinding';
-        else if (audjpyPct >= 1.0) carryState = 'Building';
+    const corePct = typeof carryBasketPct === 'number' ? carryBasketPct : audjpyPct;
+    if (coreOk && typeof corePct === 'number') {
+        const riskOff = (typeof vixPct === 'number' && vixPct >= 1.0) || (typeof dxyPct === 'number' && dxyPct >= 0.35);
+        const severeFx = (typeof usdjpyPct === 'number' && usdjpyPct <= -0.7) || (typeof audusdPct === 'number' && audusdPct <= -0.6);
+        if (corePct <= -0.85 && (riskOff || severeFx)) carryState = 'Unwinding (severo)';
+        else if (corePct <= -0.65) carryState = 'Unwinding';
+        else if (corePct >= 0.65 && !riskOff) carryState = 'Building';
         else carryState = 'Neutro';
     } else if (!coreOk) {
         carryState = 'Dados insuficientes';
     }
 
     let carryFlow = 'Neutro';
-    if (typeof audjpyPct === 'number' && typeof premiumPct === 'number') {
-        const entering = premiumPct < -0.4 && audjpyPct > 0.4 && (typeof dxyPct !== 'number' || dxyPct <= 0.1);
-        const leaving = premiumPct > 0.4 && audjpyPct < -0.4 && (typeof dxyPct !== 'number' || dxyPct >= -0.1);
+    if (typeof corePct === 'number' && typeof premiumPct === 'number') {
+        const entering = premiumPct < -0.4 && corePct > 0.4 && (typeof dxyPct !== 'number' || dxyPct <= 0.1) && (typeof vixPct !== 'number' || vixPct <= 0.25);
+        const leaving = premiumPct > 0.4 && corePct < -0.4 && (typeof dxyPct !== 'number' || dxyPct >= -0.1) && (typeof vixPct !== 'number' || vixPct >= -0.1);
         carryFlow = entering ? 'Entrando' : leaving ? 'Saindo' : 'Neutro';
-    } else if (typeof audjpyPct === 'number') {
-        if (audjpyPct > 0.6 && (typeof dxyPct !== 'number' || dxyPct < 0.1) && (typeof usdbrlPct !== 'number' || usdbrlPct < 0.1)) carryFlow = 'Entrando';
-        if (audjpyPct < -0.6 && (typeof dxyPct !== 'number' || dxyPct > -0.1) && (typeof usdbrlPct !== 'number' || usdbrlPct > -0.1)) carryFlow = 'Saindo';
+    } else if (typeof corePct === 'number') {
+        if (corePct > 0.6 && (typeof dxyPct !== 'number' || dxyPct < 0.1) && (typeof vixPct !== 'number' || vixPct <= 0.25) && (typeof usdbrlPct !== 'number' || usdbrlPct < 0.1)) carryFlow = 'Entrando';
+        if (corePct < -0.6 && (typeof dxyPct !== 'number' || dxyPct > -0.1) && (typeof vixPct !== 'number' || vixPct >= -0.1) && (typeof usdbrlPct !== 'number' || usdbrlPct > -0.1)) carryFlow = 'Saindo';
     }
 
-    const cov = [audjpyPct, usdjpyPct, audusdPct, dxyPct, usdbrlPct, premiumPct].filter(v => typeof v === 'number').length;
+    const cov = [corePct, usdjpyPct, audusdPct, dxyPct, vixPct, hygPct, usdbrlPct, premiumPct].filter(v => typeof v === 'number').length;
     const confidence = cov >= 5 ? 'Alta' : cov >= 3 ? 'Média' : 'Baixa';
 
     const rows = [
@@ -12089,9 +13732,12 @@ function renderCarryIntel(data) {
     ];
 
     const evidence = [
+        { label: 'Basket Carry (crosses JPY)', ...moveLabel(corePct, { strong: 0.9, medium: 0.35 }), note: typeof carryBasketPct === 'number' ? 'Ponderado' : '' },
         { label: 'AUD/JPY (proxy carry)', ...moveLabel(audjpyPct, { strong: 1.0, medium: 0.4 }), note: pctOf(audjpyDirect) === null ? 'Sintético' : '' },
         { label: 'USD/JPY (funding)', ...moveLabel(usdjpyPct, { strong: 0.8, medium: 0.3 }) },
         { label: 'AUD/USD (beta)', ...moveLabel(audusdPct, { strong: 0.8, medium: 0.3 }) },
+        { label: 'VIX (stress)', ...moveLabelInverted(vixPct, { strong: 1.2, medium: 0.45 }) },
+        { label: 'HYG (crédito)', ...moveLabel(hygPct, { strong: 1.0, medium: 0.35 }) },
         { label: 'DXY (USD global)', ...moveLabelInverted(dxyPct, { strong: 0.7, medium: 0.25 }) },
         { label: 'USD/BRL (risco BR)', ...moveLabelInverted(usdbrlPct, { strong: 0.7, medium: 0.25 }) },
         {
@@ -12109,6 +13755,9 @@ function renderCarryIntel(data) {
         },
         { label: 'Prêmio BR vs US (proxy)', ...(premiumPct === null ? { txt: hasPremium ? 'Disponível (sem var%)' : 'Indisponível', tone: hasPremium ? 'neutral' : 'negative' } : moveLabelInverted(premiumPct, { strong: 0.6, medium: 0.25 })) },
         { label: 'NZD/JPY (early warning)', ...moveLabel(nzdjpyPct, { strong: 1.0, medium: 0.4 }), note: pctOf(nzdjpyDirect) === null ? 'Sintético' : '' },
+        { label: 'MXN/JPY (EM/JPY)', ...moveLabel(mxnjpyPct, { strong: 1.0, medium: 0.4 }), note: pctOf(mxnjpyDirect) === null ? 'Sintético' : '' },
+        { label: 'ZAR/JPY (EM/JPY)', ...moveLabel(zarjpyPct, { strong: 1.0, medium: 0.4 }), note: pctOf(zarjpyDirect) === null ? 'Sintético' : '' },
+        { label: 'BRL/JPY (BR/JPY)', ...moveLabel(brljpyPct, { strong: 1.0, medium: 0.4 }), note: pctOf(brljpyDirect) === null ? 'Sintético' : '' },
     ];
 
     const html = `
@@ -12326,7 +13975,48 @@ function renderBrazilExportBasket(data) {
     if (!el) return;
 
     const mk = (tone, txt) => toneBadgeHtmlFromTone(tone, 0, txt, { maxAbs: 1 });
-    const pctOf = x => (x && typeof x.changePct === 'number' ? x.changePct : null);
+    const pctOf = x => (x && typeof x.changePct === 'number' && Number.isFinite(x.changePct) ? x.changePct : null);
+    const dc = (typeof window !== 'undefined' && window.DecisionCore) ? window.DecisionCore : null;
+    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const assets = data && Array.isArray(data.assets) ? data.assets : [];
+    const mostRecentMs = (symbol) => {
+        if (!symbol) return -Infinity;
+        const last = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol);
+        const t = last && last.t ? Date.parse(String(last.t)) : NaN;
+        return Number.isFinite(t) ? t : -Infinity;
+    };
+    const pickBestByMatchers = (matchers, { limit = 18 } = {}) => {
+        const out = [];
+        const seen = new Set();
+        for (const re of (matchers || [])) {
+            if (!(re instanceof RegExp)) continue;
+            for (const a of assets) {
+                const sym = a && a.symbol ? String(a.symbol) : '';
+                const name = a && a.name ? String(a.name) : '';
+                if (!sym || seen.has(sym)) continue;
+                if (re.test(sym) || re.test(name)) {
+                    out.push(sym);
+                    seen.add(sym);
+                    if (out.length >= limit) break;
+                }
+            }
+        }
+        out.sort((a, b) => mostRecentMs(b) - mostRecentMs(a));
+        return out.length ? out[0] : null;
+    };
+    const aliasSym = (k) => findAliasSymbolBest(data, k) || findAliasSymbol(data, k);
+    const staleMs = 6 * 60 * 60 * 1000;
+    const ageMsOf = (symbol) => {
+        if (!symbol) return null;
+        if (dc && typeof dc.symbolAgeMs === 'function') {
+            const age = dc.symbolAgeMs(dcDeps, data, symbol);
+            return typeof age === 'number' && Number.isFinite(age) ? age : null;
+        }
+        const ms = mostRecentMs(symbol);
+        if (!Number.isFinite(ms) || ms <= 0) return null;
+        const age = Date.now() - ms;
+        return Number.isFinite(age) ? age : null;
+    };
 
     const dirFromPct = pct => {
         if (pct === null) return { txt: 'Sem dado', tone: 'neutral' };
@@ -12336,23 +14026,30 @@ function renderBrazilExportBasket(data) {
     };
 
     const getItem = ({ key, label, matchers, weight }) => {
-        const symbol = resolveTickerSymbol(data, matchers);
-        const last = symbol ? getLastPoint(data, symbol) : null;
+        const symbol = pickBestByMatchers(matchers) || null;
+        const last = symbol ? ((typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol)) : null;
         const pct = pctOf(last);
         const present = !!(symbol && last && typeof last.price === 'number');
-        return { key, label, symbol, last, pct, present, weight: Number(weight) || 0 };
+        const ageMs = ageMsOf(symbol);
+        const stale = typeof ageMs === 'number' && Number.isFinite(ageMs) ? ageMs > staleMs : false;
+        return { key, label, symbol, last, pct, present, stale, weight: Number(weight) || 0 };
     };
 
     const items = [
-        getItem({ key: 'iron', label: 'Minério', matchers: [/^DCE_I0$/i, /^TIOc1$/i, /^SM58Fc1$/i, /^9047$/i, /^3047$/i], weight: 0.28 }),
-        getItem({ key: 'soy', label: 'Soja', matchers: [/^ZS$/i], weight: 0.20 }),
-        getItem({ key: 'oil', label: 'Petróleo', matchers: [/\bBrent\b/i, /\bWTI\b/i], weight: 0.18 }),
+        getItem({ key: 'iron', label: 'Minério', matchers: [/^DCE_I0$/i, /^TIOc1$/i, /^TIOc\d+$/i, /^SM58Fc1$/i, /^SM58Fc\d+$/i, /^9047$/i, /^3047$/i, /\bIron\s*Ore\b/i, /\bMinério\b/i], weight: 0.28 }),
+        getItem({ key: 'soy', label: 'Soja', matchers: [/^ZS=F$/i, /^ZS$/i, /^ZSc\d+$/i, /\bSoybean(s)?\b/i, /\bSoja\b/i], weight: 0.18 }),
+        getItem({ key: 'soymeal', label: 'Farelo de soja', matchers: [/^ZM=F$/i, /^ZM$/i, /^ZMc\d+$/i, /\bSoybean\s*Meal\b/i, /\bFarelo\b.*\bSoja\b/i], weight: 0.04 }),
+        getItem({ key: 'soyoil', label: 'Óleo de soja', matchers: [/^ZL=F$/i, /^ZL$/i, /^ZLc\d+$/i, /\bSoybean\s*Oil\b/i, /\bÓleo\b.*\bSoja\b/i, /\bOleo\b.*\bSoja\b/i], weight: 0.03 }),
+        getItem({ key: 'oil', label: 'Petróleo', matchers: [/^BZ=F$/i, /^LCOc\d+$/i, /^BRNc\d+$/i, /\bBrent\b/i, /^CL=F$/i, /^CL$/i, /^CLc\d+$/i, /\bWTI\b/i, /\bCrude\b/i, /\bPetróleo\b/i, /\bPetroleo\b/i], weight: 0.18 }),
         getItem({ key: 'lumber', label: 'Madeira serrada', matchers: [/^LBc1$/i, /^LBc\d+$/i, /^LXRc1$/i, /^LXRc\d+$/i, /\bMadeira Serrada\b/i, /\bLumber\b/i], weight: 0.02 }),
-        getItem({ key: 'cattle', label: 'Boi', matchers: [/^BGIc1$/i, /^LCc1$/i, /^BBOI11\.SA$/i, /\bBoi Gordo\b/i, /\bLive Cattle\b/i, /^LE$/i], weight: 0.12 }),
-        getItem({ key: 'hogs', label: 'Porco Magro', matchers: [/^LHc1$/i, /^LHc\d+$/i, /\bPorco Magro\b/i, /\bLean Hogs\b/i], weight: 0.03 }),
-        getItem({ key: 'coffee', label: 'Café', matchers: [/^KC$/i], weight: 0.07 }),
-        getItem({ key: 'sugar', label: 'Açúcar', matchers: [/^SB$/i], weight: 0.05 }),
-        getItem({ key: 'corn', label: 'Milho', matchers: [/^ZC$/i], weight: 0.04 }),
+        getItem({ key: 'cattle', label: 'Boi', matchers: [/^BGIc1$/i, /^BGIc\d+$/i, /^LC=F$/i, /^LCc\d+$/i, /^LC$/i, /^BBOI11\.SA$/i, /\bBoi Gordo\b/i, /\bLive Cattle\b/i, /^LE=F$/i, /^LE$/i, /^LEc\d+$/i], weight: 0.10 }),
+        getItem({ key: 'chicken', label: 'Frango', matchers: [/\bChicken\b/i, /\bFrango\b/i], weight: 0.02 }),
+        getItem({ key: 'hogs', label: 'Porco Magro', matchers: [/^LH=F$/i, /^LH$/i, /^LHc\d+$/i, /\bPorco Magro\b/i, /\bLean Hogs\b/i], weight: 0.03 }),
+        getItem({ key: 'coffee', label: 'Café', matchers: [/^KC=F$/i, /^KC$/i, /^KCc\d+$/i, /\bCoffee\b/i, /\bCafé\b/i, /\bCafe\b/i], weight: 0.07 }),
+        getItem({ key: 'sugar', label: 'Açúcar', matchers: [/^SB=F$/i, /^SB$/i, /^SBc\d+$/i, /\bSugar\b/i, /\bAçúcar\b/i, /\bAcucar\b/i], weight: 0.05 }),
+        getItem({ key: 'corn', label: 'Milho', matchers: [/^ZC=F$/i, /^ZC$/i, /^ZCc\d+$/i, /\bCorn\b/i, /\bMilho\b/i], weight: 0.05 }),
+        getItem({ key: 'wheat', label: 'Trigo', matchers: [/^ZW=F$/i, /^ZW$/i, /^ZWc\d+$/i, /\bWheat\b/i, /\bTrigo\b/i], weight: 0.03 }),
+        getItem({ key: 'cotton', label: 'Algodão', matchers: [/^CT=F$/i, /^CT$/i, /^CTc\d+$/i, /\bCotton\b/i, /\bAlgod[aã]o\b/i], weight: 0.02 }),
     ];
 
     const score = (() => {
@@ -12362,8 +14059,10 @@ function renderBrazilExportBasket(data) {
             if (typeof it.pct !== 'number') continue;
             const w = Number(it.weight) || 0;
             if (!Number.isFinite(w) || w <= 0) continue;
-            wSum += w;
-            sum += w * it.pct;
+            const adj = it.stale ? 0.5 : 1;
+            const ww = w * adj;
+            wSum += ww;
+            sum += ww * it.pct;
         }
         if (!wSum) return null;
         return sum / wSum;
@@ -12376,20 +14075,26 @@ function renderBrazilExportBasket(data) {
         return { label: 'Neutro', tone: 'neutral' };
     })();
 
-    const essentials = ['iron', 'soy', 'oil', 'cattle', 'coffee'];
+    const essentials = ['iron', 'soy', 'oil', 'corn', 'coffee', 'sugar'];
     const presentEssentials = essentials.filter(k => items.find(x => x.key === k && x.present)).length;
-    const coverage = presentEssentials >= essentials.length ? { label: 'Completo', tone: 'positive' } : presentEssentials >= 3 ? { label: 'Parcial', tone: 'neutral' } : { label: 'Insuficiente', tone: 'negative' };
+    const freshEssentials = essentials.filter(k => items.find(x => x.key === k && x.present && !x.stale)).length;
+    const coverage = freshEssentials >= essentials.length
+        ? { label: 'Completo', tone: 'positive' }
+        : presentEssentials >= 4
+            ? { label: 'Parcial', tone: 'neutral' }
+            : { label: 'Insuficiente', tone: 'negative' };
+    const covNote = freshEssentials < presentEssentials ? `(${freshEssentials}/${presentEssentials} fresh)` : '';
 
     const rowHtml = items
         .map(it => {
-            const status = it.present ? { label: 'OK', tone: 'positive' } : { label: 'AUSENTE', tone: 'negative' };
+            const status = it.present ? (it.stale ? { label: 'STALE', tone: 'neutral' } : { label: 'OK', tone: 'positive' }) : { label: 'AUSENTE', tone: 'negative' };
             const dir = dirFromPct(it.pct);
             const sym = it.symbol ? `<span style="opacity:.7;margin-left:8px;font-size:12px;">${escapeHtml(it.symbol)}</span>` : '';
             return `
                 <div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);align-items:center;">
                     <div style="min-width:0;">
                         <div style="font-weight:900;letter-spacing:.6px;opacity:.92;">${it.present ? '✅' : '❌'} ${escapeHtml(it.label)}${sym}</div>
-                        <div style="opacity:.75;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(it.present ? 'Presente no feed' : 'Não encontrado no feed')}</div>
+                        <div style="opacity:.75;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(it.present ? (it.stale ? 'Presente, mas desatualizado' : 'Presente no feed') : 'Não encontrado no feed')}</div>
                     </div>
                     <div style="text-align:right;min-width:150px;display:flex;gap:8px;justify-content:flex-end;align-items:center;font-family:'Share Tech Mono',monospace;font-weight:900;">
                         <span>${mk(status.tone, status.label)}</span>
@@ -12400,6 +14105,11 @@ function renderBrazilExportBasket(data) {
         })
         .join('');
 
+    const missing = essentials.filter(k => !items.find(x => x.key === k && x.present)).map(k => {
+        const it = items.find(x => x.key === k);
+        return it ? it.label : k;
+    });
+
     el.innerHTML = `
         <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
             <div style="display:grid;grid-template-columns:1fr;gap:10px;">
@@ -12409,8 +14119,12 @@ function renderBrazilExportBasket(data) {
                 </div>
                 <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:6px 0;">
                     <div style="font-weight:900;letter-spacing:.6px;opacity:.92;">Cobertura (essenciais)</div>
-                    <div style="font-family:'Share Tech Mono',monospace;font-weight:900;">${mk(coverage.tone, coverage.label)}</div>
+                    <div style="font-family:'Share Tech Mono',monospace;font-weight:900;display:flex;gap:10px;align-items:center;">
+                        ${mk(coverage.tone, coverage.label)}
+                        <span style="opacity:.7;font-size:12px;">${escapeHtml(covNote)}</span>
+                    </div>
                 </div>
+                ${missing.length ? `<div style="opacity:.75;font-size:12px;line-height:1.35;">Faltando: <b>${escapeHtml(missing.join(', '))}</b></div>` : ''}
             </div>
         </div>
         <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
@@ -12423,9 +14137,240 @@ function renderBrazilExportBasket(data) {
 function renderBrazilMarket(data) {
     const tableId = 'brazilTable';
     const chartId = 'brazilChart';
-    const assets = data && data.assets ? data.assets : [];
+    const assets = data && Array.isArray(data.assets) ? data.assets : [];
 
     renderBrazilExportBasket(data);
+
+    const metricsEl = document.getElementById('brazilMetrics');
+    const pulseEl = document.getElementById('brazilPulse');
+    const dc = (typeof window !== 'undefined' && window.DecisionCore) ? window.DecisionCore : null;
+    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
+
+    const mostRecentMs = (symbol) => {
+        if (!symbol) return -Infinity;
+        const last = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol);
+        const t = last && last.t ? Date.parse(String(last.t)) : NaN;
+        return Number.isFinite(t) ? t : -Infinity;
+    };
+    const pickBestByMatchers = (matchers, { limit = 18 } = {}) => {
+        const out = [];
+        const seen = new Set();
+        for (const re of (matchers || [])) {
+            if (!(re instanceof RegExp)) continue;
+            for (const a of assets) {
+                const sym = a && a.symbol ? String(a.symbol) : '';
+                const name = a && a.name ? String(a.name) : '';
+                if (!sym || seen.has(sym)) continue;
+                if (re.test(sym) || re.test(name)) {
+                    out.push(sym);
+                    seen.add(sym);
+                    if (out.length >= limit) break;
+                }
+            }
+        }
+        out.sort((a, b) => mostRecentMs(b) - mostRecentMs(a));
+        return out.length ? out[0] : null;
+    };
+    const aliasSym = (k) => findAliasSymbolBest(data, k) || findAliasSymbol(data, k);
+    const rcKey = (key, fallbackMatcher) => {
+        if (catalog && typeof catalog.resolveRatesCreditByKey === 'function') {
+            const sym = catalog.resolveRatesCreditByKey(dcDeps, data, key);
+            if (sym) return sym;
+        }
+        return fallbackMatcher ? pickBestByMatchers([fallbackMatcher]) : null;
+    };
+    const bp10FromYield = (symbol) => {
+        if (!symbol) return null;
+        const pt = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol);
+        const chg = pt && typeof pt.change === 'number' && Number.isFinite(pt.change) ? pt.change : null;
+        if (!(typeof chg === 'number' && Number.isFinite(chg))) return null;
+        const bps = chg * 100;
+        if (!Number.isFinite(bps)) return null;
+        return bps / 10;
+    };
+
+    if (metricsEl || pulseEl) {
+        const sym = {
+            ibov: aliasSym('IBOV') || pickBestByMatchers([/^\.BVSP$/i, /\bIbovespa\b/i, /^BOVA11\.SA$/i]),
+            win: pickBestByMatchers([/^WINc1$/i, /^WINFUT/i, /\bMini\s*Índice\b/i, /\bMini\s*Indice\b/i]),
+            usdbrl: aliasSym('USD_BRL') || pickBestByMatchers([/^USD\/BRL\b/i]),
+            ewz: pickBestByMatchers([/^EWZ(\.\w+)?$/i]),
+            bova11: pickBestByMatchers([/^BOVA11\.SA$/i, /^BOVA11$/i]),
+            br10y: rcKey('BR_10Y', /^BR10YT=RR$/i) || aliasSym('BR10Y'),
+            br2y: rcKey('BR_2Y', /^BR2YT=RR$/i),
+            di1: pickBestByMatchers([/^DDIC1$/i, /^DI1\b/i, /\bDI\s*1\b/i, /\bDI\s*Futuro\b/i]),
+            cds: rcKey('CDS_BR_5Y', /^BRGV5YUSAC=R$/i) || aliasSym('CDS_BR5Y'),
+            dxy: aliasSym('DXY') || pickBestByMatchers([/(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index|Índice\s*Dólar|Indice\s*Dolar)/i]),
+            vix: findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX30') || aliasSym('VIX') || pickBestByMatchers([/^\.?VIX(9D)?$/i, /^VIX$/i]),
+        };
+
+        const adrDefs = [
+            { k: 'VALE', label: 'VALE' },
+            { k: 'PBR', label: 'Petrobras' },
+            { k: 'ITUB', label: 'Itaú' },
+            { k: 'BBD', label: 'Bradesco' },
+            { k: 'ABEV', label: 'Ambev' },
+            { k: 'SUZ', label: 'Suzano' },
+            { k: 'GGB', label: 'Gerdau' },
+            { k: 'SID', label: 'CSN' },
+        ];
+        const adrs = adrDefs
+            .map(d => {
+                const s = pickBestByMatchers([new RegExp(`^${d.k}(\\.\\w+)?$`, 'i')]);
+                const pct = s ? getChangePct(data, s) : null;
+                return { ...d, symbol: s, pct: typeof pct === 'number' && Number.isFinite(pct) ? pct : null };
+            })
+            .filter(x => x.symbol);
+
+        const ibovPct = sym.ibov ? getChangePct(data, sym.ibov) : null;
+        const winPct = sym.win ? getChangePct(data, sym.win) : null;
+        const ewzPct = sym.ewz ? getChangePct(data, sym.ewz) : null;
+        const bova11Pct = sym.bova11 ? getChangePct(data, sym.bova11) : null;
+        const usdbrlPct = sym.usdbrl ? getChangePct(data, sym.usdbrl) : null;
+        const br10Bp10 = bp10FromYield(sym.br10y);
+        const di1Bp10 = bp10FromYield(sym.di1);
+        const cdsPct = sym.cds ? getChangePct(data, sym.cds) : null;
+        const dxyPct = sym.dxy ? getChangePct(data, sym.dxy) : null;
+        const vixPct = sym.vix ? getChangePct(data, sym.vix) : null;
+
+        const avgN = (xs) => {
+            const ys = (xs || []).filter(v => typeof v === 'number' && Number.isFinite(v));
+            if (!ys.length) return null;
+            return ys.reduce((a, b) => a + b, 0) / ys.length;
+        };
+        const eqStrength = avgN([ibovPct, winPct, ewzPct, bova11Pct]);
+        const fxStrength = typeof usdbrlPct === 'number' && Number.isFinite(usdbrlPct) ? -usdbrlPct : null;
+        const ratesStrength = avgN([
+            typeof br10Bp10 === 'number' && Number.isFinite(br10Bp10) ? -br10Bp10 : null,
+            typeof di1Bp10 === 'number' && Number.isFinite(di1Bp10) ? -di1Bp10 : null,
+        ]);
+        const riskStrength = avgN([
+            typeof cdsPct === 'number' && Number.isFinite(cdsPct) ? -cdsPct : null,
+            typeof vixPct === 'number' && Number.isFinite(vixPct) ? -vixPct : null,
+            typeof dxyPct === 'number' && Number.isFinite(dxyPct) ? -dxyPct : null,
+        ]);
+        const adrStrength = avgN(adrs.map(x => x.pct));
+
+        const weightedAvg = (pairs) => {
+            const xs = (pairs || [])
+                .filter(p => p && typeof p.v === 'number' && Number.isFinite(p.v) && typeof p.w === 'number' && Number.isFinite(p.w) && p.w > 0);
+            const wSum = xs.reduce((s, p) => s + p.w, 0);
+            if (!(wSum > 0)) return null;
+            const v = xs.reduce((acc, p) => acc + p.v * p.w, 0) / wSum;
+            return Number.isFinite(v) ? v : null;
+        };
+        const pulse = weightedAvg([
+            { v: fxStrength, w: 0.34 },
+            { v: eqStrength, w: 0.28 },
+            { v: ratesStrength, w: 0.18 },
+            { v: adrStrength, w: 0.14 },
+            { v: riskStrength, w: 0.06 },
+        ]);
+
+        let state = '—';
+        if (typeof pulse === 'number' && Number.isFinite(pulse)) {
+            if (pulse > 0.25) state = 'BR forte (fluxo pró-risco)';
+            else if (pulse < -0.25) state = 'Stress / USD forte';
+            else state = 'Misto / neutro';
+        }
+
+        const cov = (() => {
+            if (!dc || typeof dc.computeCoverage !== 'function') return null;
+            const staleMs = 6 * 60 * 60 * 1000;
+            const syms = Array.from(new Set([
+                sym.usdbrl,
+                sym.ibov,
+                sym.win,
+                sym.ewz,
+                sym.br10y,
+                sym.cds,
+            ].filter(Boolean).map(s => String(s))));
+            if (!syms.length) return null;
+            return dc.computeCoverage(dcDeps, data, syms, { staleMs });
+        })();
+
+        if (metricsEl) {
+            const pulseBadge = toneBadgeHtml(pulse, state, { maxAbs: 1.2 });
+            const br10Txt = typeof br10Bp10 === 'number' && Number.isFinite(br10Bp10) ? `${br10Bp10 > 0 ? '+' : ''}${formatNumber(br10Bp10 * 10, 1)}bp` : '—';
+            const di1Txt = typeof di1Bp10 === 'number' && Number.isFinite(di1Bp10) ? `${di1Bp10 > 0 ? '+' : ''}${formatNumber(di1Bp10 * 10, 1)}bp` : '—';
+            const adrTxt = adrStrength === null ? '—' : formatPercent(adrStrength, 2);
+            const riskTxt = riskStrength === null ? '—' : formatPercent(riskStrength, 2);
+
+            metricsEl.innerHTML = `
+                <div class="metric-card">
+                    <div class="metric-icon">🇧🇷</div>
+                    <div class="metric-value">${pulse === null ? '—' : formatPercent(pulse, 2)}</div>
+                    <div class="metric-label">Brasil Pulse</div>
+                    <div class="metric-change neutral">${pulseBadge}</div>
+                    ${cov ? `<div style="margin-top:6px;opacity:.75;font-size:12px;font-family:'Share Tech Mono',monospace;font-weight:900;">Cobertura ${escapeHtml(String(cov.counts.withChange))}/${escapeHtml(String(cov.counts.expected))} • Fresh ${escapeHtml(formatNumber(cov.ratios.freshness * 100, 0))}%</div>` : ''}
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">💱</div>
+                    <div class="metric-value">${fxStrength === null ? '—' : formatPercent(fxStrength, 2)}</div>
+                    <div class="metric-label">BRL (força local)</div>
+                    <div class="metric-change neutral">${escapeHtml(sym.usdbrl || '—')}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">📉</div>
+                    <div class="metric-value">${ratesStrength === null ? '—' : formatPercent(ratesStrength, 2)}</div>
+                    <div class="metric-label">Juros (Δbp)</div>
+                    <div class="metric-change neutral">BR10Y ${escapeHtml(br10Txt)} • DI1 ${escapeHtml(di1Txt)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">🏛️</div>
+                    <div class="metric-value">${adrTxt}</div>
+                    <div class="metric-label">ADR Basket</div>
+                    <div class="metric-change neutral">Risco ${escapeHtml(riskTxt)}</div>
+                </div>
+            `;
+        }
+
+        if (pulseEl) {
+            const line = (label, v, { maxAbs = 2.5, suffix = '' } = {}) => {
+                const txt = v === null ? '—' : (suffix === 'bp' ? `${v > 0 ? '+' : ''}${formatNumber(v, 1)}bp` : formatPercent(v, 2));
+                const badge = (v === null) ? toneBadgeHtml(null, txt, { maxAbs }) : toneBadgeHtml(v, txt, { maxAbs });
+                return `<div style="display:flex;justify-content:space-between;gap:12px;">
+                    <div style="opacity:.92;font-weight:900;">${escapeHtml(label)}</div>
+                    <div>${badge}</div>
+                </div>`;
+            };
+
+            const coreLines = []
+                .concat(sym.usdbrl ? [{ label: 'USD/BRL (inv)', v: fxStrength, maxAbs: 2.5 }] : [])
+                .concat(sym.ibov ? [{ label: 'Ibovespa', v: ibovPct, maxAbs: 2.5 }] : [])
+                .concat(sym.win ? [{ label: 'WIN (futuro)', v: winPct, maxAbs: 2.5 }] : [])
+                .concat(sym.br10y ? [{ label: 'BR10Y (Δbp)', v: (typeof br10Bp10 === 'number' ? br10Bp10 * 10 : null), maxAbs: 45, suffix: 'bp' }] : [])
+                .concat(sym.cds ? [{ label: 'CDS BR 5Y (inv)', v: (typeof cdsPct === 'number' ? -cdsPct : null), maxAbs: 3.5 }] : []);
+
+            const adrRank = adrs
+                .filter(x => typeof x.pct === 'number' && Number.isFinite(x.pct))
+                .slice()
+                .sort((a, b) => (b.pct || 0) - (a.pct || 0))
+                .slice(0, 6);
+
+            const adrLines = adrRank.map(x => ({ label: `${x.k} (${x.label})`, v: x.pct, maxAbs: 3.5 }));
+
+            const ctxLines = []
+                .concat(sym.dxy ? [{ label: 'DXY (inv)', v: (typeof dxyPct === 'number' ? -dxyPct : null), maxAbs: 3.5 }] : [])
+                .concat(sym.vix ? [{ label: 'VIX (inv)', v: (typeof vixPct === 'number' ? -vixPct : null), maxAbs: 4.5 }] : []);
+
+            const block = (title, list) => {
+                const body = (list || []).map(x => line(x.label, x.v, { maxAbs: x.maxAbs || 2.5, suffix: x.suffix || '' })).join('');
+                if (!body) return '';
+                return `<div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px;background:rgba(0,0,0,.18);">
+                    <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:8px;">${escapeHtml(title)}</div>
+                    <div style="display:flex;flex-direction:column;gap:8px;">${body}</div>
+                </div>`;
+            };
+
+            const html = [block('Core (Índices/BRL/Juros/Risco)', coreLines), block('ADRs (top)', adrLines), block('Contexto (USD/Vol)', ctxLines)]
+                .filter(Boolean)
+                .join('<div style="height:10px;"></div>');
+
+            pulseEl.innerHTML = html || '<div style="opacity:.85;">Sem dados suficientes para montar o bloco.</div>';
+        }
+    }
 
     const allRows = assets.map(a => {
         const last = getLastPoint(data, a.symbol);
@@ -12473,19 +14418,34 @@ function renderBrazilMarket(data) {
         rows.push(...list);
     }
 
-    const prioritySymbols = ['.BVSP', 'WINc1', 'WDOc1', 'USD/BRL', 'EWZ', 'BOVA11.SA', 'BR10YT=RR'];
-    let selected = null;
-    for (const ps of prioritySymbols) {
-        const found = brazilOnly.find(r => symbolKey(r.symbol) === ps || symbolKey(r.symbol).startsWith(ps));
-        if (found && data.series && data.series[found.symbol] && data.series[found.symbol].length) {
-            selected = found.symbol;
-            break;
-        }
-    }
-    if (!selected) {
-        const first = brazilOnly.find(r => data.series && data.series[r.symbol] && data.series[r.symbol].length);
-        selected = first ? first.symbol : null;
-    }
+    const pickPreferred = (candidates) => {
+        const syms = (candidates || [])
+            .map(c => {
+                if (!c) return null;
+                if (typeof c === 'string') return aliasSym(c) || null;
+                if (c.aliasKey) return aliasSym(c.aliasKey) || null;
+                if (c.matcher) return pickBestByMatchers([c.matcher]) || null;
+                return null;
+            })
+            .filter(Boolean);
+        const uniq = Array.from(new Set(syms.map(s => String(s))));
+        const ok = uniq.filter(s => data.series && Array.isArray(data.series[s]) && data.series[s].length);
+        ok.sort((a, b) => mostRecentMs(b) - mostRecentMs(a));
+        return ok.length ? ok[0] : null;
+    };
+
+    const selected = pickPreferred([
+        { aliasKey: 'IBOV' },
+        { matcher: /^\.BVSP$/i },
+        { matcher: /^WINc1$/i },
+        { matcher: /^WDOc1$/i },
+        { aliasKey: 'USD_BRL' },
+        { matcher: /^USD\/BRL\b/i },
+        { matcher: /^BOVA11\.SA$/i },
+        { matcher: /^EWZ(\.\w+)?$/i },
+        { aliasKey: 'BR10Y' },
+        { matcher: /^BR10YT=RR$/i },
+    ]) || (brazilOnly.find(r => data.series && Array.isArray(data.series[r.symbol]) && data.series[r.symbol].length)?.symbol || null);
 
     createTable(tableId, rows, data, symbol => {
         const points = data.series[symbol] || [];
@@ -12575,14 +14535,55 @@ function renderFavorites(data) {
 }
 
 function renderCategory(data, containerId, chartId, categories, defaultSymbol) {
-    const rows = buildRows(data, categories);
-    let selected = defaultSymbol && data.series[defaultSymbol] ? defaultSymbol : (rows.length ? rows[0].symbol : null);
+    const isFxCarryTable = containerId === 'fxTable' && Array.isArray(categories) && categories.length > 1;
+    const labelByCategory = {
+        fx_g10: 'FX G10',
+        fx_emerging: 'FX Emergentes',
+        emerging: 'Emergentes',
+        commodities: 'Commodities',
+        metals: 'Metais',
+    };
+
+    const dxyDefault = (() => {
+        try {
+            return findAliasSymbolBest(data, 'DXY') || findAliasSymbol(data, 'DXY') || findAssetSymbol(data, /^\.DXY$/i) || null;
+        } catch {
+            return null;
+        }
+    })();
+
+    const rows = isFxCarryTable
+        ? (() => {
+            const out = [];
+            for (const c of categories) {
+                const rs = buildRows(data, [c]);
+                if (!rs.length) continue;
+                out.push({ separator: true, label: labelByCategory[c] || String(c || '').toUpperCase() });
+                out.push(...rs);
+            }
+            return out.length ? out : buildRows(data, categories);
+        })()
+        : buildRows(data, categories);
+
+    const pickFirstSelectable = (list) => {
+        for (const r of (list || [])) {
+            if (!r || r.separator) continue;
+            if (r.symbol && data && data.series && Array.isArray(data.series[r.symbol]) && data.series[r.symbol].length) return r.symbol;
+        }
+        return null;
+    };
+
+    let selected = (defaultSymbol && data.series[defaultSymbol])
+        ? defaultSymbol
+        : (isFxCarryTable && dxyDefault && data.series[dxyDefault])
+            ? dxyDefault
+            : pickFirstSelectable(rows);
 
     createTable(containerId, rows, data, symbol => {
         selected = symbol;
         const points = data.series[selected] || [];
         window.MercadoCharts.renderLineChart(chartId, points, selected);
-    }, { limit: 60, sortable: true, tableKey: containerId, toolbar: false, favorites: true });
+    }, { limit: 60, sortable: true, grouped: isFxCarryTable, tableKey: containerId, toolbar: false, favorites: true });
 
     if (selected) {
         const points = data.series[selected] || [];
@@ -12601,76 +14602,170 @@ function renderMercosul(data) {
     const tableEl = document.getElementById(tableId);
     if (!metricsEl || !pulseEl || !tableEl) return;
 
+    const dc = (typeof window !== 'undefined' && window.DecisionCore) ? window.DecisionCore : null;
+    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+
     const assets = data && Array.isArray(data.assets) ? data.assets : [];
     const assetBySymbol = new Map(assets.map(a => [String(a && a.symbol ? a.symbol : ''), a]));
 
-    const pick = (label, matcher, { invertForScore = false } = {}) => {
-        const symbol = findAssetSymbol(data, matcher);
-        const last = symbol ? getLastPoint(data, symbol) : null;
-        const pct = last && typeof last.changePct === 'number' ? last.changePct : null;
-        const score = pct === null || pct === undefined || !Number.isFinite(pct) ? null : (invertForScore ? -pct : pct);
+    const mostRecentMs = (symbol) => {
+        if (!symbol) return -Infinity;
+        const last = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol);
+        const t = last && last.t ? Date.parse(String(last.t)) : NaN;
+        return Number.isFinite(t) ? t : -Infinity;
+    };
+    const pickBestByMatchers = (matchers, { limit = 14 } = {}) => {
+        const out = [];
+        const seen = new Set();
+        for (const re of (matchers || [])) {
+            if (!(re instanceof RegExp)) continue;
+            for (const a of assets) {
+                const sym = a && a.symbol ? String(a.symbol) : '';
+                const name = a && a.name ? String(a.name) : '';
+                if (!sym || seen.has(sym)) continue;
+                if (re.test(sym) || re.test(name)) {
+                    out.push(sym);
+                    seen.add(sym);
+                    if (out.length >= limit) break;
+                }
+            }
+        }
+        out.sort((a, b) => mostRecentMs(b) - mostRecentMs(a));
+        return out.length ? out[0] : null;
+    };
+    const aliasSym = (k) => findAliasSymbolBest(data, k) || findAliasSymbol(data, k);
+
+    const pick = (label, matchers, { invertForScore = false, aliasKey = null } = {}) => {
+        const symbol = aliasKey ? (aliasSym(aliasKey) || pickBestByMatchers(matchers) || null) : (pickBestByMatchers(matchers) || null);
+        const last = symbol ? (getMostRecentPointWithPrice(data, symbol) || getLastPoint(data, symbol)) : null;
+        const pct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+        const score = pct === null ? null : (invertForScore ? -pct : pct);
         const a = symbol ? (assetBySymbol.get(symbol) || null) : null;
-        return { label, symbol, last, pct, score, asset: a };
+        return { label, symbol, last, pct, score, asset: a, invertForScore: !!invertForScore };
     };
 
-    const components = [
-        pick('USD/BRL (BR)', /^USD\/BRL\b/i, { invertForScore: true }),
-        pick('USD/UYU (UY)', /^USD\/UYU\b/i, { invertForScore: true }),
-        pick('USD/PYG (PY)', /^USD\/PYG\b/i, { invertForScore: true }),
-        pick('USD/ARS (AR)', /^USD\/ARS\b/i, { invertForScore: true }),
-        pick('Ibovespa', /(^\.BVSP$|\bIbovespa\b)/i),
-        pick('EWZ', /^EWZ\b/i),
-    ];
+    const weightedAvg = (pairs) => {
+        const xs = (pairs || [])
+            .filter(p => p && typeof p.v === 'number' && Number.isFinite(p.v) && typeof p.w === 'number' && Number.isFinite(p.w) && p.w > 0);
+        const wSum = xs.reduce((s, p) => s + p.w, 0);
+        if (!(wSum > 0)) return null;
+        const v = xs.reduce((acc, p) => acc + p.v * p.w, 0) / wSum;
+        return Number.isFinite(v) ? v : null;
+    };
 
-    const fxStrength = avg(components.slice(0, 4).map(x => x.score));
-    const eqStrength = avg(components.slice(4).map(x => x.score));
-    const hasFx = typeof fxStrength === 'number' && Number.isFinite(fxStrength);
-    const hasEq = typeof eqStrength === 'number' && Number.isFinite(eqStrength);
-    const score = hasFx && hasEq ? (0.7 * fxStrength + 0.3 * eqStrength) : hasFx ? fxStrength : hasEq ? eqStrength : null;
+    const fxPairs = [
+        pick('USD/BRL (BR)', [/^USD\/BRL\b/i], { invertForScore: true, aliasKey: 'USD_BRL' }),
+        pick('USD/MXN (MX)', [/^USD\/MXN\b/i, /\bUSDMXN\b/i], { invertForScore: true }),
+        pick('USD/CLP (CL)', [/^USD\/CLP\b/i, /\bUSDCLP\b/i], { invertForScore: true }),
+        pick('USD/COP (CO)', [/^USD\/COP\b/i, /\bUSDCOP\b/i], { invertForScore: true }),
+        pick('USD/PEN (PE)', [/^USD\/PEN\b/i, /\bUSDPEN\b/i], { invertForScore: true }),
+        pick('USD/ARS (AR)', [/^USD\/ARS\b/i, /\bUSDARS\b/i], { invertForScore: true }),
+        pick('USD/UYU (UY)', [/^USD\/UYU\b/i, /\bUSDUYU\b/i], { invertForScore: true }),
+        pick('USD/PYG (PY)', [/^USD\/PYG\b/i, /\bUSDPYG\b/i], { invertForScore: true }),
+    ].filter(x => x && x.symbol);
+
+    const eqProxies = [
+        pick('Ibovespa', [/^\.BVSP$/i, /\bIbovespa\b/i, /^BOVA11\.SA$/i], { aliasKey: 'IBOV' }),
+        pick('EWZ (Brasil)', [/^EWZ(\.\w+)?$/i]),
+        pick('EWW (México)', [/^EWW(\.\w+)?$/i]),
+        pick('ECH (Chile)', [/^ECH(\.\w+)?$/i]),
+        pick('ARGT (Argentina)', [/^ARGT(\.\w+)?$/i]),
+        pick('EPU (Peru)', [/^EPU(\.\w+)?$/i]),
+        pick('GXG (Colômbia)', [/^GXG(\.\w+)?$/i]),
+    ].filter(x => x && x.symbol);
+
+    const context = [
+        pick('DXY', [/(^\.DXY$|\bDXY\b|US Dollar Index|\bUSDX\b|Dollar Index|Índice\s*Dólar|Indice\s*Dolar)/i], { invertForScore: true, aliasKey: 'DXY' }),
+        pick('VIX', [/^\.?VIX(9D)?$/i, /^VIX$/i], { invertForScore: true, aliasKey: 'VIX' }),
+        pick('Cobre', [/^HG=F$/i, /^HGc\d$/i, /\bCopper\b/i, /\bCobre\b/i], { invertForScore: false, aliasKey: 'COPPER' }),
+        pick('Brent/WTI', [/^BZ=F$/i, /^LCOc\d$/i, /^BRNc\d$/i, /^CL=F$/i, /^CLc\d$/i, /\bBrent\b/i, /\bWTI\b/i], { invertForScore: false, aliasKey: 'BRENT' }),
+    ].filter(x => x && x.symbol);
+
+    const fxStrength = weightedAvg(fxPairs.map(x => ({ v: x.score, w: x.symbol && /USD\/BRL/i.test(String(x.symbol)) ? 0.34 : /USD\/MXN/i.test(String(x.symbol)) ? 0.20 : /USD\/CLP/i.test(String(x.symbol)) ? 0.14 : /USD\/COP/i.test(String(x.symbol)) ? 0.10 : /USD\/PEN/i.test(String(x.symbol)) ? 0.08 : /USD\/ARS/i.test(String(x.symbol)) ? 0.06 : /USD\/UYU/i.test(String(x.symbol)) ? 0.04 : /USD\/PYG/i.test(String(x.symbol)) ? 0.04 : 0.06 })));
+
+    const eqStrength = weightedAvg(eqProxies.map(x => ({ v: x.score, w: x.symbol && /^\.BVSP$/i.test(String(x.symbol)) ? 0.24 : x.symbol && /^EWZ/i.test(String(x.symbol)) ? 0.20 : x.symbol && /^EWW/i.test(String(x.symbol)) ? 0.18 : x.symbol && /^ECH/i.test(String(x.symbol)) ? 0.12 : x.symbol && /^ARGT/i.test(String(x.symbol)) ? 0.10 : x.symbol && /^EPU/i.test(String(x.symbol)) ? 0.10 : x.symbol && /^GXG/i.test(String(x.symbol)) ? 0.06 : 0.10 })));
+
+    const ctxStrength = weightedAvg(context.map(x => ({ v: x.score, w: x.label === 'DXY' ? 0.40 : x.label === 'VIX' ? 0.30 : x.label === 'Cobre' ? 0.20 : 0.10 })));
+
+    const score = weightedAvg([
+        { v: fxStrength, w: 0.65 },
+        { v: eqStrength, w: 0.25 },
+        { v: ctxStrength, w: 0.10 },
+    ]);
 
     let state = '—';
     if (typeof score === 'number' && Number.isFinite(score)) {
-        if (score > 0.25) state = 'Entrada (LatAm/BR forte)';
+        if (score > 0.25) state = 'Entrada (LatAm forte / USD fraco)';
         else if (score < -0.25) state = 'Saída (USD/Stress LatAm)';
         else state = 'Misto / neutro';
     }
 
     const badge = toneBadgeHtml(score, state, { maxAbs: 1.2 });
+    const cov = (() => {
+        if (!dc || typeof dc.computeCoverage !== 'function') return null;
+        const staleMs = 6 * 60 * 60 * 1000;
+        const syms = Array.from(new Set([]
+            .concat(fxPairs.map(x => x.symbol))
+            .concat(eqProxies.map(x => x.symbol))
+            .concat(context.map(x => x.symbol))
+            .filter(Boolean)
+            .map(s => String(s))));
+        if (!syms.length) return null;
+        return dc.computeCoverage(dcDeps, data, syms, { staleMs });
+    })();
+
+    const usedFx = fxPairs.map(x => x.label).slice(0, 6).join(', ');
+    const usedEq = eqProxies.map(x => x.label).slice(0, 6).join(', ');
+
     metricsEl.innerHTML = `
         <div class="metric-card">
             <div class="metric-icon">🌎</div>
             <div class="metric-value">${score === null ? '—' : formatPercent(score, 2)}</div>
             <div class="metric-label">Mercosul Pulse</div>
             <div class="metric-change neutral">${badge}</div>
+            ${cov ? `<div style="margin-top:6px;opacity:.75;font-size:12px;font-family:'Share Tech Mono',monospace;font-weight:900;">Cobertura ${escapeHtml(String(cov.counts.withChange))}/${escapeHtml(String(cov.counts.expected))} • Fresh ${escapeHtml(formatNumber(cov.ratios.freshness * 100, 0))}%</div>` : ''}
         </div>
         <div class="metric-card">
             <div class="metric-icon">💱</div>
             <div class="metric-value">${fxStrength === null ? '—' : formatPercent(fxStrength, 2)}</div>
             <div class="metric-label">Cesta FX (força local)</div>
-            <div class="metric-change neutral">USD/BRL, UYU, PYG, ARS</div>
+            <div class="metric-change neutral">${escapeHtml(usedFx || '—')}</div>
         </div>
         <div class="metric-card">
             <div class="metric-icon">📊</div>
             <div class="metric-value">${eqStrength === null ? '—' : formatPercent(eqStrength, 2)}</div>
             <div class="metric-label">Proxies (Bolsa)</div>
-            <div class="metric-change neutral">Ibovespa + EWZ</div>
+            <div class="metric-change neutral">${escapeHtml(usedEq || '—')}</div>
         </div>
     `;
 
-    const lines = components
-        .filter(x => x && x.symbol)
-        .map(x => {
-            const pctTxt = x && typeof x.pct === 'number' && Number.isFinite(x.pct) ? formatPercent(x.pct, 2) : '—';
-            const tone = toneBadgeHtml(x.pct, pctTxt, { maxAbs: 2.5, inverse: false });
-            return `<div style="display:flex;justify-content:space-between;gap:12px;">
-                <div style="opacity:.92;font-weight:900;">${escapeHtml(x.label)}</div>
-                <div>${tone}</div>
-            </div>`;
-        })
-        .join('');
+    const mkLine = (x, maxAbs = 2.5) => {
+        const pctTxt = x && typeof x.pct === 'number' && Number.isFinite(x.pct) ? formatPercent(x.pct, 2) : '—';
+        const tone = toneBadgeHtml(x.pct, pctTxt, { maxAbs, inverse: false });
+        return `<div style="display:flex;justify-content:space-between;gap:12px;">
+            <div style="opacity:.92;font-weight:900;">${escapeHtml(x.label)}</div>
+            <div>${tone}</div>
+        </div>`;
+    };
 
-    pulseEl.innerHTML = lines ? `<div style="display:flex;flex-direction:column;gap:8px;">${lines}</div>` : '<div style="opacity:.85;">Sem dados suficientes para montar o bloco.</div>';
+    const block = (title, lines) => {
+        const body = (lines || []).map(l => mkLine(l)).join('');
+        if (!body) return '';
+        return `<div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px;background:rgba(0,0,0,.18);">
+            <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:8px;">${escapeHtml(title)}</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">${body}</div>
+        </div>`;
+    };
 
+    const pulseHtml = [
+        block('FX (USD/LatAm) — força local', fxPairs),
+        block('Bolsas (proxies)', eqProxies),
+        block('Contexto (USD/Vol/Commodities)', context),
+    ].filter(Boolean).join('<div style="height:10px;"></div>');
+
+    pulseEl.innerHTML = pulseHtml || '<div style="opacity:.85;">Sem dados suficientes para montar o bloco.</div>';
+
+    const components = ([]).concat(fxPairs, eqProxies, context);
     const rows = components
         .filter(x => x && x.symbol)
         .map(x => {
@@ -12686,12 +14781,14 @@ function renderMercosul(data) {
         })
         .filter(r => r.last && typeof r.last.price === 'number');
 
-    let selected = rows.length ? rows[0].symbol : null;
+    const preferred = fxPairs.find(x => x && x.symbol && /USD\/BRL/i.test(String(x.symbol))) || null;
+    let selected = preferred && preferred.symbol && data.series && data.series[preferred.symbol] ? preferred.symbol : (rows.length ? rows[0].symbol : null);
+
     createTable(tableId, rows, data, symbol => {
         selected = symbol;
         const points = data.series[selected] || [];
         window.MercadoCharts.renderLineChart(chartId, points, selected);
-    }, { limit: 20, sortable: false, tableKey: tableId, toolbar: false, favorites: true });
+    }, { limit: 28, sortable: false, tableKey: tableId, toolbar: false, favorites: true });
 
     if (selected) {
         const points = data.series[selected] || [];
@@ -12714,6 +14811,36 @@ function renderPetrobrasModule(data) {
         missingEl.innerHTML = '';
         return;
     }
+
+    const dc = (typeof window !== 'undefined' && window.DecisionCore) ? window.DecisionCore : null;
+    const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
+    const assets = data && Array.isArray(data.assets) ? data.assets : [];
+    const mostRecentMs = (symbol) => {
+        if (!symbol) return -Infinity;
+        const last = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null) || getLastPoint(data, symbol);
+        const t = last && last.t ? Date.parse(String(last.t)) : NaN;
+        return Number.isFinite(t) ? t : -Infinity;
+    };
+    const pickBestByMatchers = (matchers, { limit = 14 } = {}) => {
+        const out = [];
+        const seen = new Set();
+        for (const re of (matchers || [])) {
+            if (!(re instanceof RegExp)) continue;
+            for (const a of assets) {
+                const sym = a && a.symbol ? String(a.symbol) : '';
+                const name = a && a.name ? String(a.name) : '';
+                if (!sym || seen.has(sym)) continue;
+                if (re.test(sym) || re.test(name)) {
+                    out.push(sym);
+                    seen.add(sym);
+                    if (out.length >= limit) break;
+                }
+            }
+        }
+        out.sort((a, b) => mostRecentMs(b) - mostRecentMs(a));
+        return out.length ? out[0] : null;
+    };
+    const aliasSym = (k) => findAliasSymbolBest(data, k) || findAliasSymbol(data, k);
 
     const score = payload.score && typeof payload.score.value === 'number' ? payload.score.value : 0;
     const bias = payload.score && payload.score.bias ? String(payload.score.bias) : 'NEUTRO';
@@ -12749,6 +14876,29 @@ function renderPetrobrasModule(data) {
         return parts.length ? `Corr (fluxo): ${parts.join(' • ')}` : '';
     })();
 
+    const stalenessLine = (() => {
+        if (!dc || typeof dc.symbolAgeMs !== 'function') return '';
+        const used = Array.isArray(payload.rows) ? payload.rows : [];
+        const seen = new Set();
+        const symbols = used
+            .map(r => (r && r.symbol ? String(r.symbol) : ''))
+            .filter(Boolean)
+            .filter(s => {
+                const k = symbolKey(s) || s;
+                if (seen.has(k)) return false;
+                seen.add(k);
+                return true;
+            })
+            .slice(0, 18);
+        if (!symbols.length) return '';
+        const staleMs = 4 * 60 * 60 * 1000;
+        const ages = symbols.map(sym => dc.symbolAgeMs(dcDeps, data, sym)).filter(v => typeof v === 'number' && Number.isFinite(v));
+        if (!ages.length) return '';
+        const staleCount = ages.filter(ms => ms > staleMs).length;
+        if (!staleCount) return '';
+        return `Freshness: ${String(symbols.length - staleCount)}/${String(symbols.length)} (stale>${String(Math.round(staleMs / 3600000))}h)`;
+    })();
+
     gaugeEl.innerHTML = `
         <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
             <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
@@ -12759,8 +14909,8 @@ function renderPetrobrasModule(data) {
                 </div>
             </div>
             <div style="margin-top:8px;opacity:.85;">${escapeHtml(phaseLabel)}</div>
-            ${breadthLine || contribLine || pnlLine || corrLine ? `<div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
-                ${escapeHtml([breadthLine, contribLine, pnlLine, corrLine].filter(Boolean).join(' • '))}
+            ${(breadthLine || contribLine || pnlLine || corrLine || stalenessLine) ? `<div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+                ${escapeHtml([breadthLine, contribLine, pnlLine, corrLine, stalenessLine].filter(Boolean).join(' • '))}
             </div>` : ''}
             <div style="margin-top:8px;opacity:.82;font-size:12px;line-height:1.35;">
                 ${escapeHtml(`Escala: -10 a +10 • Zona neutra: -${formatNumber(neutralCutAbs, 1)} a +${formatNumber(neutralCutAbs, 1)} • Posição: ${formatNumber(pctPos * 100, 0)}%`)}
@@ -12838,13 +14988,19 @@ function renderPetrobrasModule(data) {
             const row = used.find(x => x && String(x.key || '') === k)
             return row && row.symbol ? String(row.symbol) : ''
         }
-        const symPetr = pickSym('petr4') || pickSym('petr3') || ''
+        const symPetr = (() => {
+            const cands = [pickSym('petr4'), pickSym('petr3')].filter(Boolean)
+            if (!cands.length) return ''
+            const sorted = cands.slice().sort((a, b) => mostRecentMs(b) - mostRecentMs(a))
+            return sorted[0] || ''
+        })()
         const symBrent = (drivers.find(x => x && String(x.key || '') === 'brent') || {}).symbol || ''
-        const symUsdBrl = findAliasSymbolBest(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i) || ''
-        const symIbov = findAliasSymbolBest(data, 'IBOV') || findAssetSymbol(data, /^\.BVSP$/i) || ''
-        const symVix = findAliasSymbolBest(data, 'VIX') || findAliasSymbolBest(data, 'VIX9D') || ''
-        const symVale = findAssetSymbol(data, /^VALE3\.SA$/i) || findAssetSymbol(data, /^VALE\.K$/i) || ''
-        const symBanks = findAssetSymbol(data, /^ITUB4\.SA$/i) || findAssetSymbol(data, /^BBDC4\.SA$/i) || ''
+        const symUsdBrl = aliasSym('USD_BRL') || pickBestByMatchers([/^USD\/BRL\b/i]) || findAssetSymbol(data, /^USD\/BRL\b/i) || ''
+        const symIbov = aliasSym('IBOV') || pickBestByMatchers([/^\.BVSP$/i, /\bIbovespa\b/i, /^BOVA11\.SA$/i, /^EWZ$/i]) || findAssetSymbol(data, /^\.BVSP$/i) || ''
+        const symVxbr = pickBestByMatchers([/^VXBR$/i, /\bVol\b.*\bBrasil\b/i]) || ''
+        const symVix = findAliasSymbolBest(data, 'VIX') || findAliasSymbolBest(data, 'VIX9D') || findAliasSymbolBest(data, 'VIX30') || pickBestByMatchers([/^\.?VIX(9D)?$/i, /^VIX$/i]) || ''
+        const symVale = pickBestByMatchers([/^VALE3\.SA$/i, /^VALE\.K$/i, /^VALE$/i]) || findAssetSymbol(data, /^VALE3\.SA$/i) || ''
+        const symBanks = pickBestByMatchers([/^ITUB4\.SA$/i, /^BBDC4\.SA$/i, /^ITUB\.K$/i, /^BBD\b/i]) || findAssetSymbol(data, /^ITUB4\.SA$/i) || ''
 
         const micro = (() => {
             const s = String(symPetr || '')
@@ -12908,6 +15064,7 @@ function renderPetrobrasModule(data) {
         const pUsd = symUsdBrl ? getChangePct(data, symUsdBrl) : null
         const pIbov = symIbov ? getChangePct(data, symIbov) : null
         const pVix = symVix ? getChangePct(data, symVix) : null
+        const pVxbr = symVxbr ? getChangePct(data, symVxbr) : null
         const pVale = symVale ? getChangePct(data, symVale) : null
         const pBanks = symBanks ? getChangePct(data, symBanks) : null
 
@@ -12943,7 +15100,7 @@ function renderPetrobrasModule(data) {
                     Micro: 5m ${escapeHtml(typeof micro.r5 === 'number' ? formatPercent(micro.r5, 2) : '—')} • 15m ${escapeHtml(typeof micro.r15 === 'number' ? formatPercent(micro.r15, 2) : '—')} • Range30 ${escapeHtml(micro.range30 ? formatPercent(micro.range30.pct, 2) : '—')}
                 </div>
                 <div style="margin-top:8px;opacity:.84;font-size:12px;line-height:1.35;">
-                    Paridades/risco: Brent ${escapeHtml(fmtP(pBrent))} • USD/BRL ${escapeHtml(fmtP(pUsd))} • VIX ${escapeHtml(fmtP(pVix))}
+                    Paridades/risco: Brent ${escapeHtml(fmtP(pBrent))} • USD/BRL ${escapeHtml(fmtP(pUsd))} • VIX ${escapeHtml(fmtP(pVix))}${(typeof pVxbr === 'number' ? ` • VXBR ${escapeHtml(fmtP(pVxbr))}` : '')}
                 </div>
                 <div style="margin-top:8px;opacity:.84;font-size:12px;line-height:1.35;">
                     Empresas/setores: VALE ${escapeHtml(fmtP(pVale))} • Bancos ${escapeHtml(fmtP(pBanks))}
@@ -13063,9 +15220,19 @@ function renderPetrobrasModule(data) {
     tableEl.querySelectorAll('tr[data-petro-row="1"]').forEach(tr => {
         tr.addEventListener('click', () => {
             const symbol = tr.getAttribute('data-symbol') || ''
-            if (!symbol || !data || !data.series || !Array.isArray(data.series[symbol]) || !data.series[symbol].length) return
-            const points = data.series[symbol] || []
-            window.MercadoCharts.renderLineChart('brazilChart', points, symbol)
+            if (!symbol) return
+            const symKey = symbolKey(symbol)
+            const points = data && data.series && Array.isArray(data.series[symbol]) ? data.series[symbol] : []
+            if (window.MercadoCharts && typeof window.MercadoCharts.renderLineChart === 'function' && points.length) {
+                window.MercadoCharts.renderLineChart('brazilChart', points, symbol)
+            }
+            try {
+                localStorage.setItem('mercado_table_q:br', symKey || symbol)
+                localStorage.setItem('mercado_table_mode:br', 'all')
+            } catch {
+            }
+            if (typeof renderBrazilMarket === 'function') renderBrazilMarket(data)
+            location.hash = '#brazil-market'
             const sec = document.getElementById('brazil-market')
             if (sec && sec.scrollIntoView) sec.scrollIntoView({ behavior: 'smooth', block: 'start' })
         })
@@ -13944,7 +16111,7 @@ function setupNavMorePanel() {
 function setupInvestingCalendarWidgetLazyLoad() {
     const details = document.getElementById('investingCalendarWidget');
     if (!details) return;
-    const enabled = localStorage.getItem('mercado_investing_iframe_autoload') === '1';
+    const enabled = localStorage.getItem('mercado_investing_iframe_autoload') !== '0';
     if (!enabled) return;
     const iframe = details.querySelector && details.querySelector('iframe[data-src]');
     if (!iframe) return;
@@ -13952,10 +16119,18 @@ function setupInvestingCalendarWidgetLazyLoad() {
     function tryLoad() {
         if (loaded) return;
         if (!details.open) return;
+        const current = String(iframe.getAttribute('src') || '');
+        if (current && current !== 'about:blank') {
+            loaded = true;
+            return;
+        }
         const url = iframe.getAttribute('data-src');
         if (!url) return;
-        iframe.setAttribute('src', url);
-        loaded = true;
+        try {
+            iframe.setAttribute('src', url);
+            loaded = true;
+        } catch {
+        }
     }
     details.addEventListener('toggle', tryLoad);
     tryLoad();
