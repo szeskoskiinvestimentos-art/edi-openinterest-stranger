@@ -10019,6 +10019,99 @@ function renderOperationalBriefing() {
         }
     }
 
+    const localTapeLead = (() => {
+        if (!data || !pulseNow || !pulseNow.sym) return { active: false, mode: '', reason: '' };
+
+        const pctAt = (symbol, minutes) => {
+            if (!symbol) return null;
+            const s = String(symbol || '');
+            const series = (data && data.series && Array.isArray(data.series[s])) ? data.series[s] : [];
+            if (!series.length) return null;
+            const last = series[series.length - 1];
+            const lastT = last && last.t ? Date.parse(String(last.t)) : NaN;
+            const lastP = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
+            if (!Number.isFinite(lastT) || lastP === null || !(lastP > 0)) return null;
+            const target = lastT - (Number(minutes) * 60 * 1000);
+            let prev = null;
+            for (let i = series.length - 1; i >= 0; i -= 1) {
+                const p = series[i];
+                const t = p && p.t ? Date.parse(String(p.t)) : NaN;
+                const price = p && typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
+                if (!Number.isFinite(t) || price === null || !(price > 0)) continue;
+                if (t <= target) { prev = { t, price }; break; }
+            }
+            if (!prev) return null;
+            return ((lastP / prev.price) - 1) * 100;
+        };
+
+        const ok = v => typeof v === 'number' && Number.isFinite(v);
+        const amp = volAmp && typeof volAmp.amp === 'number' && Number.isFinite(volAmp.amp) ? volAmp.amp : 1;
+        const th60 = 0.18 / amp;
+        const th15 = 0.08 / amp;
+        const th5 = 0.05 / amp;
+        const thEq = 0.10 / amp;
+        const thFx = 0.05 / amp;
+        const thVx = 0.18 / amp;
+
+        const symWin = pulseNow.sym.win || null;
+        const symWdo = pulseNow.sym.wdo || null;
+        const symIbov = pulseNow.sym.ibov || findAliasSymbolBest(data, 'IBOV') || findAliasSymbol(data, 'IBOV') || findAssetSymbol(data, /(^\.BVSP$|\bIbovespa\b|\bIBOV\b)/i);
+        const symEwz = pulseNow.sym.ewz || findAliasSymbolBest(data, 'EWZ') || findAliasSymbol(data, 'EWZ') || findAssetSymbol(data, /^EWZ(\.\w+)?$/i);
+        const symUsd = pulseNow.sym.usdbrl || findAliasSymbolBest(data, 'USD_BRL') || findAliasSymbol(data, 'USD_BRL') || findAssetSymbol(data, /^USD\/BRL\b/i);
+        const symVxbr = pulseNow.sym.vxbr || findAliasSymbolBest(data, 'VXBR') || findAssetSymbol(data, /(^\.VXBR$|\bVXBR\b)/i);
+
+        const win60 = pctAt(symWin, 60);
+        const win15 = pctAt(symWin, 15);
+        const win5 = pctAt(symWin, 5);
+        const wdo60 = pctAt(symWdo, 60);
+        const wdo15 = pctAt(symWdo, 15);
+        const ibov15 = pctAt(symIbov, 15);
+        const ewz15 = pctAt(symEwz, 15);
+        const usd15 = pctAt(symUsd, 15);
+        const vxbr15 = pctAt(symVxbr, 15);
+
+        const winDown = ok(win60) && ok(win15) && win60 <= -th60 && win15 <= -th15 && (!ok(win5) || win5 <= th5);
+        const winUp = ok(win60) && ok(win15) && win60 >= th60 && win15 >= th15 && (!ok(win5) || win5 >= -th5);
+        const wdoUp = ok(wdo60) && ok(wdo15) && wdo60 >= th60 && wdo15 >= th15;
+        const wdoDown = ok(wdo60) && ok(wdo15) && wdo60 <= -th60 && wdo15 <= -th15;
+
+        const confirmSell = [
+            ok(ibov15) && ibov15 <= -thEq,
+            ok(ewz15) && ewz15 <= -thEq,
+            ok(usd15) && usd15 >= thFx,
+            ok(vxbr15) && vxbr15 >= thVx,
+            wdoUp,
+        ].filter(Boolean).length;
+
+        const confirmBuy = [
+            ok(ibov15) && ibov15 >= thEq,
+            ok(ewz15) && ewz15 >= thEq,
+            ok(usd15) && usd15 <= -thFx,
+            ok(vxbr15) && vxbr15 <= -thVx,
+            wdoDown,
+        ].filter(Boolean).length;
+
+        const reasonBase = `WIN ${ok(win60) ? formatPercent(win60, 2) : '—'} / ${ok(win15) ? formatPercent(win15, 2) : '—'}${ok(win5) ? ` / ${formatPercent(win5, 2)}` : ''} • IBOV15 ${ok(ibov15) ? formatPercent(ibov15, 2) : '—'} • EWZ15 ${ok(ewz15) ? formatPercent(ewz15, 2) : '—'} • USD/BRL15 ${ok(usd15) ? formatPercent(usd15, 2) : '—'} • VXBR15 ${ok(vxbr15) ? formatPercent(vxbr15, 2) : '—'}`;
+
+        if (winDown && confirmSell >= 2) {
+            return { active: true, mode: 'risk_off_local', reason: `Fita local fraca: ${reasonBase}` };
+        }
+        if (winUp && confirmBuy >= 2) {
+            return { active: true, mode: 'risk_on_local', reason: `Fita local forte: ${reasonBase}` };
+        }
+        return { active: false, mode: '', reason: '' };
+    })();
+
+    if (!priceLead.active && !trendLead.active && localTapeLead.active) {
+        if (localTapeLead.mode === 'risk_off_local') {
+            finalBias.WIN = { bias: 'sell', source: 'FITA_LOCAL' };
+            finalBias.WDO = { bias: 'buy', source: 'FITA_LOCAL' };
+        } else if (localTapeLead.mode === 'risk_on_local') {
+            finalBias.WIN = { bias: 'buy', source: 'FITA_LOCAL' };
+            finalBias.WDO = { bias: 'sell', source: 'FITA_LOCAL' };
+        }
+    }
+
     const pulseLead = (() => {
         if (!pulseNow || !pulseNow.pulse) return { active: false, wdo: null, win: null, reason: '' };
         const w = pulseNow.pulse.wdo;
@@ -10069,24 +10162,34 @@ function renderOperationalBriefing() {
         })();
         const priceAdj = priceLead.active ? 0.06 : 0;
         const trendAdj = (!priceLead.active && trendLead.active) ? 0.04 : 0;
+        const localTapeAdj = (!priceLead.active && !trendLead.active && localTapeLead.active) ? 0.03 : 0;
         const pulseAdj = (!priceLead.active && !trendLead.active && pulseLead.active) ? 0.05 : 0;
         const alignAdj = (() => {
             if (!pulseNow || !pulseNow.align) return 0;
-            const a = pulseNow.align.wdo_usdbrl;
-            if (!a || a.ok === null || a.ok === true) return 0;
-            const strong = typeof a.a === 'number' && Number.isFinite(a.a) && Math.abs(a.a) >= 0.12
-                && typeof a.b === 'number' && Number.isFinite(a.b) && Math.abs(a.b) >= 0.12;
-            return strong ? -0.06 : 0;
+            let adj = 0;
+            const wdo = pulseNow.align.wdo_usdbrl;
+            if (wdo && wdo.ok === false) {
+                const strong = typeof wdo.a === 'number' && Number.isFinite(wdo.a) && Math.abs(wdo.a) >= 0.12
+                    && typeof wdo.b === 'number' && Number.isFinite(wdo.b) && Math.abs(wdo.b) >= 0.12;
+                if (strong) adj -= 0.06;
+            }
+            const winIbov = pulseNow.align.win_ibov;
+            const winEwz = pulseNow.align.win_ewz;
+            const misaligned =
+                (winIbov && winIbov.ok === false && typeof winIbov.a === 'number' && typeof winIbov.b === 'number' && Math.abs(winIbov.a) >= 0.10 && Math.abs(winIbov.b) >= 0.10)
+                || (winEwz && winEwz.ok === false && typeof winEwz.a === 'number' && typeof winEwz.b === 'number' && Math.abs(winEwz.a) >= 0.10 && Math.abs(winEwz.b) >= 0.10);
+            if (misaligned) adj -= 0.05;
+            return adj;
         })();
-        const out = Math.max(0, Math.min(1, base + newsAdj + agendaAdj + macroAdj + priceAdj + trendAdj + pulseAdj + alignAdj - conflicts * 0.10));
+        const out = Math.max(0, Math.min(1, base + newsAdj + agendaAdj + macroAdj + priceAdj + trendAdj + localTapeAdj + pulseAdj + alignAdj - conflicts * 0.10));
         const label = out >= 0.72 ? 'ALTA' : out >= 0.56 ? 'MÉDIA' : 'BAIXA';
         return { score: out, label };
     })();
 
     try {
         const forced = finalBias && (finalBias.WDO || finalBias.WIN)
-            ? (finalBias.WDO.source === 'PREÇO' || finalBias.WDO.source === 'TENDÊNCIA' || finalBias.WDO.source === 'PULSO'
-                || finalBias.WIN.source === 'PREÇO' || finalBias.WIN.source === 'TENDÊNCIA' || finalBias.WIN.source === 'PULSO')
+            ? (finalBias.WDO.source === 'PREÇO' || finalBias.WDO.source === 'TENDÊNCIA' || finalBias.WDO.source === 'FITA_LOCAL' || finalBias.WDO.source === 'PULSO'
+                || finalBias.WIN.source === 'PREÇO' || finalBias.WIN.source === 'TENDÊNCIA' || finalBias.WIN.source === 'FITA_LOCAL' || finalBias.WIN.source === 'PULSO')
             : false;
         const macroWinCompass = forced ? { ...macroWin, bias: 'neutral' } : macroWin;
         const macroWdoCompass = forced ? { ...macroWdo, bias: 'neutral' } : macroWdo;
@@ -10124,8 +10227,8 @@ function renderOperationalBriefing() {
         const bDir = fb && fb.bias === 'buy' ? 1 : fb && fb.bias === 'sell' ? -1 : 0;
         const src = fb && fb.source ? String(fb.source) : '';
         const clamp = (x) => Math.max(-1, Math.min(1, x));
-        if (bDir !== 0 && (src === 'PREÇO' || src === 'TENDÊNCIA' || src === 'PULSO')) {
-            const w = src === 'PREÇO' ? 0.9 : src === 'TENDÊNCIA' ? 0.8 : 0.75;
+        if (bDir !== 0 && (src === 'PREÇO' || src === 'TENDÊNCIA' || src === 'FITA_LOCAL' || src === 'PULSO')) {
+            const w = src === 'PREÇO' ? 0.9 : src === 'TENDÊNCIA' ? 0.8 : src === 'FITA_LOCAL' ? 0.82 : 0.75;
             return clamp((w * bDir) + (0.15 * nb) + (0.10 * mb));
         }
         const rb = symbol === 'WDO' ? regimeBias.wdo : regimeBias.win;
@@ -10254,6 +10357,9 @@ function renderOperationalBriefing() {
             }
             if (!priceLead.active && trendLead.active && fb.source === 'TENDÊNCIA') {
                 lines.push(trendLead.reason);
+            }
+            if (!priceLead.active && !trendLead.active && localTapeLead.active && fb.source === 'FITA_LOCAL') {
+                lines.push(localTapeLead.reason);
             }
             if (!priceLead.active && pulseLead.active && fb.source === 'PULSO') {
                 lines.push(`Pulso (drivers+preço): ${pulseLead.reason}`);
