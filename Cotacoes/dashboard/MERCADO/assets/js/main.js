@@ -12311,7 +12311,7 @@ function renderOperationalBriefing() {
             const now = new Date();
             const hr = now.getHours();
             const min = now.getMinutes();
-            if (hr > 9 || (hr === 9 && min >= 1)) return '';
+            if (hr > 11 || (hr === 11 && min >= 1)) return '';
             const assets = data && Array.isArray(data.assets) ? data.assets : [];
             const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
             const isRecentPremarketSnapshot = asOf => {
@@ -12363,7 +12363,7 @@ function renderOperationalBriefing() {
             return `
                 <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
                     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-                        <div style="font-weight:900;letter-spacing:1px;opacity:.95;">ADR BR (Extended Hours) • até 09:00</div>
+                        <div style="font-weight:900;letter-spacing:1px;opacity:.95;">ADR BR (Extended Hours) • até 11:00</div>
                         <div style="opacity:.86;font-size:12px;">${ups.length} ↑ • ${downs.length} ↓ • ${rows.length} total</div>
                     </div>
                     <div style="margin-top:8px;">${gauge}</div>
