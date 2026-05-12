@@ -1,0 +1,363 @@
+veja o código ntsl para wdo que o sistema emite: file:///C:/Users/ednil/Downloads/Gamma/Edi_Sistema_Unificado/B3_System/dashboard_unificado/WDO/assets/data/ntsl_script.txt
+
+ele tem erros de compilação por fechamento de end;
+
+Alem de erros de fechamento temos mais pontos compare por favor o txt do sistema e esses comentarios:
+
+# Análise Completa de Erros do Código Original
+
+## 🔴 Erro Principal: `begin` sem `end` (Blocos Desbalanceados)
+
+Vamos mapear cada `begin` e ver onde está faltando o `end`:
+
+```
+begin  ← BLOCO PRINCIPAL (linha ~45)
+  ...
+  if (ExibirFlips) then begin  ← BEGIN #1 - NUNCA FECHA!
+    ...
+    if (ExibirEdiWall) then begin  ← BEGIN #2 - NUNCA FECHA!
+      ...
+      if (MostrarPLUS) then begin  ← BEGIN #3 - NUNCA FECHA!
+        ...
+        if (MostrarPLUS2) then begin  ← BEGIN #4 - NUNCA FECHA!
+          ...
+          if (ExibirMelhoresPontos) then begin ... end;  ✓ OK
+          if (ExibirOpcoesEdi) then begin ... end;  ✓ OK
+          if (ExibirUsdBeta) then begin ... end;  ✓ OK
+
+end;  ← Este ÚNICO end fecha... qual dos 5 blocos abertos?
+```
+
+### O que acontece na prática:
+
+```
+ExibirFlips = true
+  └─ ExibirEdiWall = false  ← TUDO ABAIXO FICA ANINHADO AQUI!
+       └─ MostrarPLUS = true  ← Nunca executa porque pai é false
+            └─ MostrarPLUS2 = true  ← Nunca executa
+                 └─ ExibirMelhoresPontos  ← Nunca executa
+                 └─ ExibirOpcoesEdi  ← Nunca executa
+                 └─ ExibirUsdBeta  ← Nunca executa ← SEU PROBLEMA!
+```
+
+**Como `ExibirEdiWall = false`, TUDO que está aninhado dentro dele (PLUS, PLUS2, MelhoresPontos, OpcoesEdi, UsdBeta) NUNCA aparece**, independente de estar `true`!
+
+---
+
+## 📋 Lista Completa de Erros
+
+| # | Linha | Erro | Consequência |
+|---|-------|------|-------------|
+| 1 | `ExibirFlips then begin` | Falta `end;` antes de `ExibirEdiWall` | Tudo fica dentro de ExibirFlips |
+| 2 | `ExibirEdiWall then begin` | Falta `end;` antes de `MostrarPLUS` | PLUS/PLUS2/Opcoes/UsdBeta ficam dentro de EdiWall (que é `false`) |
+| 3 | `MostrarPLUS then begin` | Falta `end;` antes de `MostrarPLUS2` | PLUS2 e tudo abaixo fica dentro de PLUS |
+| 4 | `MostrarPLUS2 then begin` | Falta `end;` antes de `ExibirMelhoresPontos` | MelhoresPontos/Opcoes/UsdBeta ficam dentro de PLUS2 |
+| 5 | Final do código | Só tem 1 `end;` quando deveria ter 5 | Código nem deveria compilar corretamente |
+
+---
+
+## ✅ Código Corrigido
+
+```pascal
+// NTSL Indicator - Edi OpenInterest Levels - 29/04/2026 08:34
+// Gerado Automaticamente - CORRIGIDO
+
+const
+  clCallWall = clBlue;
+  clPutWall = clRed;
+  clGammaFlip = clFuchsia;
+  clDeltaFlip = clYellow;
+  clRangeHigh = clLime;
+  clRangeLow = clRed;
+  clMaxPain = clPurple;
+  clExpMove = clWhite;
+  clEdiWall = clSilver;
+  clEffectiveWall = clAqua;
+  clFib = clYellow;
+  TamanhoFonte = 8;
+
+input
+  ExibirWalls(true);
+  ExibirFlips(true);
+  ExibirRange(true);
+  ExibirMaxPain(true);
+  ExibirExpMoves(true);
+  ExibirEdiWall(false);
+  ExibirEffectiveWalls(true);
+  MostrarPLUS(true);
+  MostrarPLUS2(true);
+  ExibirMelhoresPontos(false);
+  ModeloFlip(7);
+  spot(0);
+  ExibirUsdBeta(true);
+  JanelaUsdBeta(0);
+  ExibirOpcoesEdi(true);
+
+var
+  GammaVal: Float;
+
+begin
+  GammaVal := 4947.85;
+
+  if (ModeloFlip = 1) then GammaVal := 4947.85;
+  if (ModeloFlip = 2) then GammaVal := 4952.46;
+  if (ModeloFlip = 3) then GammaVal := 4943.87;
+  if (ModeloFlip = 4) then GammaVal := 4928.80;
+  if (ModeloFlip = 5) then GammaVal := 4928.32;
+  if (ModeloFlip = 6) then GammaVal := 4947.85;
+  if (ModeloFlip = 7) then GammaVal := 4914.93;
+
+  // ============================================
+  // WALLS
+  // ============================================
+  if (ExibirWalls) then
+  begin
+    HorizontalLineCustom(4800.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(4900.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(4925.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5000.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5000.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(5050.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5100.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5150.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5200.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5250.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5350.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5400.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5500.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5700.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5900.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(6000.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+  end; // ← FECHA ExibirWalls
+
+  // ============================================
+  // RANGE
+  // ============================================
+  if (ExibirRange) then
+  begin
+    HorizontalLineCustom(5000.00, clRangeHigh, 1, psDot, "Edi_Range_1D", TamanhoFonte, tpBottomRight, 0, 0);
+    HorizontalLineCustom(5000.00, clRangeLow, 1, psDot, "Edi_Range_1D", TamanhoFonte, tpTopRight, 0, 0);
+  end; // ← FECHA ExibirRange
+
+  // ============================================
+  // EFFECTIVE WALLS
+  // ============================================
+  if (ExibirEffectiveWalls) then
+  begin
+    HorizontalLineCustom(5055.74, clEffectiveWall, 2, psDashDot, "Edi Effective Put", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(5720.27, clEffectiveWall, 2, psDashDot, "Edi Effective Call", TamanhoFonte, tpTopLeft, 0, 0);
+  end; // ← FECHA ExibirEffectiveWalls
+
+  // ============================================
+  // MAX PAIN
+  // ============================================
+  if (ExibirMaxPain) then
+  begin
+    HorizontalLineCustom(5100.00, clMaxPain, 2, psSolid, "Edi_MaxPain", TamanhoFonte, tpTopRight, CurrentDate, 0);
+  end; // ← FECHA ExibirMaxPain
+
+  // ============================================
+  // FLIPS (Dinâmicos)
+  // ============================================
+  if (ExibirFlips) then
+  begin
+    if (GammaVal > 0) then
+      HorizontalLineCustom(GammaVal, clGammaFlip, 2, psDash, "Edi_GammaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    if (5133.07 > 0) then
+      HorizontalLineCustom(5133.07, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
+  end; // ← FECHA ExibirFlips
+
+  // ============================================
+  // EDI WALL (Midpoints)
+  // ============================================
+  if (ExibirEdiWall) then
+  begin
+    HorizontalLineCustom(4850.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(4912.50, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(4962.50, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5025.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5075.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5125.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5175.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5225.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5300.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5375.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5450.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5600.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5800.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5950.00, clEdiWall, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+  end; // ← FECHA ExibirEdiWall
+
+  // ============================================
+  // PLUS (Fibonacci)
+  // ============================================
+  if (MostrarPLUS) then
+  begin
+    HorizontalLineCustom(4838.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(4861.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(4909.55, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(4915.45, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(4953.65, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(4971.35, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5019.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5030.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5069.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5080.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5119.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5130.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5169.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5180.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5219.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5230.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5288.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5311.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5369.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5380.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5438.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5461.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5576.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5623.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5776.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5823.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5938.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5961.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+  end; // ← FECHA MostrarPLUS
+
+  // ============================================
+  // PLUS2 (Fibonacci 2)
+  // ============================================
+  if (MostrarPLUS2) then
+  begin
+    HorizontalLineCustom(4823.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(4876.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(4905.90, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(4919.10, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(4942.70, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(4982.30, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5011.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5038.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5061.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5088.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5111.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5138.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5161.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5188.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5211.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5238.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5273.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5326.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5361.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5388.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5423.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5476.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5547.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5652.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5747.20, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5852.80, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5923.60, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+    HorizontalLineCustom(5976.40, clFib, 1, psDash, "Edi_Wall", TamanhoFonte, tpTopLeft, CurrentDate, 0);
+  end; // ← FECHA MostrarPLUS2
+
+  // ============================================
+  // MELHORES PONTOS
+  // ============================================
+  if (ExibirMelhoresPontos) then
+  begin
+    HorizontalLineCustom(4980.97, clRed, 1, psDash, "Edi_Wall_Venda", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(4976.03, clLime, 1, psDash, "Edi_Wall_Compra", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(4990.36, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(4966.67, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(5014.78, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(4942.48, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(5132.71, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(4828.92, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
+  end; // ← FECHA ExibirMelhoresPontos
+
+  // ============================================
+  // OPCOES EDI
+  // ============================================
+  if (ExibirOpcoesEdi) then
+  begin
+    HorizontalLineCustom(4340.14, clFib, 1, psDot, "OpcoesEdiMap_A_P_2400", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(4520.98, clEffectiveWall, 1, psDot, "OpcoesEdiMap_A_C_2500", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(6148.53, clEffectiveWall, 1, psDot, "OpcoesEdiMap_A_C_3400", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(5244.33, clEdiWall, 2, psSolid, "OpcoesEdiMap_A_MediaIntervalo", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(5648.34, clEffectiveWall, 2, psDashDot, "OpcoesEdiMap_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
+  end; // ← FECHA ExibirOpcoesEdi
+
+  // ============================================
+  // USD BETA
+  // ============================================
+  if (ExibirUsdBeta) then
+  begin
+    if (JanelaUsdBeta = 30) then
+    begin
+      HorizontalLineCustom(5244.33, clEffectiveWall, 2, psSolid, "UsdBeta_30_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5648.34, clFib, 2, psDashDot, "UsdBeta_30_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(4999.60, clMaxPain, 1, psDot, "UsdBeta_30_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
+    end; // ← FECHA JanelaUsdBeta=30
+
+    if (JanelaUsdBeta = 60) then
+    begin
+      HorizontalLineCustom(5244.33, clEffectiveWall, 2, psSolid, "UsdBeta_60_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5648.34, clFib, 2, psDashDot, "UsdBeta_60_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(4999.60, clMaxPain, 1, psDot, "UsdBeta_60_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
+    end; // ← FECHA JanelaUsdBeta=60
+
+    if (JanelaUsdBeta = 90) then
+    begin
+      HorizontalLineCustom(5244.33, clEffectiveWall, 2, psSolid, "UsdBeta_90_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5648.34, clFib, 2, psDashDot, "UsdBeta_90_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(4999.60, clMaxPain, 1, psDot, "UsdBeta_90_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
+    end; // ← FECHA JanelaUsdBeta=90
+
+    if (JanelaUsdBeta = 252) then
+    begin
+      HorizontalLineCustom(5244.33, clEffectiveWall, 2, psSolid, "UsdBeta_252_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5648.34, clFib, 2, psDashDot, "UsdBeta_252_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(4999.60, clMaxPain, 1, psDot, "UsdBeta_252_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
+    end; // ← FECHA JanelaUsdBeta=252
+
+    if (JanelaUsdBeta = 0) then
+    begin
+      HorizontalLineCustom(5244.33, clEffectiveWall, 2, psSolid, "UsdBeta_30_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5648.34, clFib, 2, psDashDot, "UsdBeta_30_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(4999.60, clMaxPain, 1, psDot, "UsdBeta_30_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5244.33, clEffectiveWall, 2, psSolid, "UsdBeta_60_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5648.34, clFib, 2, psDashDot, "UsdBeta_60_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(4999.60, clMaxPain, 1, psDot, "UsdBeta_60_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5244.33, clEffectiveWall, 2, psSolid, "UsdBeta_90_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5648.34, clFib, 2, psDashDot, "UsdBeta_90_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(4999.60, clMaxPain, 1, psDot, "UsdBeta_90_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5244.33, clEffectiveWall, 2, psSolid, "UsdBeta_252_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5648.34, clFib, 2, psDashDot, "UsdBeta_252_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(4999.60, clMaxPain, 1, psDot, "UsdBeta_252_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
+    end; // ← FECHA JanelaUsdBeta=0
+  end; // ← FECHA ExibirUsdBeta
+
+end; // ← FECHA bloco principal
+```
+
+---
+
+## 📊 Resumo Visual das Correções
+
+```
+ANTES (errado):                    DEPOIS (correto):
+                                   
+begin                              begin
+  Walls (ok, sem begin)              Walls begin/end ✓
+  Range (ok, sem begin)              Range begin/end ✓
+  EffectiveWalls (ok)                EffectiveWalls begin/end ✓
+  MaxPain (ok)                       MaxPain begin/end ✓
+  Flips begin ←SEM END              Flips begin/end ✓
+    EdiWall begin ←SEM END           EdiWall begin/end ✓
+      PLUS begin ←SEM END            PLUS begin/end ✓
+        PLUS2 begin ←SEM END         PLUS2 begin/end ✓
+          MelhoresPontos begin/end   MelhoresPontos begin/end ✓
+          OpcoesEdi begin/end        OpcoesEdi begin/end ✓
+          UsdBeta begin/end          UsdBeta begin/end ✓
+end; ← 1 end para 5 begins!       end; ← 1 end para 1 begin ✓
+```
+
+**A regra é simples: cada `begin` precisa do seu `end;` correspondente antes do próximo bloco `if` independente.**

@@ -1,0 +1,192 @@
+{
+  "meta": { "country": "EUA", "version": 1 },
+  "defaults": {
+    "matrixKey": "US_DEFAULT",
+    "wdo": "Se forte/hawkish: ↑ | Se fraco/dovish: ↓",
+    "win": "Se forte/hawkish: ↓ | Se fraco/dovish: ↑"
+  },
+  "events": [
+    {
+      "key": "US_FOMC",
+      "title": "FOMC / Fed (decisão/ata)",
+      "aliases": ["fomc", "decisao de taxa de juros", "decisao da taxa de juros", "ata do fomc", "minutes do fomc", "comunicado do fomc", "taxa de juros do fed"],
+      "reactions": {
+        "matrixKey": "US_FOMC",
+        "wdo": "Se mais hawkish que o esperado: ↑ | Se mais dovish: ↓",
+        "win": "Se mais hawkish que o esperado: ↓ | Se mais dovish: ↑"
+      },
+      "report": { "fetchOnCalendar": true, "query": "US FOMC rate decision minutes" }
+    },
+    {
+      "key": "US_CPI",
+      "title": "CPI (inflação EUA)",
+      "aliases": ["cpi", "indice de precos ao consumidor"],
+      "reactions": {
+        "matrixKey": "US_CPI",
+        "wdo": "Se acima do consenso: ↑ | Se abaixo do consenso: ↓",
+        "win": "Se acima do consenso: ↓ | Se abaixo do consenso: ↑"
+      },
+      "report": { "fetchOnCalendar": true, "query": "US CPI" }
+    },
+    {
+      "key": "US_PCE",
+      "title": "PCE (inflação EUA)",
+      "aliases": ["pce", "despesas de consumo pessoal"],
+      "reactions": {
+        "matrixKey": "US_PCE",
+        "wdo": "Se acima do consenso: ↑ | Se abaixo do consenso: ↓",
+        "win": "Se acima do consenso: ↓ | Se abaixo do consenso: ↑"
+      },
+      "report": { "fetchOnCalendar": true, "query": "US PCE" }
+    },
+    {
+      "key": "US_PPI",
+      "title": "PPI (inflação EUA)",
+      "aliases": ["ppi", "indice de precos ao produtor", "índice de preços ao produtor"],
+      "reactions": {
+        "matrixKey": "US_PPI",
+        "wdo": "Se acima do consenso: ↑ | Se abaixo do consenso: ↓",
+        "win": "Se acima do consenso: ↓ | Se abaixo do consenso: ↑"
+      }
+    },
+    {
+      "key": "US_NFP",
+      "title": "Payroll / NFP",
+      "aliases": ["payroll", "nfp", "folha de pagamento", "empregos nao agricolas", "empregos não agrícolas"],
+      "reactions": {
+        "matrixKey": "US_NFP",
+        "wdo": "Se forte: ↑ | Se fraco: ↓",
+        "win": "Se forte: ↓ | Se fraco: ↑"
+      },
+      "report": { "fetchOnCalendar": true, "query": "US Nonfarm Payrolls" }
+    },
+    {
+      "key": "US_ADP",
+      "title": "ADP (emprego)",
+      "aliases": ["adp", "variacao de empregos da adp", "variação de empregos da adp"],
+      "reactions": {
+        "matrixKey": "US_ADP",
+        "wdo": "Se forte: ↑ | Se fraco: ↓",
+        "win": "Se forte: ↓ | Se fraco: ↑"
+      }
+    },
+    {
+      "key": "US_JOBLESS_CLAIMS",
+      "title": "Jobless Claims (seguro-desemprego)",
+      "aliases": ["seguro-desemprego", "jobless", "claims", "pedidos de seguro desemprego"],
+      "reactions": {
+        "matrixKey": "US_JOBLESS_CLAIMS",
+        "wdo": "Se claims menores (mercado forte): ↑ | Se claims maiores (mercado fraco): ↓",
+        "win": "Se claims menores: ↓ | Se claims maiores: ↑"
+      }
+    },
+    {
+      "key": "US_RETAIL_SALES",
+      "title": "Retail Sales",
+      "aliases": ["retail sales", "vendas no varejo"],
+      "reactions": {
+        "matrixKey": "US_RETAIL_SALES",
+        "wdo": "Se forte: ↑ | Se fraco: ↓",
+        "win": "Se forte: ↓ | Se fraco: ↑"
+      }
+    },
+    {
+      "key": "US_ISM",
+      "title": "ISM (manufatura/serviços)",
+      "aliases": ["ism", "ism manufatura", "ism servicos", "ism serviços"],
+      "reactions": {
+        "matrixKey": "US_ISM",
+        "wdo": "Se forte: ↑ | Se fraco: ↓",
+        "win": "Se forte: ↓ | Se fraco: ↑"
+      }
+    },
+    {
+      "key": "US_GDP",
+      "title": "GDP (PIB EUA)",
+      "aliases": ["gdp", "pib"],
+      "reactions": {
+        "matrixKey": "US_GDP",
+        "wdo": "Se forte: ↑ | Se fraco: ↓",
+        "win": "Se forte: ↓ | Se fraco: ↑"
+      }
+    },
+    {
+      "key": "US_CRUDE_OIL_INVENTORIES",
+      "title": "Estoques de Petróleo Bruto (EIA/DOE)",
+      "aliases": [
+        "crude oil inventories",
+        "eia crude oil",
+        "eia crude oil inventories",
+        "eia crude oil stocks",
+        "crude oil stocks",
+        "doe crude oil",
+        "estoques de petroleo",
+        "estoques de petróleo",
+        "estoque de petroleo",
+        "estoque de petróleo"
+      ],
+      "reactions": {
+        "matrixKey": "US_CRUDE_OIL_INVENTORIES",
+        "wdo": "Se draw (estoque menor que o consenso): ↓ | Se build (estoque maior que o consenso): ↑",
+        "win": "Se draw (petróleo↑ WTI/Brent): ↑ (PETR↑) | Se build (petróleo↓): ↓ (PETR↓)"
+      },
+      "report": { "fetchOnCalendar": true, "query": "US EIA crude oil inventories" }
+    }
+  ],
+  "rules": [
+    {
+      "key": "US_INFLACAO",
+      "match": { "regex": ["\\b(cpi|pce|ppi|inflac|infla)\\b"] },
+      "reactions": {
+        "matrixKey": "US_INFLACAO",
+        "wdo": "Se acima do consenso: ↑ | Se abaixo do consenso: ↓",
+        "win": "Se acima do consenso: ↓ | Se abaixo do consenso: ↑"
+      }
+    },
+    {
+      "key": "US_JUROS_FED",
+      "match": { "regex": ["\\b(fomc|fed|rate decision|taxa de juros|minutes|ata)\\b"] },
+      "reactions": {
+        "matrixKey": "US_JUROS_FED",
+        "wdo": "Se mais hawkish que o esperado: ↑ | Se mais dovish: ↓",
+        "win": "Se mais hawkish que o esperado: ↓ | Se mais dovish: ↑"
+      }
+    },
+    {
+      "key": "US_EMPREGO",
+      "match": { "regex": ["\\b(payroll|nfp|adp|employment|emprego|desemprego|jobless|claims)\\b"] },
+      "reactions": {
+        "matrixKey": "US_EMPREGO",
+        "wdo": "Se forte: ↑ | Se fraco: ↓",
+        "win": "Se forte: ↓ | Se fraco: ↑"
+      }
+    },
+    {
+      "key": "US_ATIVIDADE",
+      "match": { "regex": ["\\b(gdp|pib|ism|pmi|retail|vendas|housing|moradias|industrial)\\b"] },
+      "reactions": {
+        "matrixKey": "US_ATIVIDADE",
+        "wdo": "Se forte: ↑ | Se fraco: ↓",
+        "win": "Se forte: ↓ | Se fraco: ↑"
+      }
+    },
+    {
+      "key": "US_SPEECH",
+      "match": { "regex": ["\\b(discurso|speech)\\b"] },
+      "reactions": {
+        "matrixKey": "US_SPEECH",
+        "wdo": "Se hawkish: ↑ | Se dovish: ↓",
+        "win": "Se hawkish: ↓ | Se dovish: ↑"
+      }
+    },
+    {
+      "key": "US_AUCTION",
+      "match": { "regex": ["\\b(leilao|auction)\\b"] },
+      "reactions": {
+        "matrixKey": "US_AUCTION",
+        "wdo": "Se yield sobe (pior recepção): ↑ | Se yield cai (boa recepção): ↓",
+        "win": "Se yield sobe: ↓ | Se yield cai: ↑"
+      }
+    }
+  ]
+}

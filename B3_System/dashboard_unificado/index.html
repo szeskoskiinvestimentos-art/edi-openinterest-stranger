@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Dashboard Unificado WDO/WIN</title>
+  <style>
+    body{margin:0;background:#0b0b0b;height:100vh}
+    .shell{height:100vh;display:flex;flex-direction:column}
+    .top{flex:0 0 164px;border-bottom:1px solid rgba(255,255,255,.08);background:#0b0b0b}
+    .main{flex:1 1 auto}
+    iframe{width:100%;height:100%;border:0;display:block;background:#0e0e0e}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="top">
+      <iframe id="compass"></iframe>
+    </div>
+    <div class="main">
+      <iframe id="dash"></iframe>
+    </div>
+  </div>
+  <script>
+    (function(){
+      const compass = document.getElementById('compass');
+      const iframe = document.getElementById('dash');
+      if (!iframe) return;
+      const isFile = location.protocol === 'file:';
+      const suffix = isFile ? '' : `?v=${String(Date.now())}`;
+      iframe.src = `WDO/index.html${suffix}`;
+      if (compass) {
+        const extra = isFile ? '' : `&v=${String(Date.now())}`;
+        const base = `../../Cotacoes/dashboard/MERCADO/index.html?embed=compass${extra}`;
+        compass.src = base;
+      }
+    })();
+  </script>
+</body>
+</html>

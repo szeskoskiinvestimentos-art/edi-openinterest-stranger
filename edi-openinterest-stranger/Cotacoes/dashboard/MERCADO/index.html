@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDI Market Guardian - Cotações de Mercado</title>
+    <link rel="stylesheet" href="../WDO/assets/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" onerror="this.onerror=function(){this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'};this.src='https://unpkg.com/chart.js/dist/chart.umd.min.js'"></script>
+    <style>
+        .market-ticker {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border: 1px solid rgba(0, 243, 255, .28);
+            border-radius: 12px;
+            background: rgba(0, 0, 0, .28);
+            box-shadow: 0 0 18px rgba(0, 243, 255, .08);
+            overflow: hidden;
+        }
+        .market-ticker__label {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            letter-spacing: 2px;
+            color: var(--secondary-neon);
+            text-shadow: 0 0 10px rgba(0, 243, 255, .35);
+            flex: 0 0 auto;
+        }
+        .market-ticker__viewport {
+            position: relative;
+            overflow: hidden;
+            flex: 1;
+            min-width: 0;
+        }
+        .market-ticker__viewport::before,
+        .market-ticker__viewport::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 36px;
+            pointer-events: none;
+            z-index: 2;
+        }
+        .market-ticker__viewport::before {
+            left: 0;
+            background: linear-gradient(90deg, rgba(10, 10, 10, .95), rgba(10, 10, 10, 0));
+        }
+        .market-ticker__viewport::after {
+            right: 0;
+            background: linear-gradient(270deg, rgba(10, 10, 10, .95), rgba(10, 10, 10, 0));
+        }
+        .market-ticker__track {
+            display: flex;
+            width: max-content;
+            gap: 14px;
+            animation: marketTickerScroll 70s linear infinite;
+            will-change: transform;
+        }
+        .market-ticker:hover .market-ticker__track {
+            animation-play-state: paused;
+        }
+        .market-ticker__group {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding-right: 14px;
+        }
+        .market-ticker__item {
+            display: inline-flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 8px 10px;
+            border: 1px solid rgba(255, 255, 255, .10);
+            border-radius: 999px;
+            background: rgba(26, 26, 26, .65);
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+        }
+        .market-ticker__item:hover {
+            border-color: rgba(0, 243, 255, .28);
+        }
+        .market-ticker__short {
+            font-weight: 900;
+            letter-spacing: 1px;
+        }
+        .market-ticker__price {
+            opacity: .9;
+            font-family: 'Share Tech Mono', monospace;
+        }
+        @keyframes marketTickerScroll {
+            from { transform: translateX(0); }
+            to { transform: translateX(-50%); }
+        }
+        #flow-sentinel .flow-sentinel__stack{
+            display:flex;
+            flex-direction:column;
+            gap:16px;
+        }
+        #flow-sentinel .context-box{
+            width:100%;
+            max-height:none !important;
+            height:auto !important;
+            overflow:visible !important;
+        }
+        #flow-sentinel .table-container{
+            width:100%;
+            max-height:none !important;
+            height:auto !important;
+            overflow:visible !important;
+        }
+        #flow-sentinel #fs-components,
+        #flow-sentinel #fs-components > div{
+            max-height:none !important;
+            height:auto !important;
+            overflow:visible !important;
+        }
+        .fs-dot{
+            width:14px;
+            height:14px;
+            border-radius:999px;
+            display:inline-block;
+            box-shadow:0 0 14px rgba(255,255,255,.10);
+        }
+        .fs-dot--sell-usd{background:rgba(0,255,160,.95);box-shadow:0 0 16px rgba(0,255,160,.35)}
+        .fs-dot--buy-usd{background:rgba(255,60,80,.95);box-shadow:0 0 16px rgba(255,60,80,.35)}
+        .fs-dot--neutral{background:rgba(255,210,74,.95);box-shadow:0 0 16px rgba(255,210,74,.25)}
+        @keyframes fsDotPulse{
+            0%{transform:scale(1);filter:brightness(1)}
+            50%{transform:scale(1.35);filter:brightness(1.25)}
+            100%{transform:scale(1);filter:brightness(1)}
+        }
+        .fs-dot--blink{animation:fsDotPulse .9s ease-in-out infinite}
+        .fs-thermo{
+            height:12px;
+            border-radius:999px;
+            border:1px solid rgba(255,255,255,.14);
+            background:rgba(255,255,255,.06);
+            overflow:hidden;
+            position:relative;
+        }
+        .fs-thermo__fill{
+            height:100%;
+            width:0%;
+            background:linear-gradient(90deg, rgba(255,60,80,.95) 0%, rgba(255,210,74,.95) 50%, rgba(0,255,160,.95) 100%);
+            border-radius:999px;
+            transition:width .25s ease;
+        }
+        .fs-thermo__pin{
+            position:absolute;
+            top:50%;
+            width:10px;
+            height:10px;
+            border-radius:999px;
+            transform:translate(-50%,-50%);
+            background:rgba(255,255,255,.92);
+            box-shadow:0 0 14px rgba(255,255,255,.22);
+            left:0%;
+            transition:left .25s ease;
+        }
+        #panorama .table-container{
+            width:100%;
+            max-height:none !important;
+            height:auto !important;
+            overflow:visible !important;
+        }
+        #intel .context-box{
+            max-height:none !important;
+            height:auto !important;
+            overflow-y:visible !important;
+        }
+        #intel .table-container{
+            max-height:none !important;
+            height:auto !important;
+            overflow-y:visible !important;
+            overflow-x:auto !important;
+        }
+        #overview .table-container{
+            max-height:none !important;
+            height:auto !important;
+            overflow-y:visible !important;
+            overflow-x:auto !important;
+        }
+        #commodities .table-container{
+            max-height:none !important;
+            height:auto !important;
+            overflow:visible !important;
+        }
+        #fx-carry .table-container{
+            max-height:none !important;
+            height:auto !important;
+            overflow:visible !important;
+        }
+        .agenda-matrix-wrap{
+            position:relative;
+        }
+        .agenda-matrix-legend{
+            position:absolute;
+            top:10px;
+            right:10px;
+            z-index:3;
+            display:flex;
+            gap:10px;
+            align-items:center;
+            padding:6px 10px;
+            border:1px solid rgba(255,255,255,.14);
+            border-radius:999px;
+            background:rgba(0,0,0,.22);
+            backdrop-filter: blur(6px);
+            font-family:'Share Tech Mono',monospace;
+            font-weight:900;
+            letter-spacing:.6px;
+            opacity:.92;
+            user-select:none;
+            pointer-events:auto;
+            box-shadow:0 0 16px rgba(0,243,255,.10);
+        }
+        .agenda-matrix-legend__item{
+            display:flex;
+            gap:8px;
+            align-items:center;
+            white-space:nowrap;
+            position:relative;
+            cursor:help;
+        }
+        .agenda-matrix-legend__item[data-tip]:hover::after{
+            content:attr(data-tip);
+            position:absolute;
+            top:calc(100% + 10px);
+            left:50%;
+            transform:translateX(-50%);
+            width:max-content;
+            max-width:260px;
+            white-space:normal;
+            line-height:1.25;
+            font-size:12px;
+            font-weight:800;
+            letter-spacing:.2px;
+            padding:10px 12px;
+            border-radius:12px;
+            background:rgba(0,0,0,.88);
+            border:1px solid rgba(255,255,255,.16);
+            box-shadow:0 0 20px rgba(0,0,0,.55);
+            color:#f2f2f2;
+            z-index:10;
+        }
+        .agenda-matrix-legend__item[data-tip]:hover::before{
+            content:"";
+            position:absolute;
+            top:calc(100% + 4px);
+            left:50%;
+            transform:translateX(-50%);
+            width:10px;
+            height:10px;
+            background:rgba(0,0,0,.88);
+            border-left:1px solid rgba(255,255,255,.16);
+            border-top:1px solid rgba(255,255,255,.16);
+            rotate:45deg;
+            z-index:11;
+        }
+        .agenda-matrix-legend__icon{
+            width:24px;
+            height:24px;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            border-radius:999px;
+            border:1px solid rgba(255,255,255,.18);
+            background:rgba(0,0,0,.18);
+        }
+        .agenda-matrix-legend__icon svg{
+            width:18px;
+            height:18px;
+            display:block;
+        }
+        .panorama-grid{
+            column-width:360px;
+            column-gap:14px;
+        }
+        .panorama-card{
+            border:1px solid rgba(255,255,255,.12);
+            border-radius:14px;
+            padding:12px;
+            background:rgba(0,0,0,.18);
+            display:inline-block;
+            width:100%;
+            break-inside:avoid;
+            margin:0 0 14px;
+        }
+        .panorama-card--wide{
+            grid-column:1 / -1;
+        }
+        .panorama-card__header{
+            display:flex;
+            justify-content:space-between;
+            gap:10px;
+            align-items:center;
+            margin-bottom:10px;
+        }
+        .panorama-card__title{
+            font-weight:900;
+            letter-spacing:1px;
+            opacity:.95;
+        }
+        .panorama-freeze{
+            background:#1b1b1b;
+            color:#e0e0e0;
+            border:1px solid rgba(255,255,255,.18);
+            padding:6px 10px;
+            border-radius:10px;
+            font-weight:800;
+            letter-spacing:.5px;
+            cursor:pointer;
+        }
+        .panorama-freeze[aria-pressed="true"]{
+            border-color:rgba(0,255,160,.55);
+            box-shadow:0 0 16px rgba(0,255,160,.18);
+        }
+        .panorama-table{
+            width:100%;
+            border-collapse:collapse;
+            table-layout:fixed;
+        }
+        .panorama-table th{
+            text-align:left;
+            opacity:.75;
+            font-weight:900;
+            font-size:12px;
+            letter-spacing:.8px;
+            padding:6px 0;
+            border-bottom:1px solid rgba(255,255,255,.08);
+        }
+        .panorama-table th:nth-child(1), .panorama-table td:nth-child(1){width:52%}
+        .panorama-table th:nth-child(2), .panorama-table td:nth-child(2){width:16%}
+        .panorama-table th:nth-child(3), .panorama-table td:nth-child(3){width:16%}
+        .panorama-table th:nth-child(4), .panorama-table td:nth-child(4){width:16%}
+        .panorama-table td{
+            padding:8px 0;
+            border-bottom:1px solid rgba(255,255,255,.06);
+            vertical-align:middle;
+        }
+        .panorama-asset{
+            display:flex;
+            gap:10px;
+            align-items:flex-start;
+            min-width:0;
+        }
+        .panorama-asset__name{
+            font-weight:900;
+            opacity:.92;
+            white-space:normal;
+            overflow-wrap:anywhere;
+            word-break:break-word;
+            hyphens:auto;
+            line-height:1.15;
+        }
+        .panorama-mono{
+            font-family:'Share Tech Mono',monospace;
+            font-weight:900;
+            white-space:nowrap;
+        }
+        @media (max-width: 520px){
+            .panorama-grid{column-width:auto}
+            .panorama-table th{font-size:11px}
+            .panorama-table td{padding:10px 0}
+            .panorama-table th:nth-child(1), .panorama-table td:nth-child(1){width:58%}
+            .panorama-table th:nth-child(2), .panorama-table td:nth-child(2){width:14%}
+            .panorama-table th:nth-child(3), .panorama-table td:nth-child(3){width:14%}
+            .panorama-table th:nth-child(4), .panorama-table td:nth-child(4){width:14%}
+        }
+        .help-grid{
+            display:grid;
+            grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+            gap:12px;
+            margin-top:10px;
+        }
+        .help-col{
+            border:1px solid rgba(255,255,255,.10);
+            border-radius:10px;
+            padding:10px 12px;
+            background:rgba(0,0,0,.18);
+        }
+        .help-title{
+            font-family:'Orbitron',sans-serif;
+            font-weight:900;
+            letter-spacing:1px;
+            font-size:12px;
+            opacity:.92;
+            margin-bottom:6px;
+        }
+        .help-col ul{
+            margin:0 0 0 18px;
+            opacity:.92;
+            line-height:1.45;
+        }
+
+        .quicknav-btn{
+            background:#141414;
+            color:#e0e0e0;
+            border:1px solid #333;
+            padding:6px 10px;
+            border-radius:999px;
+            font-weight:900;
+            letter-spacing:1px;
+            cursor:pointer;
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            white-space:nowrap;
+        }
+        .quicknav-btn:hover{
+            border-color:rgba(0,243,255,.45);
+            color:rgba(0,243,255,.95);
+            box-shadow:0 0 18px rgba(0,243,255,.12);
+        }
+        .quicknav-overlay{
+            position:fixed;
+            inset:0;
+            background:rgba(0,0,0,.55);
+            backdrop-filter:blur(2px);
+            z-index:120;
+            opacity:0;
+            pointer-events:none;
+            transition:opacity .18s ease;
+        }
+        .quicknav-overlay.is-open{
+            opacity:1;
+            pointer-events:auto;
+        }
+        .quicknav{
+            position:fixed;
+            top:0;
+            right:0;
+            width:min(420px, calc(100vw - 24px));
+            height:100vh;
+            background:linear-gradient(180deg, rgba(10,10,16,.98), rgba(8,8,12,.96));
+            border-left:1px solid rgba(0,243,255,.18);
+            box-shadow:-10px 0 40px rgba(0,0,0,.45);
+            z-index:121;
+            transform:translateX(105%);
+            transition:transform .22s ease;
+            display:flex;
+            flex-direction:column;
+        }
+        .quicknav.is-open{
+            transform:translateX(0);
+        }
+        .quicknav__head{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:10px;
+            padding:14px 14px 10px;
+            border-bottom:1px solid rgba(255,255,255,.08);
+        }
+        .quicknav__title{
+            font-family:'Orbitron',sans-serif;
+            font-weight:900;
+            letter-spacing:2px;
+            font-size:13px;
+            color:rgba(0,243,255,.92);
+            text-transform:uppercase;
+        }
+        .quicknav__close{
+            background:rgba(0,0,0,.18);
+            color:#e0e0e0;
+            border:1px solid rgba(255,255,255,.14);
+            padding:7px 10px;
+            border-radius:10px;
+            font-weight:900;
+            cursor:pointer;
+        }
+        .quicknav__close:hover{
+            border-color:rgba(0,243,255,.45);
+            color:rgba(0,243,255,.95);
+        }
+        .quicknav__body{
+            padding:12px 14px 16px;
+            overflow:auto;
+            overscroll-behavior:contain;
+        }
+        .quicknav__search{
+            display:flex;
+            gap:10px;
+            align-items:center;
+            margin-bottom:12px;
+        }
+        .quicknav__search input{
+            width:100%;
+            background:#141414;
+            color:#e0e0e0;
+            border:1px solid rgba(255,255,255,.14);
+            padding:10px 12px;
+            border-radius:12px;
+            font-weight:800;
+            outline:none;
+        }
+        .quicknav__search input:focus{
+            border-color:rgba(0,243,255,.55);
+            box-shadow:0 0 0 3px rgba(0,243,255,.12);
+        }
+        .quicknav__list{
+            display:flex;
+            flex-direction:column;
+            gap:8px;
+        }
+        .quicknav__item{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:10px;
+            padding:10px 12px;
+            border-radius:12px;
+            border:1px solid rgba(255,255,255,.10);
+            background:rgba(0,0,0,.22);
+            text-decoration:none;
+            color:#e0e0e0;
+            font-weight:900;
+            letter-spacing:.3px;
+            transition:transform .12s ease, border-color .12s ease, background .12s ease;
+        }
+        .quicknav__item:hover{
+            transform:translateY(-1px);
+            border-color:rgba(0,243,255,.35);
+            background:rgba(0,243,255,.08);
+        }
+        .quicknav__item.is-active{
+            border-color:rgba(0,243,255,.55);
+            background:rgba(0,243,255,.12);
+            color:rgba(0,243,255,.95);
+            box-shadow:0 0 18px rgba(0,243,255,.12);
+        }
+        .quicknav__pill{
+            font-size:11px;
+            opacity:.85;
+            border:1px solid rgba(255,255,255,.12);
+            padding:4px 8px;
+            border-radius:999px;
+            background:rgba(0,0,0,.20);
+            white-space:nowrap;
+        }
+
+        .nav-shell{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+        }
+        .nav-left{
+            display:flex;
+            align-items:center;
+            gap:12px;
+            min-width:0;
+        }
+        .nav-links{
+            display:flex;
+            align-items:center;
+            gap:10px;
+            flex-wrap:wrap;
+            min-width:0;
+        }
+        .nav-chip{
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            padding:8px 12px;
+            border-radius:999px;
+            border:1px solid rgba(255,255,255,.10);
+            background:rgba(0,0,0,.20);
+            font-weight:900;
+            letter-spacing:1px;
+            text-transform:uppercase;
+            font-size:12px;
+            white-space:nowrap;
+        }
+        .nav-chip:hover{
+            border-color:rgba(0,243,255,.35);
+            background:rgba(0,243,255,.08);
+        }
+        .nav-chip.active{
+            border-color:rgba(0,243,255,.55);
+            background:rgba(0,243,255,.12);
+            color:rgba(0,243,255,.95);
+            text-shadow:none;
+        }
+        .nav-more{
+            position:relative;
+        }
+        .nav-more__btn{
+            background:#141414;
+            color:#e0e0e0;
+            border:1px solid #333;
+            padding:8px 12px;
+            border-radius:999px;
+            font-weight:900;
+            letter-spacing:1px;
+            cursor:pointer;
+            white-space:nowrap;
+            text-transform:uppercase;
+            font-size:12px;
+        }
+        .nav-more__btn:hover{
+            border-color:rgba(0,243,255,.45);
+            color:rgba(0,243,255,.95);
+            box-shadow:0 0 18px rgba(0,243,255,.12);
+        }
+        .nav-more__panel{
+            position:absolute;
+            top:calc(100% + 10px);
+            left:0;
+            width:min(520px, calc(100vw - 24px));
+            background:linear-gradient(180deg, rgba(10,10,16,.98), rgba(8,8,12,.96));
+            border:1px solid rgba(0,243,255,.18);
+            box-shadow:0 12px 36px rgba(0,0,0,.45);
+            border-radius:14px;
+            padding:12px;
+            display:none;
+            z-index:110;
+            max-height:calc(100vh - 140px);
+            overflow:auto;
+            overscroll-behavior:contain;
+            scrollbar-gutter:stable;
+            -webkit-overflow-scrolling:touch;
+        }
+        .nav-more__panel.is-open{
+            display:block;
+        }
+        .nav-more__grid{
+            display:grid;
+            grid-template-columns:repeat(2, minmax(0, 1fr));
+            gap:12px;
+        }
+        .nav-more__group{
+            border:1px solid rgba(255,255,255,.08);
+            border-radius:12px;
+            padding:10px;
+            background:rgba(0,0,0,.18);
+            display:flex;
+            flex-direction:column;
+            gap:8px;
+            min-width:0;
+        }
+        .nav-more__title{
+            font-family:'Orbitron',sans-serif;
+            font-weight:900;
+            letter-spacing:1px;
+            font-size:12px;
+            opacity:.92;
+            color:rgba(0,243,255,.85);
+            text-transform:uppercase;
+        }
+        .nav-more__group a{
+            text-decoration:none;
+        }
+        .nav-actions{
+            display:flex;
+            gap:10px;
+            align-items:center;
+            flex:0 0 auto;
+        }
+        .nav-actions .quicknav-btn{
+            padding:8px 12px;
+        }
+        .quicksearch-btn{
+            background:#141414;
+            color:#e0e0e0;
+            border:1px solid #333;
+            padding:8px 12px;
+            border-radius:999px;
+            font-weight:900;
+            letter-spacing:1px;
+            cursor:pointer;
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            white-space:nowrap;
+            text-transform:uppercase;
+            font-size:12px;
+        }
+        .quicksearch-btn:hover{
+            border-color:rgba(0,243,255,.45);
+            color:rgba(0,243,255,.95);
+            box-shadow:0 0 18px rgba(0,243,255,.12);
+        }
+        @media (max-width: 980px){
+            .nav-more__grid{grid-template-columns:1fr}
+        }
+        @media (max-width: 820px){
+            .nav-links{gap:8px}
+            .nav-chip{padding:7px 10px;font-size:11px}
+            .nav-more__btn{padding:7px 10px;font-size:11px}
+            .quicksearch-btn{padding:7px 10px;font-size:11px}
+            .nav-actions{gap:8px}
+        }
+    </style>
+</head>
+<body>
+    <div id="particles-js"></div>
+
+    <header class="header">
+        <div class="container">
+            <div class="logo">
+                <h1 class="logo-text">EDI MARKET GUARDIAN</h1>
+                <div class="logo-subtitle">
+                    COTAÇÕES DE MERCADO
+                    <span id="last-update-label"></span>
+                </div>
+            </div>
+            <div class="header-glow"></div>
+        </div>
+    </header>
+
+    <nav class="nav">
+        <div class="container nav-shell">
+            <div class="nav-left">
+                <div class="nav-links" aria-label="Navegação superior">
+                    <div id="navPrimaryLinks" style="display:contents;"></div>
+
+                    <div class="nav-more">
+                        <button id="navMoreBtn" type="button" class="nav-more__btn" aria-haspopup="true" aria-expanded="false" aria-controls="navMorePanel">
+                            Mais ▾
+                        </button>
+                        <div id="navMorePanel" class="nav-more__panel" role="menu" aria-label="Mais seções">
+                            <div id="navMoreGrid" class="nav-more__grid"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="nav-actions">
+                <button id="quickNavBtn" type="button" class="quicknav-btn" aria-label="Abrir menu de navegação" aria-controls="quickNav" aria-expanded="false" title="Menu rápido">
+                    ☰ Menu
+                </button>
+                <button id="quickSearchBtn" type="button" class="quicksearch-btn" aria-label="Buscar seção" title="Buscar seção (Ctrl+K)">
+                    ⌘ Buscar
+                </button>
+                <select id="assetSelect" aria-label="Selecionar dashboard" title="Troca de dashboard: MERCADO, WDO ou WIN. Em produção abre o link publicado; no uso local aponta para a pasta do dashboard_unificado." style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 12px;border-radius:999px;font-weight:900;letter-spacing:1px;">
+                    <option value="WDO">WDO</option>
+                    <option value="WIN">WIN</option>
+                    <option value="MERCADO" selected>EDI Market Guardian</option>
+                </select>
+                <button id="reloadDataBtn" type="button" title="Atualiza os dados. Se o atualizador local estiver rodando, ele tenta capturar (Investing/InfoMoney) e salvar em assets/data. Se estiver offline, apenas recarrega o arquivo atual." style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 12px;border-radius:999px;font-weight:900;letter-spacing:1px;cursor:pointer;white-space:nowrap;">
+                    ↻ Dados
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div id="quickNavOverlay" class="quicknav-overlay" aria-hidden="true"></div>
+    <aside id="quickNav" class="quicknav" aria-label="Menu de navegação" aria-hidden="true">
+        <div class="quicknav__head">
+            <div class="quicknav__title">Navegação</div>
+            <button id="quickNavClose" type="button" class="quicknav__close" aria-label="Fechar menu">Fechar</button>
+        </div>
+        <div class="quicknav__body">
+            <div class="quicknav__search">
+                <input id="quickNavSearch" type="text" inputmode="search" autocomplete="off" placeholder="Buscar seção..." aria-label="Buscar seção" />
+            </div>
+            <div id="quickNavList" class="quicknav__list"></div>
+        </div>
+    </aside>
+
+    <main class="main">
+        <div class="container">
+            <section id="overview" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">VISÃO GERAL</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-icon">🧭</div>
+                        <div class="metric-value" id="metric-assets">0</div>
+                        <div class="metric-label">Ativos Monitorados</div>
+                        <div class="metric-change neutral" id="metric-retention">10 dias</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">🚀</div>
+                        <div class="metric-value" id="metric-top-up">—</div>
+                        <div class="metric-label">Maior Alta (agora)</div>
+                        <div class="metric-change positive" id="metric-top-up-pct">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">🧊</div>
+                        <div class="metric-value" id="metric-top-down">—</div>
+                        <div class="metric-label">Maior Queda (agora)</div>
+                        <div class="metric-change negative" id="metric-top-down-pct">—</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">🧲</div>
+                        <div class="metric-value" id="metric-flow">Neutro</div>
+                        <div class="metric-label">Sinal de Fluxo</div>
+                        <div class="metric-change neutral" id="metric-flow-score">0.00</div>
+                    </div>
+                </div>
+
+                <div class="market-ticker" style="margin-top:-16px;margin-bottom:28px;">
+                    <div class="market-ticker__label">MUNDO</div>
+                    <div class="market-ticker__viewport">
+                        <div id="globalTicker" class="market-ticker__track"></div>
+                    </div>
+                </div>
+
+                <div id="operational-now" class="split-layout split-layout--center-text" style="margin-top: 12px;">
+                    <div class="context-box">
+                        <h3>🎯 Resumo Operacional (agora)</h3>
+                        <p>Primeiro bloco do dia: transforma os sinais do painel em um roteiro curto (o que priorizar, quais níveis olhar e qual lado tende a ter melhor assimetria em <b>WIN</b> e <b>WDO</b>).</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="operationalBriefing"></div>
+                    </div>
+                </div>
+
+                <div id="zq-curve" class="split-layout split-layout--center-text" style="margin-top: 16px;">
+                    <div class="context-box">
+                        <h3>📈 Curva Fed Funds (ZQ) — RISK ON/OFF</h3>
+                        <p>Curva de juros implícitos dos EUA (Fed Funds). <b>Curva subindo</b> tende a <b>RISK OFF</b>; <b>curva caindo</b> tende a <b>RISK ON</b>. Fórmula: <span class="mono">Juro (%) = 100 − Preço</span>.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="zqCurveBriefing"></div>
+                    </div>
+                </div>
+
+                <div id="us-equities" class="split-layout split-layout--center-text" style="margin-top: 16px;">
+                    <div class="context-box">
+                        <h3>🇺🇸 Operacional EUA — US30 • Nasdaq • S&amp;P 500</h3>
+                        <p>Bloco dedicado aos EUA: consolida drivers (juros, dólar, vol), confirmações de fluxo (crédito, bonds, EM), correlações (janela curta) e recorte de notícias macro/geopolítica para orientar <b>compra</b>/<b>venda</b> em US30, Nasdaq e S&amp;P 500.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="usEquitiesOperationalBriefing"></div>
+                    </div>
+                </div>
+
+                <div id="commodities" class="split-layout split-layout--center-text" style="margin-top: 16px;">
+                    <div class="context-box">
+                        <h3>🪙⛽ Operacional Commodities — Ouro • Petróleo</h3>
+                        <p>Bloco dedicado a commodities: consolida drivers (dólar, juros, vol), confirmações (crédito/fluxo), correlações (janela curta) e recorte de notícias macro/geopolítica para orientar <b>compra</b>/<b>venda</b> em Ouro e Petróleo.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="commoditiesOperationalBriefing"></div>
+                    </div>
+                </div>
+
+                <div id="petrobras" class="split-layout split-layout--center-text" style="margin-top: 16px;">
+                    <div class="context-box">
+                        <h3>⛽ Operacional Petrobras</h3>
+                        <p>Velocímetro híbrido (tabela + pesos) calibrado para pré-mercado e abertura da B3 (10:00). Clique em um ativo na tabela para abrir o gráfico na seção <b>Mercado Brasileiro</b>.</p>
+                        <div id="petrobrasGauge" style="margin-top:14px;"></div>
+                        <div id="petrobrasMissing" style="margin-top:14px;"></div>
+                    </div>
+                    <div class="table-container">
+                        <div id="petrobrasNews"></div>
+                    </div>
+                </div>
+
+                <div class="table-container" id="petrobrasTable" style="margin-top: 12px;"></div>
+
+                <div class="split-layout split-layout--center-text" style="margin-top: 16px;">
+                    <div class="context-box">
+                        <h3>₿ BTC (Criptos) — Resumo Operacional (USD/BTC)</h3>
+                        <p>Bloco de cripto para leitura operacional do Bitcoin: combina preço/fluxo, correlações globais (NDX/SPX/DXY/vol/juros/crédito), commodities e um recorte de notícias macro/geopolítica relevante.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="btcOperationalBriefing"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout split-layout--center-text" style="margin-top: 16px;">
+                    <div class="context-box">
+                        <h3>🇭🇰 HK50 — Resumo Operacional (agora)</h3>
+                        <p>Bloco dedicado ao HK50 (Hang Seng): consolida drivers diretos (China/HK), confirmações globais (SPX/NDX/vol/juros) e contexto (commodities/EM), incluindo recorte de notícias geopolíticas relevantes.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="hk50OperationalBriefing"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout split-layout--center-text" style="margin-top: 24px;">
+                    <div class="context-box">
+                        <h3>⚡ Top Movers por Grupo</h3>
+                        <p>Resumo instantâneo de rotação por classe. Clique em um item para abrir a tabela correspondente já filtrada pelo símbolo.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="topMovers"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 40px;">
+                    <div class="context-box">
+                        <h3>🧠 Leitura de Fluxo (MVP)</h3>
+                        <p>O sinal de fluxo aqui é uma heurística simples baseada em comportamento conjunto por grupos (commodities/metais/FX/emergentes). Ele é um “termômetro” de risco (risk-on/off) para orientar a leitura macro, sem pretensão de ser preditivo.</p>
+                        <p>Evolução prevista (próximos passos):</p>
+                        <ul style="margin:10px 0 0 18px;opacity:.92;line-height:1.45;">
+                            <li><b>Motor de Carry Trade</b>: medir diferencial de juros e precificação de curva (ex.: US x BR), cruzando com FX (DXY, pares EM) para identificar onde o prêmio de carrego está “entrando/saindo”.</li>
+                            <li><b>Fluxo de Capitais</b>: proxies de fluxo via ETFs/índices e spreads (ex.: equities vs bonds, EM vs DM), além de “risk gauges” (volatilidade/credito) para separar fluxo estrutural de ruído intraday.</li>
+                            <li><b>Regimes</b>: classificar o ambiente (risk-on, risk-off, inflação/deflação, stress de liquidez) e ajustar pesos por regime para evitar sinais falsos.</li>
+                            <li><b>Alertas</b>: disparos por mudança de regime e divergências entre grupos (ex.: commodities fortes com FX/EM fracos) para highlight de rotação.</li>
+                        </ul>
+                        <div id="dataStatus" style="margin-top:12px;font-weight:800;letter-spacing:1px;opacity:.9;"></div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="overviewChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section id="intel" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">INTEL (MVP • Produto Mínimo Viável)</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div class="context-box" style="width:100%;">
+                        <h3>🧭 Regime &amp; Convicção</h3>
+                        <p><b>INTEL (MVP)</b> é a camada de <b>inteligência</b> do dashboard: ela transforma as cotações e sinais disponíveis em uma <b>leitura operacional</b> (o que o mercado está “precificando” agora), com transparência do <b>por quê</b> e do quanto dá para confiar.</p>
+                        <p><b>Regime</b> é a classificação do ambiente (<b>risk-on</b> x <b>risk-off</b>) a partir da concordância entre grupos (FX, commodities, volatilidade, índices). <b>Convicção</b> não é “certeza”; é um termômetro de <b>qualidade do sinal</b> com base em <b>cobertura</b> (quantos itens têm preço) e <b>consistência</b> (se os grupos contam a mesma história).</p>
+                        <p><b>O que isso costuma significar para índice emergente</b> (ex.: Brasil/IBOV, EM ETF): <b>risk-on</b> tende a favorecer <b>entrada de fluxo</b> em emergentes (índice tende a subir) e <b>USD enfraquece</b>; <b>risk-off</b> tende a puxar <b>fuga para segurança</b> (índice emergente tende a cair) e <b>USD fortalece</b>. É uma leitura de <b>probabilidade</b>, não garantia: confirme sempre com o “Por quê” e a Convicção.</p>
+                        <p><b>Como usar</b>: leia o <b>Regime</b>, confirme a <b>Convicção</b>, e então cheque o bloco <b>Por quê</b> (quais variáveis mais puxaram o resultado). Se a convicção estiver baixa, trate como <b>neutro</b> ou sinal fraco e reduza peso na decisão.</p>
+                    </div>
+                    <div class="table-container" style="width:100%;">
+                        <div id="regimeConviction"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 28px;">
+                    <div class="context-box">
+                        <h3>🇨🇳 China Proxy + 🇧🇷 Brasil Produtor</h3>
+                        <p>Leitura Brasil via China (FXI/CSI/HSI) e commodities críticas (Minério/Soja/Petróleo/Cobre), com confluências e divergências.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="chinaBrazil"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 18px;">
+                    <div class="context-box">
+                        <h3>🧲 Zona de Metais (Range do Índice)</h3>
+                        <p>Abordagem prática para estimar o <b>range provável</b> do índice quando <b>Metais divergem</b> (ex.: Minério vs Cobre): calcula-se a diferença entre as variações, divide por 2 e projeta para cima/baixo sobre o <b>fechamento anterior</b>.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="metalsZone"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 18px;">
+                    <div class="context-box">
+                        <h3>🏦 Carry Trade (estado + evidências)</h3>
+                        <p>Leitura qualitativa do carry (building/unwinding/neutro) cruzando diferencial (proxy BR vs US) com FX (DXY e pares-chave). Sem números: apenas estado e evidências.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="carryIntel"></div>
+                    </div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:16px;margin-top:28px;">
+                    <div class="context-box" style="width:100%;">
+                        <h3>📉 Curva (Proxy) por Buckets</h3>
+                        <p>Leitura de juros por <b>curto/médio/longo</b> para transformar a curva em um painel simples: <b>nível</b> (juros altos/baixos) e <b>inclinação</b> (abre/fecha). Isso ajuda a contextualizar o <b>apetite ao risco</b> e o comportamento típico de <b>emergentes</b>.</p>
+                        <p><b>Fonte</b>: quando há <b>DI (B3)</b>, usamos os contratos para montar a curva do Brasil. Quando não há DI, usamos <b>yields globais</b> disponíveis como proxy (ex.: EUA/Europa) para não deixar o bloco vazio.</p>
+                        <ul style="margin:10px 0 0 18px;opacity:.92;line-height:1.45;">
+                            <li><b>Curto</b>: reflete política monetária e expectativa imediata (sensível a “Fed/Copom”).</li>
+                            <li><b>Médio</b>: transição do ciclo; costuma capturar reprecificação do “pouso” (crescimento x inflação).</li>
+                            <li><b>Longo</b>: prêmio de prazo/risco fiscal/inflacionário; “âncora” de percepção estrutural.</li>
+                            <li><b>Shape</b>: <b>STEEPEN</b> (longos ↑ vs curtos) sugere abertura de prêmio de prazo; <b>FLATTEN</b> (curtos ↑ vs longos) sugere aperto no curto e/ou desaceleração à frente.</li>
+                            <li><b>Operacional</b>: curva abrindo e dólar firme tende a piorar para emergentes; curva fechando e dólar mais fraco tende a ajudar. Confirme com <b>Regime</b> e o bloco <b>Por quê</b>.</li>
+                        </ul>
+                    </div>
+                    <div class="table-container" style="width:100%;">
+                        <div id="ratesBuckets"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 18px;">
+                    <div class="context-box">
+                        <h3>🇧🇷 Renda Fixa Brasil &amp; Fluxo</h3>
+                        <p>Painel de renda fixa que transforma a curva de juros do Brasil em <b>leitura operacional</b>: <b>nível</b> (onde está o juro) e <b>direção</b> (yield caindo = entrada/compra; yield subindo = saída/venda). Use a leitura para calibrar <b>risco</b> (bolsa, câmbio e crédito) e valide com as confirmações cross-asset do próprio bloco.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="brazilFixedIncomeFlow"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 28px;">
+                    <div class="context-box">
+                        <h3>🧨 Opções &amp; Gamma (Resumo)</h3>
+                    </div>
+                    <div class="table-container">
+                        <div id="optionsGammaSummary"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 18px;">
+                    <div class="context-box">
+                        <h3>🗞️ Notícias (FinancialJuice)</h3>
+                        <p>Atalho para o feed ao vivo do <b>FinancialJuice</b>. Use este bloco para acompanhar <b>narrativa</b> e <b>eventos</b> em tempo real (macro, política, commodities e risco). Quando algo for material, registre o possível impacto na <b>Agenda &amp; Matriz</b> (WDO/WIN). Não use como fonte de preços/níveis.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="newsFinancialJuice"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 18px;">
+                    <div class="context-box">
+                        <h3>🕸️ Web News Module (Precificação)</h3>
+                        <p>Fallback de notícias quando você está sem bloco de manchetes anexadas. Saída é <b>qualitativa</b> (sem números): o que tende a estar sendo <b>precificado</b> em <b>WDO</b> e <b>WIN</b>, com <b>fontes</b> e <b>carimbo</b> quando disponível.</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="newsWebModule"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 28px;">
+                    <div class="context-box">
+                        <h3>🗓️ Agenda &amp; Matriz (SE–ENTÃO)</h3>
+                    </div>
+                    <div class="table-container agenda-matrix-wrap">
+                        <div class="agenda-matrix-legend" aria-hidden="true">
+                            <div class="agenda-matrix-legend__item" title="Hawkish: postura mais dura com inflação (tende a juros mais altos)." data-tip="Hawkish: postura mais dura com inflação (tende a juros mais altos).">
+                                <span class="agenda-matrix-legend__icon">
+                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M4 13c2-4 6-6 10-6 2 0 4 .5 6 1.4" stroke="rgba(255,60,80,.95)" stroke-width="2" stroke-linecap="round"/>
+                                        <path d="M7 7l-2-3M17 7l2-3" stroke="rgba(255,60,80,.95)" stroke-width="2" stroke-linecap="round"/>
+                                        <path d="M6 16c1.6 2.8 4.2 4.2 6 4.2S16.4 18.8 18 16" stroke="rgba(255,60,80,.95)" stroke-width="2" stroke-linecap="round"/>
+                                        <path d="M9 12c.7-1 1.7-1.5 3-1.5S14.3 11 15 12" stroke="rgba(255,60,80,.95)" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                </span>
+                                <span>Hawkish</span>
+                            </div>
+                            <div class="agenda-matrix-legend__item" title="Dovish: postura mais suave (tende a juros mais baixos/cortes)." data-tip="Dovish: postura mais suave (tende a juros mais baixos/cortes).">
+                                <span class="agenda-matrix-legend__icon">
+                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M4 14c2.2-4 6.2-6 10-6 2 0 4 .5 6 1.4" stroke="rgba(0,255,160,.95)" stroke-width="2" stroke-linecap="round"/>
+                                        <path d="M9 8c-1.2-1-2-2.2-2.4-3.6M15 8c1.2-1 2-2.2 2.4-3.6" stroke="rgba(0,255,160,.95)" stroke-width="2" stroke-linecap="round"/>
+                                        <path d="M7 17c1.6 2.4 3.6 3.8 5 3.8s3.4-1.4 5-3.8" stroke="rgba(0,255,160,.95)" stroke-width="2" stroke-linecap="round"/>
+                                        <path d="M9 13c.7-1 1.7-1.5 3-1.5S14.3 12 15 13" stroke="rgba(0,255,160,.95)" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                </span>
+                                <span>Dovish</span>
+                            </div>
+                        </div>
+                        <div id="agendaMatrix"></div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 18px;">
+                    <div class="context-box">
+                        <h3>📆 Calendário Econômico (Investing)</h3>
+                        <p>O Investing pode bloquear incorporação em iframe (X-Frame-Options). Use o link para abrir em nova aba. A captura tenta transformar o calendário em lista no módulo <b>Agenda &amp; Matriz</b>.</p>
+                    </div>
+                    <div class="table-container calendar-widget">
+                        <div class="calendar-widget__inner">
+                            <div class="poweredBy calendar-widget__poweredby">
+                                <span>
+                                    <a
+                                        href="https://br.investing.com/economic-calendar/"
+                                        rel="nofollow"
+                                        target="_blank"
+                                        class="underline_link"
+                                    >Abrir Calendário do Investing</a>
+                                </span>
+                            </div>
+                            <details id="investingCalendarWidget" open style="margin-top:10px;">
+                                <summary style="cursor:pointer;opacity:.9;font-weight:900;">Tentar exibir o widget aqui</summary>
+                                <div style="margin-top:10px;border:1px solid rgba(255,255,255,.10);border-radius:12px;overflow:hidden;">
+                                    <iframe
+                                        class="calendar-widget__iframe"
+                                        src="about:blank"
+                                        data-src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&features=datepicker,timezone,timeselector,filters&countries=110,32,6,37,5,39,35,7,72&calType=day&timeZone=12&lang=12"
+                                        width="650"
+                                        height="467"
+                                        frameborder="0"
+                                        allowtransparency="true"
+                                        marginwidth="0"
+                                        marginheight="0"
+                                    ></iframe>
+                                </div>
+                                <div class="poweredBy" style="font-family: Arial, Helvetica, sans-serif;margin-top:8px;">
+                                    <span style="font-size: 11px;color: #cfcfcf;text-decoration: none;">
+                                        Calendário Econômico fornecido por
+                                        <a href="https://br.investing.com/" rel="nofollow" target="_blank" style="font-size: 11px;color: #6fb7ff; font-weight: bold;" class="underline_link">Investing.com Brasil</a>, o portal líder financeiro.
+                                    </span>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:16px;margin-top:28px;">
+                    <div class="context-box" style="width:100%;">
+                        <h3>🧩 Setor Rotation (Heatmap)</h3>
+                        <p>Mapa de calor dos <b>ETFs setoriais</b> (SPDR) do S&amp;P 500: cada bloco mostra a <b>variação do setor</b> e ajuda a enxergar <b>rotação</b> (cíclicos x defensivos / growth x value).</p>
+                        <p style="margin-top:10px;opacity:.92;line-height:1.45;">
+                            <b>O que é cada setor</b>:
+                            <br><b>XLF</b> Financeiro (bancos/seguros) • <b>XLK</b> Tecnologia • <b>XLE</b> Energia • <b>XLV</b> Saúde
+                            <br><b>XLY</b> Consumo discricionário • <b>XLP</b> Consumo básico • <b>XLU</b> Utilities (serviços públicos)
+                            <br><b>XLI</b> Industriais • <b>XLB</b> Materiais • <b>XLC</b> Comunicação • <b>XLRE</b> Imobiliário
+                        </p>
+                        <p style="margin-top:10px;opacity:.92;line-height:1.45;">
+                            <b>Como ler</b>: verde = setor subindo, vermelho = setor caindo. Defensivos (XLU/XLP/XLV) liderando costuma indicar <b>risk-off</b>; cíclicos (XLY/XLI/XLB/XLE/XLF) liderando tende a indicar <b>risk-on</b>. Clique em um setor para abrir a série na tabela de ativos.
+                        </p>
+                    </div>
+                    <div class="table-container" style="width:100%;">
+                        <div id="sectorHeatmap"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="my-assets" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">MEUS ATIVOS</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>⭐ Watchlist</h3>
+                        <p>Marque ativos com a estrela nas tabelas para acompanhar aqui. Clique em um ativo para ver a série.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="favoritesChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="table-container" id="favoritesTable"></div>
+            </section>
+
+            <section id="flow-sentinel" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">SENTINELA DE FLUXO (FX)</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="flow-sentinel__stack">
+                    <div class="context-box">
+                        <h3>🛡️ Sentinela de Fluxo</h3>
+                        <p>Leitura de pré-mercado baseada em <b>blocos FX</b>: um bloco de <b>apetite ao risco</b> (moedas ligadas a commodities) versus um bloco de <b>proteção</b> (safe havens). O objetivo é capturar o viés provável para Brasil na abertura.</p>
+                        <ul style="margin:10px 0 0 18px;opacity:.92;line-height:1.45;">
+                            <li><b>Bloco Risco (FX Commodities)</b>: NZD, AUD, CAD (+ RUB). <b>Se o score estiver positivo</b>: <b>venda de USD</b> / <b>compra de índice</b>. <b>Se estiver negativo</b>: <b>compra de USD</b> / <b>venda de índice</b>.</li>
+                            <li><b>Bloco Proteção (Safe Havens)</b>: JPY, CHF, USD, SEK (+ DXY). <b>Se o score estiver positivo</b>: <b>compra de USD</b> / <b>venda de índice</b>. <b>Se estiver negativo</b>: <b>venda de USD</b> / <b>compra de índice</b>.</li>
+                            <li><b>Petróleo &amp; Geopolítica</b>: quando <b>Brent/WTI</b> estiver <b>subindo forte</b> e <b>USD/CAD</b> + <b>USD/RUB</b> caindo (CAD/RUB fortes), isso reforça o <b>Bloco Risco</b> e tende a <b>venda de USD</b>. Se petróleo cair ou CAD/RUB não confirmarem, o efeito tende a ficar <b>neutro</b>.</li>
+                            <li><b>Execução</b>: primeiro identifique o viés pelo <b>Regime</b> (Apetite ao Risco x Proteção) e só então execute. Use Fibo (111/112/141,4) e a “regra dos 30%” em dias de tendência forte para evitar caça de topo/fundo.</li>
+                        </ul>
+                    </div>
+                    <div class="table-container">
+                        <div class="metrics-grid" style="margin:0;">
+                            <div class="metric-card">
+                                <div class="metric-icon"><span id="fs-beta-pos-dot" class="fs-dot fs-dot--neutral"></span></div>
+                                <div class="metric-value" id="fs-beta-pos-score">—</div>
+                                <div class="metric-label">Bloco Risco (FX)</div>
+                                <div class="metric-change neutral" id="fs-beta-pos-detail">—</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon"><span id="fs-beta-neg-dot" class="fs-dot fs-dot--neutral"></span></div>
+                                <div class="metric-value" id="fs-beta-neg-score">—</div>
+                                <div class="metric-label">Bloco Proteção (FX)</div>
+                                <div class="metric-change neutral" id="fs-beta-neg-detail">—</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon">🛢️</div>
+                                <div class="metric-value" id="fs-oil-score">—</div>
+                                <div class="metric-label">Petróleo (Brent/WTI)</div>
+                                <div class="metric-change neutral" id="fs-oil-detail">—</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon">🧭</div>
+                                <div class="metric-value" id="fs-signal">—</div>
+                                <div class="metric-label">Regime</div>
+                                <div class="metric-change neutral" id="fs-signal-score">—</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon">🌡️</div>
+                                <div class="metric-value" id="fs-thermo-score">—</div>
+                                <div class="metric-label">Termômetro Pré‑Mercado</div>
+                                <div class="metric-change neutral" id="fs-thermo-detail">—</div>
+                            </div>
+                        </div>
+                        <div id="fs-components" style="margin-top:16px;"></div>
+                        <div id="fs-history" style="margin-top:12px;"></div>
+                        <div id="fs-alerts" style="margin-top:12px;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="commodities" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">COMMODITIES</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>🌾 Energia &amp; Agricultura</h3>
+                        <p>Acompanhe commodities com recorte por produtividade e sensibilidade a ciclo global. Clique em um ativo para ver a série dos últimos 10 dias.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="commoditiesChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="table-container" id="commoditiesTable"></div>
+            </section>
+
+            <section id="metals" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">METAIS</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>🪙 Metais Preciosos &amp; Industriais</h3>
+                        <p>Útil para leitura de demanda industrial, proteção (gold) e sensibilidade a China/ciclo. Clique em um ativo para ver a série dos últimos 10 dias.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="metalsChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="table-container" id="metalsTable"></div>
+            </section>
+
+            <section id="fx-carry" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">FX / CARRY</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>💱 FX e Proxy de Carry (MVP)</h3>
+                        <p>Separação G10 vs Emergentes e um monitor simples de carry trade: diferencial de juros (proxy BR vs US) + FX (DXY e pares chave) para inferir “carrego entrando/saindo”.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="fxChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="table-container" style="margin-top:16px;">
+                    <div class="metrics-grid" style="margin:0;">
+                        <div class="metric-card">
+                            <div class="metric-icon">🏦</div>
+                            <div class="metric-value" id="carry-premium-level">—</div>
+                            <div class="metric-label">Prêmio BR vs US (bps)</div>
+                            <div class="metric-change neutral" id="carry-premium-detail">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon">💹</div>
+                            <div class="metric-value" id="carry-audjpy-level">—</div>
+                            <div class="metric-label">AUD/JPY (sintético)</div>
+                            <div class="metric-change neutral" id="carry-audjpy-detail">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon">💴</div>
+                            <div class="metric-value" id="carry-usdjpy-level">—</div>
+                            <div class="metric-label">USD/JPY</div>
+                            <div class="metric-change neutral" id="carry-usdjpy-detail">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon">🧭</div>
+                            <div class="metric-value" id="carry-state">—</div>
+                            <div class="metric-label">Carry (status)</div>
+                            <div class="metric-change neutral" id="carry-state-detail">—</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon">🎯</div>
+                            <div class="metric-value" id="carry-score">—</div>
+                            <div class="metric-label">Carrego entrando/saindo</div>
+                            <div class="metric-change neutral" id="carry-score-detail">—</div>
+                        </div>
+                    </div>
+                    <div id="carry-components" style="margin-top:16px;"></div>
+                    <div id="carry-history" style="margin-top:12px;"></div>
+                    <div id="carry-alerts" style="margin-top:12px;"></div>
+                </div>
+
+                <div class="table-container" id="fxTable"></div>
+            </section>
+
+            <section id="emerging" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">EMERGENTES</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>🌍 ETFs / Índices Emergentes</h3>
+                        <p>Grupo para identificar rotação regional e sensibilidade a commodities. Clique em um ativo para ver a série dos últimos 10 dias.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="emergingChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="table-container" id="emergingTable"></div>
+            </section>
+
+            <section id="mercosul" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">MERCOSUL (FX + PROXIES)</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>🌎 Mercosul / LatAm</h3>
+                        <p>Leitura tática para Brasil via <b>moedas</b> (USD/BRL, USD/UYU, USD/PYG, USD/ARS) e <b>proxies</b> (Ibovespa, EWZ). Clique em um item para ver a série dos últimos 10 dias.</p>
+                        <div class="metrics-grid" id="mercosulMetrics" style="margin:0;"></div>
+                        <div id="mercosulPulse" style="margin-top:14px;"></div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="mercosulChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="table-container" id="mercosulTable"></div>
+            </section>
+
+            <section id="brazil-market" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">MERCADO BRASILEIRO</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>🇧🇷 Brasil (Índices, BRL, Juros, ADR)</h3>
+                        <p>Organiza tudo que se refere ao Brasil: Ibovespa/B3, câmbio BRL, juros (curva), risco país (CDS/spreads), ETFs e empresas brasileiras (inclui ADRs). Clique em um ativo para ver a série.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="brazilChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 28px;">
+                    <div class="context-box">
+                        <h3>📦 Export Basket (Qualitativo)</h3>
+                        <p>Leitura rápida do “cesto exportador” e checklist de cobertura das commodities-chave (sem números explícitos).</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="exportBasket"></div>
+                    </div>
+                </div>
+
+                <div class="table-container" id="brazilTable"></div>
+            </section>
+
+            <section id="alerts" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">ALERTAS</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>🔔 Alertas de Fluxo</h3>
+                        <p>Quando ativado, monitora variações de curto prazo e aponta para onde o dinheiro tende a estar indo por categoria. Funciona apenas com a aba aberta.</p>
+                        <div class="help-grid">
+                            <div class="help-col">
+                                <div class="help-title">Como usar</div>
+                                <ul>
+                                    <li>Ative a chave <b>Ativar alertas</b> e mantenha a aba aberta.</li>
+                                    <li>Ajuste <b>Disparo (|%|)</b> para definir a sensibilidade.</li>
+                                </ul>
+                            </div>
+                            <div class="help-col">
+                                <div class="help-title">Quando falha</div>
+                                <ul>
+                                    <li>Se a aba estiver fechada, o monitoramento para.</li>
+                                    <li>Se a permissão for negada, não há pop-up, mas a lista continua funcionando.</li>
+                                </ul>
+                            </div>
+                            <div class="help-col">
+                                <div class="help-title">O que fazer</div>
+                                <ul>
+                                    <li>Clique <b>Permitir Notificação</b> para habilitar pop-ups do navegador.</li>
+                                    <li>Em dias de alta volatilidade, aumente o disparo para reduzir ruído.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                            <label style="display:flex;gap:10px;align-items:center;">
+                                <input type="checkbox" id="alertsEnabled" />
+                                <span style="font-family:'Orbitron',monospace;letter-spacing:1px;">Ativar alertas</span>
+                            </label>
+                            <label style="display:flex;gap:10px;align-items:center;">
+                                <span style="opacity:.8;">Disparo (|%|)</span>
+                                <input id="alertsThresholdPct" type="number" min="0" step="0.05" value="1.0" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 10px;border-radius:4px;font-weight:700;width:110px;" />
+                            </label>
+                            <button id="alertsRequestPermission" class="btn" style="padding:8px 12px;">Permitir Notificação</button>
+                        </div>
+                        <div id="alertsList" style="margin-top:16px;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="all-assets" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">TODOS OS ATIVOS</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>🗂️ Monitoramento Geral</h3>
+                        <p>Tabela consolidada de todos os ativos monitorados, agrupados por classe. Inclui ícone por ativo e um mini gráfico de linha para leitura rápida de tendência.</p>
+                    </div>
+                    <div class="table-container" id="allAssetsTable"></div>
+                </div>
+            </section>
+
+            <section id="panorama" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">PANORAMA DE MERCADO (MVP)</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div class="context-box" style="width:100%;">
+                        <h3>🧩 Panorama (Visão Refinada)</h3>
+                        <p>Resumo final em formato “mesa”: organiza os principais grupos com <b>Último</b>, <b>Var%</b> e <b>Hora</b> para leitura rápida. Use <b>Congelar</b> para fixar um snapshot e comparar com a próxima atualização.</p>
+                        <div class="help-grid">
+                            <div class="help-col">
+                                <div class="help-title">Como usar</div>
+                                <ul>
+                                    <li>Clique <b>Congelar</b> no card do grupo para salvar um snapshot local.</li>
+                                    <li>Clique novamente para descongelar e voltar ao “agora”.</li>
+                                </ul>
+                            </div>
+                            <div class="help-col">
+                                <div class="help-title">Quando falha</div>
+                                <ul>
+                                    <li>Se não houver dados suficientes, alguns cards podem aparecer vazios.</li>
+                                </ul>
+                            </div>
+                            <div class="help-col">
+                                <div class="help-title">O que fazer</div>
+                                <ul>
+                                    <li>Congele antes de eventos/notícias e compare depois para medir reação.</li>
+                                    <li>Se um grupo estiver vazio, confirme no <b>Data Pack</b> se a cobertura está baixa.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="width:100%;">
+                        <div id="marketPanorama"></div>
+                    </div>
+                </div>
+            </section>
+
+            <div id="data-pack" class="split-layout" style="margin-top: 28px;">
+                <div class="context-box">
+                    <h3>🧾 Data Pack (Cobertura)</h3>
+                    <p>Auditoria simples: presença, atualização e itens críticos. Use como checklist para não operar “no escuro”.</p>
+                    <div class="help-grid">
+                        <div class="help-col">
+                            <div class="help-title">Como usar</div>
+                            <ul>
+                                <li>Verifique <b>presença</b> e <b>carimbo</b> antes de confiar nos sinais.</li>
+                                <li>Use como checklist para validar se o dia está “completo” (preços, DI, calendário).</li>
+                            </ul>
+                        </div>
+                        <div class="help-col">
+                            <div class="help-title">Quando falha</div>
+                            <ul>
+                                <li><b>Falha/bloqueio</b>: a captura pode ter sido interrompida (captcha/timeout).</li>
+                                <li><b>Fonte ausente</b>: algum arquivo/endpoint não atualizou e o bloco fica incompleto.</li>
+                            </ul>
+                        </div>
+                        <div class="help-col">
+                            <div class="help-title">O que fazer</div>
+                            <ul>
+                                <li>Trate blocos com falha como “desatualizados” e reduza convicção.</li>
+                                <li>Priorize o que é operacional (DI, USD/BRL, índices e calendário) e complete manualmente quando necessário.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <div id="dataAudit"></div>
+                    <div id="assetsCatalog" style="margin-top:14px;"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="assets/data/market_quotes.js"></script>
+    <script src="assets/data/zq_curve.js"></script>
+    <script src="assets/data/economic_calendar.js"></script>
+    <script src="assets/data/agenda_reports.js"></script>
+    <script src="assets/data/options_gamma_summary.js"></script>
+    <script src="assets/data/web_news_module.js"></script>
+    <script src="assets/data/foreign_flow.js"></script>
+    <script src="assets/data/petrobras_module.js"></script>
+    <script src="assets/js/charts.js?v=20260416_1"></script>
+    <script src="assets/js/main.js?v=20260416_19"></script>
+</body>
+</html>

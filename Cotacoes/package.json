@@ -1,0 +1,37 @@
+{
+  "name": "trae-project",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint .",
+    "check": "tsc --noEmit",
+    "market:update": "tsx tools/market/build-market-history.ts --interval 30 --retentionDays 5",
+    "market:addons": "tsx tools/market/build-market-history.ts --addonsOnly",
+    "market:login": "tsx tools/market/investing-sync.ts --mode login",
+    "market:calendar-login": "tsx tools/market/investing-sync.ts --mode calendar-login",
+    "market:portfolio": "tsx tools/market/investing-sync.ts --mode portfolio",
+    "market:calendar": "tsx tools/market/investing-sync.ts --mode calendar",
+    "market:di": "tsx tools/market/investing-sync.ts --mode di",
+    "market:once": "tsx tools/market/investing-sync.ts --mode once",
+    "market:daemon": "tsx tools/market/investing-sync.ts --mode daemon",
+    "market:service": "tsx tools/market/update-service.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.25.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.15.30",
+    "eslint": "^9.25.0",
+    "globals": "^16.0.0",
+    "playwright": "^1.58.2",
+    "tsx": "^4.20.3",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.30.1"
+  }
+}

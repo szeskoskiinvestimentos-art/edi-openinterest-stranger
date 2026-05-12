@@ -1,0 +1,914 @@
+@echo off
+echo Instalador do Visualizador de Opcoes de Dolar v1.0.0
+echo.
+echo Este instalador vai configurar o ambiente Python e instalar o visualizador.
+echo.
+
+REM Verificar se está sendo executado como administrador
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo AVISO: Este script deve ser executado como administrador.
+    echo Por favor, clique com o botao direito e selecione "Executar como administrador".
+    echo.
+    pause
+    exit /b
+)
+
+echo Verificando instalacao do Miniconda...
+echo.
+
+REM Verificar se o Miniconda já está instalado
+if exist "%USERPROFILE%\miniconda3\Scripts\conda.exe" (
+    echo Miniconda encontrado em %USERPROFILE%\miniconda3
+    set CONDA_PATH=%USERPROFILE%\miniconda3
+    goto :CONDA_INSTALLED
+)
+
+if exist "C:\ProgramData\miniconda3\Scripts\conda.exe" (
+    echo Miniconda encontrado em C:\ProgramData\miniconda3
+    set CONDA_PATH=C:\ProgramData\miniconda3
+    goto :CONDA_INSTALLED
+)
+
+if exist "C:\Miniconda3\Scripts\conda.exe" (
+    echo Miniconda encontrado em C:\Miniconda3
+    set CONDA_PATH=C:\Miniconda3
+    goto :CONDA_INSTALLED
+)
+
+REM Verificar se o Anaconda já está instalado
+if exist "%USERPROFILE%\anaconda3\Scripts\conda.exe" (
+    echo Anaconda encontrado em %USERPROFILE%\anaconda3
+    set CONDA_PATH=%USERPROFILE%\anaconda3
+    goto :CONDA_INSTALLED
+)
+
+if exist "C:\ProgramData\anaconda3\Scripts\conda.exe" (
+    echo Anaconda encontrado em C:\ProgramData\anaconda3
+    set CONDA_PATH=C:\ProgramData\anaconda3
+    goto :CONDA_INSTALLED
+)
+
+if exist "C:\Anaconda3\Scripts\conda.exe" (
+    echo Anaconda encontrado em C:\Anaconda3
+    set CONDA_PATH=C:\Anaconda3
+    goto :CONDA_INSTALLED
+)
+
+echo Miniconda/Anaconda nao encontrado. Baixando e instalando Miniconda...
+echo.
+
+REM Baixar Miniconda
+echo Baixando Miniconda...
+powershell -Command "& {Invoke-WebRequest -Uri 'https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe' -OutFile '%TEMP%\miniconda.exe'}"
+
+if %errorLevel% neq 0 (
+    echo Erro ao baixar Miniconda. Por favor, verifique sua conexao com a internet.
+    pause
+    exit /b
+)
+
+echo Instalando Miniconda...
+start /wait "" "%TEMP%\miniconda.exe" /InstallationType=JustMe /RegisterPython=0 /S /D=%USERPROFILE%\miniconda3
+
+if %errorLevel% neq 0 (
+    echo Erro ao instalar Miniconda.
+    pause
+    exit /b
+)
+
+set CONDA_PATH=%USERPROFILE%\miniconda3
+echo Miniconda instalado em %CONDA_PATH%
+
+:CONDA_INSTALLED
+echo.
+echo Criando ambiente Python para o visualizador...
+echo.
+
+REM Criar ambiente conda se não existir
+call "%CONDA_PATH%\Scripts\activate.bat"
+call conda env list | findstr /C:"dolar_options" > nul
+if %errorLevel% neq 0 (
+    echo Criando novo ambiente Python 'dolar_options'...
+    call conda create -y -n dolar_options python=3.9
+) else (
+    echo Ambiente 'dolar_options' ja existe, atualizando...
+)
+
+REM Ativar ambiente e instalar pacotes
+call conda activate dolar_options
+echo Instalando pacotes necessarios...
+call conda install -y matplotlib pandas numpy
+call pip install yfinance
+
+if %errorLevel% neq 0 (
+    echo Erro ao instalar pacotes. Verifique sua conexao com a internet.
+    pause
+    exit /b
+)
+
+echo.
+echo Copiando arquivos do visualizador...
+
+REM Criar diretório para o visualizador
+set INSTALL_DIR=%USERPROFILE%\dolar_options_viewer
+if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
+
+REM Copiar arquivos
+copy /Y "%~dp0dolar_options_viewer\*.py" "%INSTALL_DIR%\"
+copy /Y "%~dp0dolar_options_viewer\*.txt" "%INSTALL_DIR%\"
+
+echo.
+echo Criando arquivo de inicializacao...
+
+REM Criar arquivo .bat para iniciar o visualizador
+echo @echo off > "%INSTALL_DIR%\iniciar_visualizador.bat"
+echo call "%CONDA_PATH%\Scripts\activate.bat" dolar_options >> "%INSTALL_DIR%\iniciar_visualizador.bat"
+echo python "%INSTALL_DIR%\gui_viewer.py" >> "%INSTALL_DIR%\iniciar_visualizador.bat"
+echo pause >> "%INSTALL_DIR%\iniciar_visualizador.bat"
+
+echo.
+echo Criando atalho na area de trabalho...
+
+REM Detectar caminho da área de trabalho (considerando OneDrive)
+set DESKTOP_DIR=%USERPROFILE%\Desktop
+if not exist "%DESKTOP_DIR%" (
+    set DESKTOP_DIR=%USERPROFILE%\OneDrive\Desktop
+    if not exist "%DESKTOP_DIR%" (
+        set DESKTOP_DIR=%USERPROFILE%\OneDrive - Microsoft\Desktop
+        if not exist "%DESKTOP_DIR%" (
+            echo Nao foi possivel encontrar a pasta da area de trabalho.
+            echo O atalho nao sera criado, mas voce pode iniciar o programa pelo arquivo:
+            echo %INSTALL_DIR%\iniciar_visualizador.bat
+        )
+    )
+)
+
+REM *** MÉTODO 1: VBScript (mais confiável) ***
+if exist "%DESKTOP_DIR%" (
+    echo Set WshShell = CreateObject("WScript.Shell") > "%TEMP%\createShortcut.vbs"
+    echo Set oShellLink = WshShell.CreateShortcut("%DESKTOP_DIR%\Visualizador de Opcoes Dolar.lnk") >> "%TEMP%\createShortcut.vbs"
+    echo oShellLink.TargetPath = "%INSTALL_DIR%\iniciar_visualizador.bat" >> "%TEMP%\createShortcut.vbs"
+    echo oShellLink.WorkingDirectory = "%INSTALL_DIR%" >> "%TEMP%\createShortcut.vbs"
+    echo oShellLink.Description = "Visualizador de Opcoes de Dolar" >> "%TEMP%\createShortcut.vbs"
+    echo oShellLink.Save >> "%TEMP%\createShortcut.vbs"
+    
+    cscript //nologo "%TEMP%\createShortcut.vbs"
+    
+    if %errorLevel% neq 0 (
+        echo Falha ao criar atalho usando VBScript. Tentando método alternativo...
+        goto :SHORTCUT_METHOD2
+    ) else (
+        echo Atalho criado com sucesso usando VBScript.
+        goto :SHORTCUT_DONE
+    )
+)
+
+:SHORTCUT_METHOD2
+REM *** MÉTODO 2: PowerShell (alternativa) ***
+if exist "%DESKTOP_DIR%" (
+    echo Tentando criar atalho usando PowerShell...
+    
+    powershell -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('%DESKTOP_DIR%\Visualizador de Opcoes Dolar.lnk'); $s.TargetPath = '%INSTALL_DIR%\iniciar_visualizador.bat'; $s.WorkingDirectory = '%INSTALL_DIR%'; $s.Description = 'Visualizador de Opcoes de Dolar'; $s.Save()"
+    
+    if %errorLevel% neq 0 (
+        echo Falha ao criar atalho usando PowerShell. Tentando método alternativo...
+        goto :SHORTCUT_METHOD3
+    ) else (
+        echo Atalho criado com sucesso usando PowerShell.
+        goto :SHORTCUT_DONE
+    )
+)
+
+:SHORTCUT_METHOD3
+REM *** MÉTODO 3: Cópia direta do arquivo .bat ***
+if exist "%DESKTOP_DIR%" (
+    echo Tentando criar cópia direta do inicializador na área de trabalho...
+    
+    copy /Y "%INSTALL_DIR%\iniciar_visualizador.bat" "%DESKTOP_DIR%\Visualizador de Opcoes Dolar.bat"
+    
+    if %errorLevel% neq 0 (
+        echo Falha ao criar cópia do inicializador.
+        echo Você precisará iniciar o programa manualmente usando:
+        echo %INSTALL_DIR%\iniciar_visualizador.bat
+    ) else (
+        echo Arquivo de inicialização copiado para a área de trabalho.
+    )
+)
+
+:SHORTCUT_DONE
+echo.
+echo Instalacao concluida!
+echo.
+echo O visualizador de opcoes de Dolar foi instalado com sucesso.
+echo.
+echo Voce pode iniciar o programa de tres formas:
+echo 1. Pelo atalho criado na area de trabalho (se disponível)
+echo 2. Executando o arquivo: %INSTALL_DIR%\iniciar_visualizador.bat
+echo 3. Via Anaconda Prompt:
+echo    - Abra o Anaconda Prompt
+echo    - Execute: conda activate dolar_options
+echo    - Execute: python %INSTALL_DIR%\gui_viewer.py
+echo.
+echo Para mais informacoes, consulte o arquivo de instrucoes em:
+echo %INSTALL_DIR%\instrucoes_dolar.txt
+echo.
+
+pause
+
+
+# Instruções para o Visualizador de Opções de Dólar
+
+## Visão Geral
+Este programa permite visualizar dados de opções de dólar, mostrando o Open Interest de calls e puts por strike para diferentes datas de vencimento.
+
+## Funcionalidades
+- Visualização gráfica de calls e puts de dólar por strike
+- Seleção de diferentes datas de vencimento
+- Filtro automático por volume mínimo
+- Sistema de cache para funcionamento offline
+- Ferramentas de zoom e navegação no gráfico
+
+## Como Usar
+1. Inicie o programa clicando no atalho criado na área de trabalho ou executando diretamente o arquivo `iniciar_visualizador.bat`
+2. O programa carregará automaticamente os dados mais recentes de opções de dólar
+3. Selecione a data de vencimento desejada no menu suspenso
+4. Use as ferramentas de navegação abaixo do gráfico para zoom e movimentação
+
+## Opções Adicionais
+- **Atualizar Dados e Gráfico**: Atualiza os dados do Yahoo Finance e redesenha o gráfico
+- **Usar Dados em Cache**: Quando marcada, esta opção usa apenas dados armazenados localmente, sem tentar conectar ao Yahoo Finance
+
+## Fontes de Dados
+O visualizador obtém dados de múltiplas fontes para garantir máxima disponibilidade:
+- Invesco DB US Dollar Index Bullish Fund (UUP)
+- Invesco DB US Dollar Index Bearish Fund (UDN)
+- WisdomTree Bloomberg U.S. Dollar Bullish Fund (USDU)
+- US Dollar Index (DX-Y.NYB)
+
+O sistema automaticamente seleciona a melhor fonte disponível no momento.
+
+## Solução de Problemas
+Se encontrar a mensagem "Too Many Requests" ou "Rate Limited", o Yahoo Finance está limitando as requisições. Neste caso:
+1. Marque a opção "Usar Dados em Cache" se já tiver usado o programa anteriormente
+2. Aguarde algumas horas e tente novamente sem a opção de cache marcada
+
+## Requisitos Técnicos
+- Python 3.6 ou superior
+- Bibliotecas: matplotlib, pandas, numpy, yfinance
+- Conexão com internet (exceto no modo cache)
+
+## Notas
+- Os dados são obtidos do Yahoo Finance e podem estar sujeitos a atrasos ou limitações
+- O sistema de cache armazena dados por até 7 dias em caso de problemas de conexão
+
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import tkinter as tk
+from tkinter import ttk, messagebox
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+import threading
+import os
+import sys
+import logging
+from datetime import datetime
+import traceback
+
+# Importar o módulo de extração de dados
+try:
+    from data_fetcher import get_dolar_options_data, get_cached_options_data, list_available_cache
+except ImportError:
+    # Se estiver executando o script diretamente, ajustar o path
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    sys.path.append(script_dir)
+    from data_fetcher import get_dolar_options_data, get_cached_options_data, list_available_cache
+
+class DolarOptionsViewer:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Visualizador de Opções de Dólar")
+        self.root.geometry("1000x600")
+        self.root.minsize(800, 500)
+        
+        # Configurar estilo
+        style = ttk.Style()
+        style.configure("TButton", padding=6, relief="flat", background="#ccc")
+        style.configure("TLabel", padding=6)
+        style.configure("TFrame", background="#f0f0f0")
+        
+        # Variáveis
+        self.data = pd.DataFrame()
+        self.expiry_dates = []
+        self.selected_expiry = tk.StringVar()
+        self.status_text = tk.StringVar(value="Carregando dados...")
+        self.use_cache_only = tk.BooleanVar(value=False)
+        self.min_volume = tk.IntVar(value=5)
+        self.loading = False
+        self.cache_info = []
+        self.ticker_used = None
+        
+        # Criar layout
+        self.create_widgets()
+        
+        # Carregar dados iniciais
+        self.root.after(100, self.load_data)
+    
+    def create_widgets(self):
+        # Frame principal
+        main_frame = ttk.Frame(self.root, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Frame superior para controles
+        control_frame = ttk.Frame(main_frame)
+        control_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Botão para atualizar dados
+        refresh_btn = ttk.Button(control_frame, text="Atualizar Dados e Gráfico", command=self.load_data)
+        refresh_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Seletor de data de vencimento
+        expiry_label = ttk.Label(control_frame, text="Data de Vencimento:")
+        expiry_label.pack(side=tk.LEFT, padx=(20, 5))
+        
+        self.expiry_combo = ttk.Combobox(control_frame, textvariable=self.selected_expiry, state="readonly", width=15)
+        self.expiry_combo.pack(side=tk.LEFT, padx=5)
+        self.expiry_combo.bind("<<ComboboxSelected>>", self.on_expiry_selected)
+        
+        # Checkbox para usar apenas cache
+        cache_check = ttk.Checkbutton(control_frame, text="Usar Dados em Cache", variable=self.use_cache_only)
+        cache_check.pack(side=tk.RIGHT, padx=5)
+        
+        # Status bar
+        status_bar = ttk.Label(main_frame, textvariable=self.status_text, relief=tk.SUNKEN, anchor=tk.W)
+        status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        # Frame para o gráfico
+        self.chart_frame = ttk.Frame(main_frame)
+        self.chart_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Criar figura do matplotlib
+        self.fig = Figure(figsize=(10, 6), dpi=100)
+        self.ax = self.fig.add_subplot(111)
+        
+        # Incorporar figura no tkinter
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.chart_frame)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        
+        # Adicionar barra de ferramentas de navegação
+        from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
+        toolbar = NavigationToolbar2Tk(self.canvas, self.chart_frame)
+        toolbar.update()
+    
+    def load_data(self):
+        """Carrega os dados de opções em uma thread separada"""
+        if self.loading:
+            messagebox.showinfo("Processando", "Já existe um carregamento em andamento. Por favor, aguarde.")
+            return
+        
+        self.loading = True
+        self.status_text.set("Carregando dados...")
+        
+        # Desabilitar controles durante o carregamento
+        self.expiry_combo.config(state="disabled")
+        
+        # Iniciar thread para não bloquear a interface
+        thread = threading.Thread(target=self._load_data_thread)
+        thread.daemon = True
+        thread.start()
+    
+    def _load_data_thread(self):
+        """Thread para carregar dados sem bloquear a interface"""
+        try:
+            # Verificar se deve usar apenas cache
+            if self.use_cache_only.get():
+                self.data, self.ticker_used = get_cached_options_data(min_volume=self.min_volume.get())
+                if self.ticker_used:
+                    self.root.after(0, lambda: self.status_text.set(f"Usando dados em cache ({self.ticker_used})"))
+                else:
+                    self.root.after(0, lambda: self.status_text.set("Usando dados em cache"))
+            else:
+                self.data, self.ticker_used = get_dolar_options_data(min_volume=self.min_volume.get(), use_cache=True)
+                if self.ticker_used:
+                    self.root.after(0, lambda: self.status_text.set(f"Dados atualizados ({self.ticker_used})"))
+                else:
+                    self.root.after(0, lambda: self.status_text.set("Dados atualizados"))
+            
+            # Atualizar lista de datas de vencimento
+            if not self.data.empty:
+                self.expiry_dates = sorted(self.data['expiry'].unique())
+                
+                # Atualizar combobox na thread principal
+                self.root.after(0, self._update_expiry_combo)
+            else:
+                self.root.after(0, self._show_no_data_message)
+        except Exception as e:
+            error_msg = f"Erro ao carregar dados: {str(e)}"
+            logging.error(error_msg)
+            logging.error(traceback.format_exc())
+            self.root.after(0, lambda: messagebox.showerror("Erro", error_msg))
+            self.root.after(0, lambda: self.status_text.set("Erro ao carregar dados"))
+        finally:
+            self.loading = False
+            self.root.after(0, lambda: self.expiry_combo.config(state="readonly"))
+    
+    def _update_expiry_combo(self):
+        """Atualiza o combobox de datas de vencimento"""
+        self.expiry_combo['values'] = self.expiry_dates
+        
+        if self.expiry_dates:
+            # Selecionar a primeira data
+            self.selected_expiry.set(self.expiry_dates[0])
+            self.update_chart()
+        else:
+            self.selected_expiry.set("")
+            self._show_no_data_message()
+    
+    def _show_no_data_message(self):
+        """Mostra mensagem quando não há dados disponíveis"""
+        messagebox.showwarning("Sem Dados", 
+                              "Não foi possível obter dados de opções para o Dólar.\n\n"
+                              "Possíveis causas:\n"
+                              "- Problemas de conexão com o Yahoo Finance\n"
+                              "- Limite de requisições atingido\n"
+                              "- Não há dados de opções disponíveis\n\n"
+                              "Sugestões:\n"
+                              "- Tente novamente mais tarde\n"
+                              "- Marque a opção 'Usar Dados em Cache' se disponível")
+        
+        # Limpar gráfico
+        self.ax.clear()
+        self.ax.set_title("Sem dados disponíveis")
+        self.canvas.draw()
+        
+        # Atualizar status
+        self.status_text.set("Sem dados disponíveis")
+    
+    def on_expiry_selected(self, event):
+        """Manipulador para mudança na data de vencimento selecionada"""
+        self.update_chart()
+    
+    def update_chart(self):
+        """Atualiza o gráfico com os dados da data de vencimento selecionada"""
+        expiry = self.selected_expiry.get()
+        if not expiry or self.data.empty:
+            return
+        
+        # Filtrar dados para a data de vencimento selecionada
+        df_expiry = self.data[self.data['expiry'] == expiry]
+        
+        if df_expiry.empty:
+            messagebox.showinfo("Sem Dados", f"Não há dados disponíveis para o vencimento {expiry}")
+            return
+        
+        # Separar calls e puts
+        calls = df_expiry[df_expiry['type'] == 'call']
+        puts = df_expiry[df_expiry['type'] == 'put']
+        
+        # Limpar gráfico anterior
+        self.ax.clear()
+        
+        # Plotar dados
+        if not calls.empty:
+            self.ax.bar(calls['strike'], calls['open_interest'], width=0.5, alpha=0.7, color='green', label='Calls')
+        
+        if not puts.empty:
+            self.ax.bar(puts['strike'], puts['open_interest'], width=0.5, alpha=0.7, color='red', label='Puts')
+        
+        # Configurar gráfico
+        title = f"Open Interest de Opções de Dólar - Vencimento {expiry}"
+        if self.ticker_used:
+            title += f" ({self.ticker_used})"
+        self.ax.set_title(title)
+        self.ax.set_xlabel('Strike')
+        self.ax.set_ylabel('Open Interest')
+        self.ax.legend()
+        self.ax.grid(True, linestyle='--', alpha=0.7)
+        
+        # Formatar eixo X para mostrar strikes de forma mais legível
+        if not df_expiry.empty:
+            strikes = sorted(df_expiry['strike'].unique())
+            if len(strikes) > 15:
+                # Se houver muitos strikes, mostrar apenas alguns
+                step = max(1, len(strikes) // 15)
+                self.ax.set_xticks(strikes[::step])
+                self.ax.set_xticklabels([f"{x:,.2f}" for x in strikes[::step]], rotation=45)
+            else:
+                self.ax.set_xticks(strikes)
+                self.ax.set_xticklabels([f"{x:,.2f}" for x in strikes], rotation=45)
+        
+        # Ajustar layout
+        self.fig.tight_layout()
+        
+        # Atualizar canvas
+        self.canvas.draw()
+        
+        # Atualizar status
+        num_calls = len(calls)
+        num_puts = len(puts)
+        self.status_text.set(f"Vencimento {expiry}: {num_calls} calls e {num_puts} puts (filtrado por volume mínimo: {self.min_volume.get()})")
+
+def main():
+    # Configurar janela principal
+    root = tk.Tk()
+    app = DolarOptionsViewer(root)
+    
+    # Configurar ícone se disponível
+    try:
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
+        if os.path.exists(icon_path):
+            root.iconbitmap(icon_path)
+    except:
+        pass  # Ignorar erros de ícone
+    
+    # Iniciar loop principal
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
+import yfinance as yf
+import pandas as pd
+import numpy as np
+from datetime import datetime
+import os
+import logging
+import traceback
+import json
+import time
+import random
+from pathlib import Path
+
+# Configuração de logging compatível com Windows
+# Usar pasta do usuário ou diretório atual como fallback
+try:
+    user_home = os.path.expanduser("~")
+    log_dir = os.path.join(user_home, "dolar_options_data")
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    log_file = os.path.join(log_dir, "dolar_options_fetcher.log")
+except Exception:
+    # Fallback para diretório do script
+    log_dir = os.path.dirname(os.path.abspath(__file__))
+    log_file = os.path.join(log_dir, "dolar_options_fetcher.log")
+
+# Configurar logging
+try:
+    logging.basicConfig(
+        filename=log_file,
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        filemode="w"  # Sobrescrever arquivo a cada execução
+    )
+    # Adicionar handler para console
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    console.setFormatter(formatter)
+    logging.getLogger('').addHandler(console)
+except Exception as e:
+    # Se falhar ao configurar logging para arquivo, usar apenas console
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+    logging.warning(f"Não foi possível configurar logging para arquivo: {str(e)}")
+
+# Configuração do cache
+CACHE_DIR = os.path.join(log_dir, "cache")
+if not os.path.exists(CACHE_DIR):
+    try:
+        os.makedirs(CACHE_DIR)
+    except Exception as e:
+        logging.warning(f"Não foi possível criar diretório de cache: {str(e)}")
+        CACHE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def save_to_cache(data, cache_key):
+    """Salva dados no cache local"""
+    try:
+        cache_file = os.path.join(CACHE_DIR, f"{cache_key}.json")
+        with open(cache_file, 'w') as f:
+            json.dump({
+                'timestamp': datetime.now().timestamp(),
+                'data': data
+            }, f)
+        logging.info(f"Dados salvos em cache: {cache_key}")
+        return True
+    except Exception as e:
+        logging.warning(f"Erro ao salvar cache: {str(e)}")
+        return False
+
+def load_from_cache(cache_key, max_age_hours=24):
+    """Carrega dados do cache local se não estiverem expirados"""
+    try:
+        cache_file = os.path.join(CACHE_DIR, f"{cache_key}.json")
+        if not os.path.exists(cache_file):
+            return None
+        
+        with open(cache_file, 'r') as f:
+            cache_data = json.load(f)
+        
+        # Verificar idade do cache
+        cache_time = cache_data.get('timestamp', 0)
+        current_time = datetime.now().timestamp()
+        age_hours = (current_time - cache_time) / 3600
+        
+        if age_hours <= max_age_hours:
+            logging.info(f"Usando dados em cache para {cache_key} (idade: {age_hours:.1f} horas)")
+            return cache_data.get('data')
+        else:
+            logging.info(f"Cache expirado para {cache_key} (idade: {age_hours:.1f} horas)")
+            return None
+    except Exception as e:
+        logging.warning(f"Erro ao carregar cache: {str(e)}")
+        return None
+
+def list_available_cache():
+    """Lista todos os arquivos de cache disponíveis"""
+    try:
+        cache_files = [f for f in os.listdir(CACHE_DIR) if f.endswith('.json')]
+        cache_info = []
+        
+        for file in cache_files:
+            try:
+                cache_path = os.path.join(CACHE_DIR, file)
+                with open(cache_path, 'r') as f:
+                    cache_data = json.load(f)
+                
+                timestamp = cache_data.get('timestamp', 0)
+                cache_date = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+                cache_key = file.replace('.json', '')
+                
+                cache_info.append({
+                    'key': cache_key,
+                    'date': cache_date,
+                    'age_hours': (datetime.now().timestamp() - timestamp) / 3600
+                })
+            except:
+                pass
+        
+        return cache_info
+    except Exception as e:
+        logging.warning(f"Erro ao listar cache: {str(e)}")
+        return []
+
+def get_dolar_options_data(min_volume=5, use_cache=True, force_refresh=False):
+    """
+    Obtém dados de opções de dólar do Yahoo Finance.
+    
+    Tickers testados:
+    - DX-Y.NYB: US Dollar Index
+    - UUP: Invesco DB US Dollar Index Bullish Fund
+    - UDN: Invesco DB US Dollar Index Bearish Fund
+    - USDU: WisdomTree Bloomberg U.S. Dollar Bullish Fund
+    
+    Args:
+        min_volume (int): Volume mínimo para filtrar opções (padrão: 5)
+        use_cache (bool): Se deve usar cache quando disponível
+        force_refresh (bool): Se deve forçar atualização mesmo com cache válido
+        
+    Returns:
+        pandas.DataFrame: DataFrame com dados de opções filtrados
+    """
+    # Lista de tickers a tentar, em ordem de prioridade
+    tickers = ["UUP", "UDN", "USDU", "DX-Y.NYB"]
+    
+    # Tentar cada ticker até encontrar um com dados válidos
+    for ticker in tickers:
+        logging.info(f"Tentando obter dados de opções para {ticker}...")
+        
+        cache_key = f"dolar_options_{ticker}"
+        
+        # Tentar carregar do cache se permitido
+        if use_cache and not force_refresh:
+            cached_data = load_from_cache(cache_key)
+            if cached_data:
+                # Converter para DataFrame
+                try:
+                    df = pd.DataFrame(cached_data)
+                    # Filtrar por volume mínimo
+                    df_filtered = df[df['open_interest'] >= min_volume]
+                    logging.info(f"Dados carregados do cache para {ticker}: {len(df)} opções totais, {len(df_filtered)} após filtro")
+                    return df_filtered, ticker
+                except Exception as e:
+                    logging.warning(f"Erro ao processar dados do cache para {ticker}: {str(e)}")
+                    # Continuar com busca online se cache falhar
+        
+        try:
+            # Adicionar espera aleatória para evitar rate limiting
+            wait_time = random.uniform(1.0, 3.0)
+            logging.info(f"Aguardando {wait_time:.1f} segundos antes da requisição...")
+            time.sleep(wait_time)
+            
+            # Obter dados do ticker
+            dolar = yf.Ticker(ticker)
+            
+            # Verificar se o ticker é válido
+            try:
+                info = dolar.info
+                if info.get('regularMarketPrice') is None:
+                    logging.warning(f"Não foi possível obter dados para o ticker {ticker}, tentando próximo...")
+                    continue
+                
+                # Registrar informações sobre o ticker
+                ticker_name = info.get('shortName', ticker)
+                current_price = info.get('regularMarketPrice', 0)
+                logging.info(f"Ticker válido: {ticker_name} (Preço atual: {current_price})")
+                
+            except Exception as e:
+                if "Too Many Requests" in str(e):
+                    logging.error(f"Yahoo Finance retornou erro de limite de requisições (Rate Limit) para {ticker}")
+                    # Tentar usar cache mesmo que expirado em caso de rate limit
+                    cached_data = load_from_cache(cache_key, max_age_hours=168)  # Aceitar cache de até 7 dias
+                    if cached_data:
+                        logging.info(f"Usando cache expirado para {ticker} devido a limite de requisições")
+                        df = pd.DataFrame(cached_data)
+                        df_filtered = df[df['open_interest'] >= min_volume]
+                        return df_filtered, ticker
+                else:
+                    logging.error(f"Erro ao verificar ticker {ticker}: {str(e)}")
+                continue
+            
+            # Obter datas de vencimento disponíveis
+            try:
+                expiry_dates = dolar.options
+                if not expiry_dates:
+                    logging.warning(f"Nenhuma data de vencimento encontrada para {ticker}, tentando próximo...")
+                    continue
+                
+                logging.info(f"Encontradas {len(expiry_dates)} datas de vencimento para {ticker}")
+            except Exception as e:
+                if "Too Many Requests" in str(e):
+                    logging.error(f"Yahoo Finance retornou erro de limite de requisições (Rate Limit) para {ticker}")
+                    # Tentar usar cache mesmo que expirado em caso de rate limit
+                    cached_data = load_from_cache(cache_key, max_age_hours=168)  # Aceitar cache de até 7 dias
+                    if cached_data:
+                        logging.info(f"Usando cache expirado para {ticker} devido a limite de requisições")
+                        df = pd.DataFrame(cached_data)
+                        df_filtered = df[df['open_interest'] >= min_volume]
+                        return df_filtered, ticker
+                else:
+                    logging.error(f"Erro ao obter datas de vencimento para {ticker}: {str(e)}")
+                continue
+            
+            # Lista para armazenar todos os dados de opções
+            all_options = []
+            
+            # Processar cada data de vencimento
+            for expiry in expiry_dates:
+                try:
+                    logging.info(f"Processando vencimento: {expiry}")
+                    
+                    # Adicionar espera entre requisições para evitar rate limiting
+                    time.sleep(random.uniform(0.5, 1.5))
+                    
+                    # Obter opções para esta data de vencimento
+                    opt = dolar.option_chain(expiry)
+                    
+                    # Processar calls
+                    if not opt.calls.empty:
+                        # Adicionar coluna de tipo e data de vencimento
+                        calls = opt.calls.copy()
+                        calls['type'] = 'call'
+                        calls['expiry'] = expiry
+                        
+                        # Selecionar e renomear colunas relevantes
+                        calls = calls[['strike', 'type', 'openInterest', 'expiry']]
+                        calls.rename(columns={'openInterest': 'open_interest'}, inplace=True)
+                        
+                        # Adicionar à lista
+                        all_options.append(calls)
+                    
+                    # Processar puts
+                    if not opt.puts.empty:
+                        # Adicionar coluna de tipo e data de vencimento
+                        puts = opt.puts.copy()
+                        puts['type'] = 'put'
+                        puts['expiry'] = expiry
+                        
+                        # Selecionar e renomear colunas relevantes
+                        puts = puts[['strike', 'type', 'openInterest', 'expiry']]
+                        puts.rename(columns={'openInterest': 'open_interest'}, inplace=True)
+                        
+                        # Adicionar à lista
+                        all_options.append(puts)
+                    
+                except Exception as e:
+                    if "Too Many Requests" in str(e):
+                        logging.error(f"Limite de requisições atingido ao processar {expiry} para {ticker}. Tentando próximo vencimento.")
+                    else:
+                        logging.error(f"Erro ao processar vencimento {expiry} para {ticker}: {str(e)}")
+                    continue
+            
+            # Verificar se temos dados
+            if not all_options:
+                logging.warning(f"Nenhum dado de opção encontrado para {ticker}, tentando próximo...")
+                continue
+            
+            # Concatenar todos os dados
+            df = pd.concat(all_options, ignore_index=True)
+            
+            # Converter open_interest para numérico e preencher NaN com 0
+            df['open_interest'] = pd.to_numeric(df['open_interest'], errors='coerce').fillna(0).astype(int)
+            
+            # Converter datas para formato YYYY-MM-DD
+            df['expiry'] = pd.to_datetime(df['expiry']).dt.strftime('%Y-%m-%d')
+            
+            # Salvar em cache
+            save_to_cache(df.to_dict('records'), cache_key)
+            
+            # Filtrar por volume mínimo
+            df_filtered = df[df['open_interest'] >= min_volume]
+            
+            # Log de resultados
+            total_options = len(df)
+            filtered_options = len(df_filtered)
+            logging.info(f"Total de opções encontradas para {ticker}: {total_options}")
+            logging.info(f"Opções após filtro de volume mínimo ({min_volume}): {filtered_options}")
+            
+            if filtered_options > 0:
+                # Mostrar estatísticas por data de vencimento
+                expiries = sorted(df_filtered['expiry'].unique())
+                logging.info(f"Datas de vencimento disponíveis após filtro: {len(expiries)}")
+                
+                for expiry in expiries[:5]:  # Mostrar até 5 vencimentos
+                    expiry_data = df_filtered[df_filtered['expiry'] == expiry]
+                    calls = len(expiry_data[expiry_data['type'] == 'call'])
+                    puts = len(expiry_data[expiry_data['type'] == 'put'])
+                    logging.info(f"Vencimento {expiry}: {len(expiry_data)} opções (Calls: {calls}, Puts: {puts})")
+                
+                return df_filtered, ticker
+            else:
+                logging.warning(f"Nenhuma opção com volume mínimo {min_volume} encontrada para {ticker}, tentando próximo...")
+                continue
+            
+        except Exception as e:
+            logging.error(f"Erro ao buscar dados de opções para {ticker}: {str(e)}")
+            logging.error(traceback.format_exc())
+            continue
+    
+    # Se chegou aqui, nenhum ticker funcionou
+    logging.error("Não foi possível obter dados de opções para nenhum dos tickers testados")
+    
+    # Tentar usar cache de qualquer ticker como último recurso
+    for ticker in tickers:
+        cache_key = f"dolar_options_{ticker}"
+        cached_data = load_from_cache(cache_key, max_age_hours=168)  # Aceitar cache de até 7 dias
+        if cached_data:
+            logging.info(f"Usando cache de {ticker} como último recurso")
+            df = pd.DataFrame(cached_data)
+            df_filtered = df[df['open_interest'] >= min_volume]
+            return df_filtered, ticker
+    
+    # Se realmente não há dados, retornar DataFrame vazio
+    return pd.DataFrame(columns=["strike", "type", "open_interest", "expiry"]), None
+
+def get_cached_options_data(min_volume=5):
+    """
+    Retorna apenas dados em cache, sem tentar buscar online.
+    Útil para modo offline.
+    """
+    # Lista de tickers a tentar, em ordem de prioridade
+    tickers = ["UUP", "UDN", "USDU", "DX-Y.NYB"]
+    
+    # Tentar cada ticker até encontrar um com dados válidos em cache
+    for ticker in tickers:
+        cache_key = f"dolar_options_{ticker}"
+        
+        cached_data = load_from_cache(cache_key, max_age_hours=float('inf'))  # Sem limite de idade
+        if cached_data:
+            df = pd.DataFrame(cached_data)
+            df_filtered = df[df['open_interest'] >= min_volume]
+            logging.info(f"Dados carregados do cache para {ticker} (modo offline): {len(df)} opções totais, {len(df_filtered)} após filtro")
+            return df_filtered, ticker
+    
+    logging.warning("Nenhum dado em cache disponível para modo offline")
+    return pd.DataFrame(columns=["strike", "type", "open_interest", "expiry"]), None
+
+if __name__ == "__main__":
+    # Teste da função
+    logging.info("Iniciando teste do extrator de opções de dólar...")
+    
+    # Verificar cache disponível
+    cache_info = list_available_cache()
+    if cache_info:
+        logging.info("Cache disponível:")
+        for item in cache_info:
+            logging.info(f"  {item['key']} - {item['date']} (idade: {item['age_hours']:.1f} horas)")
+    else:
+        logging.info("Nenhum cache disponível")
+    
+    # Testar busca com cache
+    df, ticker_used = get_dolar_options_data(min_volume=5, use_cache=True)
+    
+    if not df.empty:
+        logging.info(f"\nExemplo dos dados obtidos de {ticker_used} (primeiras 5 linhas):")
+        logging.info(df.head().to_string())
+    else:
+        logging.warning("Nenhum dado de opção retornado no teste.")
+    
+    logging.info("Teste concluído.")
+
+
