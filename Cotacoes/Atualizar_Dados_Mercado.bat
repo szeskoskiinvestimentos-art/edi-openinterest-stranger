@@ -10,6 +10,7 @@ echo - Para parar, feche esta janela.
 echo.
 set "MARKET_GIT_SYNC_ENABLED=true"
 set "MARKET_GIT_SYNC_PUSH=true"
+set "MARKET_GIT_SYNC_BRANCH=cotacoes-sites"
 set "MARKET_UPDATE_MODE=once"
 set "MARKET_SCHEDULE_MODE=interval"
 set "MARKET_INTERVAL_MINUTES=5"
