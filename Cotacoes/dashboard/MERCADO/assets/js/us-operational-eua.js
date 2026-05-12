@@ -255,7 +255,7 @@
             return { key: k, label: prof.label, sig: mv.sig, strength: mv.strength, min: mv.min };
         })();
 
-        const edge = (() => {
+        const edgeModel = (() => {
             const microBias = (m) => {
                 const s = m && m.scalp && m.scalp.signal ? String(m.scalp.signal) : 'neutral';
                 return s === 'buy' || s === 'sell' ? s : 'neutral';
@@ -281,10 +281,13 @@
 
             const base = 0.26;
             const score = base + 0.28 * microAlign + 0.30 * netAvg + 0.20 * (regimeScore - 0.5) + sessionAdj + volAdj + volTrend + staleAdj + divAdj + modeAdj;
-            return clamp(score, 0, 1);
+            return {
+                score: clamp(score, 0, 1),
+                parts: { base, microAlign, netAvg, regimeScore, sessionAdj, volAdj, volTrend, staleAdj, divAdj, modeAdj },
+            };
         })();
 
-        const edgePct = Math.round(edge * 100);
+        const edgePct = Math.round(edgeModel.score * 100);
 
         const threshold = (() => {
             const base = mode === 'conservative' ? 74 : 62;
@@ -394,6 +397,7 @@
             lead,
             divergent,
             edgePct,
+            edgeParts: edgeModel.parts,
             threshold,
             conviction,
             today,
@@ -634,6 +638,37 @@
         const convLine = `Convicção do setup: ${model.conviction.label}${model.conviction.extra ? ` - ${model.conviction.extra}` : model.regime.extra === 'Regime indefinido' ? ' - Regime indefinido' : ''}`;
         const edgeTitle = `EDGE ${String(model.edgePct)}%`;
 
+        const edgeBreakdownHtml = (() => {
+            const p = model.edgeParts;
+            if (!p) return '';
+            const fmt = (v) => deps.escapeHtml(isNum(v) ? deps.formatNumber(v, 2) : '—');
+            const fmtSigned = (v) => {
+                if (!isNum(v)) return '—';
+                const s = v > 0 ? '+' : '';
+                return deps.escapeHtml(`${s}${deps.formatNumber(v, 2)}`);
+            };
+            const microAlignTxt = p.microAlign === 1 ? '2/3 alinhados' : p.microAlign === 0.5 ? '1/3 alinhado' : 'sem alinhamento';
+            const regimeTxt = p.regimeScore === 1 ? 'RISK_ON' : p.regimeScore === 0 ? 'RISK_OFF' : 'N/D';
+            return `
+                <div style="margin-top:12px;padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <div style="font-weight:900;letter-spacing:.8px;opacity:.95;">EDGE (componentes)</div>
+                        <div style="opacity:.78;font-size:12px;">escala 0–1 (depois vira %)</div>
+                    </div>
+                    <div style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;font-family:'Share Tech Mono',monospace;font-weight:900;">
+                        <div>base ${fmt(p.base)}</div>
+                        <div>microAlign ${fmt(p.microAlign)} (${deps.escapeHtml(microAlignTxt)})</div>
+                        <div>netAvg ${fmt(p.netAvg)}</div>
+                        <div>regime ${fmt(p.regimeScore)} (${deps.escapeHtml(regimeTxt)})</div>
+                        <div>sessãoAdj ${fmtSigned(p.sessionAdj)}</div>
+                        <div>volAdj ${fmtSigned(p.volAdj)} • volTrend ${fmtSigned(p.volTrend)}</div>
+                        <div>staleAdj ${fmtSigned(p.staleAdj)}</div>
+                        <div>divAdj ${fmtSigned(p.divAdj)} • modeAdj ${fmtSigned(p.modeAdj)}</div>
+                    </div>
+                </div>
+            `;
+        })();
+
         const whyHtml = (model.whyTop || []).map(x => `<span class="usop-pill usop-pill--why">${deps.escapeHtml(x)}</span>`).join('');
         const leadHtml = model.lead && model.lead.label ? `<span class="usop-pill">Lead ${deps.escapeHtml(String(model.lead.label))} • thr ${deps.escapeHtml(String(model.threshold || '—'))}%</span>` : '';
         const conflictHtml = model.blocked && (model.conflicts || []).length
@@ -710,6 +745,7 @@
                         </div>
                     </div>
                     ${suggestLine ? `<div style="margin-top:8px;opacity:.82;font-size:12px;line-height:1.35;">${deps.escapeHtml(suggestLine)}</div>` : ''}
+                    ${edgeBreakdownHtml}
                     <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">
                         ${planFor('spx', 'S&P 500', usNow.pulse.spx, spxExtras, usNow.execution ? usNow.execution.spx : null, usNow.source ? usNow.source.spx : null, usNow.micro ? usNow.micro.spx : null)}
                         ${planFor('ndx', 'Nasdaq', usNow.pulse.ndx, ndxExtras, usNow.execution ? usNow.execution.ndx : null, usNow.source ? usNow.source.ndx : null, usNow.micro ? usNow.micro.ndx : null)}

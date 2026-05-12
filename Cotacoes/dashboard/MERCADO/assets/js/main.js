@@ -16216,11 +16216,22 @@ function renderMarketPanorama(data) {
     const inPanoramaCount = Array.from(monitoredUnique).filter(s => panoramaSet.has(s)).length;
     const extrasInPanorama = Array.from(panoramaSet).filter(s => !monitoredUnique.has(s)).length;
 
+    const hasExpandableGroups = groups.some(g => {
+        const snap = frozen && frozen[g.key] ? frozen[g.key] : buildSnapshot(g);
+        const allRows = (snap && Array.isArray(snap.rows) ? snap.rows : []).slice().filter(r => r && r.symbol);
+        const maxRows = typeof g.maxRows === 'number' && Number.isFinite(g.maxRows) && g.maxRows > 0 ? g.maxRows : 14;
+        return allRows.length > maxRows;
+    });
+
     const coverageHtml = `
         <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);margin-bottom:12px;">
-            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
                 <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Cobertura do Panorama</div>
-                <div style="opacity:.80;font-size:12px;">Ativos: ${escapeHtml(String(monitoredUnique.size))} • No panorama: ${escapeHtml(String(inPanoramaCount))}${extrasInPanorama ? ` • Extras: ${escapeHtml(String(extrasInPanorama))}` : ''}${duplicates ? ` • Duplicados: ${escapeHtml(String(duplicates))}` : ''}</div>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+                    <div style="opacity:.80;font-size:12px;">Ativos: ${escapeHtml(String(monitoredUnique.size))} • No panorama: ${escapeHtml(String(inPanoramaCount))}${extrasInPanorama ? ` • Extras: ${escapeHtml(String(extrasInPanorama))}` : ''}${duplicates ? ` • Duplicados: ${escapeHtml(String(duplicates))}` : ''}</div>
+                    ${hasExpandableGroups ? `<button class="panorama-freeze" data-panorama-expand-all="1">Ver tudo</button>` : ''}
+                    ${hasExpandableGroups ? `<button class="panorama-freeze" data-panorama-collapse-all="1">Recolher</button>` : ''}
+                </div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
                 <span class="neutral" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">Sem categoria: ${escapeHtml(String(uncategorized.length))}</span>
@@ -16276,6 +16287,30 @@ function renderMarketPanorama(data) {
             saveExpanded(next);
             renderMarketPanorama(data);
         });
+    });
+
+    const expandAll = () => {
+        const next = { ...(expandedState || {}) };
+        for (const g of groups) {
+            const snap = frozen && frozen[g.key] ? frozen[g.key] : buildSnapshot(g);
+            const allRows = (snap && Array.isArray(snap.rows) ? snap.rows : []).slice().filter(r => r && r.symbol);
+            const maxRows = typeof g.maxRows === 'number' && Number.isFinite(g.maxRows) && g.maxRows > 0 ? g.maxRows : 14;
+            if (allRows.length > maxRows) next[g.key] = true;
+        }
+        saveExpanded(next);
+        renderMarketPanorama(data);
+    };
+
+    const collapseAll = () => {
+        saveExpanded({});
+        renderMarketPanorama(data);
+    };
+
+    el.querySelectorAll('[data-panorama-expand-all]').forEach(btn => {
+        btn.addEventListener('click', () => expandAll());
+    });
+    el.querySelectorAll('[data-panorama-collapse-all]').forEach(btn => {
+        btn.addEventListener('click', () => collapseAll());
     });
 }
 
