@@ -208,9 +208,10 @@ async function main() {
   const gitSyncEnabled = envBool('MARKET_GIT_SYNC_ENABLED', true)
   const gitSyncPush = envBool('MARKET_GIT_SYNC_PUSH', true)
   const gitSyncRemote = env('MARKET_GIT_SYNC_REMOTE', 'origin')
+  const gitSyncRemoteUrl = env('MARKET_GIT_SYNC_REMOTE_URL')
   const gitSyncBranch = env('MARKET_GIT_SYNC_BRANCH')
   const gitSyncRepoDir = env('MARKET_GIT_SYNC_REPO_DIR')
-  const gitSyncTargetDir = env('MARKET_GIT_SYNC_TARGET_DIR', 'dashboard/MERCADO/assets/data')
+  const gitSyncTargetDir = env('MARKET_GIT_SYNC_TARGET_DIR', '')
   const sourceDataDir = env('MARKET_SOURCE_DATA_DIR', 'dashboard/MERCADO/assets/data')
 
   const optionsDashboardDir = resolveFromProject(
@@ -1038,6 +1039,7 @@ async function main() {
   async function resolveGitRepoDir() {
     const candidates = [
       gitSyncRepoDir ? resolveFromWorkspace(gitSyncRepoDir) : null,
+      WORKSPACE_ROOT,
       PROJECT_ROOT,
     ].filter(Boolean) as string[]
 
@@ -1076,15 +1078,48 @@ async function main() {
       return
     }
 
+    const remoteName = String(gitSyncRemote || 'origin')
+    const hasHttpCreds = (u: string) => /^https?:\/\/[^/]+@/i.test(String(u || '').trim())
+    const remoteUrlSafe = (() => {
+      const raw = String(gitSyncRemoteUrl || '').trim()
+      if (!raw) return null
+      if (hasHttpCreds(raw)) return '__blocked_http_credentials__'
+      return raw
+    })()
+    const ensureRemote = async () => {
+      const check = await spawnCapture('git', ['remote', 'get-url', remoteName], { cwd: repoDir, env: process.env })
+      if (check.exitCode === 0 && check.stdout.trim()) return true
+      if (!remoteUrlSafe) {
+        await appendLog(meta.logPath, `GIT_SYNC skip • remote "${remoteName}" not configured (set MARKET_GIT_SYNC_REMOTE_URL)\n`)
+        await finish('remote_missing')
+        return false
+      }
+      if (remoteUrlSafe === '__blocked_http_credentials__') {
+        await appendLog(meta.logPath, `GIT_SYNC skip • MARKET_GIT_SYNC_REMOTE_URL blocked (do not embed credentials in URL)\n`)
+        await finish('remote_url_blocked')
+        return false
+      }
+      await appendLog(meta.logPath, `GIT_SYNC remote bootstrap • ${remoteName} => ${remoteUrlSafe}\n`)
+      const add = await spawnCapture('git', ['remote', 'add', remoteName, remoteUrlSafe], { cwd: repoDir, env: process.env })
+      if (add.exitCode === 0) return true
+      const out = `${add.stdout}\n${add.stderr}`.trim()
+      const setUrl = await spawnCapture('git', ['remote', 'set-url', remoteName, remoteUrlSafe], { cwd: repoDir, env: process.env })
+      if (setUrl.exitCode === 0) return true
+      await appendLog(meta.logPath, `GIT_SYNC error • git remote add/set-url failed\n${out}\n${setUrl.stderr || setUrl.stdout}\n`)
+      await finish('failed', 'git remote configure failed')
+      return false
+    }
+
     const repoAbs = requireInsideWorkspace('GIT_SYNC_REPO_DIR', repoDir)
-    const targetDirAbs = requireInsideWorkspace('GIT_SYNC_TARGET_DIR', resolveFromBase(repoAbs, gitSyncTargetDir))
+    const sourceDirAbs = requireInsideWorkspace('GIT_SYNC_SOURCE_DATA_DIR', resolveFromProject(String(sourceDataDir)))
+    const defaultTargetDirRel = path.relative(repoAbs, sourceDirAbs).replace(/\\/g, '/')
+    const targetDirRel = String(gitSyncTargetDir || '').trim() ? String(gitSyncTargetDir || '').trim() : defaultTargetDirRel
+    const targetDirAbs = requireInsideWorkspace('GIT_SYNC_TARGET_DIR', resolveFromBase(repoAbs, targetDirRel))
     await mkdir(targetDirAbs, { recursive: true })
 
     await appendLog(meta.logPath, `GIT_SYNC repo • ${repoDir}\n`)
-    await appendLog(meta.logPath, `GIT_SYNC target • ${gitSyncTargetDir}\n`)
+    await appendLog(meta.logPath, `GIT_SYNC target • ${targetDirRel}\n`)
     await appendLog(meta.logPath, `GIT_SYNC source • ${sourceDataDir}\n`)
-
-    const sourceDirAbs = requireInsideWorkspace('GIT_SYNC_SOURCE_DATA_DIR', resolveFromProject(String(sourceDataDir)))
     const entries = await readdir(sourceDirAbs, { withFileTypes: true })
     const sourceFileNames = entries
       .filter(e => e.isFile())
@@ -1098,8 +1133,8 @@ async function main() {
       return
     }
 
-    const targetRel = path.relative(repoAbs, targetDirAbs).replace(/\\/g, '/')
-    const targetFiles = sourceFileNames.map(name => path.posix.join(targetRel, name))
+    const targetRelFromRepo = path.relative(repoAbs, targetDirAbs).replace(/\\/g, '/')
+    const targetFiles = sourceFileNames.map(name => path.posix.join(targetRelFromRepo, name))
 
     const sameDir =
       (process.platform === 'win32' ? sourceDirAbs.toLowerCase() : sourceDirAbs) ===
@@ -1155,9 +1190,10 @@ async function main() {
     await appendLog(meta.logPath, `GIT_SYNC committed\n${commit.stdout}\n`)
 
     if (gitSyncPush) {
+      if (!(await ensureRemote())) return
       const pushArgs = gitSyncBranch
-        ? ['push', String(gitSyncRemote || 'origin'), String(gitSyncBranch)]
-        : ['push', String(gitSyncRemote || 'origin'), 'HEAD']
+        ? ['push', remoteName, String(gitSyncBranch)]
+        : ['push', remoteName, 'HEAD']
       const push = await spawnCapture('git', pushArgs, { cwd: repoDir, env: process.env })
       if (push.exitCode !== 0) {
         const out = String(push.stderr || push.stdout || '').trim()
@@ -1169,12 +1205,11 @@ async function main() {
           return
         }
 
-        const remote = String(gitSyncRemote || 'origin')
         const curBranch = await spawnCapture('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repoDir, env: process.env })
         const branch = (gitSyncBranch || curBranch.stdout.trim() || 'main').trim()
 
-        await appendLog(meta.logPath, `GIT_SYNC retry • pull --no-rebase -X ours ${remote} ${branch}\n`)
-        const pull = await spawnCapture('git', ['pull', '--no-rebase', '--no-edit', '-X', 'ours', remote, branch], { cwd: repoDir, env: process.env })
+        await appendLog(meta.logPath, `GIT_SYNC retry • pull --no-rebase -X ours ${remoteName} ${branch}\n`)
+        const pull = await spawnCapture('git', ['pull', '--no-rebase', '--no-edit', '-X', 'ours', remoteName, branch], { cwd: repoDir, env: process.env })
         if (pull.exitCode !== 0) {
           await appendLog(meta.logPath, `GIT_SYNC error • git pull failed\n${pull.stderr || pull.stdout}\n`)
           await finish('failed', 'git pull failed')
@@ -1374,12 +1409,11 @@ async function main() {
     })
 
     child.on('close', code => {
-      const finishedAt = nowISO()
-      void appendLog(logPath, `END ${finishedAt} • exit=${code ?? -1}\n`)
-      const exitCode = typeof code === 'number' ? code : -1
-      state = {
-        running: false,
-        last: {
+      void (async () => {
+        const finishedAt = nowISO()
+        await appendLog(logPath, `END ${finishedAt} • exit=${code ?? -1}\n`)
+        const exitCode = typeof code === 'number' ? code : -1
+        const last = {
           startedAt,
           finishedAt,
           exitCode,
@@ -1387,31 +1421,36 @@ async function main() {
           reason,
           mode,
           summary: currentSummary,
-        },
-      }
-      const finalize = () => {
+        }
+
+        if (exitCode === 0) {
+          try {
+            await runConfiguredSubsystems(logPath)
+          } catch {
+            void 0
+          }
+        }
+
+        await gitSyncAfterUpdate({ logPath, finishedAt, exitCode, reason, mode })
+
+        if (exitCode === 0) {
+          try {
+            await sendTelegramOperationalOnce({ reason, logPath })
+          } catch (err) {
+            await appendLog(logPath, `TELEGRAM operational error • ${String(err instanceof Error ? err.message : err)}\n`)
+          }
+        }
+
+        state = { running: false, last }
+
         if (shutdownRequested) {
           if (state.running) return
           if (httpServer) httpServer.close(() => process.exit(0))
           setTimeout(() => process.exit(0), 2500).unref()
           return
         }
-        void runScheduledIfDue()
-      }
-
-      if (exitCode === 0) {
-        void runConfiguredSubsystems(logPath)
-          .catch(() => false)
-          .then(() => gitSyncAfterUpdate({ logPath, finishedAt, exitCode, reason, mode }))
-          .then(() =>
-            sendTelegramOperationalOnce({ reason, logPath }).catch(err => {
-              void appendLog(logPath, `TELEGRAM operational error • ${String(err instanceof Error ? err.message : err)}\n`)
-            }),
-          )
-          .finally(finalize)
-      } else {
-        void gitSyncAfterUpdate({ logPath, finishedAt, exitCode, reason, mode }).finally(finalize)
-      }
+        await runScheduledIfDue()
+      })()
     })
 
     return true
