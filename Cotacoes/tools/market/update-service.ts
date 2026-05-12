@@ -1191,9 +1191,9 @@ async function main() {
 
     if (gitSyncPush) {
       if (!(await ensureRemote())) return
-      const pushArgs = gitSyncBranch
-        ? ['push', remoteName, String(gitSyncBranch)]
-        : ['push', remoteName, 'HEAD']
+      const branchName = String(gitSyncBranch || '').trim()
+      const pushRef = branchName ? `HEAD:${branchName}` : 'HEAD'
+      const pushArgs = ['push', remoteName, pushRef]
       const push = await spawnCapture('git', pushArgs, { cwd: repoDir, env: process.env })
       if (push.exitCode !== 0) {
         const out = String(push.stderr || push.stdout || '').trim()
@@ -1205,18 +1205,31 @@ async function main() {
           return
         }
 
-        const curBranch = await spawnCapture('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repoDir, env: process.env })
-        const branch = (gitSyncBranch || curBranch.stdout.trim() || 'main').trim()
+        const push2 = await (branchName
+          ? (async () => {
+              await appendLog(meta.logPath, `GIT_SYNC retry • push --force-with-lease ${remoteName} ${pushRef}\n`)
+              return await spawnCapture('git', ['push', '--force-with-lease', remoteName, pushRef], {
+                cwd: repoDir,
+                env: process.env,
+              })
+            })()
+          : (async () => {
+              const curBranch = await spawnCapture('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repoDir, env: process.env })
+              const branch = (curBranch.stdout.trim() || 'main').trim()
+              await appendLog(meta.logPath, `GIT_SYNC retry • pull --no-rebase -X ours ${remoteName} ${branch}\n`)
+              const pull = await spawnCapture('git', ['pull', '--no-rebase', '--no-edit', '-X', 'ours', remoteName, branch], {
+                cwd: repoDir,
+                env: process.env,
+              })
+              if (pull.exitCode !== 0) {
+                await appendLog(meta.logPath, `GIT_SYNC error • git pull failed\n${pull.stderr || pull.stdout}\n`)
+                await finish('failed', 'git pull failed')
+                return null
+              }
+              return await spawnCapture('git', pushArgs, { cwd: repoDir, env: process.env })
+            })())
 
-        await appendLog(meta.logPath, `GIT_SYNC retry • pull --no-rebase -X ours ${remoteName} ${branch}\n`)
-        const pull = await spawnCapture('git', ['pull', '--no-rebase', '--no-edit', '-X', 'ours', remoteName, branch], { cwd: repoDir, env: process.env })
-        if (pull.exitCode !== 0) {
-          await appendLog(meta.logPath, `GIT_SYNC error • git pull failed\n${pull.stderr || pull.stdout}\n`)
-          await finish('failed', 'git pull failed')
-          return
-        }
-
-        const push2 = await spawnCapture('git', pushArgs, { cwd: repoDir, env: process.env })
+        if (!push2) return
         if (push2.exitCode !== 0) {
           await appendLog(meta.logPath, `GIT_SYNC error • git push retry failed\n${push2.stderr || push2.stdout}\n`)
           await finish('failed', 'git push retry failed')
