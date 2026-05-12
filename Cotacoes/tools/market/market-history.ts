@@ -204,7 +204,7 @@ export async function buildMarketHistory(input: BuildMarketHistoryInput) {
   const csvPath = input.csvPath
   const outDir = input.outDir
   const intervalMinutes = Number(input.intervalMinutes ?? 30)
-  const retentionDays = Number(input.retentionDays ?? 10)
+  const retentionDays = Number(input.retentionDays ?? 5)
   const generatedAt = toISO(input.timestamp, new Date())
 
   const retentionMs = retentionDays * 24 * 60 * 60 * 1000

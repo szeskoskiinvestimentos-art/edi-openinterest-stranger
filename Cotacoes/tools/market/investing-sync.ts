@@ -2470,7 +2470,7 @@ async function mergeYahooQuotesIntoMarketQuotes(outDir: string, opts: { maxSymbo
   if (!parsed || !Array.isArray(parsed.assets) || !parsed.series || !parsed.meta) return
 
   const nowIso = new Date().toISOString()
-  const retentionDays = Number(parsed.meta.retentionDays || 10)
+  const retentionDays = Number(parsed.meta.retentionDays || 5)
   const cutoffMs = Date.now() - Math.max(1, retentionDays) * 24 * 60 * 60 * 1000
 
   const overrides = parseSymbolOverrides(env('MARKET_YAHOO_SYMBOL_OVERRIDES'))
@@ -4382,7 +4382,7 @@ async function runOnce(modeRaw: string) {
     env('MARKET_OUT_DIR', path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'assets', 'data')),
   )
   const intervalMinutes = envNumber('MARKET_INTERVAL_MINUTES', 15)
-  const retentionDays = envNumber('MARKET_RETENTION_DAYS', 10)
+  const retentionDays = envNumber('MARKET_RETENTION_DAYS', 5)
 
   const enableDiBase = envBool('INFOMONEY_DI_ENABLED', true) && (mode === 'once' || mode === 'all' || mode === 'di')
   const enableCalendarBase =
