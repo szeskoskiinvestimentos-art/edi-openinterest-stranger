@@ -214,6 +214,8 @@ async function main() {
   const gitSyncTargetDir = env('MARKET_GIT_SYNC_TARGET_DIR', '')
   const sourceDataDir = env('MARKET_SOURCE_DATA_DIR', 'dashboard/MERCADO/assets/data')
 
+  const marketUpdateTimeoutMinutes = Math.max(3, envNumber('MARKET_UPDATE_TIMEOUT_MINUTES', 25))
+
   const optionsDashboardDir = resolveFromProject(
     env('OPTIONS_UNIFIED_DASHBOARD_DIR', path.resolve(WORKSPACE_ROOT, 'B3_System', 'dashboard_unificado')),
   )
@@ -1410,6 +1412,36 @@ async function main() {
             windowsHide: true,
           })
 
+    let timeoutFired = false
+    const timeoutMs = marketUpdateTimeoutMinutes * 60 * 1000
+    const timeoutTimer = setTimeout(() => {
+      if (timeoutFired) return
+      timeoutFired = true
+      void (async () => {
+        await appendLog(logPath, `TIMEOUT • update excedeu ${marketUpdateTimeoutMinutes}min\n`)
+        const pid = child && typeof child.pid === 'number' ? child.pid : null
+        if (!pid) {
+          await appendLog(logPath, `TIMEOUT • sem PID para encerrar\n`)
+          return
+        }
+        if (process.platform === 'win32') {
+          const kill = await spawnCapture('taskkill', ['/PID', String(pid), '/T', '/F'], { cwd: PROJECT_ROOT, env: process.env })
+          if (kill.exitCode !== 0) {
+            await appendLog(logPath, `TIMEOUT • taskkill falhou\n${kill.stderr || kill.stdout}\n`)
+          } else {
+            await appendLog(logPath, `TIMEOUT • taskkill OK (pid=${pid})\n`)
+          }
+          return
+        }
+        try {
+          child.kill('SIGKILL')
+          await appendLog(logPath, `TIMEOUT • kill OK (pid=${pid})\n`)
+        } catch (err) {
+          await appendLog(logPath, `TIMEOUT • kill falhou (pid=${pid}) • ${String(err instanceof Error ? err.message : err)}\n`)
+        }
+      })()
+    }, timeoutMs).unref()
+
     child.stdout.on('data', d => {
       const s = String(d)
       tryCaptureSummary(s)
@@ -1422,6 +1454,7 @@ async function main() {
     })
 
     child.on('close', code => {
+      clearTimeout(timeoutTimer)
       void (async () => {
         const finishedAt = nowISO()
         await appendLog(logPath, `END ${finishedAt} • exit=${code ?? -1}\n`)
