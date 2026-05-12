@@ -10,12 +10,12 @@ echo - Para parar, feche esta janela.
 echo.
 set "MARKET_GIT_SYNC_ENABLED=true"
 set "MARKET_GIT_SYNC_PUSH=true"
-set "MARKET_GIT_SYNC_BRANCH=cotacoes-sites"
+set "MARKET_GIT_SYNC_BRANCH=main"
 set "MARKET_UPDATE_MODE=once"
 set "MARKET_SCHEDULE_MODE=interval"
 set "MARKET_INTERVAL_MINUTES=5"
 set "INVESTING_PORTFOLIO_INTERVAL_MINUTES=15"
-set "MARKET_SUBSYSTEMS=market:addons"
+set "MARKET_SUBSYSTEMS="
 
 set "MARKET_PORT=%MARKET_SERVICE_PORT%"
 if "!MARKET_PORT!"=="" set "MARKET_PORT=3033"
