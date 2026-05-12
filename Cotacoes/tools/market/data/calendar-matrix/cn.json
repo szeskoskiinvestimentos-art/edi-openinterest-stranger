@@ -1,0 +1,112 @@
+{
+  "meta": { "country": "CHINA/HK", "version": 1 },
+  "defaults": {
+    "matrixKey": "CN_DEFAULT",
+    "wdo": "Se forte (China risk-on): ↓ | Se fraco (China risk-off): ↑",
+    "win": "Se forte: ↑ | Se fraco: ↓"
+  },
+  "events": [
+    {
+      "key": "CN_PMI",
+      "title": "PMI China (NBS/Caixin)",
+      "aliases": ["pmi", "nbs", "caixin", "pmi manufatura", "pmi servicos", "pmi serviços"],
+      "reactions": {
+        "matrixKey": "CN_PMI",
+        "wdo": "Se acima do consenso (China forte): ↓ | Se abaixo (China fraca): ↑",
+        "win": "Se acima do consenso: ↑ | Se abaixo: ↓"
+      },
+      "report": { "fetchOnCalendar": true, "query": "China PMI NBS Caixin" }
+    },
+    {
+      "key": "CN_GDP",
+      "title": "GDP China",
+      "aliases": ["gdp", "pib", "produto interno bruto"],
+      "reactions": {
+        "matrixKey": "CN_GDP",
+        "wdo": "Se forte: ↓ | Se fraco: ↑",
+        "win": "Se forte: ↑ | Se fraco: ↓"
+      },
+      "report": { "fetchOnCalendar": true, "query": "China GDP" }
+    },
+    {
+      "key": "CN_INDUSTRIAL_PRODUCTION",
+      "title": "Produção industrial China",
+      "aliases": ["industrial production", "producao industrial", "produção industrial"],
+      "reactions": {
+        "matrixKey": "CN_INDUSTRIAL_PRODUCTION",
+        "wdo": "Se forte: ↓ | Se fraco: ↑",
+        "win": "Se forte: ↑ | Se fraco: ↓"
+      }
+    },
+    {
+      "key": "CN_RETAIL_SALES",
+      "title": "Vendas no varejo China",
+      "aliases": ["retail sales", "vendas no varejo"],
+      "reactions": {
+        "matrixKey": "CN_RETAIL_SALES",
+        "wdo": "Se forte: ↓ | Se fraco: ↑",
+        "win": "Se forte: ↑ | Se fraco: ↓"
+      }
+    },
+    {
+      "key": "CN_TRADE",
+      "title": "Balança comercial / exportações / importações",
+      "aliases": ["balanca comercial", "balança comercial", "exportacoes", "exportações", "importacoes", "importações", "trade balance", "exports", "imports"],
+      "reactions": {
+        "matrixKey": "CN_TRADE",
+        "wdo": "Se forte (demanda China): ↓ | Se fraco: ↑",
+        "win": "Se forte: ↑ | Se fraco: ↓"
+      }
+    },
+    {
+      "key": "CN_LIQUIDITY",
+      "title": "Crédito/liquidez (TSF/M2/Loans)",
+      "aliases": ["tsf", "m2", "new yuan loans", "emprestimos", "empréstimos", "financiamento social total", "total social financing"],
+      "reactions": {
+        "matrixKey": "CN_LIQUIDITY",
+        "wdo": "Se liquidez forte: ↓ | Se liquidez fraca: ↑",
+        "win": "Se liquidez forte: ↑ | Se liquidez fraca: ↓"
+      }
+    },
+    {
+      "key": "HK_POLICY",
+      "title": "HK (dados e policy)",
+      "aliases": ["hkd", "hong kong", "hk"],
+      "reactions": {
+        "matrixKey": "HK_POLICY",
+        "wdo": "Se forte: ↓ | Se fraco: ↑",
+        "win": "Se forte: ↑ | Se fraco: ↓"
+      }
+    }
+  ],
+  "rules": [
+    {
+      "key": "CN_ATIVIDADE",
+      "match": { "regex": ["\\b(gdp|pib|pmi|industrial|producao|produção|varejo|retail)\\b"] },
+      "reactions": {
+        "matrixKey": "CN_ATIVIDADE",
+        "wdo": "Se forte (China risk-on): ↓ | Se fraco (China risk-off): ↑",
+        "win": "Se forte: ↑ | Se fraco: ↓"
+      }
+    },
+    {
+      "key": "CN_TRADE_RULE",
+      "match": { "regex": ["\\b(trade|balanca|balança|export|import)\\b"] },
+      "reactions": {
+        "matrixKey": "CN_TRADE",
+        "wdo": "Se forte (China demand): ↓ | Se fraco: ↑",
+        "win": "Se forte: ↑ | Se fraco: ↓"
+      }
+    },
+    {
+      "key": "CN_POLICY",
+      "match": { "regex": ["\\b(pboc|rate|rrr|fixing|yuan|cny|cnh|intervencao|intervenção)\\b"] },
+      "reactions": {
+        "matrixKey": "CN_POLICY",
+        "wdo": "Se estímulo/afrouxamento: ↓ | Se aperto/sinal duro: ↑",
+        "win": "Se estímulo: ↑ | Se aperto: ↓"
+      }
+    }
+  ]
+}
+

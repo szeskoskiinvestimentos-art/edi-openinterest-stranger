@@ -1,0 +1,133 @@
+{
+  "meta": { "country": "BR", "version": 1 },
+  "defaults": {
+    "matrixKey": "BR_DEFAULT",
+    "wdo": "Se pior que o esperado: ↑ | Se melhor que o esperado: ↓",
+    "win": "Se melhor: ↑ | Se pior: ↓"
+  },
+  "events": [
+    {
+      "key": "BR_IPCA",
+      "title": "IPCA (IBGE)",
+      "aliases": ["ipca", "ipca com ajuste", "ipca mensal", "indice de precos ao consumidor amplo"],
+      "reactions": {
+        "matrixKey": "BR_IPCA",
+        "wdo": "Se acima do consenso: ↑ | Se abaixo do consenso: ↓",
+        "win": "Se acima do consenso: ↓ | Se abaixo do consenso: ↑"
+      },
+      "report": { "fetchOnCalendar": true, "query": "BR IPCA IBGE" }
+    },
+    {
+      "key": "BR_IPCA_15",
+      "title": "IPCA-15 (IBGE)",
+      "aliases": ["ipca-15", "ipca 15", "previa do ipca", "ipca15"],
+      "reactions": {
+        "matrixKey": "BR_IPCA_15",
+        "wdo": "Se acima do consenso: ↑ (moderado) | Se abaixo do consenso: ↓ (moderado)",
+        "win": "Se acima do consenso: ↓ (moderado) | Se abaixo do consenso: ↑ (moderado)"
+      },
+      "report": { "fetchOnCalendar": true, "query": "BR IPCA-15 IBGE" }
+    },
+    {
+      "key": "BR_IGP",
+      "title": "IGP (FGV)",
+      "aliases": ["igp-m", "igp10", "igp-10", "igp", "indice geral de precos"],
+      "reactions": {
+        "matrixKey": "BR_IGP",
+        "wdo": "Se acima do consenso: ↑ | Se abaixo do consenso: ↓",
+        "win": "Se acima do consenso: ↓ | Se abaixo do consenso: ↑"
+      }
+    },
+    {
+      "key": "BR_COPOM_SELIC",
+      "title": "COPOM / SELIC",
+      "aliases": ["copom", "decisao de taxa de juros", "decisao da taxa de juros", "selic", "ata do copom", "comunicado do copom"],
+      "reactions": {
+        "matrixKey": "BR_COPOM_SELIC",
+        "wdo": "Se mais hawkish que o esperado: ↑ | Se mais dovish: ↓",
+        "win": "Se mais hawkish que o esperado: ↓ | Se mais dovish: ↑"
+      },
+      "report": { "fetchOnCalendar": true, "query": "BR COPOM Selic" }
+    },
+    {
+      "key": "BR_IBC_BR",
+      "title": "IBC-Br",
+      "aliases": ["ibc-br", "ibc br", "pib do bc", "atividade economica (ibc-br)"],
+      "reactions": {
+        "matrixKey": "BR_IBC_BR",
+        "wdo": "Se forte: ↓ | Se fraco: ↑",
+        "win": "Se forte: ↑ | Se fraco: ↓"
+      }
+    },
+    {
+      "key": "BR_PIB",
+      "title": "PIB (Brasil)",
+      "aliases": ["pib", "produto interno bruto"],
+      "reactions": {
+        "matrixKey": "BR_PIB",
+        "wdo": "Se forte: ↓ | Se fraco: ↑",
+        "win": "Se forte: ↑ | Se fraco: ↓"
+      },
+      "report": { "fetchOnCalendar": true, "query": "BR PIB" }
+    },
+    {
+      "key": "BR_PMI",
+      "title": "PMI (Brasil)",
+      "aliases": ["pmi", "pmi servicos", "pmi composto", "pmi industrial", "pmi manufatura"],
+      "reactions": {
+        "matrixKey": "BR_PMI",
+        "wdo": "Se forte: ↓ | Se fraco: ↑",
+        "win": "Se forte: ↑ | Se fraco: ↓"
+      }
+    },
+    {
+      "key": "BR_VAREJO",
+      "title": "Vendas no varejo (Brasil)",
+      "aliases": ["vendas no varejo", "volume de vendas no varejo"],
+      "reactions": {
+        "matrixKey": "BR_VAREJO",
+        "wdo": "Se forte: ↓ | Se fraco: ↑",
+        "win": "Se forte: ↑ | Se fraco: ↓"
+      }
+    },
+    {
+      "key": "BR_PRODUCAO_INDUSTRIAL",
+      "title": "Produção industrial (Brasil)",
+      "aliases": ["producao industrial", "produção industrial"],
+      "reactions": {
+        "matrixKey": "BR_PRODUCAO_INDUSTRIAL",
+        "wdo": "Se forte: ↓ | Se fraco: ↑",
+        "win": "Se forte: ↑ | Se fraco: ↓"
+      }
+    }
+  ],
+  "rules": [
+    {
+      "key": "BR_INFLACAO",
+      "match": { "regex": ["\\b(ipca|igp|ipc|infla)\\b"] },
+      "reactions": {
+        "matrixKey": "BR_INFLACAO",
+        "wdo": "Se acima do consenso: ↑ | Se abaixo do consenso: ↓",
+        "win": "Se acima do consenso: ↓ | Se abaixo do consenso: ↑"
+      }
+    },
+    {
+      "key": "BR_JUROS_BC",
+      "match": { "regex": ["\\b(copom|selic|banco central|ata)\\b"] },
+      "reactions": {
+        "matrixKey": "BR_JUROS_BC",
+        "wdo": "Se mais hawkish que o esperado: ↑ | Se mais dovish: ↓",
+        "win": "Se mais hawkish que o esperado: ↓ | Se mais dovish: ↑"
+      }
+    },
+    {
+      "key": "BR_ATIVIDADE",
+      "match": { "regex": ["\\b(pib|ibc|pmi|producao|produção|varejo|confianca)\\b"] },
+      "reactions": {
+        "matrixKey": "BR_ATIVIDADE",
+        "wdo": "Se fraco: ↑ | Se forte: ↓",
+        "win": "Se forte: ↑ | Se fraco: ↓"
+      }
+    }
+  ]
+}
