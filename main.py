@@ -71,12 +71,12 @@ def main():
     try:
         # 1. Carregar Dados
         print("Carregando dados CSV...")
-        project_root = os.path.abspath(os.path.join(os.getcwd(), '..'))
+        project_root = os.path.dirname(os.path.abspath(__file__))
         env_dir = getattr(settings, 'CSV_INDICE_DIR', '') or ''
         default_dir = os.path.join(project_root, 'CSV_Indice')
         target_dir = env_dir if env_dir else default_dir
         if not (os.path.exists(target_dir) and any(f.endswith('.csv') for f in os.listdir(target_dir))):
-            print("ERRO CRÍTICO: Nenhum CSV encontrado em CSV_Indice configurado.")
+            print(f"ERRO CRÍTICO: Nenhum CSV encontrado em CSV_Indice configurado: {target_dir}")
             return
     
         options_df, spot, expiry = load_data(directory=target_dir, use_csv_spot=settings.USE_CSV_SPOT, spot_override=settings.SPOT)

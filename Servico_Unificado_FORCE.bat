@@ -30,6 +30,19 @@ if not exist "%COTACOES_DIR%\package.json" (
 
 set "ENABLE_AUTO_GIT_PUSH=true"
 
+if "%CSV_INDICE_DIR%"=="" (
+  if exist "%~dp0CSV_Indice\\*.csv" set "CSV_INDICE_DIR=%~dp0CSV_Indice"
+)
+if "%CSV_INDICE_DIR%"=="" (
+  if exist "%USERPROFILE%\\OneDrive - 12s1y\\Edi_Sistamas\\Sistema\\B3_System\\CSV_Indice\\*.csv" set "CSV_INDICE_DIR=%USERPROFILE%\\OneDrive - 12s1y\\Edi_Sistamas\\Sistema\\B3_System\\CSV_Indice"
+)
+if "%CSV_INDICE_DIR%"=="" (
+  if exist "%USERPROFILE%\\OneDrive\\Edi_Sistamas\\Sistema\\B3_System\\CSV_Indice\\*.csv" set "CSV_INDICE_DIR=%USERPROFILE%\\OneDrive\\Edi_Sistamas\\Sistema\\B3_System\\CSV_Indice"
+)
+if "%CSV_INDICE_DIR%"=="" (
+  if exist "%USERPROFILE%\\OneDrive - 12s1y (1)\\Edi_Sistamas\\Sistema\\B3_System\\CSV_Indice\\*.csv" set "CSV_INDICE_DIR=%USERPROFILE%\\OneDrive - 12s1y (1)\\Edi_Sistamas\\Sistema\\B3_System\\CSV_Indice"
+)
+
 set "PY_CMD="
 where py >nul 2>&1
 if not errorlevel 1 set "PY_CMD=py -3"
@@ -72,6 +85,13 @@ if "%MARKET_ALREADY_RUNNING%"=="0" (
   timeout /t 3 >nul
 )
 
+echo.
+call :WAIT_MARKET
+if errorlevel 1 (
+  echo ERRO: market:service nao respondeu em http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/health
+  goto :END
+)
+
 echo Forcando update (bypass cooldown)...
 powershell -NoProfile -Command "try { $u='http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/update'; $b='{\"\"reason\"\":\"\"schedule\"\"}'; Invoke-RestMethod -Method Post -Uri $u -ContentType 'application/json' -Body $b | Out-String | Write-Host } catch { Write-Host ('ERRO: ' + $_.Exception.Message); exit 1 }"
 
@@ -84,3 +104,9 @@ if exist "%~dp0controle_de_dados.html" start "" "%~dp0controle_de_dados.html"
 :END
 if "%EDI_NO_PAUSE%"=="1" exit /b 0
 pause
+
+:WAIT_MARKET
+setlocal
+set "URL=http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/health"
+powershell -NoProfile -Command "try { $u='%URL%'; $deadline=(Get-Date).AddSeconds(120); while((Get-Date) -lt $deadline){ try { $r=Invoke-RestMethod -Method Get -Uri $u -TimeoutSec 2; if($r -and $r.ok -eq $true){ exit 0 } } catch {} Start-Sleep -Seconds 1 } exit 1 } catch { exit 1 }"
+endlocal & exit /b %errorlevel%
