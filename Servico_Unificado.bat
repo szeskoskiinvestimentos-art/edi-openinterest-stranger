@@ -8,6 +8,10 @@ if /i "%~1"=="--no-pause" (
   set "EDI_NO_PAUSE=1"
   shift
 )
+if /i "%~1"=="--once" (
+  set "EDI_ONCE=1"
+  shift
+)
 
 set "MARKET_GIT_SYNC_ENABLED=true"
 set "MARKET_GIT_SYNC_PUSH=true"
@@ -118,6 +122,13 @@ echo Status: http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/statu
 echo Update: POST http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/update
 echo.
 
+if "%EDI_ONCE%"=="1" goto :END
+if not "%PY_CMD%"=="" (
+  if exist "%~dp0..\\Auto_B3_System\\automacao_dados.py" (
+    goto :OPCOES_LOOP
+  )
+)
+
 :END
 if "%EDI_NO_PAUSE%"=="1" exit /b 0
 pause
@@ -127,6 +138,32 @@ setlocal
 set "URL=http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/health"
 powershell -NoProfile -Command "try { $u='%URL%'; $deadline=(Get-Date).AddSeconds(120); while((Get-Date) -lt $deadline){ try { $r=Invoke-RestMethod -Method Get -Uri $u -TimeoutSec 2; if($r -and $r.ok -eq $true){ exit 0 } } catch {} Start-Sleep -Seconds 1 } exit 1 } catch { exit 1 }"
 endlocal & exit /b %errorlevel%
+
+:OPCOES_LOOP
+if "%OPCOES_INTERVAL_SECONDS%"=="" set "OPCOES_INTERVAL_SECONDS=900"
+echo.
+echo Mantendo rotinas de opcoes (Barchart) ativas a cada %OPCOES_INTERVAL_SECONDS%s. Feche esta janela para parar.
+echo.
+:OPCOES_LOOP_RUN
+pushd "%~dp0..\\Auto_B3_System"
+%PY_CMD% automacao_dados.py
+%PY_CMD% config.py
+popd
+call :SYNC_UNIFIED_FROM_AUTO
+call :GIT_PUSH_UNIFIED
+timeout /t %OPCOES_INTERVAL_SECONDS% /nobreak >nul
+goto :OPCOES_LOOP_RUN
+
+:GIT_PUSH_UNIFIED
+setlocal
+git add dashboard_unificado >nul 2>&1
+git diff --cached --quiet >nul 2>&1
+if errorlevel 1 (
+  for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "(Get-Date).ToString('yyyy-MM-dd HH:mm')"`) do set "TS=%%i"
+  git commit -m "Atualiza dashboard_unificado (auto %TS%)" >nul 2>&1
+  git push origin main >nul 2>&1
+)
+endlocal & exit /b 0
 
 :SYNC_UNIFIED_FROM_AUTO
 setlocal
