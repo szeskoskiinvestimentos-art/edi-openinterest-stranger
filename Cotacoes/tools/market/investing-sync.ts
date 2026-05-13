@@ -1134,9 +1134,11 @@ function launchOptions(headless: boolean) {
   const channel = browserChannel()
   const exePath = executablePath()
   const useChannel = shouldUseChannel(exePath)
+  const timeout = Math.max(5000, envNumber('INVESTING_BROWSER_LAUNCH_TIMEOUT_MS', 45000))
   return {
     headless,
     acceptDownloads: true,
+    timeout,
     ...(useChannel && channel ? { channel } : {}),
     ...(!useChannel && exePath ? { executablePath: exePath } : {}),
     args: launchArgs(),

@@ -169,15 +169,25 @@ async function buildControleDeDadosSnapshot(input: {
 
 async function writeControleDeDadosHtml(snapshot: ControleDeDadosSnapshot, baseDir = WORKSPACE_ROOT) {
   const htmlPath = path.resolve(baseDir, 'controle_de_dados.html')
-  if (!(await fileExists(htmlPath))) return false
   const markerStart = '<script id="data" type="application/json">'
   const markerEnd = '</script>'
+  const payload = JSON.stringify(snapshot)
+  const fallbackHtml = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Controle de Dados</title></head><body><script id="data" type="application/json">${payload}</script><pre style="white-space:pre-wrap;font-family:ui-monospace,Consolas,monospace">controle_de_dados.html foi regenerado automaticamente.\nAbra via HTTP para modo ao vivo: http://127.0.0.1:3033/controle_de_dados.html</pre></body></html>`
+  if (!(await fileExists(htmlPath))) {
+    await writeFile(htmlPath, fallbackHtml, 'utf8')
+    return true
+  }
   const raw = await readFile(htmlPath, 'utf8')
   const i = raw.indexOf(markerStart)
-  if (i < 0) return false
+  if (i < 0) {
+    await writeFile(htmlPath, fallbackHtml, 'utf8')
+    return true
+  }
   const j = raw.indexOf(markerEnd, i + markerStart.length)
-  if (j < 0) return false
-  const payload = JSON.stringify(snapshot)
+  if (j < 0) {
+    await writeFile(htmlPath, fallbackHtml, 'utf8')
+    return true
+  }
   const next = raw.slice(0, i + markerStart.length) + payload + raw.slice(j)
   if (next === raw) return false
   await writeFile(htmlPath, next, 'utf8')
@@ -301,6 +311,58 @@ function spawnCapture(cmd: string, args: string[], opts: { cwd?: string; env?: N
     child.on('close', code => {
       resolve({
         exitCode: typeof code === 'number' ? code : -1,
+        stdout,
+        stderr,
+      })
+    })
+  })
+}
+
+function spawnCaptureWithTimeout(
+  cmd: string,
+  args: string[],
+  opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+  timeoutMs: number,
+) {
+  return new Promise<SpawnResult>(resolve => {
+    const child = spawn(platformCmd(cmd), args, {
+      cwd: opts.cwd,
+      env: opts.env,
+      windowsHide: true,
+    })
+
+    let stdout = ''
+    let stderr = ''
+    let timeoutFired = false
+
+    const timeout = setTimeout(() => {
+      if (timeoutFired) return
+      timeoutFired = true
+      const pid = child && typeof child.pid === 'number' ? child.pid : null
+      stderr += `TIMEOUT • ${cmd} ${args.join(' ')} • ${timeoutMs}ms\n`
+      if (!pid) return
+      if (process.platform === 'win32') {
+        void spawnCapture('taskkill', ['/PID', String(pid), '/T', '/F'], { cwd: opts.cwd, env: opts.env })
+        return
+      }
+      try {
+        child.kill('SIGKILL')
+      } catch {
+        void 0
+      }
+    }, Math.max(250, timeoutMs)).unref()
+
+    child.stdout.on('data', d => {
+      stdout += String(d)
+    })
+    child.stderr.on('data', d => {
+      stderr += String(d)
+    })
+
+    child.on('close', code => {
+      clearTimeout(timeout)
+      resolve({
+        exitCode: typeof code === 'number' ? code : timeoutFired ? 124 : -1,
         stdout,
         stderr,
       })
@@ -1256,8 +1318,6 @@ async function main() {
     const targetRelFromRepo = path.relative(repoAbs, targetDirAbs).replace(/\\/g, '/')
     const targetFiles = sourceFileNames.map(name => path.posix.join(targetRelFromRepo, name))
     const controleRel = 'controle_de_dados.html'
-    const controleAbs = path.join(repoAbs, controleRel)
-    const includeControle = await fileExists(controleAbs)
 
     const sameDir =
       (process.platform === 'win32' ? sourceDirAbs.toLowerCase() : sourceDirAbs) ===
@@ -1277,49 +1337,33 @@ async function main() {
       return
     }
 
-    const st = await spawnCapture('git', ['status', '--porcelain', '--', ...targetFiles], { cwd: repoDir, env: process.env })
-    if (st.exitCode !== 0) {
-      await appendLog(meta.logPath, `GIT_SYNC error • git status failed\n${st.stderr || st.stdout}\n`)
-      await finish('failed', 'git status failed')
-      return
-    }
-    if (!st.stdout.trim() && !includeControle) {
-      await appendLog(meta.logPath, `GIT_SYNC skip • no changes\n`)
-      await finish('no_changes')
-      return
-    }
-
-    let controleChanged = false
-    if (includeControle) {
-      try {
-        const gitSync = await readGitSyncStatusFromLog(meta.logPath)
-        const snapshot = await buildControleDeDadosSnapshot({
-          marketStatus: state,
-          logPath: meta.logPath,
-          gitSyncStatus: gitSync?.status ?? null,
-        })
-        snapshot.state.last_cotacoes_finished_iso = meta.finishedAt
-        controleChanged = await writeControleDeDadosHtml(snapshot, repoAbs)
-      } catch {
-        controleChanged = false
-      }
+    try {
+      const gitSync = await readGitSyncStatusFromLog(meta.logPath)
+      const snapshot = await buildControleDeDadosSnapshot({
+        marketStatus: { ok: true, state },
+        logPath: meta.logPath,
+        gitSyncStatus: gitSync?.status ?? null,
+      })
+      snapshot.state.last_cotacoes_finished_iso = meta.finishedAt
+      await writeControleDeDadosHtml(snapshot, repoAbs)
+    } catch {
+      void 0
     }
 
-    const statusFiles = includeControle ? [...targetFiles, controleRel] : targetFiles
+    const statusFiles = [...targetFiles, controleRel]
     const st2 = await spawnCapture('git', ['status', '--porcelain', '--', ...statusFiles], { cwd: repoDir, env: process.env })
     if (st2.exitCode !== 0) {
       await appendLog(meta.logPath, `GIT_SYNC error • git status failed\n${st2.stderr || st2.stdout}\n`)
       await finish('failed', 'git status failed')
       return
     }
-    if (!st2.stdout.trim() && !controleChanged) {
+    if (!st2.stdout.trim()) {
       await appendLog(meta.logPath, `GIT_SYNC skip • no changes\n`)
       await finish('no_changes')
       return
     }
 
-    const addTargets = includeControle ? [...targetFiles, controleRel] : targetFiles
-    const add = await spawnCapture('git', ['add', '--', ...addTargets], { cwd: repoDir, env: process.env })
+    const add = await spawnCapture('git', ['add', '--', ...statusFiles], { cwd: repoDir, env: process.env })
     if (add.exitCode !== 0) {
       await appendLog(meta.logPath, `GIT_SYNC error • git add failed\n${add.stderr || add.stdout}\n`)
       await finish('failed', 'git add failed')
@@ -1507,17 +1551,19 @@ async function main() {
       .map(s => s.trim())
       .filter(Boolean)
     if (!list.length) return true
+    const timeoutMinutes = Math.max(1, envNumber('MARKET_SUBSYSTEM_TIMEOUT_MINUTES', 10))
+    const timeoutMs = timeoutMinutes * 60 * 1000
 
     let ok = true
     for (const script of list) {
       const args = ['run', '-s', script]
       const res =
         process.platform === 'win32'
-          ? await spawnCapture(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', 'npm', ...args], {
+          ? await spawnCaptureWithTimeout(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', 'npm', ...args], {
               cwd: PROJECT_ROOT,
               env: { ...process.env },
-            })
-          : await spawnCapture('npm', args, { cwd: PROJECT_ROOT, env: { ...process.env } })
+            }, timeoutMs)
+          : await spawnCaptureWithTimeout('npm', args, { cwd: PROJECT_ROOT, env: { ...process.env } }, timeoutMs)
       if (res.stdout) await appendLog(logPath, res.stdout)
       if (res.stderr) await appendLog(logPath, res.stderr)
       if (res.exitCode !== 0) ok = false
@@ -1539,6 +1585,16 @@ async function main() {
 
     await appendLog(logPath, `START ${startedAt} • ${reason}\n`)
     await appendLog(logPath, `MODE ${mode}\n`)
+    try {
+      const snapshot = await buildControleDeDadosSnapshot({
+        marketStatus: { ok: true, state },
+        logPath,
+        gitSyncStatus: null,
+      })
+      await writeControleDeDadosHtml(snapshot, WORKSPACE_ROOT)
+    } catch {
+      void 0
+    }
 
     const script = scriptForMode(mode)
     const npmArgs = ['run', '-s', script]
@@ -1620,6 +1676,18 @@ async function main() {
           summary: currentSummary,
         }
 
+        try {
+          const snapshot = await buildControleDeDadosSnapshot({
+            marketStatus: { ok: true, state },
+            logPath,
+            gitSyncStatus: null,
+          })
+          snapshot.state.last_cotacoes_finished_iso = finishedAt
+          await writeControleDeDadosHtml(snapshot, WORKSPACE_ROOT)
+        } catch {
+          void 0
+        }
+
         if (exitCode === 0) {
           try {
             await runConfiguredSubsystems(logPath)
@@ -1630,6 +1698,8 @@ async function main() {
 
         await gitSyncAfterUpdate({ logPath, finishedAt, exitCode, reason, mode })
 
+        state = { running: false, last }
+
         if (exitCode === 0) {
           try {
             await sendTelegramOperationalOnce({ reason, logPath })
@@ -1637,8 +1707,6 @@ async function main() {
             await appendLog(logPath, `TELEGRAM operational error • ${String(err instanceof Error ? err.message : err)}\n`)
           }
         }
-
-        state = { running: false, last }
 
         if (shutdownRequested) {
           if (state.running) return
@@ -1662,6 +1730,13 @@ async function main() {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
     if (req.method === 'OPTIONS') return res.sendStatus(204)
     next()
+  })
+
+  app.get('/controle_de_dados.html', async (_req, res) => {
+    const htmlPath = path.resolve(WORKSPACE_ROOT, 'controle_de_dados.html')
+    if (!(await fileExists(htmlPath))) return res.status(404).send('not_found')
+    res.setHeader('Content-Type', 'text/html; charset=utf-8')
+    res.send(await readFile(htmlPath, 'utf8'))
   })
 
   app.get('/api/market/health', (_req, res) => {

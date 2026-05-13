@@ -139,7 +139,7 @@ echo Disparando update (manual)...
 powershell -NoProfile -Command "try { $u='http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/update'; $b=@{ reason='manual' } | ConvertTo-Json -Compress; Invoke-RestMethod -Method Post -Uri $u -ContentType 'application/json' -Body $b | Out-String | Write-Host } catch { Write-Host ('AVISO: ' + $_.Exception.Message) }"
 
 :AFTER_UPDATE
-if exist "%~dp0controle_de_dados.html" start "" "%~dp0controle_de_dados.html"
+start "" "http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/controle_de_dados.html"
 if exist "%COTACOES_DIR%\dashboard\index.html" start "" "%COTACOES_DIR%\dashboard\index.html"
 
 echo.
