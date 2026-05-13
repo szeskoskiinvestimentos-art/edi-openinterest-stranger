@@ -32,6 +32,8 @@ if not exist "%COTACOES_DIR%\package.json" (
   goto :END
 )
 set "OPTIONS_UNIFIED_DASHBOARD_DIR=%~dp0dashboard_unificado"
+set "AUTO_B3_DIR=%~dp0..\\Auto_B3_System"
+for %%I in ("%AUTO_B3_DIR%") do set "AUTO_B3_DIR=%%~fI"
 
 set "ENABLE_AUTO_GIT_PUSH=false"
 
@@ -59,10 +61,9 @@ if "%PY_CMD%"=="" (
 if not "%PY_CMD%"=="" (
   echo.
   echo === Atualizando Opcoes - Python ===
-  set "AUTO_B3_DIR=%~dp0..\\Auto_B3_System"
-  if exist "!AUTO_B3_DIR!\\automacao_dados.py" (
+  if exist "%AUTO_B3_DIR%\\automacao_dados.py" (
     echo Rodando coleta Barchart - Auto_B3_System...
-    pushd "!AUTO_B3_DIR!"
+    pushd "%AUTO_B3_DIR%"
     %PY_CMD% automacao_dados.py
     if errorlevel 1 echo AVISO: automacao_dados.py falhou.
     %PY_CMD% config.py
@@ -160,7 +161,7 @@ echo.
 echo Mantendo rotinas de opcoes - Barchart - ativas a cada %OPCOES_INTERVAL_SECONDS%s. Feche esta janela para parar.
 echo.
 :OPCOES_LOOP_RUN
-pushd "%~dp0..\\Auto_B3_System"
+pushd "%AUTO_B3_DIR%"
 %PY_CMD% automacao_dados.py
 %PY_CMD% config.py
 popd
@@ -171,7 +172,7 @@ goto :OPCOES_LOOP_RUN
 
 :GIT_PUSH_UNIFIED
 setlocal
-git add dashboard_unificado >nul 2>&1
+git add dashboard_unificado controle_de_dados.html >nul 2>&1
 git diff --cached --quiet >nul 2>&1
 if errorlevel 1 (
   for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "(Get-Date).ToString('yyyy-MM-dd HH:mm')"`) do set "TS=%%i"
@@ -186,7 +187,6 @@ endlocal & exit /b 0
 
 :SYNC_UNIFIED_FROM_AUTO
 setlocal
-set "AUTO_B3_DIR=%~dp0..\\Auto_B3_System"
 set "SRC_WDO=%AUTO_B3_DIR%\\dashboard_unificado\\WDO\\assets\\data"
 set "SRC_WIN=%AUTO_B3_DIR%\\dashboard_unificado\\WIN\\assets\\data"
 set "DST_WDO=%~dp0dashboard_unificado\\WDO\\assets\\data"

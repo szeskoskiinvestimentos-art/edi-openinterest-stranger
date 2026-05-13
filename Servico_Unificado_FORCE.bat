@@ -28,6 +28,8 @@ if not exist "%COTACOES_DIR%\package.json" (
   goto :END
 )
 set "OPTIONS_UNIFIED_DASHBOARD_DIR=%~dp0dashboard_unificado"
+set "AUTO_B3_DIR=%~dp0..\\Auto_B3_System"
+for %%I in ("%AUTO_B3_DIR%") do set "AUTO_B3_DIR=%%~fI"
 
 set "ENABLE_AUTO_GIT_PUSH=false"
 
@@ -55,10 +57,9 @@ if "%PY_CMD%"=="" (
 if not "%PY_CMD%"=="" (
   echo.
   echo === Atualizando Opcoes - Python ===
-  set "AUTO_B3_DIR=%~dp0..\\Auto_B3_System"
-  if exist "!AUTO_B3_DIR!\\automacao_dados.py" (
+  if exist "%AUTO_B3_DIR%\\automacao_dados.py" (
     echo Rodando coleta Barchart - Auto_B3_System...
-    pushd "!AUTO_B3_DIR!"
+    pushd "%AUTO_B3_DIR%"
     %PY_CMD% automacao_dados.py
     if errorlevel 1 echo AVISO: automacao_dados.py falhou.
     %PY_CMD% config.py

@@ -83,6 +83,107 @@ async function readGitSyncStatusFromLog(logPath: string) {
   }
 }
 
+type ControleDeDadosSnapshot = {
+  generated_at: string
+  root_dir: string
+  state: {
+    last_cotacoes_finished_iso?: string | null
+    last_cotacoes_log_path?: string | null
+    last_cotacoes_git_status?: string | null
+    last_options_wdo_last_updated?: string | null
+    last_options_win_last_updated?: string | null
+  }
+  cotacoes?: {
+    market_status?: unknown
+    last_log_hint?: string | null
+  }
+  options?: {
+    dashboard_unificado?: {
+      wdo_last_updated?: string | null
+      win_last_updated?: string | null
+      wdo_volume_total?: number | null
+      win_volume_total?: number | null
+      wdo_open_interest_total?: number | null
+      win_open_interest_total?: number | null
+    }
+  }
+}
+
+async function tryReadMarketDataSummary(absJsonPath: string) {
+  try {
+    const raw = await readJsonFile<unknown>(absJsonPath)
+    if (!raw || typeof raw !== 'object') return null
+    const obj = raw as Record<string, unknown>
+
+    const overviewRaw = obj.overview
+    const overview = overviewRaw && typeof overviewRaw === 'object' ? (overviewRaw as Record<string, unknown>) : null
+
+    const lastUpdatedRaw = obj.last_updated ?? overview?.last_update ?? obj.updatedAt
+    const lastUpdated = lastUpdatedRaw !== undefined && lastUpdatedRaw !== null ? String(lastUpdatedRaw) : null
+
+    const volumeTotalRaw = overview && overview.volume_total !== undefined ? Number(overview.volume_total) : null
+    const oiTotalRaw = overview && overview.open_interest_total !== undefined ? Number(overview.open_interest_total) : null
+
+    const volumeTotal = Number.isFinite(volumeTotalRaw ?? NaN) ? volumeTotalRaw : null
+    const oiTotal = Number.isFinite(oiTotalRaw ?? NaN) ? oiTotalRaw : null
+    return { lastUpdated, volumeTotal, oiTotal }
+  } catch {
+    return null
+  }
+}
+
+async function buildControleDeDadosSnapshot(input: {
+  marketStatus?: unknown
+  logPath?: string | null
+  gitSyncStatus?: string | null
+}): Promise<ControleDeDadosSnapshot> {
+  const wdoJson = path.resolve(WORKSPACE_ROOT, 'dashboard_unificado', 'WDO', 'assets', 'data', 'market_data.json')
+  const winJson = path.resolve(WORKSPACE_ROOT, 'dashboard_unificado', 'WIN', 'assets', 'data', 'market_data.json')
+  const [wdo, win] = await Promise.all([tryReadMarketDataSummary(wdoJson), tryReadMarketDataSummary(winJson)])
+  return {
+    generated_at: nowISO(),
+    root_dir: WORKSPACE_ROOT,
+    state: {
+      last_cotacoes_finished_iso: null,
+      last_cotacoes_log_path: input.logPath ?? null,
+      last_cotacoes_git_status: input.gitSyncStatus ?? null,
+      last_options_wdo_last_updated: wdo?.lastUpdated ?? null,
+      last_options_win_last_updated: win?.lastUpdated ?? null,
+    },
+    cotacoes: {
+      market_status: input.marketStatus,
+      last_log_hint: null,
+    },
+    options: {
+      dashboard_unificado: {
+        wdo_last_updated: wdo?.lastUpdated ?? null,
+        win_last_updated: win?.lastUpdated ?? null,
+        wdo_volume_total: wdo?.volumeTotal ?? null,
+        win_volume_total: win?.volumeTotal ?? null,
+        wdo_open_interest_total: wdo?.oiTotal ?? null,
+        win_open_interest_total: win?.oiTotal ?? null,
+      },
+    },
+  }
+}
+
+async function writeControleDeDadosHtml(snapshot: ControleDeDadosSnapshot, baseDir = WORKSPACE_ROOT) {
+  const htmlPath = path.resolve(baseDir, 'controle_de_dados.html')
+  if (!(await fileExists(htmlPath))) return false
+  const markerStart = '<script id="data" type="application/json">'
+  const markerEnd = '</script>'
+  const raw = await readFile(htmlPath, 'utf8')
+  const i = raw.indexOf(markerStart)
+  if (i < 0) return false
+  const j = raw.indexOf(markerEnd, i + markerStart.length)
+  if (j < 0) return false
+  const payload = JSON.stringify(snapshot)
+  const next = raw.slice(0, i + markerStart.length) + payload + raw.slice(j)
+  if (next === raw) return false
+  await writeFile(htmlPath, next, 'utf8')
+  return true
+}
+
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = path.resolve(SCRIPT_DIR, '..', '..')
 const WORKSPACE_ROOT = path.resolve(PROJECT_ROOT, '..')
@@ -1154,6 +1255,9 @@ async function main() {
 
     const targetRelFromRepo = path.relative(repoAbs, targetDirAbs).replace(/\\/g, '/')
     const targetFiles = sourceFileNames.map(name => path.posix.join(targetRelFromRepo, name))
+    const controleRel = 'controle_de_dados.html'
+    const controleAbs = path.join(repoAbs, controleRel)
+    const includeControle = await fileExists(controleAbs)
 
     const sameDir =
       (process.platform === 'win32' ? sourceDirAbs.toLowerCase() : sourceDirAbs) ===
@@ -1179,13 +1283,43 @@ async function main() {
       await finish('failed', 'git status failed')
       return
     }
-    if (!st.stdout.trim()) {
+    if (!st.stdout.trim() && !includeControle) {
       await appendLog(meta.logPath, `GIT_SYNC skip • no changes\n`)
       await finish('no_changes')
       return
     }
 
-    const add = await spawnCapture('git', ['add', '--', ...targetFiles], { cwd: repoDir, env: process.env })
+    let controleChanged = false
+    if (includeControle) {
+      try {
+        const gitSync = await readGitSyncStatusFromLog(meta.logPath)
+        const snapshot = await buildControleDeDadosSnapshot({
+          marketStatus: state,
+          logPath: meta.logPath,
+          gitSyncStatus: gitSync?.status ?? null,
+        })
+        snapshot.state.last_cotacoes_finished_iso = meta.finishedAt
+        controleChanged = await writeControleDeDadosHtml(snapshot, repoAbs)
+      } catch {
+        controleChanged = false
+      }
+    }
+
+    const statusFiles = includeControle ? [...targetFiles, controleRel] : targetFiles
+    const st2 = await spawnCapture('git', ['status', '--porcelain', '--', ...statusFiles], { cwd: repoDir, env: process.env })
+    if (st2.exitCode !== 0) {
+      await appendLog(meta.logPath, `GIT_SYNC error • git status failed\n${st2.stderr || st2.stdout}\n`)
+      await finish('failed', 'git status failed')
+      return
+    }
+    if (!st2.stdout.trim() && !controleChanged) {
+      await appendLog(meta.logPath, `GIT_SYNC skip • no changes\n`)
+      await finish('no_changes')
+      return
+    }
+
+    const addTargets = includeControle ? [...targetFiles, controleRel] : targetFiles
+    const add = await spawnCapture('git', ['add', '--', ...addTargets], { cwd: repoDir, env: process.env })
     if (add.exitCode !== 0) {
       await appendLog(meta.logPath, `GIT_SYNC error • git add failed\n${add.stderr || add.stdout}\n`)
       await finish('failed', 'git add failed')
