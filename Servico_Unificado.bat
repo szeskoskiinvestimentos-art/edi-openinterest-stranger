@@ -35,6 +35,9 @@ set "OPTIONS_UNIFIED_DASHBOARD_DIR=%~dp0dashboard_unificado"
 set "AUTO_B3_DIR=%~dp0..\\Auto_B3_System"
 for %%I in ("%AUTO_B3_DIR%") do set "AUTO_B3_DIR=%%~fI"
 
+if "%OPTIONS_RUN_TIMES%"=="" set "OPTIONS_RUN_TIMES=08:30,09:30,10:30,11:30,12:30,13:30,14:30,15:30,16:30,17:30"
+if "%OPTIONS_RUN_WEEKDAYS_ONLY%"=="" set "OPTIONS_RUN_WEEKDAYS_ONLY=1"
+
 set "ENABLE_AUTO_GIT_PUSH=false"
 
 if "%CSV_INDICE_DIR%"=="" (
@@ -60,21 +63,26 @@ if "%PY_CMD%"=="" (
 
 if not "%PY_CMD%"=="" (
   echo.
-  echo === Atualizando Opcoes - Python ===
-  if exist "%AUTO_B3_DIR%\\automacao_dados.py" (
-    echo Rodando coleta Barchart - Auto_B3_System...
-    pushd "%AUTO_B3_DIR%"
-    %PY_CMD% automacao_dados.py
-    if errorlevel 1 echo AVISO: automacao_dados.py falhou.
-    %PY_CMD% config.py
-    if errorlevel 1 echo AVISO: config.py - Auto_B3_System falhou.
-    popd
-    call :SYNC_UNIFIED_FROM_AUTO
+  call :SHOULD_RUN_OPTIONS
+  if errorlevel 1 (
+    echo Opcoes: fora da programacao ou ja executado. Pulando nesta inicializacao.
   ) else (
-    %PY_CMD% export_v1_data.py
-    if errorlevel 1 echo AVISO: export_v1_data.py falhou.
-    %PY_CMD% main.py
-    if errorlevel 1 echo AVISO: main.py falhou.
+    echo === Atualizando Opcoes - Python ===
+    if exist "%AUTO_B3_DIR%\\automacao_dados.py" (
+      echo Rodando coleta Barchart - Auto_B3_System...
+      pushd "%AUTO_B3_DIR%"
+      %PY_CMD% automacao_dados.py
+      if errorlevel 1 echo AVISO: automacao_dados.py falhou.
+      %PY_CMD% config.py
+      if errorlevel 1 echo AVISO: config.py - Auto_B3_System falhou.
+      popd
+      call :SYNC_UNIFIED_FROM_AUTO
+    ) else (
+      %PY_CMD% export_v1_data.py
+      if errorlevel 1 echo AVISO: export_v1_data.py falhou.
+      %PY_CMD% main.py
+      if errorlevel 1 echo AVISO: main.py falhou.
+    )
   )
 ) else (
   echo.
@@ -161,12 +169,17 @@ echo.
 echo Mantendo rotinas de opcoes - Barchart - ativas a cada %OPCOES_INTERVAL_SECONDS%s. Feche esta janela para parar.
 echo.
 :OPCOES_LOOP_RUN
-pushd "%AUTO_B3_DIR%"
-%PY_CMD% automacao_dados.py
-%PY_CMD% config.py
-popd
-call :SYNC_UNIFIED_FROM_AUTO
-call :GIT_PUSH_UNIFIED
+call :SHOULD_RUN_OPTIONS
+if errorlevel 1 (
+  rem skip
+) else (
+  pushd "%AUTO_B3_DIR%"
+  %PY_CMD% automacao_dados.py
+  %PY_CMD% config.py
+  popd
+  call :SYNC_UNIFIED_FROM_AUTO
+  call :GIT_PUSH_UNIFIED
+)
 timeout /t %OPCOES_INTERVAL_SECONDS% /nobreak >nul
 goto :OPCOES_LOOP_RUN
 
@@ -184,6 +197,28 @@ if errorlevel 1 (
   )
 )
 endlocal & exit /b 0
+
+:SHOULD_RUN_OPTIONS
+setlocal
+set "WDO_JSON=%~dp0dashboard_unificado\WDO\assets\data\market_data.json"
+set "WIN_JSON=%~dp0dashboard_unificado\WIN\assets\data\market_data.json"
+set "AUTO_WDO_JSON=%AUTO_B3_DIR%\dashboard_unificado\WDO\assets\data\market_data.json"
+set "AUTO_WIN_JSON=%AUTO_B3_DIR%\dashboard_unificado\WIN\assets\data\market_data.json"
+powershell -NoProfile -Command ^
+  "$now=Get-Date; " ^
+  "$times=($env:OPTIONS_RUN_TIMES -split ',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }; " ^
+  "$weekdaysOnly=($env:OPTIONS_RUN_WEEKDAYS_ONLY -eq '1' -or $env:OPTIONS_RUN_WEEKDAYS_ONLY -eq 'true'); " ^
+  "if($weekdaysOnly -and ($now.DayOfWeek -eq 'Saturday' -or $now.DayOfWeek -eq 'Sunday')){ exit 1 }; " ^
+  "function ParseDt($s){ if(-not $s){ return $null }; try { return [datetime]::Parse($s,[globalization.cultureinfo]::InvariantCulture) } catch { try { return [datetime]::Parse($s) } catch { return $null } } }; " ^
+  "function ReadLast($p){ if(-not (Test-Path -LiteralPath $p)){ return $null }; try { $j=Get-Content -LiteralPath $p -Raw | ConvertFrom-Json; $v=$j.last_updated; if(-not $v -and $j.overview){ $v=$j.overview.last_update }; if(-not $v){ return $null }; return (ParseDt ([string]$v)) } catch { return $null } }; " ^
+  "$lw=ReadLast('%WDO_JSON%'); $ln=ReadLast('%WIN_JSON%'); $aw=ReadLast('%AUTO_WDO_JSON%'); $an=ReadLast('%AUTO_WIN_JSON%'); " ^
+  "$last=$lw; foreach($x in @($ln,$aw,$an)){ if($x -and ((-not $last) -or $x -gt $last)){ $last=$x } }; " ^
+  "$today=$now.Date; " ^
+  "$slots=@(); foreach($t in $times){ try { $ts=[TimeSpan]::Parse($t); $d=$today.Add($ts); if($d -le $now){ $slots += $d } } catch {} }; " ^
+  "if(-not $slots -or $slots.Count -eq 0){ exit 1 }; " ^
+  "$due=($slots | Sort-Object | Select-Object -Last 1); " ^
+  "if($last -and $last.Date -eq $today -and $last -ge $due){ exit 1 } else { exit 0 }"
+endlocal & exit /b %errorlevel%
 
 :SYNC_UNIFIED_FROM_AUTO
 setlocal
