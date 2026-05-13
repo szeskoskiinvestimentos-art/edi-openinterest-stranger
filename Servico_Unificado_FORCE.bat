@@ -29,7 +29,7 @@ if not exist "%COTACOES_DIR%\package.json" (
 )
 set "OPTIONS_UNIFIED_DASHBOARD_DIR=%~dp0dashboard_unificado"
 
-set "ENABLE_AUTO_GIT_PUSH=true"
+set "ENABLE_AUTO_GIT_PUSH=false"
 
 if "%CSV_INDICE_DIR%"=="" (
   if exist "%~dp0CSV_Indice\\*.csv" set "CSV_INDICE_DIR=%~dp0CSV_Indice"
@@ -56,9 +56,9 @@ if not "%PY_CMD%"=="" (
   echo.
   echo === Atualizando Opcoes - Python ===
   set "AUTO_B3_DIR=%~dp0..\\Auto_B3_System"
-  if exist "%AUTO_B3_DIR%\\automacao_dados.py" (
+  if exist "!AUTO_B3_DIR!\\automacao_dados.py" (
     echo Rodando coleta Barchart - Auto_B3_System...
-    pushd "%AUTO_B3_DIR%"
+    pushd "!AUTO_B3_DIR!"
     %PY_CMD% automacao_dados.py
     if errorlevel 1 echo AVISO: automacao_dados.py falhou.
     %PY_CMD% config.py

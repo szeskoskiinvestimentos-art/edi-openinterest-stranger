@@ -66,6 +66,23 @@ function envBool(name: string, fallback: boolean) {
   return fallback
 }
 
+async function readGitSyncStatusFromLog(logPath: string) {
+  try {
+    const raw = await readFile(logPath, 'utf8')
+    const re = /^GIT_SYNC status=([a-z_]+)(?:\s*•\s*(.*))?$/gim
+    let last: { status: string; detail?: string } | null = null
+    for (const m of raw.matchAll(re)) {
+      const status = String(m[1] || '').trim()
+      const detail = String(m[2] || '').trim()
+      if (status) last = detail ? { status, detail } : { status }
+    }
+    if (last) return last
+    return null
+  } catch {
+    return null
+  }
+}
+
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = path.resolve(SCRIPT_DIR, '..', '..')
 const WORKSPACE_ROOT = path.resolve(PROJECT_ROOT, '..')
@@ -1576,6 +1593,13 @@ async function main() {
         },
       },
     })
+  })
+
+  app.get('/api/market/git-sync', async (_req, res) => {
+    const logPath = state.running ? state.current.logPath : state.last?.logPath
+    if (!logPath) return res.json({ ok: false, error: 'no_log' })
+    const gitSync = await readGitSyncStatusFromLog(logPath)
+    res.json({ ok: true, logPath, gitSync })
   })
 
   app.post('/api/telegram/operational/send', async (req, res) => {
