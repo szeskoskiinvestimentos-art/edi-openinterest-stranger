@@ -81,8 +81,22 @@ if not "%PY_CMD%"=="" (
 )
 
 set "MARKET_ALREADY_RUNNING=0"
+set "MARKET_PID="
+for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "$p=(Get-NetTCPConnection -State Listen -LocalPort %MARKET_SERVICE_PORT% -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess; if($p){$p}"`) do set "MARKET_PID=%%i"
+
 powershell -NoProfile -Command "$x=Get-NetTCPConnection -State Listen -LocalPort %MARKET_SERVICE_PORT% -ErrorAction SilentlyContinue | Select-Object -First 1; if($x){exit 0}else{exit 1}" >nul 2>&1
 if not errorlevel 1 set "MARKET_ALREADY_RUNNING=1"
+if "%MARKET_ALREADY_RUNNING%"=="1" (
+  powershell -NoProfile -Command "try { $r=Invoke-RestMethod -Method Get -Uri 'http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/health' -TimeoutSec 2; if($r -and $r.ok -eq $true){ exit 0 } exit 2 } catch { exit 2 }" >nul 2>&1
+  if errorlevel 2 (
+    if not "%MARKET_PID%"=="" (
+      echo AVISO: Porta %MARKET_SERVICE_PORT% esta ocupada, mas o healthcheck falhou. Encerrando PID=%MARKET_PID%...
+      taskkill /PID %MARKET_PID% /T /F >nul 2>&1
+      timeout /t 1 >nul
+    )
+    set "MARKET_ALREADY_RUNNING=0"
+  )
+)
 if "%MARKET_ALREADY_RUNNING%"=="0" (
   netstat -ano | findstr ":%MARKET_SERVICE_PORT%" | findstr /I "LISTENING OUVINDO" >nul 2>&1
   if not errorlevel 1 set "MARKET_ALREADY_RUNNING=1"
@@ -110,6 +124,7 @@ if errorlevel 1 (
   echo AVISO: market:service nao respondeu em http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/health
   goto :AFTER_UPDATE
 )
+start "COTACOES monitor" powershell -NoProfile -NoExit -Command "$base='http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%'; while($true){ try { $h=Invoke-RestMethod -Method Get -Uri ($base+'/api/market/health') -TimeoutSec 2; $last=$null; if($h.state -and $h.state.last){$last=$h.state.last.finishedAt}; $run=($h.state -and $h.state.running); $next=$null; if($h.schedule){$next=$h.schedule.nextDueAt}; Write-Host ('['+(Get-Date).ToString('HH:mm:ss')+'] running='+$run+' last='+($last -as [string])+' next='+($next -as [string])); } catch { Write-Host ('['+(Get-Date).ToString('HH:mm:ss')+'] health ERROR'); } Start-Sleep -Seconds 5 }"
 echo Disparando update (manual)...
 powershell -NoProfile -Command "try { $u='http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/update'; $b=@{ reason='manual' } | ConvertTo-Json -Compress; Invoke-RestMethod -Method Post -Uri $u -ContentType 'application/json' -Body $b | Out-String | Write-Host } catch { Write-Host ('AVISO: ' + $_.Exception.Message) }"
 
