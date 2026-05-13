@@ -96,6 +96,16 @@ type ControleDeDadosSnapshot = {
   cotacoes?: {
     market_status?: unknown
     last_log_hint?: string | null
+    log_tail?: string[] | null
+    downloads?: {
+      yahoo?: { status: 'ok' | 'fail' | 'skip' | 'warn' | 'unknown'; detail?: string | null }
+      portfolio?: { status: 'ok' | 'fail' | 'skip' | 'warn' | 'unknown'; detail?: string | null }
+      di?: { status: 'ok' | 'fail' | 'skip' | 'warn' | 'unknown'; detail?: string | null }
+      calendar?: { status: 'ok' | 'fail' | 'skip' | 'warn' | 'unknown'; detail?: string | null }
+      pdf?: { status: 'ok' | 'fail' | 'skip' | 'warn' | 'unknown'; detail?: string | null }
+      tradingview?: { status: 'ok' | 'fail' | 'skip' | 'warn' | 'unknown'; detail?: string | null }
+      git_sync?: { status: 'ok' | 'fail' | 'skip' | 'warn' | 'unknown'; detail?: string | null }
+    } | null
   }
   options?: {
     dashboard_unificado?: {
@@ -106,6 +116,76 @@ type ControleDeDadosSnapshot = {
       wdo_open_interest_total?: number | null
       win_open_interest_total?: number | null
     }
+  }
+}
+
+type LogSignal = { status: 'ok' | 'fail' | 'skip' | 'warn' | 'unknown'; detail?: string | null }
+
+async function readLogTail(logPath: string, maxLines = 80) {
+  try {
+    const raw = await readFile(logPath, 'utf8')
+    const lines = raw
+      .split(/\r?\n/g)
+      .map(s => s.trim())
+      .filter(Boolean)
+    return lines.slice(Math.max(0, lines.length - maxLines))
+  } catch {
+    return null
+  }
+}
+
+async function readMarketDownloadSignalsFromLog(logPath: string) {
+  try {
+    const raw = await readFile(logPath, 'utf8')
+    const lines = raw.split(/\r?\n/g).map(s => s.trim())
+
+    const out: NonNullable<ControleDeDadosSnapshot['cotacoes']>['downloads'] = {}
+
+    for (const line of lines) {
+      if (!line) continue
+
+      const yahooOk = line.match(/^OK\s+•\s+Yahoo quotes:\s*(.*)$/i)
+      const yahooFail = line.match(/^(FAIL|ERROR)\s+•\s+Yahoo quotes:\s*(.*)$/i)
+      if (yahooOk) out.yahoo = { status: 'ok', detail: yahooOk[1] ? yahooOk[1].trim() : null }
+      if (yahooFail) out.yahoo = { status: 'fail', detail: yahooFail[2] ? yahooFail[2].trim() : null }
+
+      const pf = line.match(/^(OK|SKIP|FAIL|ERROR)\s+•\s+Portfolio Investing(?:\s*\((.*)\))?$/i)
+      if (pf) {
+        const status = pf[1].toLowerCase()
+        out.portfolio = { status: status === 'error' ? 'fail' : (status as LogSignal['status']), detail: pf[2] ? pf[2].trim() : null }
+      }
+
+      const di = line.match(/^(OK|SKIP|FAIL|ERROR)\s+•\s+DI\b.*$/i)
+      if (di) {
+        const status = di[1].toLowerCase()
+        out.di = { status: status === 'error' ? 'fail' : (status as LogSignal['status']), detail: line.replace(/^(OK|SKIP|FAIL|ERROR)\s+•\s+/i, '') }
+      }
+
+      const cal = line.match(/^(OK|SKIP|FAIL|ERROR)\s+•\s+Calendar\b.*$/i)
+      if (cal) {
+        const status = cal[1].toLowerCase()
+        out.calendar = { status: status === 'error' ? 'fail' : (status as LogSignal['status']), detail: line.replace(/^(OK|SKIP|FAIL|ERROR)\s+•\s+/i, '') }
+      }
+
+      const pdf = line.match(/^OK\s+•\s+dashboard PDF\b.*$/i)
+      if (pdf) out.pdf = { status: 'ok', detail: line.replace(/^OK\s+•\s+/i, '') }
+
+      const tv = line.match(/^SUGGEST\s+•\s+MARKET_TRADINGVIEW_SYMBOL_OVERRIDES\b.*$/i)
+      if (tv) out.tradingview = { status: 'warn', detail: line.replace(/^SUGGEST\s+•\s+/i, '') }
+
+      const git = line.match(/^GIT_SYNC status=([a-z_]+)(?:\s*•\s*(.*))?$/i)
+      if (git) {
+        const s = String(git[1] || '').trim().toLowerCase()
+        const detail = git[2] ? String(git[2]).trim() : null
+        const status: LogSignal['status'] = s === 'pushed' || s === 'committed' ? 'ok' : s === 'failed' ? 'fail' : 'warn'
+        out.git_sync = { status, detail: detail || s }
+      }
+    }
+
+    const hasAny = Object.keys(out).length > 0
+    return hasAny ? out : null
+  } catch {
+    return null
   }
 }
 
@@ -121,8 +201,32 @@ async function tryReadMarketDataSummary(absJsonPath: string) {
     const lastUpdatedRaw = obj.last_updated ?? overview?.last_update ?? obj.updatedAt
     const lastUpdated = lastUpdatedRaw !== undefined && lastUpdatedRaw !== null ? String(lastUpdatedRaw) : null
 
-    const volumeTotalRaw = overview && overview.volume_total !== undefined ? Number(overview.volume_total) : null
-    const oiTotalRaw = overview && overview.open_interest_total !== undefined ? Number(overview.open_interest_total) : null
+    const volumeRaw =
+      overview && overview.volume_total !== undefined
+        ? overview.volume_total
+        : overview && overview.total_volume !== undefined
+          ? overview.total_volume
+          : overview && overview.total_trades !== undefined
+            ? overview.total_trades
+            : obj.volume_total !== undefined
+              ? obj.volume_total
+              : obj.total_volume !== undefined
+                ? obj.total_volume
+                : null
+
+    const oiRaw =
+      overview && overview.open_interest_total !== undefined
+        ? overview.open_interest_total
+        : overview && overview.oi_total !== undefined
+          ? overview.oi_total
+          : overview && overview.open_interest !== undefined
+            ? overview.open_interest
+            : obj.open_interest_total !== undefined
+              ? obj.open_interest_total
+              : null
+
+    const volumeTotalRaw = volumeRaw !== null && volumeRaw !== undefined ? Number(volumeRaw) : null
+    const oiTotalRaw = oiRaw !== null && oiRaw !== undefined ? Number(oiRaw) : null
 
     const volumeTotal = Number.isFinite(volumeTotalRaw ?? NaN) ? volumeTotalRaw : null
     const oiTotal = Number.isFinite(oiTotalRaw ?? NaN) ? oiTotalRaw : null
@@ -139,20 +243,28 @@ async function buildControleDeDadosSnapshot(input: {
 }): Promise<ControleDeDadosSnapshot> {
   const wdoJson = path.resolve(WORKSPACE_ROOT, 'dashboard_unificado', 'WDO', 'assets', 'data', 'market_data.json')
   const winJson = path.resolve(WORKSPACE_ROOT, 'dashboard_unificado', 'WIN', 'assets', 'data', 'market_data.json')
-  const [wdo, win] = await Promise.all([tryReadMarketDataSummary(wdoJson), tryReadMarketDataSummary(winJson)])
+  const [wdo, win, downloads, logTail] = await Promise.all([
+    tryReadMarketDataSummary(wdoJson),
+    tryReadMarketDataSummary(winJson),
+    input.logPath ? readMarketDownloadSignalsFromLog(input.logPath) : Promise.resolve(null),
+    input.logPath ? readLogTail(input.logPath, 80) : Promise.resolve(null),
+  ])
+  const gitFromLog = downloads?.git_sync?.detail ? String(downloads.git_sync.detail) : null
   return {
     generated_at: nowISO(),
     root_dir: WORKSPACE_ROOT,
     state: {
       last_cotacoes_finished_iso: null,
       last_cotacoes_log_path: input.logPath ?? null,
-      last_cotacoes_git_status: input.gitSyncStatus ?? null,
+      last_cotacoes_git_status: input.gitSyncStatus ?? gitFromLog ?? null,
       last_options_wdo_last_updated: wdo?.lastUpdated ?? null,
       last_options_win_last_updated: win?.lastUpdated ?? null,
     },
     cotacoes: {
       market_status: input.marketStatus,
       last_log_hint: null,
+      log_tail: logTail,
+      downloads,
     },
     options: {
       dashboard_unificado: {
