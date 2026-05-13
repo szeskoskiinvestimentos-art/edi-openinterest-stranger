@@ -75,9 +75,9 @@
     };
 
     const assetProfiles = {
-        spx: { label: 'S&P 500', microStrengthMin: 0.45, signTh: 0.06, edgeAdj: 0, stopMinPct: 0.07, stopMaxPct: 0.60, targetMinPct: 0.12, targetMaxPct: 0.95, stopRangeMult: 0.22, targetRangeMult: 0.45, vol30Ref: 0.45 },
-        ndx: { label: 'Nasdaq', microStrengthMin: 0.55, signTh: 0.08, edgeAdj: 4, stopMinPct: 0.09, stopMaxPct: 0.75, targetMinPct: 0.15, targetMaxPct: 1.20, stopRangeMult: 0.25, targetRangeMult: 0.52, vol30Ref: 0.60 },
-        dow: { label: 'US30', microStrengthMin: 0.50, signTh: 0.07, edgeAdj: 2, stopMinPct: 0.08, stopMaxPct: 0.70, targetMinPct: 0.14, targetMaxPct: 1.10, stopRangeMult: 0.24, targetRangeMult: 0.50, vol30Ref: 0.52 },
+        spx: { label: 'S&P 500', microStrengthMin: 0.45, signTh: 0.06, edgeAdj: 0 },
+        ndx: { label: 'Nasdaq', microStrengthMin: 0.55, signTh: 0.08, edgeAdj: 4 },
+        dow: { label: 'US30', microStrengthMin: 0.50, signTh: 0.07, edgeAdj: 2 },
     };
 
     const voteLabel = (b) => (b === 'buy' ? 'buy' : b === 'sell' ? 'sell' : 'neutral');
@@ -91,10 +91,7 @@
         const sig = (scalpSig === 'buy' || scalpSig === 'sell')
             ? scalpSig
             : (pulse && (pulse.bias === 'buy' || pulse.bias === 'sell') ? pulse.bias : 'neutral');
-        const baseMin = assetProfiles[key] ? assetProfiles[key].microStrengthMin : 0.5;
-        const amp = usNow && usNow.volAmp && isNum(usNow.volAmp.amp) ? usNow.volAmp.amp : 1;
-        const adj = amp >= 1.25 ? 1.15 : amp <= 0.90 ? 0.95 : 1;
-        const min = clamp(baseMin * adj, 0.35, 0.92);
+        const min = assetProfiles[key] ? assetProfiles[key].microStrengthMin : 0.5;
         const ok = sig !== 'neutral' && strength >= min;
         return { key, sig, strength, min, ok };
     };
@@ -115,38 +112,22 @@
         const ndx = usNow.market ? usNow.market.ndxPct : null;
         const dow = usNow.market ? usNow.market.dowPct : null;
         const xlf = usNow.sym && usNow.sym.xlf ? deps.getChangePct(data, usNow.sym.xlf) : null;
-        const xlk = usNow.sym && usNow.sym.xlk ? deps.getChangePct(data, usNow.sym.xlk) : null;
-        const iwm = usNow.sym && usNow.sym.iwm ? deps.getChangePct(data, usNow.sym.iwm) : null;
-        const amp = usNow && usNow.volAmp && isNum(usNow.volAmp.amp) ? usNow.volAmp.amp : 1;
 
         const p1 = (() => {
-            const a = sign(spx, assetProfiles.spx.signTh * amp);
-            const b = sign(ndx, assetProfiles.ndx.signTh * amp);
+            const a = sign(spx, assetProfiles.spx.signTh);
+            const b = sign(ndx, assetProfiles.ndx.signTh);
             if (!a || !b) return null;
             return a === b;
         })();
         const p2 = (() => {
-            const a = sign(dow, assetProfiles.dow.signTh * amp);
-            const b = sign(xlf, 0.06 * amp);
+            const a = sign(dow, assetProfiles.dow.signTh);
+            const b = sign(xlf, 0.06);
             if (!a || !b) return null;
             return a === b;
         })();
-        const p3 = (() => {
-            const a = sign(ndx, assetProfiles.ndx.signTh * amp);
-            const b = sign(xlk, 0.07 * amp);
-            if (!a || !b) return null;
-            return a === b;
-        })();
-        const p4 = (() => {
-            const a = sign(spx, assetProfiles.spx.signTh * amp);
-            const b = sign(iwm, 0.07 * amp);
-            if (!a || !b) return null;
-            return a === b;
-        })();
-
-        const bad = [p1, p2, p3, p4].some(v => v === false);
+        const bad = [p1, p2].some(v => v === false);
         const mixedRegime = regime.zqRisk && regime.tsyRisk && regime.zqRisk !== regime.tsyRisk;
-        return { active: bad || mixedRegime, parity: { spxNdx: p1, dowXlf: p2, ndxXlk: p3, spxIwm: p4 }, mixedRegime };
+        return { active: bad || mixedRegime, parity: { spxNdx: p1, dowXlf: p2 }, mixedRegime };
     };
 
     const volLevelOf = (vixPx, vxnPx) => {
@@ -255,7 +236,7 @@
             return { key: k, label: prof.label, sig: mv.sig, strength: mv.strength, min: mv.min };
         })();
 
-        const edgeModel = (() => {
+        const edge = (() => {
             const microBias = (m) => {
                 const s = m && m.scalp && m.scalp.signal ? String(m.scalp.signal) : 'neutral';
                 return s === 'buy' || s === 'sell' ? s : 'neutral';
@@ -281,20 +262,15 @@
 
             const base = 0.26;
             const score = base + 0.28 * microAlign + 0.30 * netAvg + 0.20 * (regimeScore - 0.5) + sessionAdj + volAdj + volTrend + staleAdj + divAdj + modeAdj;
-            return {
-                score: clamp(score, 0, 1),
-                parts: { base, microAlign, netAvg, regimeScore, sessionAdj, volAdj, volTrend, staleAdj, divAdj, modeAdj },
-            };
+            return clamp(score, 0, 1);
         })();
 
-        const edgePct = Math.round(edgeModel.score * 100);
+        const edgePct = Math.round(edge * 100);
 
         const threshold = (() => {
             const base = mode === 'conservative' ? 74 : 62;
             const adj = assetProfiles[lead.key] ? assetProfiles[lead.key].edgeAdj : 0;
-            const amp = usNow && usNow.volAmp && isNum(usNow.volAmp.amp) ? usNow.volAmp.amp : 1;
-            const volAdj = amp >= 1.25 ? 6 : amp >= 1.12 ? 3 : amp <= 0.90 ? -2 : 0;
-            return base + adj + volAdj;
+            return base + adj;
         })();
 
         const conflicts = (() => {
@@ -305,8 +281,6 @@
             if (!regime.agree && regime.zqRisk && regime.tsyRisk) out.push(`Regime divergente: ZQ=${String(regime.zqRisk)} vs Treasuries=${String(regime.tsyRisk)}`);
             if (divergeInfo && divergeInfo.parity && divergeInfo.parity.spxNdx === false) out.push('Paridade divergente: SPX×NDX');
             if (divergeInfo && divergeInfo.parity && divergeInfo.parity.dowXlf === false) out.push('Paridade divergente: DOW×XLF');
-            if (divergeInfo && divergeInfo.parity && divergeInfo.parity.ndxXlk === false) out.push('Paridade divergente: NDX×XLK');
-            if (divergeInfo && divergeInfo.parity && divergeInfo.parity.spxIwm === false) out.push('Paridade divergente: SPX×IWM');
             if (regime.final === 'RISK_OFF' && majorityBias === 'buy') out.push(`ZQ/Tsy RISK_OFF vs ${lead.label} micro=${voteLabel(lead.sig)}`);
             if (regime.final === 'RISK_ON' && majorityBias === 'sell') out.push(`ZQ/Tsy RISK_ON vs ${lead.label} micro=${voteLabel(lead.sig)}`);
             if (majorityBias === 'neutral') out.push('Equities sem consenso (micro)');
@@ -317,8 +291,6 @@
             if (staleQuotes) return { active: true, reason: 'Dados com atraso' };
             if (session.key === 'after' || session.isWeekend) return { active: true, reason: 'Fora do horário' };
             if (!regime.agree && regime.zqRisk && regime.tsyRisk) return { active: true, reason: 'Divergência estrutural (regime)' };
-            if (divergeInfo && divergeInfo.parity && (divergeInfo.parity.spxNdx === false || divergeInfo.parity.dowXlf === false || divergeInfo.parity.ndxXlk === false || divergeInfo.parity.spxIwm === false) && edgePct < 86)
-                return { active: true, reason: 'Paridades divergentes (estrutura)' };
             if (regime.final === 'RISK_OFF' && majorityBias === 'buy' && edgePct < 80) return { active: true, reason: 'Regime RISK_OFF contra compra' };
             if (regime.final === 'RISK_ON' && majorityBias === 'sell' && edgePct < 80) return { active: true, reason: 'Regime RISK_ON contra venda' };
             if (volLevel.level === 'stress') return { active: true, reason: 'Volatilidade em STRESS' };
@@ -397,7 +369,6 @@
             lead,
             divergent,
             edgePct,
-            edgeParts: edgeModel.parts,
             threshold,
             conviction,
             today,
@@ -439,7 +410,7 @@
             return { spot, t };
         };
 
-        const planFor = (assetKey, name, p, extras, execSym, src, micro) => {
+        const planFor = (name, p, extras, execSym, src, micro) => {
             const scalp = micro && micro.scalp ? micro.scalp : { signal: 'neutral', strength: 0, label: 'n/d' };
             const scalpBias = scalp && scalp.signal ? String(scalp.signal) : 'neutral';
             const primaryBias = scalpBias !== 'neutral' ? scalpBias : (p && p.bias ? p.bias : 'neutral');
@@ -467,31 +438,12 @@
 
             const scalpPlan = (() => {
                 const rangePct = micro && micro.range30 && isNum(micro.range30.pct) ? micro.range30.pct : null;
-                const vol30 = micro && micro.vol30 && isNum(micro.vol30.sumAbsPct) ? micro.vol30.sumAbsPct : null;
-                const prof = assetProfiles[assetKey] || assetProfiles.spx;
-                const amp = usNow && usNow.volAmp && isNum(usNow.volAmp.amp) ? usNow.volAmp.amp : 1;
-                const ampAdj = clamp(0.6 + 0.4 * amp, 0.85, 1.35);
-                const volAdj = vol30 !== null ? clamp(vol30 / (isNum(prof.vol30Ref) && prof.vol30Ref > 0 ? prof.vol30Ref : 0.55), 0.85, 1.35) : 1;
-
-                const stopBase = rangePct !== null
-                    ? Math.max(prof.stopMinPct || 0.08, rangePct * (prof.stopRangeMult || 0.25))
-                    : null;
-                const targetBase = rangePct !== null
-                    ? Math.max(prof.targetMinPct || 0.12, rangePct * (prof.targetRangeMult || 0.5))
-                    : null;
-                const stopPct = stopBase !== null
-                    ? clamp(stopBase * ampAdj * volAdj, prof.stopMinPct || 0.08, prof.stopMaxPct || 0.9)
-                    : null;
-                const alvoPct = targetBase !== null
-                    ? clamp(targetBase * ampAdj * volAdj, prof.targetMinPct || 0.12, prof.targetMaxPct || 1.4)
-                    : null;
-                const r = (stopPct !== null && alvoPct !== null && stopPct > 1e-9) ? (alvoPct / stopPct) : null;
+                const stopPct = rangePct !== null ? Math.max(0.08, rangePct * 0.25) : null;
+                const alvoPct = rangePct !== null ? Math.max(0.12, rangePct * 0.5) : null;
                 const risk = stopPct !== null ? `Stop ~${deps.formatPercent(stopPct, 2)}` : 'Stop: curto';
                 const reward = alvoPct !== null ? `Alvo ~${deps.formatPercent(alvoPct, 2)}` : 'Alvo: curto';
-                const rTxt = r !== null ? ` • R~${deps.formatNumber(r, 1)}` : '';
-                const volTxt = (usNow && usNow.volAmp && isNum(usNow.volAmp.amp)) ? ` • volAmp ${deps.formatNumber(amp, 2)}` : '';
-                if (primaryBias === 'buy') return `Scalp: comprar a favor do fluxo curto (pullback leve ou rompimento) • ${risk} • ${reward}${rTxt}${volTxt}`;
-                if (primaryBias === 'sell') return `Scalp: vender a favor do fluxo curto (repique ou rompimento) • ${risk} • ${reward}${rTxt}${volTxt}`;
+                if (primaryBias === 'buy') return `Scalp: comprar a favor do fluxo curto (pullback leve ou rompimento) • ${risk} • ${reward}`;
+                if (primaryBias === 'sell') return `Scalp: vender a favor do fluxo curto (repique ou rompimento) • ${risk} • ${reward}`;
                 return 'Scalp: sem edge (5m×15m não alinhado) • prefira esperar gatilho e operar range.';
             })();
 
@@ -554,8 +506,6 @@
             const msg = [txt ? `Faltando (dados): ${txt}${miss.length > 6 ? `… +${miss.length - 6}` : ''}` : '', futTxt].filter(Boolean).join(' | ');
             return badge('neutral', msg || 'Cobertura parcial');
         })();
-        const sugg = Array.isArray(usNow.missingAssetsSuggestion) ? usNow.missingAssetsSuggestion : [];
-        const suggestLine = sugg.length ? `Sugestões p/ carteira (Investing): ${sugg.slice(0, 12).join(' • ')}${sugg.length > 12 ? `… +${sugg.length - 12}` : ''}` : '';
 
         const spxSpot = spotOf(usNow.sym.spx);
         const ndxSpot = spotOf(usNow.sym.ndx);
@@ -591,14 +541,11 @@
 
             const p1 = ok(spx, ndx);
             const p2 = ok(dow, xlf);
-            const p3 = ok(ndx, xlk);
-            const p4 = ok(spx, iwm);
             const riskOn = (() => {
-                const amp = usNow && usNow.volAmp && isNum(usNow.volAmp.amp) ? usNow.volAmp.amp : 1;
-                const s1 = sign(hyg, 0.06 * amp);
-                const s2 = sign(tlt, 0.06 * amp);
-                const s3 = sign(dxy, 0.06 * amp);
-                const s4 = sign(vix, 0.20 * amp);
+                const s1 = sign(hyg, 0.06);
+                const s2 = sign(tlt, 0.06);
+                const s3 = sign(dxy, 0.06);
+                const s4 = sign(vix, 0.20);
                 const score = (s1 > 0 ? 1 : s1 < 0 ? -1 : 0) + (s2 > 0 ? 0.5 : s2 < 0 ? -0.5 : 0) + (s3 < 0 ? 0.5 : s3 > 0 ? -0.5 : 0) + (s4 < 0 ? 1 : s4 > 0 ? -1 : 0);
                 if (score >= 1.5) return { label: 'RISK ON', tone: 'positive' };
                 if (score <= -1.5) return { label: 'RISK OFF', tone: 'negative' };
@@ -616,8 +563,6 @@
                             ${badge(riskOn.tone, riskOn.label)}
                             ${parityBadge('SPX×NDX', p1)}
                             ${parityBadge('DOW×XLF', p2)}
-                            ${parityBadge('NDX×XLK', p3)}
-                            ${parityBadge('SPX×IWM', p4)}
                         </div>
                     </div>
                     <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
@@ -637,37 +582,6 @@
 
         const convLine = `Convicção do setup: ${model.conviction.label}${model.conviction.extra ? ` - ${model.conviction.extra}` : model.regime.extra === 'Regime indefinido' ? ' - Regime indefinido' : ''}`;
         const edgeTitle = `EDGE ${String(model.edgePct)}%`;
-
-        const edgeBreakdownHtml = (() => {
-            const p = model.edgeParts;
-            if (!p) return '';
-            const fmt = (v) => deps.escapeHtml(isNum(v) ? deps.formatNumber(v, 2) : '—');
-            const fmtSigned = (v) => {
-                if (!isNum(v)) return '—';
-                const s = v > 0 ? '+' : '';
-                return deps.escapeHtml(`${s}${deps.formatNumber(v, 2)}`);
-            };
-            const microAlignTxt = p.microAlign === 1 ? '2/3 alinhados' : p.microAlign === 0.5 ? '1/3 alinhado' : 'sem alinhamento';
-            const regimeTxt = p.regimeScore === 1 ? 'RISK_ON' : p.regimeScore === 0 ? 'RISK_OFF' : 'N/D';
-            return `
-                <div style="margin-top:12px;padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);">
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                        <div style="font-weight:900;letter-spacing:.8px;opacity:.95;">EDGE (componentes)</div>
-                        <div style="opacity:.78;font-size:12px;">escala 0–1 (depois vira %)</div>
-                    </div>
-                    <div style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;font-family:'Share Tech Mono',monospace;font-weight:900;">
-                        <div>base ${fmt(p.base)}</div>
-                        <div>microAlign ${fmt(p.microAlign)} (${deps.escapeHtml(microAlignTxt)})</div>
-                        <div>netAvg ${fmt(p.netAvg)}</div>
-                        <div>regime ${fmt(p.regimeScore)} (${deps.escapeHtml(regimeTxt)})</div>
-                        <div>sessãoAdj ${fmtSigned(p.sessionAdj)}</div>
-                        <div>volAdj ${fmtSigned(p.volAdj)} • volTrend ${fmtSigned(p.volTrend)}</div>
-                        <div>staleAdj ${fmtSigned(p.staleAdj)}</div>
-                        <div>divAdj ${fmtSigned(p.divAdj)} • modeAdj ${fmtSigned(p.modeAdj)}</div>
-                    </div>
-                </div>
-            `;
-        })();
 
         const whyHtml = (model.whyTop || []).map(x => `<span class="usop-pill usop-pill--why">${deps.escapeHtml(x)}</span>`).join('');
         const leadHtml = model.lead && model.lead.label ? `<span class="usop-pill">Lead ${deps.escapeHtml(String(model.lead.label))} • thr ${deps.escapeHtml(String(model.threshold || '—'))}%</span>` : '';
@@ -744,12 +658,10 @@
                             ${badge('neutral', `asOf ${deps.escapeHtml(asOf)}`)}
                         </div>
                     </div>
-                    ${suggestLine ? `<div style="margin-top:8px;opacity:.82;font-size:12px;line-height:1.35;">${deps.escapeHtml(suggestLine)}</div>` : ''}
-                    ${edgeBreakdownHtml}
                     <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">
-                        ${planFor('spx', 'S&P 500', usNow.pulse.spx, spxExtras, usNow.execution ? usNow.execution.spx : null, usNow.source ? usNow.source.spx : null, usNow.micro ? usNow.micro.spx : null)}
-                        ${planFor('ndx', 'Nasdaq', usNow.pulse.ndx, ndxExtras, usNow.execution ? usNow.execution.ndx : null, usNow.source ? usNow.source.ndx : null, usNow.micro ? usNow.micro.ndx : null)}
-                        ${planFor('dow', 'US30 (Dow)', usNow.pulse.dow, dowExtras, usNow.execution ? usNow.execution.dow : null, usNow.source ? usNow.source.dow : null, usNow.micro ? usNow.micro.dow : null)}
+                        ${planFor('S&P 500', usNow.pulse.spx, spxExtras, usNow.execution ? usNow.execution.spx : null, usNow.source ? usNow.source.spx : null, usNow.micro ? usNow.micro.spx : null)}
+                        ${planFor('Nasdaq', usNow.pulse.ndx, ndxExtras, usNow.execution ? usNow.execution.ndx : null, usNow.source ? usNow.source.ndx : null, usNow.micro ? usNow.micro.ndx : null)}
+                        ${planFor('US30 (Dow)', usNow.pulse.dow, dowExtras, usNow.execution ? usNow.execution.dow : null, usNow.source ? usNow.source.dow : null, usNow.micro ? usNow.micro.dow : null)}
                     </div>
                 </div>
                 ${scalperPanel}
