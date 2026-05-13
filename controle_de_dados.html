@@ -1,396 +1,431 @@
 <!doctype html>
-<html lang="pt-BR">
-  <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Controle de Dados (Downloads)</title>
-    <style>
-      :root {
-        --bg: #0b0b0b;
-        --panel: rgba(255, 255, 255, 0.06);
-        --panel2: rgba(255, 255, 255, 0.04);
-        --text: rgba(255, 255, 255, 0.92);
-        --muted: rgba(255, 255, 255, 0.62);
-        --accent: #00f3ff;
-        --bad: #ff3b5c;
-        --ok: #00ff7a;
-        --warn: #ffd000;
-        --border: rgba(255, 255, 255, 0.1);
-      }
-      html,
-      body {
-        margin: 0;
-        background: var(--bg);
-        color: var(--text);
-        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-      }
-      .wrap {
-        max-width: 1100px;
-        margin: 0 auto;
-        padding: 18px 16px 28px;
-      }
-      .top {
-        display: flex;
-        align-items: flex-end;
-        justify-content: space-between;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-      h1 {
-        margin: 0;
-        font-size: 18px;
-        letter-spacing: 0.2px;
-      }
-      .sub {
-        margin-top: 6px;
-        color: var(--muted);
-        font-size: 12px;
-      }
-      .actions {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        justify-content: flex-end;
-      }
-      .btn {
-        appearance: none;
-        border: 1px solid var(--border);
-        background: var(--panel2);
-        color: var(--text);
-        padding: 9px 12px;
-        font-size: 12px;
-        border-radius: 10px;
-        cursor: pointer;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-      }
-      .btn:hover {
-        border-color: rgba(255, 255, 255, 0.22);
-      }
-      .grid {
-        margin-top: 14px;
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 12px;
-      }
-      @media (min-width: 940px) {
-        .grid {
-          grid-template-columns: 1fr 1fr;
-        }
-      }
-      .card {
-        border: 1px solid var(--border);
-        background: var(--panel);
-        border-radius: 14px;
-        padding: 14px 14px 12px;
-      }
-      .card h2 {
-        margin: 0 0 8px;
-        font-size: 13px;
-        color: rgba(255, 255, 255, 0.86);
-        font-weight: 650;
-        letter-spacing: 0.2px;
-      }
-      .kv {
-        display: grid;
-        grid-template-columns: 180px 1fr;
-        gap: 8px 12px;
-        align-items: baseline;
-        font-size: 12px;
-      }
-      .k {
-        color: var(--muted);
-      }
-      .v {
-        color: var(--text);
-        word-break: break-word;
-      }
-      .pill {
-        display: inline-flex;
-        align-items: center;
-        padding: 2px 8px;
-        border-radius: 999px;
-        font-size: 11px;
-        border: 1px solid var(--border);
-        background: rgba(0, 0, 0, 0.12);
-      }
-      .pill.ok {
-        border-color: rgba(0, 255, 122, 0.35);
-        color: var(--ok);
-      }
-      .pill.bad {
-        border-color: rgba(255, 59, 92, 0.35);
-        color: var(--bad);
-      }
-      .pill.warn {
-        border-color: rgba(255, 208, 0, 0.35);
-        color: var(--warn);
-      }
-      .mono {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      }
-      .footer {
-        margin-top: 12px;
-        font-size: 12px;
-        color: var(--muted);
-      }
-      .err {
-        margin-top: 10px;
-        border: 1px solid rgba(255, 59, 92, 0.25);
-        background: rgba(255, 59, 92, 0.08);
-        padding: 10px 12px;
-        border-radius: 12px;
-        color: rgba(255, 255, 255, 0.86);
-        font-size: 12px;
-      }
-    </style>
-  </head>
-  <body>
-    <script id="data" type="application/json">{"generated_at":"2026-05-13T14:16:08.464Z","root_dir":"C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado","state":{"last_cotacoes_finished_iso":"2026-05-13T14:15:36.145Z","last_cotacoes_log_path":"C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260513_111500.log","last_cotacoes_git_status":null,"last_options_wdo_last_updated":"2026-05-13 10:39:34","last_options_win_last_updated":"2026-02-27 08:04:30"},"cotacoes":{"market_status":{"ok":true,"state":{"running":true,"current":{"startedAt":"2026-05-13T14:15:00.078Z","logPath":"C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260513_111500.log","reason":"schedule","mode":"once","summary":{"startedAt":"2026-05-13T14:15:01.641Z","finishedAt":"2026-05-13T14:15:36.101Z","mode":"once","outDir":"C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\dashboard\\MERCADO\\assets\\data","portfolio":{"enabled":false,"status":"skip","csvPath":null},"di":{"enabled":false,"status":"skip","count":0},"calendar":{"enabled":false,"status":"skip","count":0}}},"last":{"startedAt":"2026-05-13T14:00:00.046Z","finishedAt":"2026-05-13T14:04:57.642Z","exitCode":0,"logPath":"C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260513_110000.log","reason":"schedule","mode":"once","summary":{"startedAt":"2026-05-13T14:00:02.061Z","finishedAt":"2026-05-13T14:04:57.536Z","mode":"once","outDir":"C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\dashboard\\MERCADO\\assets\\data","portfolio":{"enabled":true,"status":"ok","csvPath":"C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\downloads\\PréMercado_Watchlist_13052026.csv","error":"Não encontrei o botão/link de exportação do Investing nesta página.","method":"seed","seedAgeMinutes":22},"di":{"enabled":true,"status":"ok","count":36},"calendar":{"enabled":false,"status":"skip","count":0}}}}},"last_log_hint":null,"log_tail":["START 2026-05-13T14:15:00.078Z • schedule","MODE once","SKIP • Portfolio Investing (modo once)","OK • Yahoo quotes: updated=223 covered=224/234 uniqueYahoo=224 dailyFallback=17 quoteFallback=0 skipped=0","SUGGEST • MARKET_TRADINGVIEW_SYMBOL_OVERRIDES (auto_resolved) 10:","CFI2M6=ICE:BXRTGC2T ; GCMC.BO=BSE:BOIL ; HSIK6=HKEX:HSI ; MAL3=COMEX:ALI ; MCU=ICEUS:MCU ; MNI3=MATBAROFEX:WTI ; MPB3=MATBAROFEX:WTI ; MSN3=LME:SN ; MZN3=MATBAROFEX:WTI ; SSPK5=SHFE:SP","SUGGEST • MARKET_YAHOO_SYMBOL_OVERRIDES (critical_first) total=2 critical=0:","HSIK6=HSIK6.SA ; SSPK5=SSPK5.SA","OK • Dalian I0=818 (Sina)","SKIP • DI InfoMoney (intervalo por agendamento)","SUMMARY_JSON {\"startedAt\":\"2026-05-13T14:15:01.641Z\",\"finishedAt\":\"2026-05-13T14:15:36.101Z\",\"mode\":\"once\",\"outDir\":\"C:\\\\Users\\\\ednil\\\\Downloads\\\\Gamma\\\\Edi_Sistema_Unificado\\\\Cotacoes\\\\dashboard\\\\MERCADO\\\\assets\\\\data\",\"portfolio\":{\"enabled\":false,\"status\":\"skip\",\"csvPath\":null},\"di\":{\"enabled\":false,\"status\":\"skip\",\"count\":0},\"calendar\":{\"enabled\":false,\"status\":\"skip\",\"count\":0}}","OK • CSV=null • OUT=C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\dashboard\\MERCADO\\assets\\data","END 2026-05-13T14:15:36.145Z • exit=0","OK • options_gamma_summary.json","OK • web_news_module.json","OK • foreign_flow.json","OK • focus_summary.json","OK • petrobras_module.json","OK • dashboard PDF exportado: C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\PDF PreMercado\\MERCADO_20260513_111538.pdf","OK • dashboard PDF (Lite) exportado: C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\PDF PreMercado\\MERCADO_LITE_20260513_111548.pdf","OK • dashboard WDO v1 (Lite): C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\PDF PreMercado\\WDO_V1_LITE_20260513_111555.pdf","OK • dashboard WIN v1 (Lite): C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\PDF PreMercado\\WIN_V1_LITE_20260513_111601.pdf","GIT_SYNC start • 2026-05-13T14:15:36.145Z","GIT_SYNC repo • C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado","GIT_SYNC target • Cotacoes/dashboard/MERCADO/assets/data","GIT_SYNC source • dashboard/MERCADO/assets/data"],"downloads":{"portfolio":{"status":"skip","detail":"modo once"},"yahoo":{"status":"ok","detail":"updated=223 covered=224/234 uniqueYahoo=224 dailyFallback=17 quoteFallback=0 skipped=0"},"tradingview":{"status":"warn","detail":"MARKET_TRADINGVIEW_SYMBOL_OVERRIDES (auto_resolved) 10:"},"di":{"status":"skip","detail":"DI InfoMoney (intervalo por agendamento)"},"pdf":{"status":"ok","detail":"dashboard PDF (Lite) exportado: C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\PDF PreMercado\\MERCADO_LITE_20260513_111548.pdf"}}},"options":{"dashboard_unificado":{"wdo_last_updated":"2026-05-13 10:39:34","win_last_updated":"2026-02-27 08:04:30","wdo_volume_total":104200,"win_volume_total":30701,"wdo_open_interest_total":null,"win_open_interest_total":null}}}</script>
-    <div class="wrap">
-      <div class="top">
-        <div>
-          <h1>Controle de Dados (Downloads)</h1>
-          <div class="sub">
-            <span class="mono" id="mode"></span>
-            <span id="lastRender"></span>
-          </div>
-        </div>
-        <div class="actions">
-          <a class="btn" href="dashboard_unificado/index.html" target="_blank" rel="noreferrer">Dashboard Unificado</a>
-          <a class="btn" href="Cotacoes/dashboard/MERCADO/index.html" target="_blank" rel="noreferrer">MERCADO</a>
-          <button class="btn" id="refreshBtn" type="button">Atualizar</button>
-        </div>
-      </div>
-
-      <div id="err" class="err" style="display: none"></div>
-
-      <div class="grid">
-        <div class="card">
-          <h2>Cotações</h2>
-          <div class="kv">
-            <div class="k">Status</div>
-            <div class="v" id="cotacoesStatus"></div>
-            <div class="k">Yahoo</div>
-            <div class="v" id="cotacoesYahoo"></div>
-            <div class="k">Portfolio</div>
-            <div class="v" id="cotacoesPortfolio"></div>
-            <div class="k">DI</div>
-            <div class="v" id="cotacoesDi"></div>
-            <div class="k">Calendar</div>
-            <div class="v" id="cotacoesCalendar"></div>
-            <div class="k">PDF</div>
-            <div class="v" id="cotacoesPdf"></div>
-            <div class="k">TradingView</div>
-            <div class="v" id="cotacoesTradingView"></div>
-            <div class="k">Última finalização</div>
-            <div class="v mono" id="cotacoesLastFinished"></div>
-            <div class="k">Git sync</div>
-            <div class="v" id="gitSync"></div>
-            <div class="k">Log</div>
-            <div class="v mono" id="logPath"></div>
-            <div class="k">Log tail</div>
-            <div class="v mono" id="logTail"></div>
-          </div>
-        </div>
-
-        <div class="card">
-          <h2>Opções (Dashboard Unificado)</h2>
-          <div class="kv">
-            <div class="k">WDO last_updated</div>
-            <div class="v mono" id="wdoLastUpdated"></div>
-            <div class="k">WDO volume / OI</div>
-            <div class="v mono" id="wdoVolOi"></div>
-            <div class="k">WIN last_updated</div>
-            <div class="v mono" id="winLastUpdated"></div>
-            <div class="k">WIN volume / OI</div>
-            <div class="v mono" id="winVolOi"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="footer">
-        Dica: para ter atualização ao vivo, abra via HTTP: <span class="mono">http://127.0.0.1:3033/controle_de_dados.html</span>
-      </div>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Controle de Dados</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: #121a33;
+      --muted: #99a3c2;
+      --text: #e8ecff;
+      --ok: #2bd576;
+      --warn: #ffcc66;
+      --bad: #ff5c77;
+      --border: rgba(255,255,255,0.09);
+    }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+      background: linear-gradient(180deg, var(--bg), #050713 70%);
+      color: var(--text);
+    }
+    .wrap { max-width: 1180px; margin: 24px auto; padding: 0 16px 40px; }
+    .top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    h1 { margin: 0; font-size: 22px; letter-spacing: 0.2px; }
+    .meta { color: var(--muted); font-size: 13px; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; margin-top: 14px; }
+    .card {
+      grid-column: span 12;
+      background: rgba(18, 26, 51, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 14px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+      overflow: hidden;
+    }
+    @media (min-width: 980px) {
+      .card.half { grid-column: span 6; }
+      .card.third { grid-column: span 4; }
+    }
+    .row { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .k { color: var(--muted); font-size: 12px; }
+    .v { font-size: 14px; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+    }
+    .dot { width: 9px; height: 9px; border-radius: 99px; display: inline-block; }
+    .ok { background: var(--ok); }
+    .warn { background: var(--warn); }
+    .bad { background: var(--bad); }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { text-align: left; padding: 8px 10px; border-top: 1px solid var(--border); font-size: 13px; }
+    th { color: var(--muted); font-weight: 600; }
+    .muted { color: var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .small { font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <h1>Controle de Dados</h1>
+      <div class="meta" id="meta"></div>
     </div>
+    <div class="grid" id="grid"></div>
+  </div>
+  <script id="data" type="application/json">{"generated_at":"2026-05-13T14:33:54.428Z","root_dir":"C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado","state":{"last_cotacoes_finished_iso":"2026-05-13T14:33:13.764Z","last_cotacoes_log_path":"C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260513_113000.log","last_cotacoes_git_status":null,"last_options_wdo_last_updated":"2026-05-13 10:39:34","last_options_win_last_updated":"2026-02-27 08:04:30"},"cotacoes":{"market_status":{"ok":true,"state":{"running":true,"current":{"startedAt":"2026-05-13T14:30:00.046Z","logPath":"C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260513_113000.log","reason":"schedule","mode":"once","summary":{"startedAt":"2026-05-13T14:30:02.699Z","finishedAt":"2026-05-13T14:33:13.719Z","mode":"once","outDir":"C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\dashboard\\MERCADO\\assets\\data","portfolio":{"enabled":true,"status":"ok","csvPath":"C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\downloads\\PréMercado_Watchlist_13052026.csv","method":"investing"},"di":{"enabled":true,"status":"ok","count":38},"calendar":{"enabled":false,"status":"skip","count":0}}},"last":{"startedAt":"2026-05-13T14:15:00.078Z","finishedAt":"2026-05-13T14:15:36.145Z","exitCode":0,"logPath":"C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260513_111500.log","reason":"schedule","mode":"once","summary":{"startedAt":"2026-05-13T14:15:01.641Z","finishedAt":"2026-05-13T14:15:36.101Z","mode":"once","outDir":"C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\dashboard\\MERCADO\\assets\\data","portfolio":{"enabled":false,"status":"skip","csvPath":null},"di":{"enabled":false,"status":"skip","count":0},"calendar":{"enabled":false,"status":"skip","count":0}}}}},"last_log_hint":null,"log_tail":["START 2026-05-13T14:30:00.046Z • schedule","MODE once","BROWSER • channel=chrome","OK • Yahoo quotes: updated=223 covered=224/233 uniqueYahoo=223 dailyFallback=16 quoteFallback=0 skipped=0","SUGGEST • MARKET_TRADINGVIEW_SYMBOL_OVERRIDES (auto_resolved) 10:","CFI2M6=ICE:BXRTGC2T ; GCMC.BO=BSE:BOIL ; HSIK6=HKEX:HSI ; MAL3=COMEX:ALI ; MCU=ICEUS:MCU ; MNI3=MATBAROFEX:WTI ; MPB3=MATBAROFEX:WTI ; MSN3=LME:SN ; MZN3=MATBAROFEX:WTI ; SSPK5=SHFE:SP","HSIK6=HSIK6.SA ; SSPK5=SSPK5.SA","SUGGEST • MARKET_YAHOO_SYMBOL_OVERRIDES (critical_first) total=2 critical=0:","OK • Dalian I0=817 (Sina)","BROWSER • channel=chrome","OK • DI=38 contratos (InfoMoney)","SUMMARY_JSON {\"startedAt\":\"2026-05-13T14:30:02.699Z\",\"finishedAt\":\"2026-05-13T14:33:13.719Z\",\"mode\":\"once\",\"outDir\":\"C:\\\\Users\\\\ednil\\\\Downloads\\\\Gamma\\\\Edi_Sistema_Unificado\\\\Cotacoes\\\\dashboard\\\\MERCADO\\\\assets\\\\data\",\"portfolio\":{\"enabled\":true,\"status\":\"ok\",\"csvPath\":\"C:\\\\Users\\\\ednil\\\\Downloads\\\\Gamma\\\\Edi_Sistema_Unificado\\\\Cotacoes\\\\.edi-market-guardin\\\\downloads\\\\PréMercado_Watchlist_13052026.csv\",\"method\":\"investing\"},\"di\":{\"enabled\":true,\"status\":\"ok\",\"count\":38},\"calendar\":{\"enabled\":false,\"status\":\"skip\",\"count\":0}}","OK • CSV=C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\downloads\\PréMercado_Watchlist_13052026.csv • OUT=C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\dashboard\\MERCADO\\assets\\data","END 2026-05-13T14:33:13.764Z • exit=0","OK • options_gamma_summary.json","OK • web_news_module.json","OK • foreign_flow.json","OK • focus_summary.json","OK • petrobras_module.json","OK • dashboard PDF exportado: C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\PDF PreMercado\\MERCADO_20260513_113317.pdf","OK • dashboard PDF (Lite) exportado: C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\PDF PreMercado\\MERCADO_LITE_20260513_113333.pdf","OK • dashboard WDO v1 (Lite): C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\PDF PreMercado\\WDO_V1_LITE_20260513_113340.pdf","OK • dashboard WIN v1 (Lite): C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\PDF PreMercado\\WIN_V1_LITE_20260513_113347.pdf","GIT_SYNC start • 2026-05-13T14:33:13.764Z","GIT_SYNC repo • C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado","GIT_SYNC target • Cotacoes/dashboard/MERCADO/assets/data","GIT_SYNC source • dashboard/MERCADO/assets/data"],"downloads":{"yahoo":{"status":"ok","detail":"updated=223 covered=224/233 uniqueYahoo=223 dailyFallback=16 quoteFallback=0 skipped=0"},"tradingview":{"status":"warn","detail":"MARKET_TRADINGVIEW_SYMBOL_OVERRIDES (auto_resolved) 10:"},"di":{"status":"ok","detail":"DI=38 contratos (InfoMoney)"},"pdf":{"status":"ok","detail":"dashboard PDF (Lite) exportado: C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\PDF PreMercado\\MERCADO_LITE_20260513_113333.pdf"}}},"options":{"dashboard_unificado":{"wdo_last_updated":"2026-05-13 10:39:34","win_last_updated":"2026-02-27 08:04:30","wdo_volume_total":104200,"win_volume_total":30701,"wdo_open_interest_total":null,"win_open_interest_total":null}}}</script>
+  <script>
+    const data = JSON.parse(document.getElementById('data').textContent || '{}');
+    const grid = document.getElementById('grid');
+    const meta = document.getElementById('meta');
 
-    <script>
-      (function () {
-        const qs = sel => document.querySelector(sel);
-        const errBox = qs('#err');
-        const modeEl = qs('#mode');
-        const lastRenderEl = qs('#lastRender');
-        const refreshBtn = qs('#refreshBtn');
+    const fmt = (v) => (v === null || v === undefined || v === '' ? '-' : String(v));
+    const escapeHtml = (s) => String(s ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
 
-        const cotacoesStatus = qs('#cotacoesStatus');
-        const cotacoesYahoo = qs('#cotacoesYahoo');
-        const cotacoesPortfolio = qs('#cotacoesPortfolio');
-        const cotacoesDi = qs('#cotacoesDi');
-        const cotacoesCalendar = qs('#cotacoesCalendar');
-        const cotacoesPdf = qs('#cotacoesPdf');
-        const cotacoesTradingView = qs('#cotacoesTradingView');
-        const cotacoesLastFinished = qs('#cotacoesLastFinished');
-        const gitSync = qs('#gitSync');
-        const logPath = qs('#logPath');
-        const logTail = qs('#logTail');
+    const badge = (kind, text) => `<span class="badge"><span class="dot ${kind}"></span><span>${escapeHtml(text)}</span></span>`;
+    const card = (title, body, cls='') => `<div class="card ${cls}"><div class="row"><div><div class="k">${escapeHtml(title)}</div></div></div>${body}</div>`;
+    const hrow = (k, v) => `<div class="row"><div class="k">${escapeHtml(k)}</div><div class="v mono">${escapeHtml(fmt(v))}</div></div>`;
+    const table = (headers, rows) => {
+      const th = headers.map(h => `<th>${escapeHtml(h)}</th>`).join('');
+      const tr = rows.map(r => `<tr>${r.map(c => `<td class="mono">${escapeHtml(fmt(c))}</td>`).join('')}</tr>`).join('');
+      return `<table><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>`;
+    };
 
-        const wdoLastUpdated = qs('#wdoLastUpdated');
-        const wdoVolOi = qs('#wdoVolOi');
-        const winLastUpdated = qs('#winLastUpdated');
-        const winVolOi = qs('#winVolOi');
+    meta.textContent = `Gerado em ${fmt(data.generated_at)} • ${fmt(data.root_dir)}`;
 
-        function pill(text, kind) {
-          const span = document.createElement('span');
-          span.className = `pill ${kind || ''}`.trim();
-          span.textContent = text;
-          return span;
-        }
+    const opt = data.options || {};
+    const st = (data.state || {});
+    const optExit = st.last_options_exit_code;
+    const optGit = fmt(st.last_options_git_status);
+    const optWdoLast = fmt(st.last_options_wdo_last_updated);
+    const optWinLast = fmt(st.last_options_win_last_updated);
+    const optHint = fmt(opt.last_log_hint);
 
-        function setErr(msg) {
-          if (!errBox) return;
-          if (!msg) {
-            errBox.style.display = 'none';
-            errBox.textContent = '';
-            return;
-          }
-          errBox.style.display = 'block';
-          errBox.textContent = msg;
-        }
+    const optStatusKind = (optExit === 0 && !String(optHint).includes('FALHA')) ? 'ok' : (optExit === 0 ? 'warn' : 'bad');
+    const optBadges = [
+      badge(optStatusKind, `Opções exit=${fmt(optExit)} | git=${optGit}`),
+      badge('ok', `WDO last_updated=${optWdoLast}`),
+      badge('ok', `WIN last_updated=${optWinLast}`),
+    ].join(' ');
 
-        function parseSnapshot() {
-          try {
-            const el = document.getElementById('data');
-            if (!el) return null;
-            const raw = (el.textContent || '').trim();
-            if (!raw) return null;
-            return JSON.parse(raw);
-          } catch {
-            return null;
-          }
-        }
+    const wdo = (opt.csv_dolar || {});
+    const missingWdo = (wdo.missing_prefixes || []);
+    const wdoStatusKind = missingWdo.length === 0 ? 'ok' : (missingWdo.length <= 2 ? 'warn' : 'bad');
+    const wdoSummary = badge(wdoStatusKind, `WDO contratos: ${fmt((opt.wdo_expected_contracts || []).length)} esperados | ${fmt(Object.keys(wdo.latest_by_prefix || {}).length)} presentes | ${missingWdo.length} faltando`);
 
-        function render(snapshot, live) {
-          const s = snapshot || {};
-          const state = (s && s.state) || {};
-          const options = (s && s.options && s.options.dashboard_unificado) || {};
-          const downloads = (s && s.cotacoes && s.cotacoes.downloads) || {};
-          const tail = (s && s.cotacoes && s.cotacoes.log_tail) || null;
+    const recentWdoRows = (opt.wdo_expected_contracts || []).map(sym => {
+      const it = (wdo.latest_by_prefix || {})[sym];
+      return [sym, it ? it.mtime_fmt : '-', it ? it.size : '-', it ? it.name : '-'];
+    });
 
-          function signalStatus(raw) {
-            if (!raw || typeof raw !== 'object') return { status: '', detail: '' };
-            const status = String(raw.status || '').trim().toLowerCase();
-            const detail = raw.detail == null ? '' : String(raw.detail);
-            return { status, detail };
-          }
+    const idx = (opt.csv_indice || {});
+    const recentIdxRows = (idx.files_recent || []).slice(0, 8).map(f => [f.mtime_fmt, f.size, f.name]);
 
-          function statusKind(status) {
-            if (status === 'ok' || status === 'pushed' || status === 'committed') return 'ok';
-            if (status === 'fail' || status === 'failed' || status === 'error') return 'bad';
-            if (status === 'warn' || status === 'warning') return 'warn';
-            return '';
-          }
+    const dash = (opt.dashboard_unificado || {});
+    const dashWdo = fmt(dash.wdo_last_updated);
+    const dashWin = fmt(dash.win_last_updated);
 
-          function fillSignal(el, sig) {
-            if (!el) return;
-            el.innerHTML = '';
-            const s = signalStatus(sig);
-            if (!s.status) return;
-            el.appendChild(pill(s.status, statusKind(s.status)));
-            if (s.detail) el.appendChild(document.createTextNode(` ${s.detail}`));
-          }
+    const cot = data.cotacoes || {};
+    const ms = (cot.market_status || {});
+    const files = (cot.data_files || {});
+    const cotHint = fmt(cot.last_log_hint);
+    const running = !!ms.running;
+    const lastFinished = fmt(ms.last_finishedAt || ms.current_finishedAt);
+    const gitSt = fmt(st.last_cotacoes_git_status || 'unknown');
+    const kind = gitSt === 'pushed' || gitSt === 'committed' ? 'ok' : (gitSt === 'no_changes' ? 'warn' : 'bad');
+    const b = badge(kind, `Cotações git=${gitSt} | last_finished=${lastFinished} ${running ? '(rodando)' : ''}`);
+    const fileRows = (files.files || []).map(f => [f.name, f.exists ? f.mtime_fmt : 'não existe', f.exists ? f.size : '-', f.exists ? f.path : '-']);
 
-          if (modeEl) modeEl.textContent = live ? 'modo: ao vivo' : 'modo: snapshot';
-          if (lastRenderEl) lastRenderEl.textContent = ` • render: ${new Date().toLocaleString('pt-BR')}`;
+    const logs = data.logs || {};
+    const optLogs = (logs.options_recent || []).map(l => [l.mtime_fmt, l.name, l.path]);
+    const cotLogs = (logs.cotacoes_recent || []).map(l => [l.mtime_fmt, l.name, l.path]);
 
-          if (cotacoesStatus) {
-            cotacoesStatus.innerHTML = '';
-            const running = !!(s && s.cotacoes && s.cotacoes.market_status && s.cotacoes.market_status.state && s.cotacoes.market_status.state.running);
-            cotacoesStatus.appendChild(pill(running ? 'running' : 'idle', running ? 'warn' : 'ok'));
-          }
+    const mq = data.market_quotes || {};
+    const mqMeta = (mq.meta || {});
+    const yc = (mqMeta.yahooCoverage || null);
+    const yUpd = yc && typeof yc.updatedAssets === 'number' ? yc.updatedAssets : Number(yc && yc.updatedAssets ? yc.updatedAssets : 0);
+    const yMiss = yc && typeof yc.missingAssets === 'number' ? yc.missingAssets : Number(yc && yc.missingAssets ? yc.missingAssets : 0);
+    const yKind = yc && yc.enabled ? (yMiss === 0 ? 'ok' : (yMiss <= 10 ? 'warn' : 'bad')) : 'warn';
+    const yahooBadge = yc && yc.enabled
+      ? badge(yKind, `Yahoo updated=${fmt(yUpd)} | missing=${fmt(yMiss)} | at=${fmt(yc.lastRunAt || mqMeta.yahooUpdatedAt || mqMeta.generatedAt)}`)
+      : badge('warn', `Yahoo cobertura: n/d (habilite MARKET_YAHOO_ENABLED)`);    
 
-          fillSignal(cotacoesYahoo, downloads.yahoo);
-          fillSignal(cotacoesPortfolio, downloads.portfolio);
-          fillSignal(cotacoesDi, downloads.di);
-          fillSignal(cotacoesCalendar, downloads.calendar);
-          fillSignal(cotacoesPdf, downloads.pdf);
-          fillSignal(cotacoesTradingView, downloads.tradingview);
+    const ycCatsRaw = yc && yc.byCategory && typeof yc.byCategory === 'object' ? yc.byCategory : {};
+    const ycCats = Object.entries(ycCatsRaw);
+    ycCats.sort((a, b) => {
+      const am = Number((a[1] && a[1].missing) || 0);
+      const bm = Number((b[1] && b[1].missing) || 0);
+      if (bm !== am) return bm - am;
+      return String(a[0]).localeCompare(String(b[0]));
+    });
+    const ycCatRows = ycCats.map(([cat, row]) => [
+      cat,
+      row && row.assets !== undefined ? row.assets : '-',
+      row && row.attempted !== undefined ? row.attempted : '-',
+      row && row.updated !== undefined ? row.updated : '-',
+      row && row.missing !== undefined ? row.missing : '-',
+    ]);
 
-          if (cotacoesLastFinished) cotacoesLastFinished.textContent = state.last_cotacoes_finished_iso || '';
+    const yMissingSymbols = yc && Array.isArray(yc.missingSymbols) ? yc.missingSymbols : [];
+    const yOverrides = yc && yc.symbolOverrides && typeof yc.symbolOverrides === 'object' ? yc.symbolOverrides : null;
+    const yOverridesCount = yOverrides && typeof yOverrides.count === 'number' ? yOverrides.count : Number(yOverrides && yOverrides.count ? yOverrides.count : 0);
+    const yOverridesItems = yOverrides && Array.isArray(yOverrides.items) ? yOverrides.items : [];
 
-          if (gitSync) {
-            gitSync.innerHTML = '';
-            const raw = state.last_cotacoes_git_status || '';
-            const kind = raw === 'pushed' || raw === 'committed' ? 'ok' : raw ? 'warn' : '';
-            gitSync.appendChild(raw ? pill(raw, kind) : document.createTextNode(''));
-          }
+    const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+    const parseTs = (s) => {
+      const t = Date.parse(String(s || ''));
+      return Number.isFinite(t) ? t : null;
+    };
+    const dtFmt = new Intl.DateTimeFormat('pt-BR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+      timeZoneName: 'short',
+    });
+    const fmtLocalIso = (iso) => {
+      const ms = iso ? parseTs(iso) : null;
+      return ms === null ? fmt(iso) : dtFmt.format(new Date(ms));
+    };
+    const fmtLocalEpochSec = (sec) => {
+      const v = typeof sec === 'number' ? sec : null;
+      return v === null ? '-' : dtFmt.format(new Date(v * 1000));
+    };
 
-          if (logPath) logPath.textContent = state.last_cotacoes_log_path || '';
-          if (logTail) {
-            const lines = Array.isArray(tail) ? tail : [];
-            logTail.textContent = lines.length ? lines.slice(Math.max(0, lines.length - 12)).join('\n') : '';
-          }
+    const yAttempted = yc && typeof yc.attemptedAssets === 'number'
+      ? yc.attemptedAssets
+      : (yc && yc.attemptedAssets ? Number(yc.attemptedAssets) : 0);
+    const yAt = (yc && (yc.lastRunAt || yc.timestamp)) || mqMeta.yahooUpdatedAt || mqMeta.generatedAt || null;
+    const yAtMs = yAt ? parseTs(yAt) : null;
+    const stalenessMin = yAtMs ? Math.max(0, Math.round((Date.now() - yAtMs) / 60000)) : null;
+    const coveragePct = yAttempted > 0 ? (yUpd / yAttempted) * 100 : null;
+    const scoreCoverage = coveragePct === null ? 0 : clamp(coveragePct, 0, 100);
+    const scoreStale = stalenessMin === null ? 0 : clamp(100 - stalenessMin * 2, 0, 100);
+    const healthScore = Math.round(scoreCoverage * 0.75 + scoreStale * 0.25);
+    const healthKind = (yc && yc.enabled)
+      ? (healthScore >= 90 ? 'ok' : (healthScore >= 75 ? 'warn' : 'bad'))
+      : 'warn';
+    const healthBadge = (yc && yc.enabled)
+      ? badge(healthKind, `Saúde Yahoo=${fmt(healthScore)}/100 | cobertura=${coveragePct === null ? '-' : coveragePct.toFixed(1)}% | staleness=${stalenessMin === null ? '-' : fmt(stalenessMin)}m`)
+      : badge('warn', 'Saúde Yahoo: n/d');
 
-          if (wdoLastUpdated) wdoLastUpdated.textContent = options.wdo_last_updated || '';
-          if (winLastUpdated) winLastUpdated.textContent = options.win_last_updated || '';
+    const degraded = ycCats.map(([cat, row]) => {
+      const attempted = Number((row && row.attempted) || 0);
+      const updated = Number((row && row.updated) || 0);
+      const missing = Number((row && row.missing) || 0);
+      const cov = attempted > 0 ? (updated / attempted) * 100 : null;
+      const degraded = missing > 0 || (cov !== null && cov < 90);
+      return { cat: String(cat), attempted, updated, missing, cov, degraded };
+    }).filter(x => x.degraded);
+    degraded.sort((a, b) => {
+      if (b.missing !== a.missing) return b.missing - a.missing;
+      const ac = a.cov === null ? 0 : a.cov;
+      const bc = b.cov === null ? 0 : b.cov;
+      if (ac !== bc) return ac - bc;
+      return a.cat.localeCompare(b.cat);
+    });
+    const degradedRows = degraded.slice(0, 10).map(x => [
+      x.cat,
+      x.cov === null ? '-' : x.cov.toFixed(1) + '%',
+      x.missing,
+    ]);
 
-          const wdoVol = options.wdo_volume_total == null ? '' : String(options.wdo_volume_total);
-          const wdoOi = options.wdo_open_interest_total == null ? '' : String(options.wdo_open_interest_total);
-          if (wdoVolOi) wdoVolOi.textContent = wdoVol || wdoOi ? `${wdoVol || '-'} / ${wdoOi || '-'}` : '';
+    const audit = data.yahoo_audit || {};
+    const auditMissing = Array.isArray(audit.missing) ? audit.missing : [];
+    const auditBadge = badge(
+      auditMissing.length > 0 ? 'warn' : 'ok',
+      `Audit missing=${fmt(auditMissing.length)}`
+    );
+    const auditRows = auditMissing.slice(0, 80).map(x => [
+      fmt(x.assetSymbol),
+      fmt(x.category),
+      fmt(x.yahooSymbol),
+      fmt(x.reason),
+    ]);
 
-          const winVol = options.win_volume_total == null ? '' : String(options.win_volume_total);
-          const winOi = options.win_open_interest_total == null ? '' : String(options.win_open_interest_total);
-          if (winVolOi) winVolOi.textContent = winVol || winOi ? `${winVol || '-'} / ${winOi || '-'}` : '';
-        }
+    const zq = data.zq_curve || {};
+    const zqExists = !!zq.exists;
+    const zqItems = Array.isArray(zq.items) ? zq.items : [];
+    const zqCount = typeof zq.contractCount === 'number' ? zq.contractCount : zqItems.length;
+    const zqSlope = (zq && (zq.slopePct !== undefined && zq.slopePct !== null)) ? Number(zq.slopePct) : null;
+    const zqRisk = fmt(zq.riskMode || '-');
+    const zqKind = zqRisk === 'RISK_OFF' ? 'warn' : (zqRisk === 'RISK_ON' ? 'ok' : 'warn');
+    const zqBadge = zqExists
+      ? badge(zqKind, `ZQ contratos=${fmt(zqCount)} | ${zqRisk}${zqSlope === null || !Number.isFinite(zqSlope) ? '' : ` | slope=${zqSlope.toFixed(2)}%`}`)
+      : badge('warn', 'Curva ZQ: n/d');
+    const zqRows = zqItems.slice(0, 120).map(it => [
+      fmt(it.vertex),
+      fmt(it.expirationFmt),
+      it && typeof it.lastPrice === 'number' ? it.lastPrice.toFixed(4) : fmt(it.lastPrice),
+      it && typeof it.impliedRatePct === 'number' ? it.impliedRatePct.toFixed(3) : fmt(it.impliedRatePct),
+      fmt(it.yahooSymbol),
+    ]);
 
-        async function fetchJson(url) {
-          const r = await fetch(url, { cache: 'no-store' });
-          if (!r.ok) throw new Error(`${url} • HTTP ${r.status}`);
-          return await r.json();
-        }
+    const ageMinutes = (iso) => {
+      const ms = iso ? parseTs(iso) : null;
+      return ms ? Math.max(0, Math.round((Date.now() - ms) / 60000)) : null;
+    };
 
-        async function refreshLive() {
-          const status = await fetchJson('/api/market/status');
-          const git = await fetchJson('/api/market/git-sync');
-          const snap = parseSnapshot() || {};
-          snap.cotacoes = snap.cotacoes || {};
-          snap.cotacoes.market_status = status;
-          snap.state = snap.state || {};
-          snap.state.last_cotacoes_git_status = git && git.gitSync && git.gitSync.status ? String(git.gitSync.status) : snap.state.last_cotacoes_git_status;
-          snap.state.last_cotacoes_log_path = git && git.logPath ? String(git.logPath) : snap.state.last_cotacoes_log_path;
-          render(snap, true);
-        }
+    const flow = data.foreign_flow || {};
+    const flowAgeMin = ageMinutes(flow.generatedAt || null);
+    const flowKind = flow && flow.exists ? (flowAgeMin !== null && flowAgeMin <= 36 * 60 ? 'ok' : 'warn') : 'bad';
+    const flowBadge = flow && flow.exists
+      ? badge(flowKind, `Fluxo gerado ${fmt(flow.generatedAt)} | idade=${flowAgeMin === null ? '-' : fmt(flowAgeMin)}m`)
+      : badge('bad', 'Fluxo estrangeiro: n/d');
 
-        function setup() {
-          const snapshot = parseSnapshot();
-          render(snapshot, false);
+    const tv = data.tradingview || {};
+    const tvAgeMin = ageMinutes(tv.last_collected_at_utc || null);
+    const tvKind = tv && tv.exists ? (tvAgeMin !== null && tvAgeMin <= 36 * 60 ? 'ok' : 'warn') : 'bad';
+    const tvBadge = tv && tv.exists
+      ? badge(tvKind, `TradingView (env) ${fmt(tv.last_collected_at_utc)} | idade=${tvAgeMin === null ? '-' : fmt(tvAgeMin)}m`)
+      : badge('bad', 'TradingView: n/d');
 
-          const isHttp = location.protocol === 'http:' || location.protocol === 'https:';
-          if (!isHttp) {
-            if (refreshBtn) refreshBtn.addEventListener('click', () => render(parseSnapshot(), false));
-            return;
-          }
+    const sina = data.sina || {};
+    const sinaLast = sina && sina.last ? sina.last : {};
+    const sinaTs = sinaLast && (sinaLast.asOf || sinaLast.t) ? (sinaLast.asOf || sinaLast.t) : null;
+    const sinaAgeMin = ageMinutes(sinaTs);
+    const sinaKind = sina && sina.present ? (sinaAgeMin !== null && sinaAgeMin <= 36 * 60 ? 'ok' : 'warn') : 'warn';
+    const sinaBadge = sina && sina.present
+      ? badge(sinaKind, `Sina DCE_I0 ${fmt(sinaTs)} | idade=${sinaAgeMin === null ? '-' : fmt(sinaAgeMin)}m`)
+      : badge('warn', 'Sina DCE_I0: n/d');
 
-          const tick = async () => {
-            try {
-              setErr('');
-              await refreshLive();
-            } catch (e) {
-              setErr(String(e && e.message ? e.message : e));
-            }
-          };
+    const ageMinutesFromMtime = (mtimeSec) => {
+      const v = typeof mtimeSec === 'number' ? mtimeSec : null;
+      return v ? Math.max(0, Math.round((Date.now() - v * 1000) / 60000)) : null;
+    };
 
-          if (refreshBtn) refreshBtn.addEventListener('click', tick);
-          void tick();
-          setInterval(tick, 5000);
-        }
+    const invPortfolioAt = mqMeta.portfolioUpdatedAt || null;
+    const invPortfolioAgeMin = ageMinutes(invPortfolioAt);
+    const invPortfolioKind = invPortfolioAt ? (invPortfolioAgeMin !== null && invPortfolioAgeMin <= 36 * 60 ? 'ok' : 'warn') : 'bad';
+    const invPortfolioBadge = invPortfolioAt
+      ? badge(invPortfolioKind, `Investing (Portfolio) ${fmtLocalIso(invPortfolioAt)} | idade=${invPortfolioAgeMin === null ? '-' : fmt(invPortfolioAgeMin)}m`)
+      : badge('bad', 'Investing (Portfolio): n/d');
 
-        setup();
-      })();
-    </script>
-  </body>
+    const diAt = mqMeta.diUpdatedAt || null;
+    const diAgeMin = ageMinutes(diAt);
+    const diKind = diAt ? (diAgeMin !== null && diAgeMin <= 36 * 60 ? 'ok' : 'warn') : 'warn';
+    const diBadge = diAt
+      ? badge(diKind, `InfoMoney (DI) ${fmtLocalIso(diAt)} | idade=${diAgeMin === null ? '-' : fmt(diAgeMin)}m`)
+      : badge('warn', 'InfoMoney (DI): n/d');
+
+    const calFile = (files.files || []).find(f => f && f.name === 'economic_calendar.json') || null;
+    const calKind = calFile && calFile.exists
+      ? ((ageMinutesFromMtime(calFile.mtime) !== null && ageMinutesFromMtime(calFile.mtime) <= 36 * 60) ? 'ok' : 'warn')
+      : 'warn';
+    const calBadge = calFile && calFile.exists
+      ? badge(calKind, `Investing (Calendário) ${fmtLocalEpochSec(calFile.mtime)} | idade=${ageMinutesFromMtime(calFile.mtime) === null ? '-' : fmt(ageMinutesFromMtime(calFile.mtime))}m`)
+      : badge('warn', 'Investing (Calendário): n/d');
+
+    grid.innerHTML = [
+      card('Resumo', `
+        <div>${optBadges}</div>
+        <div style="margin-top:10px">${wdoSummary}</div>
+        <div style="margin-top:10px">${yahooBadge}</div>
+        <div style="margin-top:10px">${healthBadge}</div>
+        <div style="margin-top:12px" class="small muted">Último alerta relevante (se existir): <span class="mono">${escapeHtml(optHint)}</span></div>
+      `),
+
+      card('Opções • WDO (Barchart CSV_Dolar)', `
+        ${hrow('Diretório', wdo.dir)}
+        ${hrow('Arquivos totais', wdo.files_total)}
+        ${missingWdo.length ? `<div class="small muted" style="margin-top:10px">Faltando: <span class="mono">${escapeHtml(missingWdo.join(', '))}</span></div>` : `<div class="small muted" style="margin-top:10px">Todos os contratos esperados estão presentes.</div>`}
+        ${table(['Contrato', 'Criado/Atualizado', 'Tamanho', 'Arquivo'], recentWdoRows)}
+      `, 'half'),
+
+      card('Opções • Índice (Barchart CSV_Indice)', `
+        ${hrow('Diretório', idx.dir)}
+        ${hrow('Arquivos totais', idx.files_total)}
+        ${table(['Criado/Atualizado', 'Tamanho', 'Arquivo'], recentIdxRows)}
+      `, 'half'),
+
+      card('Dashboard Unificado (saídas)', `
+        ${hrow('WDO market_data.json', dashWdo)}
+        ${hrow('WIN market_data.json', dashWin)}
+        <div class="small muted" style="margin-top:10px">Caminhos:</div>
+        <div class="small mono muted">${escapeHtml(fmt(dash.wdo_path || ''))}</div>
+        <div class="small mono muted">${escapeHtml(fmt(dash.win_path || ''))}</div>
+      `, 'third'),
+
+      card('Cotações (market:service)', `
+        <div>${b}</div>
+        <div class="small muted" style="margin-top:10px">Último alerta relevante (se existir): <span class="mono">${escapeHtml(cotHint)}</span></div>
+        <div style="margin-top:10px" class="small muted">Arquivos em ${escapeHtml(fmt(files.dir || ''))} (newest=${escapeHtml(fmt(files.newest_mtime_fmt || '-'))})</div>
+        ${table(['Arquivo', 'Atualizado em', 'Tamanho', 'Caminho'], fileRows)}
+      `),
+
+      card('Investing + InfoMoney', `
+        <div>${invPortfolioBadge}</div>
+        <div style="margin-top:10px">${calBadge}</div>
+        <div style="margin-top:10px">${diBadge}</div>
+        <div class="small muted" style="margin-top:10px">Fonte: <span class="mono">market_quotes.json</span> (portfolio/DI) e <span class="mono">economic_calendar.json</span> (calendário).</div>
+      `, 'third'),
+
+      card('Yahoo (sem navegador) • Cobertura', `
+        <div>${yahooBadge} ${healthBadge} ${badge('ok', `overrides=${fmt(yOverridesCount)}`)}</div>
+        <div style="margin-top:10px" class="small muted">market_quotes.json: <span class="mono">${escapeHtml(fmt(mq.mtime_fmt || '-'))}</span> • <span class="mono">${escapeHtml(fmt(mq.path || ''))}</span></div>
+        <div style="margin-top:10px">${hrow('meta.portfolioUpdatedAt', mqMeta.portfolioUpdatedAt || '-')}</div>
+        <div style="margin-top:6px">${hrow('meta.yahooUpdatedAt', mqMeta.yahooUpdatedAt || '-')}</div>
+        <div style="margin-top:6px">${hrow('meta.source', mqMeta.source || '-')}</div>
+        ${degradedRows.length ? table(['Categoria degradada', 'Cobertura', 'Ausentes'], degradedRows) : `<div class="small muted" style="margin-top:10px">Sem categorias degradadas.</div>`}
+        ${ycCatRows.length ? table(['Categoria', 'Assets', 'Tentados', 'Atualizados', 'Ausentes'], ycCatRows) : `<div class="small muted" style="margin-top:10px">Sem dados de categoria (meta.yahooCoverage.byCategory vazio).</div>`}
+        ${yMissingSymbols.length ? `<div class="small muted" style="margin-top:10px">Ausentes (top): <span class="mono">${escapeHtml(yMissingSymbols.slice(0, 40).join(', '))}</span></div>` : `<div class="small muted" style="margin-top:10px">Sem ausências relevantes.</div>`}
+        ${yOverridesItems.length ? `<div class="small muted" style="margin-top:10px">Overrides (top): <span class="mono">${escapeHtml(yOverridesItems.slice(0, 25).join(' ; '))}</span></div>` : ``}
+      `),
+
+      card('Curva de Juros EUA (Fed Funds • ZQ)', `
+        <div>${zqBadge}</div>
+        <div class="small muted" style="margin-top:10px">Fonte: Yahoo • Fórmula: <span class="mono">Juro Implícito (%) = 100 - Preço</span></div>
+        <div class="small muted" style="margin-top:6px">Interpretação: curva subindo tende a <span class="mono">RISK_OFF</span>; curva caindo tende a <span class="mono">RISK_ON</span>.</div>
+        <div class="small muted" style="margin-top:10px">Arquivo: <span class="mono">${escapeHtml(fmt(zq.mtime_fmt || '-'))}</span> • <span class="mono">${escapeHtml(fmt(zq.path || ''))}</span></div>
+        ${zqRows.length ? table(['Vértice', 'Vencimento', 'Preço', 'Juro Implícito (%)', 'Yahoo'], zqRows) : `<div class="small muted" style="margin-top:10px">Sem dados da curva ZQ.</div>`}
+      `),
+
+      card('Fluxo estrangeiro (Dados de Mercado)', `
+        <div>${flowBadge}</div>
+        <div class="small muted" style="margin-top:10px">Arquivo: <span class="mono">${escapeHtml(fmt(flow.mtime_fmt || '-'))}</span> • <span class="mono">${escapeHtml(fmt(flow.path || ''))}</span></div>
+        <div style="margin-top:10px">${hrow('Fonte', (flow.source && flow.source.url) || '-')}</div>
+        <div style="margin-top:6px">${hrow('Fonte atualizado', (flow.source && (flow.source.updatedAtText || flow.source.updatedAt)) || '-')}</div>
+        <div style="margin-top:6px">${hrow('Último dia', (flow.latest && flow.latest.date) || '-')}</div>
+        <div style="margin-top:6px">${hrow('Estrangeiro (último dia)', (flow.latest && flow.latest.foreigners) !== undefined ? flow.latest.foreigners : '-')}</div>
+      `, 'third'),
+
+      card('TradingView (fechamentos)', `
+        <div>${tvBadge}</div>
+        <div class="small muted" style="margin-top:10px">Arquivo: <span class="mono">${escapeHtml(fmt(tv.mtime_fmt || '-'))}</span> • <span class="mono">${escapeHtml(fmt(tv.path || ''))}</span></div>
+        <div style="margin-top:10px">${hrow('AUTO_BARCHART_LAST_SLOT_ISO', tv.last_slot_iso || '-')}</div>
+        <div style="margin-top:6px">${hrow('WDO_SPOT', tv.wdo_spot || '-')}</div>
+        <div style="margin-top:6px">${hrow('WIN_SCALING_INDEX_REF_CLOSE', tv.win_scaling_index_ref_close || '-')}</div>
+        <div style="margin-top:6px">${hrow('WIN_SCALING_EWZ_REF_CLOSE', tv.win_scaling_ewz_ref_close || '-')}</div>
+      `, 'third'),
+
+      card('Sina (minério DCE_I0)', `
+        <div>${sinaBadge}</div>
+        <div class="small muted" style="margin-top:10px">Fonte: <span class="mono">https://hq.sinajs.cn</span> • Série: <span class="mono">DCE_I0</span></div>
+        <div style="margin-top:10px">${hrow('Último carimbo (asOf/t)', sinaTs || '-')}</div>
+        <div style="margin-top:6px">${hrow('Preço', (sinaLast && sinaLast.price) !== undefined ? sinaLast.price : '-')}</div>
+        <div style="margin-top:6px">${hrow('Variação %', (sinaLast && sinaLast.changePct) !== undefined ? sinaLast.changePct : '-')}</div>
+      `, 'third'),
+
+      card('Yahoo Auditoria (faltantes)', `
+        <div>${auditBadge}</div>
+        <div class="small muted" style="margin-top:10px">Arquivo: <span class="mono">${escapeHtml(fmt((audit && audit.mtime_fmt) || '-'))}</span> • <span class="mono">${escapeHtml(fmt((audit && audit.path) || ''))}</span></div>
+        ${auditRows.length ? table(['Asset', 'Categoria', 'Yahoo', 'Motivo'], auditRows) : `<div class="small muted" style="margin-top:10px">Sem faltantes na auditoria.</div>`}
+      `),
+
+      card('Logs recentes', `
+        <div class="k">Opções</div>
+        ${table(['Data/hora', 'Arquivo', 'Caminho'], optLogs)}
+        <div class="k" style="margin-top:14px">Cotações</div>
+        ${table(['Data/hora', 'Arquivo', 'Caminho'], cotLogs)}
+      `),
+    ].join('');
+  </script>
+</body>
 </html>
