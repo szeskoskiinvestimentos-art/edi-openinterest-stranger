@@ -58,15 +58,15 @@ if "%PY_CMD%"=="" (
 
 if not "%PY_CMD%"=="" (
   echo.
-  echo === Atualizando Opcoes (Python) ===
+  echo === Atualizando Opcoes - Python ===
   set "AUTO_B3_DIR=%~dp0..\\Auto_B3_System"
   if exist "%AUTO_B3_DIR%\\automacao_dados.py" (
-    echo Rodando coleta Barchart (Auto_B3_System)...
+    echo Rodando coleta Barchart - Auto_B3_System...
     pushd "%AUTO_B3_DIR%"
     %PY_CMD% automacao_dados.py
     if errorlevel 1 echo AVISO: automacao_dados.py falhou.
     %PY_CMD% config.py
-    if errorlevel 1 echo AVISO: config.py (Auto_B3_System) falhou.
+    if errorlevel 1 echo AVISO: config.py - Auto_B3_System falhou.
     popd
     call :SYNC_UNIFIED_FROM_AUTO
   ) else (
@@ -77,7 +77,7 @@ if not "%PY_CMD%"=="" (
   )
 ) else (
   echo.
-  echo AVISO: Python nao encontrado (py/python). Pulei Opcoes.
+  echo AVISO: Python nao encontrado. Pulei Opcoes.
 )
 
 set "MARKET_ALREADY_RUNNING=0"
@@ -142,7 +142,7 @@ endlocal & exit /b %errorlevel%
 :OPCOES_LOOP
 if "%OPCOES_INTERVAL_SECONDS%"=="" set "OPCOES_INTERVAL_SECONDS=900"
 echo.
-echo Mantendo rotinas de opcoes (Barchart) ativas a cada %OPCOES_INTERVAL_SECONDS%s. Feche esta janela para parar.
+echo Mantendo rotinas de opcoes - Barchart - ativas a cada %OPCOES_INTERVAL_SECONDS%s. Feche esta janela para parar.
 echo.
 :OPCOES_LOOP_RUN
 pushd "%~dp0..\\Auto_B3_System"
