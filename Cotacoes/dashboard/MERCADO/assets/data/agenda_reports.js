@@ -60,6 +60,61 @@ Divulgação: ~Dia 23-27 do mês, 9h00 | Impacto: MÉDIO-ALTO
 | GDP forte + PCE fraco | Crescimento sem inflação | Goldilocks → S&P compra forte |
 | GDP fraco + PCE forte | Stagflation | Risk-off → S&P venda, DXY inicialmente compra |
 
+### CPI (BLS) — Inflação (Headline/Core)
+Divulgação: 8h30 ET | Impacto: ALTO
+
+| Resultado | Interpretação Macro | WDO (Dólar) | WIN (Ibovespa) | Nota |
+|-----------|---------------------|-------------|----------------|------|
+| ACIMA do consenso | Fed mais hawkish (juros por mais tempo) | COMPRA | VENDA | DXY/US10Y tendem a subir; validar com VIX |
+| NA LINHA do consenso | Sem surpresa → ruído inicial | NEUTRO | NEUTRO | Só operar se o preço confirmar |
+| ABAIXO do consenso | Fed mais dovish (alívio) | VENDA | COMPRA | DXY/US10Y tendem a cair; pode virar risk-on |
+
+### Payrolls (BLS) — NFP & Wages
+Divulgação: 8h30 ET | Impacto: ALTO
+
+| Resultado | Interpretação Macro | WDO (Dólar) | WIN (Ibovespa) | Nota |
+|-----------|---------------------|-------------|----------------|------|
+| NFP forte + Wages fortes | Hawkish forte (inflação salarial) | COMPRA | VENDA | Alto risco de whipsaw; evitar “chase” |
+| NFP forte + Wages fracos | Hawkish moderado | COMPRA (leve) | NEUTRO | DXY tende a subir sem tanto stress |
+| NFP fraco + Wages fortes | Confuso | NEUTRO | NEUTRO | Aguardar clareza; confirmar por DXY/US10Y |
+| NFP fraco + Wages fracos | Dovish (alívio) | VENDA | COMPRA | DXY tende a cair; equities tendem a reagir bem |
+
+### FOMC (Fed) — Decisão + Coletiva + Dot Plot
+Divulgação: 14h00 ET (decisão) | Impacto: ALTO
+
+| Resultado | Interpretação Macro | WDO (Dólar) | WIN (Ibovespa) | Nota |
+|-----------|---------------------|-------------|----------------|------|
+| Hawkish surprise | Aperto maior/mais longo | COMPRA | VENDA | DXY/US10Y ↑; cuidado com volatilidade |
+| In line | Mercado já precificou | NEUTRO | NEUTRO | Foque nos níveis (VWAP/HI-LO) |
+| Dovish surprise | Alívio/normalização | VENDA | COMPRA | DXY/US10Y ↓; pode melhorar apetite ao risco |
+
+### PCE (BEA) — Inflação preferida do Fed
+Divulgação: 8h30 ET | Impacto: ALTO
+
+| Resultado | Interpretação Macro | WDO (Dólar) | WIN (Ibovespa) | Validar |
+|-----------|---------------------|-------------|----------------|---------|
+| ACIMA do consenso | Hawkish (juros por mais tempo) | COMPRA | VENDA | DXY • US10Y • VIX |
+| NA LINHA do consenso | Sem surpresa | NEUTRO | NEUTRO | Preço/fluxo |
+| ABAIXO do consenso | Dovish (alívio) | VENDA | COMPRA | DXY • US10Y • VIX |
+
+### ISM — Atividade (Manufatura/Serviços)
+Divulgação: 10h00 ET | Impacto: MÉDIO-ALTO
+
+| Resultado | Interpretação Macro | WDO (Dólar) | WIN (Ibovespa) | Validar |
+|-----------|---------------------|-------------|----------------|---------|
+| ACIMA do consenso | Atividade forte (pode elevar yields) | COMPRA (leve) | COMPRA (se risk-on) | US10Y • SPX • HYG |
+| NA LINHA do consenso | Neutro | NEUTRO | NEUTRO | Preço |
+| ABAIXO do consenso | Desaceleração (pode virar risk-off) | COMPRA | VENDA | DXY • US10Y • VIX |
+
+### Retail Sales (Census) — Consumo
+Divulgação: 8h30 ET | Impacto: MÉDIO-ALTO
+
+| Resultado | Interpretação Macro | WDO (Dólar) | WIN (Ibovespa) | Validar |
+|-----------|---------------------|-------------|----------------|---------|
+| ACIMA do consenso | Consumo forte (atividade) | DEPENDE (ver yields) | COMPRA (se risk-on) | US10Y • SPX |
+| NA LINHA do consenso | Neutro | NEUTRO | NEUTRO | Preço |
+| ABAIXO do consenso | Consumo fraco (risco) | COMPRA | VENDA | DXY • VIX |
+
 ## COMBINACOES PERIGOSAS
 1. NFP + dado brasileiro no mesmo dia
 2. CPI + PPI no mesmo período (pode ter ruído)

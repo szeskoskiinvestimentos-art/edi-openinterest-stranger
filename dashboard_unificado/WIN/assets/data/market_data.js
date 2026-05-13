@@ -35,7 +35,7 @@ window.marketData = {
         "range_high": 188510.42452337325,
         "expected_moves": [
             {
-                "label": "1 Dia",
+                "label": "Intraday (0DTE)",
                 "days": 1,
                 "move": 5835.424523373285,
                 "upper": 188510.42452337325,
@@ -50,8 +50,8 @@ window.marketData = {
             }
         ],
         "pinning_risk": {
-            "strike": null,
-            "score": null
+            "strike": 196201.85421994884,
+            "score": 129227505623.81937
         },
         "volatility_analysis": {
             "iv_current": 0.5071,
@@ -666,8 +666,22 @@ window.marketData = {
                 -0.0,
                 -0.0,
                 -0.0,
-                -2.0,
-                -2.0,
+                -0.0,
+                -40.0,
+                -0.0,
+                -0.0,
+                -0.0,
+                -0.0,
+                -15.0,
+                -157.0,
+                -4014.0,
+                -9294.0,
+                -215.0,
+                -53.0,
+                -0.0,
+                -0.0,
+                -100.0,
+                -0.0,
                 -0.0,
                 -1.0,
                 -2.0,
@@ -3463,6 +3477,7 @@ window.marketData = {
         "put_volume": [
             0.0,
             0.0,
+            9.0,
             0.0,
             0.0,
             0.0,
@@ -3524,6 +3539,7 @@ window.marketData = {
         "total_volume": [
             0.0,
             0.0,
+            9.0,
             0.0,
             0.0,
             0.0,

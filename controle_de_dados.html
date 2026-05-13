@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Controle de Dados</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: #121a33;
+      --muted: #99a3c2;
+      --text: #e8ecff;
+      --ok: #2bd576;
+      --warn: #ffcc66;
+      --bad: #ff5c77;
+      --border: rgba(255,255,255,0.09);
+    }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+      background: linear-gradient(180deg, var(--bg), #050713 70%);
+      color: var(--text);
+    }
+    .wrap { max-width: 1180px; margin: 24px auto; padding: 0 16px 40px; }
+    .top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    h1 { margin: 0; font-size: 22px; letter-spacing: 0.2px; }
+    .meta { color: var(--muted); font-size: 13px; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; margin-top: 14px; }
+    .card {
+      grid-column: span 12;
+      background: rgba(18, 26, 51, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 14px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+      overflow: hidden;
+    }
+    @media (min-width: 980px) {
+      .card.half { grid-column: span 6; }
+      .card.third { grid-column: span 4; }
+    }
+    .row { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .k { color: var(--muted); font-size: 12px; }
+    .v { font-size: 14px; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+    }
+    .dot { width: 9px; height: 9px; border-radius: 99px; display: inline-block; }
+    .ok { background: var(--ok); }
+    .warn { background: var(--warn); }
+    .bad { background: var(--bad); }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { text-align: left; padding: 8px 10px; border-top: 1px solid var(--border); font-size: 13px; }
+    th { color: var(--muted); font-weight: 600; }
+    .muted { color: var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .small { font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <h1>Controle de Dados</h1>
+      <div class="meta" id="meta"></div>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+  <script id="data" type="application/json">{"generated_at": "2026-05-12T15:25:07", "root_dir": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado", "state": {"last_run_scheduled_iso": "2026-05-12T08:30:00", "last_options_finished_iso": "2026-05-12T08:34:12.437774", "last_options_exit_code": 0, "last_options_log_path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\service_logs\\options_20260512_083000.log", "last_options_git_status": "pushed", "last_cotacoes_finished_iso": "2026-05-12T18:24:12.852Z", "last_cotacoes_log_path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260512_152226.log", "last_cotacoes_git_status": "pushed", "last_options_wdo_last_updated": "2026-05-12 08:33:11", "last_options_win_last_updated": "2026-05-12 08:33:25"}, "options": {"wdo_expected_contracts": ["XDM26", "XDN26", "XDQ26", "XDU26", "XDV26", "XDX26", "XDZ26", "XDF27", "XDG27", "XDH27", "XDJ27", "XDK27", "XDM27", "XDN27", "XDQ27", "XDU27", "XDV27", "XDX27", "XDZ27", "XDF28", "XDG28", "XDH28", "XDJ28", "XDK28"], "win_expected_contracts": [], "csv_dolar": {"dir": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar", "files_total": 17, "files_recent": [{"name": "XDJ28_options_exp-2028-04-03.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDJ28_options_exp-2028-04-03.csv", "mtime": 1778585586.2525527, "mtime_fmt": "2026-05-12 08:33:06", "size": 146}, {"name": "XDF28_options_exp-2028-01-03.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDF28_options_exp-2028-01-03.csv", "mtime": 1778585583.4610083, "mtime_fmt": "2026-05-12 08:33:03", "size": 149}, {"name": "XDV27_options_exp-2027-10-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDV27_options_exp-2027-10-01.csv", "mtime": 1778585580.7712228, "mtime_fmt": "2026-05-12 08:33:00", "size": 326}, {"name": "XDQ27_options_exp-2027-08-02.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDQ27_options_exp-2027-08-02.csv", "mtime": 1778585578.9012325, "mtime_fmt": "2026-05-12 08:32:58", "size": 147}, {"name": "XDN27_options_exp-2027-07-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDN27_options_exp-2027-07-01.csv", "mtime": 1778585577.9861138, "mtime_fmt": "2026-05-12 08:32:57", "size": 149}, {"name": "XDK27_options_exp-2027-05-03.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDK27_options_exp-2027-05-03.csv", "mtime": 1778585576.1648035, "mtime_fmt": "2026-05-12 08:32:56", "size": 147}, {"name": "XDJ27_options_exp-2027-04-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDJ27_options_exp-2027-04-01.csv", "mtime": 1778585575.1094837, "mtime_fmt": "2026-05-12 08:32:55", "size": 374}, {"name": "XDH27_options_exp-2027-03-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDH27_options_exp-2027-03-01.csv", "mtime": 1778585574.1504407, "mtime_fmt": "2026-05-12 08:32:54", "size": 150}, {"name": "XDG27_options_exp-2027-02-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDG27_options_exp-2027-02-01.csv", "mtime": 1778585573.1901002, "mtime_fmt": "2026-05-12 08:32:53", "size": 253}, {"name": "XDF27_options_exp-2027-01-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDF27_options_exp-2027-01-01.csv", "mtime": 1778585572.293322, "mtime_fmt": "2026-05-12 08:32:52", "size": 149}, {"name": "XDZ26_options_exp-2026-12-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDZ26_options_exp-2026-12-01.csv", "mtime": 1778585571.4219995, "mtime_fmt": "2026-05-12 08:32:51", "size": 148}, {"name": "XDX26_options_exp-2026-11-02.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDX26_options_exp-2026-11-02.csv", "mtime": 1778585570.4930983, "mtime_fmt": "2026-05-12 08:32:50", "size": 150}, {"name": "XDV26_options_exp-2026-10-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDV26_options_exp-2026-10-01.csv", "mtime": 1778585569.496578, "mtime_fmt": "2026-05-12 08:32:49", "size": 323}, {"name": "XDU26_options_exp-2026-09-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDU26_options_exp-2026-09-01.csv", "mtime": 1778585568.4837303, "mtime_fmt": "2026-05-12 08:32:48", "size": 148}, {"name": "XDQ26_options_exp-2026-08-03.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDQ26_options_exp-2026-08-03.csv", "mtime": 1778585567.5025432, "mtime_fmt": "2026-05-12 08:32:47", "size": 308}, {"name": "XDN26_options_exp-2026-07-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDN26_options_exp-2026-07-01.csv", "mtime": 1778585566.506949, "mtime_fmt": "2026-05-12 08:32:46", "size": 423}, {"name": "XDM26_options_exp-2026-06-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDM26_options_exp-2026-06-01.csv", "mtime": 1778585565.6653378, "mtime_fmt": "2026-05-12 08:32:45", "size": 436}], "latest_by_prefix": {"XDF27": {"name": "XDF27_options_exp-2027-01-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDF27_options_exp-2027-01-01.csv", "mtime": 1778585572.293322, "mtime_fmt": "2026-05-12 08:32:52", "size": 149}, "XDF28": {"name": "XDF28_options_exp-2028-01-03.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDF28_options_exp-2028-01-03.csv", "mtime": 1778585583.4610083, "mtime_fmt": "2026-05-12 08:33:03", "size": 149}, "XDG27": {"name": "XDG27_options_exp-2027-02-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDG27_options_exp-2027-02-01.csv", "mtime": 1778585573.1901002, "mtime_fmt": "2026-05-12 08:32:53", "size": 253}, "XDH27": {"name": "XDH27_options_exp-2027-03-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDH27_options_exp-2027-03-01.csv", "mtime": 1778585574.1504407, "mtime_fmt": "2026-05-12 08:32:54", "size": 150}, "XDJ27": {"name": "XDJ27_options_exp-2027-04-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDJ27_options_exp-2027-04-01.csv", "mtime": 1778585575.1094837, "mtime_fmt": "2026-05-12 08:32:55", "size": 374}, "XDJ28": {"name": "XDJ28_options_exp-2028-04-03.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDJ28_options_exp-2028-04-03.csv", "mtime": 1778585586.2525527, "mtime_fmt": "2026-05-12 08:33:06", "size": 146}, "XDK27": {"name": "XDK27_options_exp-2027-05-03.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDK27_options_exp-2027-05-03.csv", "mtime": 1778585576.1648035, "mtime_fmt": "2026-05-12 08:32:56", "size": 147}, "XDM26": {"name": "XDM26_options_exp-2026-06-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDM26_options_exp-2026-06-01.csv", "mtime": 1778585565.6653378, "mtime_fmt": "2026-05-12 08:32:45", "size": 436}, "XDN26": {"name": "XDN26_options_exp-2026-07-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDN26_options_exp-2026-07-01.csv", "mtime": 1778585566.506949, "mtime_fmt": "2026-05-12 08:32:46", "size": 423}, "XDN27": {"name": "XDN27_options_exp-2027-07-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDN27_options_exp-2027-07-01.csv", "mtime": 1778585577.9861138, "mtime_fmt": "2026-05-12 08:32:57", "size": 149}, "XDQ26": {"name": "XDQ26_options_exp-2026-08-03.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDQ26_options_exp-2026-08-03.csv", "mtime": 1778585567.5025432, "mtime_fmt": "2026-05-12 08:32:47", "size": 308}, "XDQ27": {"name": "XDQ27_options_exp-2027-08-02.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDQ27_options_exp-2027-08-02.csv", "mtime": 1778585578.9012325, "mtime_fmt": "2026-05-12 08:32:58", "size": 147}, "XDU26": {"name": "XDU26_options_exp-2026-09-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDU26_options_exp-2026-09-01.csv", "mtime": 1778585568.4837303, "mtime_fmt": "2026-05-12 08:32:48", "size": 148}, "XDV26": {"name": "XDV26_options_exp-2026-10-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDV26_options_exp-2026-10-01.csv", "mtime": 1778585569.496578, "mtime_fmt": "2026-05-12 08:32:49", "size": 323}, "XDV27": {"name": "XDV27_options_exp-2027-10-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDV27_options_exp-2027-10-01.csv", "mtime": 1778585580.7712228, "mtime_fmt": "2026-05-12 08:33:00", "size": 326}, "XDX26": {"name": "XDX26_options_exp-2026-11-02.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDX26_options_exp-2026-11-02.csv", "mtime": 1778585570.4930983, "mtime_fmt": "2026-05-12 08:32:50", "size": 150}, "XDZ26": {"name": "XDZ26_options_exp-2026-12-01.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Dolar\\XDZ26_options_exp-2026-12-01.csv", "mtime": 1778585571.4219995, "mtime_fmt": "2026-05-12 08:32:51", "size": 148}}, "missing_prefixes": ["XDM27", "XDU27", "XDX27", "XDZ27", "XDG28", "XDH28", "XDK28"]}, "csv_indice": {"dir": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice", "files_total": 22, "files_recent": [{"name": "EWZ_options_exp-2028-01-21.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2028-01-21.csv", "mtime": 1778585558.973646, "mtime_fmt": "2026-05-12 08:32:38", "size": 3975}, {"name": "EWZ_options_exp-2027-12-17.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2027-12-17.csv", "mtime": 1778585558.9661143, "mtime_fmt": "2026-05-12 08:32:38", "size": 4660}, {"name": "EWZ_options_exp-2027-07-16.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2027-07-16.csv", "mtime": 1778585558.9562929, "mtime_fmt": "2026-05-12 08:32:38", "size": 4661}, {"name": "EWZ_options_exp-2027-03-31.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2027-03-31.csv", "mtime": 1778585558.947741, "mtime_fmt": "2026-05-12 08:32:38", "size": 2507}, {"name": "EWZ_options_exp-2027-03-19.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2027-03-19.csv", "mtime": 1778585558.9391804, "mtime_fmt": "2026-05-12 08:32:38", "size": 4208}, {"name": "EWZ_options_exp-2027-01-15.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2027-01-15.csv", "mtime": 1778585558.9292803, "mtime_fmt": "2026-05-12 08:32:38", "size": 4496}, {"name": "EWZ_options_exp-2026-12-31.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2026-12-31.csv", "mtime": 1778585558.9201262, "mtime_fmt": "2026-05-12 08:32:38", "size": 2996}, {"name": "EWZ_options_exp-2026-12-18.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2026-12-18.csv", "mtime": 1778585558.911421, "mtime_fmt": "2026-05-12 08:32:38", "size": 5143}, {"name": "EWZ_options_exp-2026-11-20.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2026-11-20.csv", "mtime": 1778585558.9033442, "mtime_fmt": "2026-05-12 08:32:38", "size": 4010}, {"name": "EWZ_options_exp-2026-10-16.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2026-10-16.csv", "mtime": 1778585558.8948839, "mtime_fmt": "2026-05-12 08:32:38", "size": 4156}, {"name": "EWZ_options_exp-2026-09-30.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2026-09-30.csv", "mtime": 1778585558.8881683, "mtime_fmt": "2026-05-12 08:32:38", "size": 3173}, {"name": "EWZ_options_exp-2026-09-18.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2026-09-18.csv", "mtime": 1778585558.8814657, "mtime_fmt": "2026-05-12 08:32:38", "size": 4263}, {"name": "EWZ_options_exp-2026-08-21.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2026-08-21.csv", "mtime": 1778585558.875472, "mtime_fmt": "2026-05-12 08:32:38", "size": 4349}, {"name": "EWZ_options_exp-2026-07-17.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2026-07-17.csv", "mtime": 1778585558.8687267, "mtime_fmt": "2026-05-12 08:32:38", "size": 4205}, {"name": "EWZ_options_exp-2026-06-30.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2026-06-30.csv", "mtime": 1778585558.861998, "mtime_fmt": "2026-05-12 08:32:38", "size": 3045}, {"name": "EWZ_options_exp-2026-06-26.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2026-06-26.csv", "mtime": 1778585558.855901, "mtime_fmt": "2026-05-12 08:32:38", "size": 4007}, {"name": "EWZ_options_exp-2026-06-18.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2026-06-18.csv", "mtime": 1778585558.8462348, "mtime_fmt": "2026-05-12 08:32:38", "size": 4625}, {"name": "EWZ_options_exp-2026-06-12.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2026-06-12.csv", "mtime": 1778585558.8375146, "mtime_fmt": "2026-05-12 08:32:38", "size": 3785}, {"name": "EWZ_options_exp-2026-06-05.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2026-06-05.csv", "mtime": 1778585558.829913, "mtime_fmt": "2026-05-12 08:32:38", "size": 4029}, {"name": "EWZ_options_exp-2026-05-29.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2026-05-29.csv", "mtime": 1778585558.8220384, "mtime_fmt": "2026-05-12 08:32:38", "size": 4103}, {"name": "EWZ_options_exp-2026-05-22.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2026-05-22.csv", "mtime": 1778585558.8096561, "mtime_fmt": "2026-05-12 08:32:38", "size": 4358}, {"name": "EWZ_options_exp-2026-05-15.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2026-05-15.csv", "mtime": 1778585558.802095, "mtime_fmt": "2026-05-12 08:32:38", "size": 5369}], "latest_by_prefix": {"EWZ": {"name": "EWZ_options_exp-2028-01-21.csv", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\CSV_Indice\\EWZ_options_exp-2028-01-21.csv", "mtime": 1778585558.973646, "mtime_fmt": "2026-05-12 08:32:38", "size": 3975}}, "missing_prefixes": []}, "dashboard_unificado": {"ok": true, "wdo_last_updated": "2026-05-12 08:33:11", "win_last_updated": "2026-05-12 08:33:25", "wdo_path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\dashboard_unificado\\WDO\\assets\\data\\market_data.json", "win_path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\B3_System\\dashboard_unificado\\WIN\\assets\\data\\market_data.json", "wdo_mtime": 1778585629.2439072, "win_mtime": 1778585629.2685573}, "last_log_hint": null}, "cotacoes": {"market_status": {"ok": true, "running": false, "current_startedAt": null, "current_logPath": null, "current_finishedAt": null, "last_startedAt": "2026-05-12T18:22:26.765Z", "last_finishedAt": "2026-05-12T18:24:12.852Z", "last_logPath": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260512_152226.log", "nextDueAt": "2026-05-12T18:27:26.765Z"}, "data_files": {"dir": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\dashboard\\MERCADO\\assets\\data", "files": [{"name": "market_quotes.json", "exists": true, "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\dashboard\\MERCADO\\assets\\data\\market_quotes.json", "mtime": 1778610252.6224897, "mtime_fmt": "2026-05-12 15:24:12", "size": 18573962}, {"name": "economic_calendar.json", "exists": true, "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\dashboard\\MERCADO\\assets\\data\\economic_calendar.json", "mtime": 1778609144.6460912, "mtime_fmt": "2026-05-12 15:05:44", "size": 17474}, {"name": "agenda_reports.js", "exists": true, "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\dashboard\\MERCADO\\assets\\data\\agenda_reports.js", "mtime": 1778030050.0029655, "mtime_fmt": "2026-05-05 22:14:10", "size": 7861}, {"name": "zq_curve.json", "exists": true, "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\dashboard\\MERCADO\\assets\\data\\zq_curve.json", "mtime": 1778610172.4377484, "mtime_fmt": "2026-05-12 15:22:52", "size": 5970}], "newest_mtime": 1778610252.6224897, "newest_mtime_fmt": "2026-05-12 15:24:12"}, "last_log_hint": null}, "market_quotes": {"exists": true, "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\dashboard\\MERCADO\\assets\\data\\market_quotes.json", "mtime": 1778610252.6224897, "mtime_fmt": "2026-05-12 15:24:12", "size": 18573962, "meta": {"generatedAt": "2026-05-12T18:22:28.061Z", "source": "PréMercado_Watchlist_12052026.csv", "intervalMinutes": 5, "retentionDays": 10, "portfolioUpdatedAt": "2026-05-12T18:19:39.036Z", "diUpdatedAt": "2026-05-12T18:22:56.325Z", "yahooUpdatedAt": "2026-05-12T18:22:28.061Z", "yahooCoverage": {"enabled": true, "lastRunAt": "2026-05-12T18:22:28.061Z", "attemptedAssets": 234, "uniqueYahooSymbols": 224, "returnedYahooSymbols": 214, "updatedAssets": 224, "missingAssets": 10, "byCategory": {"equities": {"assets": 130, "attempted": 105, "updated": 104, "missing": 1}, "emerging": {"assets": 29, "attempted": 22, "updated": 22, "missing": 0}, "fx_emerging": {"assets": 20, "attempted": 17, "updated": 17, "missing": 0}, "volatility": {"assets": 14, "attempted": 7, "updated": 7, "missing": 0}, "rates": {"assets": 155, "attempted": 0, "updated": 0, "missing": 0}, "energy": {"assets": 17, "attempted": 9, "updated": 9, "missing": 0}, "metals": {"assets": 17, "attempted": 10, "updated": 7, "missing": 3}, "crypto": {"assets": 12, "attempted": 12, "updated": 12, "missing": 0}, "commodities": {"assets": 45, "attempted": 26, "updated": 20, "missing": 6}, "fx_g10": {"assets": 12, "attempted": 12, "updated": 12, "missing": 0}, "agriculture": {"assets": 22, "attempted": 12, "updated": 12, "missing": 0}, "credit": {"assets": 38, "attempted": 0, "updated": 0, "missing": 0}, "other": {"assets": 10, "attempted": 2, "updated": 2, "missing": 0}}, "updatedSymbols": [".BVSP", ".CSI300", ".DJI", ".GVZ", ".MXX", ".NDX", ".OVX", ".SKEWX", ".SSEC", ".VIX9D", ".VVIX", ".VXN", "0P0000N9A6", "2838.HK", "3047.HK", "9047.HK", "ABEV.K", "ADA/USD", "AFYA.O", "ARKB.K", "AU", "AUD/USD - Dólar Australiano Dólar Americano", "AVAX/USD", "AXIA.K", "B", "BBD", "BBDO.K", "BBOI11.SA", "BBSEY.PK", "BCH/USD - Bitcoin Cash Dólar Americano", "BCI", "BDORY.PK", "BEWZ39.SA", "BHP", "BITB.K", "BNO", "BOLSY.PK", "BOVA11.SA", "BP", "BRAZ.K", "BRF", "BRZU.K", "BSBR.K", "BTC/USD", "BZQ", "CC", "CHINA50", "CIG", "CIGc", "CL", "COGNY.PK", "COIN.O", "COP", "CORN11.SA", "CT", "CVX", "DE40", "DIA", "DOGE/USD", "EC", "ECH", "EEM", "EGIEY.PK", "EMBJ.K", "EPU", "EQNR.K", "EQUEY.PK", "ESM26", "ETH/USD - Ethereum Dólar Americano", "EUR/BRL - Euro Real Brasileiro", "EUR/GBP - Euro Libra Esterlina", "EUR/USD - Euro Dólar Americano", "EWH", "EWT", "EWW", "EWY", "EWZ", "EWZS.O", "EZA", "FBR", "FBTC.K", "FC", "FFc1", "FFc2", "FFc3", "FFc4", "FFc5", "FFc6", "FFc7", "FLBR.K", "FNV.TO", "FXI", "GBP/USD - Libra Esterlina Dólar Americano", "GC", "GCMC.BO", "GGB", "GLD", "GPR", "GRO", "HG", "HK50", "HTDIX.O", "HYPMY.PK", "IBIT.O", "ILF", "ITUB.K", "IWM", "JP225", "KC", "KLBAY.PK", "LCO", "LGO", "LGSXY.PK", "LINK/USD - Chainlink Dólar Americano", "LND", "LTC/USD", "LZRFY.PK", "MARA.O", "MBRFY.PK", "MCHI.O", "MRVSY.PK", "MSCI.K", "MSTR.O", "NEM", "NG", "NQM26", "NU", "NYF", "NZD/USD - Dólar Neozelandês Dólar Americano", "O", "OIH", "OJ", "OXY", "PA", "PAGS.K", "PBR", "PBRa", "pDOTn/USD", "PETR3.SA", "PETR4.SA"], "missingSymbols": ["CFI2M6", "DCE_I0", "HSIK6", "MAL3", "MCU", "MNI3", "MPB3", "MSN3", "MZN3", "SSPK5"], "symbolOverrides": {"count": 60, "items": ["USD/BRL=USDBRL=X", "EUR/USD=EURUSD=X", "NZD/USD=NZDUSD=X", "USD/CAD=USDCAD=X", "USD/CHF=USDCHF=X", "USD/HKD=USDHKD=X", "USD/JPY=USDJPY=X", "USD/SEK=USDSEK=X", "XAU/USD=GC=F", "AXIA_p.K=EBR", "JBSAY.PK=JBSS3.SA", "QQQ.O=QQQ", "RADLY.PK=RADLY", "RIOT.O=RIOT", "RTYM26=RTY=F", "RVXCF.PK=RVXCF", "SHEL.K=SHEL", "STNE.O=STNE", "SYYNY.PK=SYYNY", "USNZY.PK=USNZY", "VALE.K=VALE", "VSSPY.PK=VSSPY", "WEGZY.PK=WEGZY", "XLRE.K=XLRE", "XP.O=XP", "SOL/USD=SOL-USD", "XRP/USD=XRP-USD", "BDAP11=BDAP11.SA", "JGBH6=JGBH6.SA", "NTNS11=NTNS11.SA", "SHY.O=SHY", "TLT.O=TLT", "PDOTN/USD=PDOTN-USD", "USD/ARS=USDARS=X", "USD/CLP=USDCLP=X", "USD/CNH=USDCNH=X", "USD/CNY=USDCNY=X", "USD/COP=USDCOP=X", "USD/INR=USDINR=X", "USD/KRW=USDKRW=X", "USD/MXN=USDMXN=X", "USD/PEN=USDPEN=X", "USD/TRY=USDTRY=X", "USD/ZAR=USDZAR=X", "DE40=^GDAXI", "HK50=^HSI", "JP225=^N225", "UK100=^FTSE", "pDOTn/USD=DOT-USD", "SX5E.S=SX5E.SW", "PBRa=PBR-A", "YPFDm.BA=YPFD.BA", "CHINA50=XIN9.FGI", "0P0000N9A6=000016.SS", "CIGc=CIG", "HSIQJ6=^HSI", "GPR=RB=F", "FBR=SUZ", "Wv1=ZW=F", "GCMC.BO=GCMCOMM.BO"]}, "dailyFallbackUsed": 11, "quoteFallbackUsed": 0, "skippedAssets": 0, "nameResolvedUsed": 1, "tradingViewUsed": 0}}}, "yahoo_audit": {"exists": true, "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\dashboard\\MERCADO\\assets\\data\\market_yahoo_audit.json", "mtime": 1778610170.5273113, "mtime_fmt": "2026-05-12 15:22:50", "size": 50908, "generatedAt": "2026-05-12T18:22:28.061Z", "attemptedAssets": 234, "updatedAssets": 224, "missingAssets": 10, "uniqueYahooSymbols": 224, "returnedYahooSymbols": 214, "missing": [{"assetSymbol": "CFI2M6", "category": "commodities", "yahooSymbol": "CFI2M6", "reason": "not_returned"}, {"assetSymbol": "DCE_I0", "category": "commodities", "yahooSymbol": "DCE_I0", "reason": "not_returned"}, {"assetSymbol": "HSIK6", "category": "equities", "yahooSymbol": "HSIK6", "reason": "not_returned"}, {"assetSymbol": "MAL3", "category": "metals", "yahooSymbol": "MAL3", "reason": "not_returned"}, {"assetSymbol": "MCU", "category": "commodities", "yahooSymbol": "MCU", "reason": "no_price"}, {"assetSymbol": "MNI3", "category": "metals", "yahooSymbol": "MNI3", "reason": "not_returned"}, {"assetSymbol": "MPB3", "category": "commodities", "yahooSymbol": "MPB3", "reason": "not_returned"}, {"assetSymbol": "MSN3", "category": "commodities", "yahooSymbol": "MSN3", "reason": "not_returned"}, {"assetSymbol": "MZN3", "category": "metals", "yahooSymbol": "MZN3", "reason": "not_returned"}, {"assetSymbol": "SSPK5", "category": "commodities", "yahooSymbol": "SSPK5", "reason": "not_returned"}]}, "zq_curve": {"exists": true, "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\dashboard\\MERCADO\\assets\\data\\zq_curve.json", "mtime": 1778610172.4377484, "mtime_fmt": "2026-05-12 15:22:52", "size": 5970, "generatedAt": "2026-05-12T18:22:52.435Z", "rootSymbol": "ZQ=F", "riskMode": "NEUTRO", "slopePct": -0.025000000000005684, "contractCount": 20, "items": [{"vertex": "ZQK26", "yahooSymbol": "ZQK26.CBT", "expiration": 1777593600, "expirationFmt": "mai/2026", "lastPrice": 96.365, "impliedRatePct": 3.635000000000005, "dayChange": -0.002500000000011937, "dayChangePct": -0.002594235608490349}, {"vertex": "ZQM26", "yahooSymbol": "ZQM26.CBT", "expiration": 1780272000, "expirationFmt": "jun/2026", "lastPrice": 96.37, "impliedRatePct": 3.6299999999999955, "dayChange": 0, "dayChangePct": 0}, {"vertex": "ZQN26", "yahooSymbol": "ZQN26.CBT", "expiration": 1782864000, "expirationFmt": "jul/2026", "lastPrice": 96.375, "impliedRatePct": 3.625, "dayChange": 0, "dayChangePct": 0}, {"vertex": "ZQQ26", "yahooSymbol": "ZQQ26.CBT", "expiration": 1785542400, "expirationFmt": "ago/2026", "lastPrice": 96.38, "impliedRatePct": 3.6200000000000045, "dayChange": 0, "dayChangePct": 0}, {"vertex": "ZQU26", "yahooSymbol": "ZQU26.CBT", "expiration": 1788220800, "expirationFmt": "set/2026", "lastPrice": 96.365, "impliedRatePct": 3.635000000000005, "dayChange": -0.010000000000005116, "dayChangePct": -0.010376134889758876}, {"vertex": "ZQV26", "yahooSymbol": "ZQV26.CBT", "expiration": 1790812800, "expirationFmt": "out/2026", "lastPrice": 96.35, "impliedRatePct": 3.6500000000000057, "dayChange": -0.015000000000000568, "dayChangePct": -0.015565817464847786}, {"vertex": "ZQX26", "yahooSymbol": "ZQX26.CBT", "expiration": 1793491200, "expirationFmt": "nov/2026", "lastPrice": 96.32, "impliedRatePct": 3.680000000000007, "dayChange": -0.025000000000005684, "dayChangePct": -0.02594841455187678}, {"vertex": "ZQZ26", "yahooSymbol": "ZQZ26.CBT", "expiration": 1796083200, "expirationFmt": "dez/2026", "lastPrice": 96.28, "impliedRatePct": 3.719999999999999, "dayChange": -0.03999999999999204, "dayChangePct": -0.041528239202649544}, {"vertex": "ZQF27", "yahooSymbol": "ZQF27.CBT", "expiration": 1798761600, "expirationFmt": "jan/2027", "lastPrice": 96.265, "impliedRatePct": 3.7349999999999994, "dayChange": -0.045000000000001705, "dayChangePct": -0.046724120029074556}, {"vertex": "ZQG27", "yahooSymbol": "ZQG27.CBT", "expiration": 1801440000, "expirationFmt": "fev/2027", "lastPrice": 96.23, "impliedRatePct": 3.769999999999996, "dayChange": -0.060000000000002274, "dayChangePct": -0.062311766538583724}, {"vertex": "ZQH27", "yahooSymbol": "ZQH27.CBT", "expiration": 1803859200, "expirationFmt": "mar/2027", "lastPrice": 96.21, "impliedRatePct": 3.7900000000000063, "dayChange": -0.060000000000002274, "dayChangePct": -0.062324711748210526}, {"vertex": "ZQJ27", "yahooSymbol": "ZQJ27.CBT", "expiration": 1806537600, "expirationFmt": "abr/2027", "lastPrice": 96.18, "impliedRatePct": 3.819999999999993, "dayChange": -0.06999999999999318, "dayChangePct": -0.07272727272726565}, {"vertex": "ZQK27", "yahooSymbol": "ZQK27.CBT", "expiration": 1809129600, "expirationFmt": "mai/2027", "lastPrice": 96.15, "impliedRatePct": 3.8499999999999943, "dayChange": -0.08499999999999375, "dayChangePct": -0.08832545331739362}, {"vertex": "ZQM27", "yahooSymbol": "ZQM27.CBT", "expiration": 1811808000, "expirationFmt": "jun/2027", "lastPrice": 96.155, "impliedRatePct": 3.844999999999999, "dayChange": -0.08499999999999375, "dayChangePct": -0.08832086450539667}, {"vertex": "ZQN27", "yahooSymbol": "ZQN27.CBT", "expiration": 1814400000, "expirationFmt": "jul/2027", "lastPrice": 96.155, "impliedRatePct": 3.844999999999999, "dayChange": -0.08499999999999375, "dayChangePct": -0.08832086450539667}, {"vertex": "ZQQ27", "yahooSymbol": "ZQQ27.CBT", "expiration": 1817078400, "expirationFmt": "ago/2027", "lastPrice": 96.17, "impliedRatePct": 3.8299999999999983, "dayChange": -0.0799999999999983, "dayChangePct": -0.08311688311688134}, {"vertex": "ZQU27", "yahooSymbol": "ZQU27.CBT", "expiration": 1819756800, "expirationFmt": "set/2027", "lastPrice": 96.275, "impliedRatePct": 3.7249999999999943, "dayChange": -0.06999999999999318, "dayChangePct": -0.07265556074523138}, {"vertex": "ZQV27", "yahooSymbol": "ZQV27.CBT", "expiration": 1822348800, "expirationFmt": "out/2027", "lastPrice": 96.295, "impliedRatePct": 3.7049999999999983, "dayChange": -0.06999999999999318, "dayChangePct": -0.07264048150261317}, {"vertex": "ZQX27", "yahooSymbol": "ZQX27.CBT", "expiration": 1825027200, "expirationFmt": "nov/2027", "lastPrice": 96.31, "impliedRatePct": 3.6899999999999977, "dayChange": -0.06999999999999318, "dayChangePct": -0.07262917617762314}, {"vertex": "ZQZ27", "yahooSymbol": "ZQZ27.CBT", "expiration": 1827619200, "expirationFmt": "dez/2027", "lastPrice": 96.39, "impliedRatePct": 3.6099999999999994, "dayChange": -0.06999999999999318, "dayChangePct": -0.07256894049346173}]}, "foreign_flow": {"exists": true, "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\dashboard\\MERCADO\\assets\\data\\foreign_flow.json", "mtime": 1778610254.9117365, "mtime_fmt": "2026-05-12 15:24:14", "size": 52507, "generatedAt": "2026-05-12T10:29:45.055Z", "latest": {"date": "2026-05-08", "foreigners": 118780000}, "source": {"url": "https://www.dadosdemercado.com.br/fluxo", "updatedAt": "2026-05-12T09:12:00.000Z", "updatedAtText": "Atualizado em 12 Mai, 2026 06:12"}}, "tradingview": {"exists": true, "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Automacao\\.env.auto", "mtime": 1778585587.0398633, "mtime_fmt": "2026-05-12 08:33:07", "size": 823, "last_collected_at_utc": "2026-05-12T11:30:14Z", "last_slot_iso": "2026-05-12T08:30", "wdo_spot": "4918.0", "win_scaling_index_ref_close": "184325", "win_scaling_ewz_ref_close": "38.66"}, "sina": {"exists": true, "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\dashboard\\MERCADO\\assets\\data\\market_quotes.json", "symbol": "DCE_I0", "present": true, "last": {"t": "2026-05-12T18:22:28.061Z", "asOf": null, "price": 815.5, "change": -2, "changePct": -0.24464831804281345, "source": null}}, "logs": {"options_recent": [{"name": "options_20260512_083000.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\service_logs\\options_20260512_083000.log", "mtime": 1778585629.2993178, "mtime_fmt": "2026-05-12 08:33:49"}, {"name": "options_20260512_072615.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\service_logs\\options_20260512_072615.log", "mtime": 1778581867.4078095, "mtime_fmt": "2026-05-12 07:31:07"}, {"name": "options_20260511_083713.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\service_logs\\options_20260511_083713.log", "mtime": 1778499704.7575617, "mtime_fmt": "2026-05-11 08:41:44"}, {"name": "options_20260511_070315.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\service_logs\\options_20260511_070315.log", "mtime": 1778494049.0803938, "mtime_fmt": "2026-05-11 07:07:29"}, {"name": "options_20260511_065808.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\service_logs\\options_20260511_065808.log", "mtime": 1778493774.0551555, "mtime_fmt": "2026-05-11 07:02:54"}, {"name": "options_20260508_083830.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\service_logs\\options_20260508_083830.log", "mtime": 1778240588.9459026, "mtime_fmt": "2026-05-08 08:43:08"}, {"name": "options_20260508_070015.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\service_logs\\options_20260508_070015.log", "mtime": 1778234649.9760325, "mtime_fmt": "2026-05-08 07:04:09"}, {"name": "options_20260508_065445.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\service_logs\\options_20260508_065445.log", "mtime": 1778234395.319312, "mtime_fmt": "2026-05-08 06:59:55"}, {"name": "options_20260507_083000.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\service_logs\\options_20260507_083000.log", "mtime": 1778153674.3284838, "mtime_fmt": "2026-05-07 08:34:34"}, {"name": "options_20260507_070000.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\service_logs\\options_20260507_070000.log", "mtime": 1778148253.717019, "mtime_fmt": "2026-05-07 07:04:13"}], "cotacoes_recent": [{"name": "market_update_20260512_152226.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260512_152226.log", "mtime": 1778610306.691922, "mtime_fmt": "2026-05-12 15:25:06"}, {"name": "market_update_20260512_151834.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260512_151834.log", "mtime": 1778610069.6510353, "mtime_fmt": "2026-05-12 15:21:09"}, {"name": "market_update_20260512_150834.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260512_150834.log", "mtime": 1778609401.788131, "mtime_fmt": "2026-05-12 15:10:01"}, {"name": "market_update_20260512_150231.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260512_150231.log", "mtime": 1778609200.0025787, "mtime_fmt": "2026-05-12 15:06:40"}, {"name": "market_update_20260512_145834.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260512_145834.log", "mtime": 1778608817.6096272, "mtime_fmt": "2026-05-12 15:00:17"}, {"name": "market_update_20260512_145511.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260512_145511.log", "mtime": 1778608613.1305442, "mtime_fmt": "2026-05-12 14:56:53"}, {"name": "market_update_20260512_144511.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260512_144511.log", "mtime": 1778607993.495535, "mtime_fmt": "2026-05-12 14:46:33"}, {"name": "market_update_20260512_143511.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260512_143511.log", "mtime": 1778607387.0552793, "mtime_fmt": "2026-05-12 14:36:27"}, {"name": "market_update_20260512_142912.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260512_142912.log", "mtime": 1778607181.862462, "mtime_fmt": "2026-05-12 14:33:01"}, {"name": "market_update_20260512_141912.log", "path": "C:\\Users\\ednil\\Downloads\\Gamma\\Edi_Sistema_Unificado\\Cotacoes\\.edi-market-guardin\\logs\\market_update_20260512_141912.log", "mtime": 1778606469.6241157, "mtime_fmt": "2026-05-12 14:21:09"}]}}</script>
+  <script>
+    const data = JSON.parse(document.getElementById('data').textContent || '{}');
+    const grid = document.getElementById('grid');
+    const meta = document.getElementById('meta');
+
+    const fmt = (v) => (v === null || v === undefined || v === '' ? '-' : String(v));
+    const escapeHtml = (s) => String(s ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+
+    const badge = (kind, text) => `<span class="badge"><span class="dot ${kind}"></span><span>${escapeHtml(text)}</span></span>`;
+    const card = (title, body, cls='') => `<div class="card ${cls}"><div class="row"><div><div class="k">${escapeHtml(title)}</div></div></div>${body}</div>`;
+    const hrow = (k, v) => `<div class="row"><div class="k">${escapeHtml(k)}</div><div class="v mono">${escapeHtml(fmt(v))}</div></div>`;
+    const table = (headers, rows) => {
+      const th = headers.map(h => `<th>${escapeHtml(h)}</th>`).join('');
+      const tr = rows.map(r => `<tr>${r.map(c => `<td class="mono">${escapeHtml(fmt(c))}</td>`).join('')}</tr>`).join('');
+      return `<table><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>`;
+    };
+
+    meta.textContent = `Gerado em ${fmt(data.generated_at)} • ${fmt(data.root_dir)}`;
+
+    const opt = data.options || {};
+    const st = (data.state || {});
+    const optExit = st.last_options_exit_code;
+    const optGit = fmt(st.last_options_git_status);
+    const optWdoLast = fmt(st.last_options_wdo_last_updated);
+    const optWinLast = fmt(st.last_options_win_last_updated);
+    const optHint = fmt(opt.last_log_hint);
+
+    const optStatusKind = (optExit === 0 && !String(optHint).includes('FALHA')) ? 'ok' : (optExit === 0 ? 'warn' : 'bad');
+    const optBadges = [
+      badge(optStatusKind, `Opções exit=${fmt(optExit)} | git=${optGit}`),
+      badge('ok', `WDO last_updated=${optWdoLast}`),
+      badge('ok', `WIN last_updated=${optWinLast}`),
+    ].join(' ');
+
+    const wdo = (opt.csv_dolar || {});
+    const missingWdo = (wdo.missing_prefixes || []);
+    const wdoStatusKind = missingWdo.length === 0 ? 'ok' : (missingWdo.length <= 2 ? 'warn' : 'bad');
+    const wdoSummary = badge(wdoStatusKind, `WDO contratos: ${fmt((opt.wdo_expected_contracts || []).length)} esperados | ${fmt(Object.keys(wdo.latest_by_prefix || {}).length)} presentes | ${missingWdo.length} faltando`);
+
+    const recentWdoRows = (opt.wdo_expected_contracts || []).map(sym => {
+      const it = (wdo.latest_by_prefix || {})[sym];
+      return [sym, it ? it.mtime_fmt : '-', it ? it.size : '-', it ? it.name : '-'];
+    });
+
+    const idx = (opt.csv_indice || {});
+    const recentIdxRows = (idx.files_recent || []).slice(0, 8).map(f => [f.mtime_fmt, f.size, f.name]);
+
+    const dash = (opt.dashboard_unificado || {});
+    const dashWdo = fmt(dash.wdo_last_updated);
+    const dashWin = fmt(dash.win_last_updated);
+
+    const cot = data.cotacoes || {};
+    const ms = (cot.market_status || {});
+    const files = (cot.data_files || {});
+    const cotHint = fmt(cot.last_log_hint);
+    const running = !!ms.running;
+    const lastFinishedIso = ms.last_finishedAt || ms.current_finishedAt || null;
+    const gitSt = fmt(st.last_cotacoes_git_status || 'unknown');
+    const kind = gitSt === 'pushed' || gitSt === 'committed' ? 'ok' : (gitSt === 'no_changes' ? 'warn' : 'bad');
+    const lastFinishedBrt = fmtLocalIso(lastFinishedIso);
+    const gitLabel = gitSt === 'pushed' ? 'enviado' : gitSt === 'committed' ? 'commitado' : gitSt;
+    const b = badge(kind, `Cotações • Git: ${gitLabel} • Última atualização (UTC-3): ${lastFinishedBrt} ${running ? '• rodando' : ''}`);
+    const fileRows = (files.files || []).map(f => [f.name, f.exists ? f.mtime_fmt : 'não existe', f.exists ? f.size : '-', f.exists ? f.path : '-']);
+
+    const logs = data.logs || {};
+    const optLogs = (logs.options_recent || []).map(l => [l.mtime_fmt, l.name, l.path]);
+    const cotLogs = (logs.cotacoes_recent || []).map(l => [l.mtime_fmt, l.name, l.path]);
+
+    const mq = data.market_quotes || {};
+    const mqMeta = (mq.meta || {});
+    const yc = (mqMeta.yahooCoverage || null);
+    const yUpd = yc && typeof yc.updatedAssets === 'number' ? yc.updatedAssets : Number(yc && yc.updatedAssets ? yc.updatedAssets : 0);
+    const yMiss = yc && typeof yc.missingAssets === 'number' ? yc.missingAssets : Number(yc && yc.missingAssets ? yc.missingAssets : 0);
+    const yKind = yc && yc.enabled ? (yMiss === 0 ? 'ok' : (yMiss <= 10 ? 'warn' : 'bad')) : 'warn';
+    const yahooBadge = yc && yc.enabled
+      ? badge(yKind, `Yahoo updated=${fmt(yUpd)} | missing=${fmt(yMiss)} | at=${fmt(yc.lastRunAt || mqMeta.yahooUpdatedAt || mqMeta.generatedAt)}`)
+      : badge('warn', `Yahoo cobertura: n/d (habilite MARKET_YAHOO_ENABLED)`);    
+
+    const ycCatsRaw = yc && yc.byCategory && typeof yc.byCategory === 'object' ? yc.byCategory : {};
+    const ycCats = Object.entries(ycCatsRaw);
+    ycCats.sort((a, b) => {
+      const am = Number((a[1] && a[1].missing) || 0);
+      const bm = Number((b[1] && b[1].missing) || 0);
+      if (bm !== am) return bm - am;
+      return String(a[0]).localeCompare(String(b[0]));
+    });
+    const ycCatRows = ycCats.map(([cat, row]) => [
+      cat,
+      row && row.assets !== undefined ? row.assets : '-',
+      row && row.attempted !== undefined ? row.attempted : '-',
+      row && row.updated !== undefined ? row.updated : '-',
+      row && row.missing !== undefined ? row.missing : '-',
+    ]);
+
+    const yMissingSymbols = yc && Array.isArray(yc.missingSymbols) ? yc.missingSymbols : [];
+    const yOverrides = yc && yc.symbolOverrides && typeof yc.symbolOverrides === 'object' ? yc.symbolOverrides : null;
+    const yOverridesCount = yOverrides && typeof yOverrides.count === 'number' ? yOverrides.count : Number(yOverrides && yOverrides.count ? yOverrides.count : 0);
+    const yOverridesItems = yOverrides && Array.isArray(yOverrides.items) ? yOverrides.items : [];
+
+    const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+    const parseTs = (s) => {
+      const t = Date.parse(String(s || ''));
+      return Number.isFinite(t) ? t : null;
+    };
+    const dtFmt = new Intl.DateTimeFormat('pt-BR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+      timeZone: 'America/Sao_Paulo',
+      timeZoneName: 'short',
+    });
+    const fmtLocalIso = (iso) => {
+      const ms = iso ? parseTs(iso) : null;
+      return ms === null ? fmt(iso) : dtFmt.format(new Date(ms));
+    };
+    const fmtLocalEpochSec = (sec) => {
+      const v = typeof sec === 'number' ? sec : null;
+      return v === null ? '-' : dtFmt.format(new Date(v * 1000));
+    };
+
+    const yAttempted = yc && typeof yc.attemptedAssets === 'number'
+      ? yc.attemptedAssets
+      : (yc && yc.attemptedAssets ? Number(yc.attemptedAssets) : 0);
+    const yAt = (yc && (yc.lastRunAt || yc.timestamp)) || mqMeta.yahooUpdatedAt || mqMeta.generatedAt || null;
+    const yAtMs = yAt ? parseTs(yAt) : null;
+    const stalenessMin = yAtMs ? Math.max(0, Math.round((Date.now() - yAtMs) / 60000)) : null;
+    const coveragePct = yAttempted > 0 ? (yUpd / yAttempted) * 100 : null;
+    const scoreCoverage = coveragePct === null ? 0 : clamp(coveragePct, 0, 100);
+    const scoreStale = stalenessMin === null ? 0 : clamp(100 - stalenessMin * 2, 0, 100);
+    const healthScore = Math.round(scoreCoverage * 0.75 + scoreStale * 0.25);
+    const healthKind = (yc && yc.enabled)
+      ? (healthScore >= 90 ? 'ok' : (healthScore >= 75 ? 'warn' : 'bad'))
+      : 'warn';
+    const healthBadge = (yc && yc.enabled)
+      ? badge(healthKind, `Saúde Yahoo=${fmt(healthScore)}/100 | cobertura=${coveragePct === null ? '-' : coveragePct.toFixed(1)}% | staleness=${stalenessMin === null ? '-' : fmt(stalenessMin)}m`)
+      : badge('warn', 'Saúde Yahoo: n/d');
+
+    const degraded = ycCats.map(([cat, row]) => {
+      const attempted = Number((row && row.attempted) || 0);
+      const updated = Number((row && row.updated) || 0);
+      const missing = Number((row && row.missing) || 0);
+      const cov = attempted > 0 ? (updated / attempted) * 100 : null;
+      const degraded = missing > 0 || (cov !== null && cov < 90);
+      return { cat: String(cat), attempted, updated, missing, cov, degraded };
+    }).filter(x => x.degraded);
+    degraded.sort((a, b) => {
+      if (b.missing !== a.missing) return b.missing - a.missing;
+      const ac = a.cov === null ? 0 : a.cov;
+      const bc = b.cov === null ? 0 : b.cov;
+      if (ac !== bc) return ac - bc;
+      return a.cat.localeCompare(b.cat);
+    });
+    const degradedRows = degraded.slice(0, 10).map(x => [
+      x.cat,
+      x.cov === null ? '-' : x.cov.toFixed(1) + '%',
+      x.missing,
+    ]);
+
+    const audit = data.yahoo_audit || {};
+    const auditMissing = Array.isArray(audit.missing) ? audit.missing : [];
+    const auditBadge = badge(
+      auditMissing.length > 0 ? 'warn' : 'ok',
+      `Audit missing=${fmt(auditMissing.length)}`
+    );
+    const auditRows = auditMissing.slice(0, 80).map(x => [
+      fmt(x.assetSymbol),
+      fmt(x.category),
+      fmt(x.yahooSymbol),
+      fmt(x.reason),
+    ]);
+
+    const zq = data.zq_curve || {};
+    const zqExists = !!zq.exists;
+    const zqItems = Array.isArray(zq.items) ? zq.items : [];
+    const zqCount = typeof zq.contractCount === 'number' ? zq.contractCount : zqItems.length;
+    const zqSlope = (zq && (zq.slopePct !== undefined && zq.slopePct !== null)) ? Number(zq.slopePct) : null;
+    const zqRisk = fmt(zq.riskMode || '-');
+    const zqKind = zqRisk === 'RISK_OFF' ? 'warn' : (zqRisk === 'RISK_ON' ? 'ok' : 'warn');
+    const zqBadge = zqExists
+      ? badge(zqKind, `ZQ contratos=${fmt(zqCount)} | ${zqRisk}${zqSlope === null || !Number.isFinite(zqSlope) ? '' : ` | slope=${zqSlope.toFixed(2)}%`}`)
+      : badge('warn', 'Curva ZQ: n/d');
+    const zqRows = zqItems.slice(0, 120).map(it => [
+      fmt(it.vertex),
+      fmt(it.expirationFmt),
+      it && typeof it.lastPrice === 'number' ? it.lastPrice.toFixed(4) : fmt(it.lastPrice),
+      it && typeof it.impliedRatePct === 'number' ? it.impliedRatePct.toFixed(3) : fmt(it.impliedRatePct),
+      fmt(it.yahooSymbol),
+    ]);
+
+    const ageMinutes = (iso) => {
+      const ms = iso ? parseTs(iso) : null;
+      return ms ? Math.max(0, Math.round((Date.now() - ms) / 60000)) : null;
+    };
+
+    const flow = data.foreign_flow || {};
+    const flowAgeMin = ageMinutes(flow.generatedAt || null);
+    const flowKind = flow && flow.exists ? (flowAgeMin !== null && flowAgeMin <= 36 * 60 ? 'ok' : 'warn') : 'bad';
+    const flowBadge = flow && flow.exists
+      ? badge(flowKind, `Fluxo gerado ${fmt(flow.generatedAt)} | idade=${flowAgeMin === null ? '-' : fmt(flowAgeMin)}m`)
+      : badge('bad', 'Fluxo estrangeiro: n/d');
+
+    const tv = data.tradingview || {};
+    const tvAgeMin = ageMinutes(tv.last_collected_at_utc || null);
+    const tvKind = tv && tv.exists ? (tvAgeMin !== null && tvAgeMin <= 36 * 60 ? 'ok' : 'warn') : 'bad';
+    const tvBadge = tv && tv.exists
+      ? badge(tvKind, `TradingView (env) ${fmt(tv.last_collected_at_utc)} | idade=${tvAgeMin === null ? '-' : fmt(tvAgeMin)}m`)
+      : badge('bad', 'TradingView: n/d');
+
+    const sina = data.sina || {};
+    const sinaLast = sina && sina.last ? sina.last : {};
+    const sinaTs = sinaLast && (sinaLast.asOf || sinaLast.t) ? (sinaLast.asOf || sinaLast.t) : null;
+    const sinaAgeMin = ageMinutes(sinaTs);
+    const sinaKind = sina && sina.present ? (sinaAgeMin !== null && sinaAgeMin <= 36 * 60 ? 'ok' : 'warn') : 'warn';
+    const sinaBadge = sina && sina.present
+      ? badge(sinaKind, `Sina DCE_I0 ${fmt(sinaTs)} | idade=${sinaAgeMin === null ? '-' : fmt(sinaAgeMin)}m`)
+      : badge('warn', 'Sina DCE_I0: n/d');
+
+    const ageMinutesFromMtime = (mtimeSec) => {
+      const v = typeof mtimeSec === 'number' ? mtimeSec : null;
+      return v ? Math.max(0, Math.round((Date.now() - v * 1000) / 60000)) : null;
+    };
+
+    const invPortfolioAt = mqMeta.portfolioUpdatedAt || null;
+    const invPortfolioAgeMin = ageMinutes(invPortfolioAt);
+    const invPortfolioKind = invPortfolioAt ? (invPortfolioAgeMin !== null && invPortfolioAgeMin <= 36 * 60 ? 'ok' : 'warn') : 'bad';
+    const invPortfolioBadge = invPortfolioAt
+      ? badge(invPortfolioKind, `Investing (Portfolio) ${fmtLocalIso(invPortfolioAt)} | idade=${invPortfolioAgeMin === null ? '-' : fmt(invPortfolioAgeMin)}m`)
+      : badge('bad', 'Investing (Portfolio): n/d');
+
+    const diAt = mqMeta.diUpdatedAt || null;
+    const diAgeMin = ageMinutes(diAt);
+    const diKind = diAt ? (diAgeMin !== null && diAgeMin <= 36 * 60 ? 'ok' : 'warn') : 'warn';
+    const diBadge = diAt
+      ? badge(diKind, `InfoMoney (DI) ${fmtLocalIso(diAt)} | idade=${diAgeMin === null ? '-' : fmt(diAgeMin)}m`)
+      : badge('warn', 'InfoMoney (DI): n/d');
+
+    const calFile = (files.files || []).find(f => f && f.name === 'economic_calendar.json') || null;
+    const calKind = calFile && calFile.exists
+      ? ((ageMinutesFromMtime(calFile.mtime) !== null && ageMinutesFromMtime(calFile.mtime) <= 36 * 60) ? 'ok' : 'warn')
+      : 'warn';
+    const calBadge = calFile && calFile.exists
+      ? badge(calKind, `Investing (Calendário) ${fmtLocalEpochSec(calFile.mtime)} | idade=${ageMinutesFromMtime(calFile.mtime) === null ? '-' : fmt(ageMinutesFromMtime(calFile.mtime))}m`)
+      : badge('warn', 'Investing (Calendário): n/d');
+
+    grid.innerHTML = [
+      card('Resumo', `
+        <div>${optBadges}</div>
+        <div style="margin-top:10px">${wdoSummary}</div>
+        <div style="margin-top:10px">${yahooBadge}</div>
+        <div style="margin-top:10px">${healthBadge}</div>
+        <div style="margin-top:12px" class="small muted">Último alerta relevante (se existir): <span class="mono">${escapeHtml(optHint)}</span></div>
+      `),
+
+      card('Opções • WDO (Barchart CSV_Dolar)', `
+        ${hrow('Diretório', wdo.dir)}
+        ${hrow('Arquivos totais', wdo.files_total)}
+        ${missingWdo.length ? `<div class="small muted" style="margin-top:10px">Faltando: <span class="mono">${escapeHtml(missingWdo.join(', '))}</span></div>` : `<div class="small muted" style="margin-top:10px">Todos os contratos esperados estão presentes.</div>`}
+        ${table(['Contrato', 'Criado/Atualizado', 'Tamanho', 'Arquivo'], recentWdoRows)}
+      `, 'half'),
+
+      card('Opções • Índice (Barchart CSV_Indice)', `
+        ${hrow('Diretório', idx.dir)}
+        ${hrow('Arquivos totais', idx.files_total)}
+        ${table(['Criado/Atualizado', 'Tamanho', 'Arquivo'], recentIdxRows)}
+      `, 'half'),
+
+      card('Dashboard Unificado (saídas)', `
+        ${hrow('WDO market_data.json', dashWdo)}
+        ${hrow('WIN market_data.json', dashWin)}
+        <div class="small muted" style="margin-top:10px">Caminhos:</div>
+        <div class="small mono muted">${escapeHtml(fmt(dash.wdo_path || ''))}</div>
+        <div class="small mono muted">${escapeHtml(fmt(dash.win_path || ''))}</div>
+      `, 'third'),
+
+      card('Cotações (market:service)', `
+        <div>${b}</div>
+        <div class="small muted" style="margin-top:10px">Último alerta relevante (se existir): <span class="mono">${escapeHtml(cotHint)}</span></div>
+        <div style="margin-top:10px" class="small muted">Arquivos em ${escapeHtml(fmt(files.dir || ''))} (newest=${escapeHtml(fmt(files.newest_mtime_fmt || '-'))})</div>
+        ${table(['Arquivo', 'Atualizado em', 'Tamanho', 'Caminho'], fileRows)}
+      `),
+
+      card('Investing + InfoMoney', `
+        <div>${invPortfolioBadge}</div>
+        <div style="margin-top:10px">${calBadge}</div>
+        <div style="margin-top:10px">${diBadge}</div>
+        <div class="small muted" style="margin-top:10px">Fonte: <span class="mono">market_quotes.json</span> (portfolio/DI) e <span class="mono">economic_calendar.json</span> (calendário).</div>
+      `, 'third'),
+
+      card('Yahoo (sem navegador) • Cobertura', `
+        <div>${yahooBadge} ${healthBadge} ${badge('ok', `overrides=${fmt(yOverridesCount)}`)}</div>
+        <div style="margin-top:10px" class="small muted">market_quotes.json: <span class="mono">${escapeHtml(fmt(mq.mtime_fmt || '-'))}</span> • <span class="mono">${escapeHtml(fmt(mq.path || ''))}</span></div>
+        <div style="margin-top:10px">${hrow('meta.portfolioUpdatedAt', mqMeta.portfolioUpdatedAt || '-')}</div>
+        <div style="margin-top:6px">${hrow('meta.yahooUpdatedAt', mqMeta.yahooUpdatedAt || '-')}</div>
+        <div style="margin-top:6px">${hrow('meta.source', mqMeta.source || '-')}</div>
+        ${degradedRows.length ? table(['Categoria degradada', 'Cobertura', 'Ausentes'], degradedRows) : `<div class="small muted" style="margin-top:10px">Sem categorias degradadas.</div>`}
+        ${ycCatRows.length ? table(['Categoria', 'Assets', 'Tentados', 'Atualizados', 'Ausentes'], ycCatRows) : `<div class="small muted" style="margin-top:10px">Sem dados de categoria (meta.yahooCoverage.byCategory vazio).</div>`}
+        ${yMissingSymbols.length ? `<div class="small muted" style="margin-top:10px">Ausentes (top): <span class="mono">${escapeHtml(yMissingSymbols.slice(0, 40).join(', '))}</span></div>` : `<div class="small muted" style="margin-top:10px">Sem ausências relevantes.</div>`}
+        ${yOverridesItems.length ? `<div class="small muted" style="margin-top:10px">Overrides (top): <span class="mono">${escapeHtml(yOverridesItems.slice(0, 25).join(' ; '))}</span></div>` : ``}
+      `),
+
+      card('Curva de Juros EUA (Fed Funds • ZQ)', `
+        <div>${zqBadge}</div>
+        <div class="small muted" style="margin-top:10px">Fonte: Yahoo • Fórmula: <span class="mono">Juro Implícito (%) = 100 - Preço</span></div>
+        <div class="small muted" style="margin-top:6px">Interpretação: curva subindo tende a <span class="mono">RISK_OFF</span>; curva caindo tende a <span class="mono">RISK_ON</span>.</div>
+        <div class="small muted" style="margin-top:10px">Arquivo: <span class="mono">${escapeHtml(fmt(zq.mtime_fmt || '-'))}</span> • <span class="mono">${escapeHtml(fmt(zq.path || ''))}</span></div>
+        ${zqRows.length ? table(['Vértice', 'Vencimento', 'Preço', 'Juro Implícito (%)', 'Yahoo'], zqRows) : `<div class="small muted" style="margin-top:10px">Sem dados da curva ZQ.</div>`}
+      `),
+
+      card('Fluxo estrangeiro (Dados de Mercado)', `
+        <div>${flowBadge}</div>
+        <div class="small muted" style="margin-top:10px">Arquivo: <span class="mono">${escapeHtml(fmt(flow.mtime_fmt || '-'))}</span> • <span class="mono">${escapeHtml(fmt(flow.path || ''))}</span></div>
+        <div style="margin-top:10px">${hrow('Fonte', (flow.source && flow.source.url) || '-')}</div>
+        <div style="margin-top:6px">${hrow('Fonte atualizado', (flow.source && (flow.source.updatedAtText || flow.source.updatedAt)) || '-')}</div>
+        <div style="margin-top:6px">${hrow('Último dia', (flow.latest && flow.latest.date) || '-')}</div>
+        <div style="margin-top:6px">${hrow('Estrangeiro (último dia)', (flow.latest && flow.latest.foreigners) !== undefined ? flow.latest.foreigners : '-')}</div>
+      `, 'third'),
+
+      card('TradingView (fechamentos)', `
+        <div>${tvBadge}</div>
+        <div class="small muted" style="margin-top:10px">Arquivo: <span class="mono">${escapeHtml(fmt(tv.mtime_fmt || '-'))}</span> • <span class="mono">${escapeHtml(fmt(tv.path || ''))}</span></div>
+        <div style="margin-top:10px">${hrow('AUTO_BARCHART_LAST_SLOT_ISO', tv.last_slot_iso || '-')}</div>
+        <div style="margin-top:6px">${hrow('WDO_SPOT', tv.wdo_spot || '-')}</div>
+        <div style="margin-top:6px">${hrow('WIN_SCALING_INDEX_REF_CLOSE', tv.win_scaling_index_ref_close || '-')}</div>
+        <div style="margin-top:6px">${hrow('WIN_SCALING_EWZ_REF_CLOSE', tv.win_scaling_ewz_ref_close || '-')}</div>
+      `, 'third'),
+
+      card('Sina (minério DCE_I0)', `
+        <div>${sinaBadge}</div>
+        <div class="small muted" style="margin-top:10px">Fonte: <span class="mono">https://hq.sinajs.cn</span> • Série: <span class="mono">DCE_I0</span></div>
+        <div style="margin-top:10px">${hrow('Último carimbo (asOf/t)', sinaTs || '-')}</div>
+        <div style="margin-top:6px">${hrow('Preço', (sinaLast && sinaLast.price) !== undefined ? sinaLast.price : '-')}</div>
+        <div style="margin-top:6px">${hrow('Variação %', (sinaLast && sinaLast.changePct) !== undefined ? sinaLast.changePct : '-')}</div>
+      `, 'third'),
+
+      card('Yahoo Auditoria (faltantes)', `
+        <div>${auditBadge}</div>
+        <div class="small muted" style="margin-top:10px">Arquivo: <span class="mono">${escapeHtml(fmt((audit && audit.mtime_fmt) || '-'))}</span> • <span class="mono">${escapeHtml(fmt((audit && audit.path) || ''))}</span></div>
+        ${auditRows.length ? table(['Asset', 'Categoria', 'Yahoo', 'Motivo'], auditRows) : `<div class="small muted" style="margin-top:10px">Sem faltantes na auditoria.</div>`}
+      `),
+
+      card('Logs recentes', `
+        <div class="k">Opções</div>
+        ${table(['Data/hora', 'Arquivo', 'Caminho'], optLogs)}
+        <div class="k" style="margin-top:14px">Cotações</div>
+        ${table(['Data/hora', 'Arquivo', 'Caminho'], cotLogs)}
+      `),
+    ].join('');
+  </script>
+</body>
+</html>
