@@ -4482,230 +4482,32 @@ function renderUsEquitiesOperationalBriefing() {
     const el = document.getElementById('usEquitiesOperationalBriefing');
     if (!el) return;
 
-    const data = getData();
-    const rawWeb = operationalInputs.webNews || null;
-    const web = rawWeb && rawWeb.ok === true ? rawWeb : null;
-    const usNow = data ? computeUsEquitiesPulseNow(data, web) : null;
+    const api = (() => {
+        try { return window.USOperationalEua || null; } catch { return null; }
+    })();
 
-    const badge = (tone, text) => {
-        const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
-        return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
-    };
-
-    if (!data || !usNow) {
-        el.innerHTML = `<div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);opacity:.88;">Sem dados suficientes para montar o bloco EUA agora.</div>`;
+    if (!api || typeof api.render !== 'function') {
+        el.innerHTML = `<div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);opacity:.88;">Módulo do bloco EUA indisponível.</div>`;
         return;
     }
 
-    const fmtP = v => (typeof v === 'number' && Number.isFinite(v) ? formatPercent(v, 2) : '—');
-    const fmt0 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 0) : '—');
-    const fmt2 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 2) : '—');
-    const srcLabel = s => (s === 'future' ? 'FUTURO' : s === 'proxy' ? 'PROXY' : 'N/D');
-    const biasLabel = b => (b === 'buy' ? 'COMPRA' : b === 'sell' ? 'VENDA' : 'NEUTRO');
-
-    const spotOf = s => {
-        const pt = s ? (getMostRecentPointWithPrice(data, s) || getLastPoint(data, s)) : null;
-        const spot = pt && typeof pt.price === 'number' && Number.isFinite(pt.price) ? pt.price : null;
-        const t = pt && pt.t ? String(pt.t) : null;
-        return { spot, t };
-    };
-
-    const planFor = (name, p, extras, execSym, src, micro) => {
-        const scalp = micro && micro.scalp ? micro.scalp : { signal: 'neutral', strength: 0, label: 'n/d' };
-        const scalpBias = scalp && scalp.signal ? String(scalp.signal) : 'neutral';
-        const primaryBias = scalpBias !== 'neutral' ? scalpBias : (p && p.bias ? p.bias : 'neutral');
-        const tone = primaryBias === 'buy' ? 'positive' : primaryBias === 'sell' ? 'negative' : 'neutral';
-        const action = primaryBias === 'buy' ? 'Compra' : primaryBias === 'sell' ? 'Venda' : 'Neutro';
-        const macroTxt = p && p.bias ? (p.bias === 'buy' ? 'Compra' : p.bias === 'sell' ? 'Venda' : 'Neutro') : '—';
-
-        const microLine = (() => {
-            if (!micro) return null;
-            const r5 = typeof micro.ret5 === 'number' && Number.isFinite(micro.ret5) ? micro.ret5 : null;
-            const r15 = typeof micro.ret15 === 'number' && Number.isFinite(micro.ret15) ? micro.ret15 : null;
-            const r60 = typeof micro.ret60 === 'number' && Number.isFinite(micro.ret60) ? micro.ret60 : null;
-            const range30 = micro.range30 && typeof micro.range30.pct === 'number' && Number.isFinite(micro.range30.pct) ? micro.range30.pct : null;
-            const vol30 = micro.vol30 && typeof micro.vol30.sumAbsPct === 'number' && Number.isFinite(micro.vol30.sumAbsPct) ? micro.vol30.sumAbsPct : null;
-            const bits = [
-                r5 !== null ? `5m ${formatPercent(r5, 2)}` : null,
-                r15 !== null ? `15m ${formatPercent(r15, 2)}` : null,
-                r60 !== null ? `60m ${formatPercent(r60, 2)}` : null,
-                range30 !== null ? `Range30 ${formatPercent(range30, 2)}` : null,
-                vol30 !== null ? `Vol30 ${formatPercent(vol30, 2)}` : null,
-            ].filter(Boolean);
-            if (!bits.length) return null;
-            return `Micro: ${bits.join(' • ')}`;
-        })();
-
-        const scalpPlan = (() => {
-            const rangePct = micro && micro.range30 && typeof micro.range30.pct === 'number' && Number.isFinite(micro.range30.pct) ? micro.range30.pct : null;
-            const stopPct = rangePct !== null ? Math.max(0.08, rangePct * 0.25) : null;
-            const alvoPct = rangePct !== null ? Math.max(0.12, rangePct * 0.5) : null;
-            const risk = stopPct !== null ? `Stop ~${formatPercent(stopPct, 2)}` : 'Stop: curto';
-            const reward = alvoPct !== null ? `Alvo ~${formatPercent(alvoPct, 2)}` : 'Alvo: curto';
-            if (primaryBias === 'buy') return `Scalp: comprar a favor do fluxo curto (pullback leve ou rompimento) • ${risk} • ${reward}`;
-            if (primaryBias === 'sell') return `Scalp: vender a favor do fluxo curto (repique ou rompimento) • ${risk} • ${reward}`;
-            return 'Scalp: sem edge (5m×15m não alinhado) • prefira esperar gatilho e operar range.';
-        })();
-
-        const w = p.groups ? p.groups.driver || { net: 0, count: 0 } : { net: 0, count: 0 };
-        const c = p.groups ? p.groups.confirm || { net: 0, count: 0 } : { net: 0, count: 0 };
-        const x = p.groups ? p.groups.context || { net: 0, count: 0 } : { net: 0, count: 0 };
-        return `<div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                <div style="font-weight:900;letter-spacing:1px;">${escapeHtml(name)}</div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                    ${badge(tone, `Scalp: ${action}`)}
-                    ${badge('neutral', `Macro: ${macroTxt}`)}
-                    ${badge('neutral', `Drivers net ${escapeHtml(fmt2(p.net))}`)}
-                    ${badge(src === 'future' ? 'positive' : src === 'proxy' ? 'warn' : 'neutral', `Execução: ${escapeHtml(execSym || '—')} (${srcLabel(src)})`)}
-                </div>
-            </div>
-            <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">${escapeHtml(extras)}</div>
-            ${microLine ? `<div style="margin-top:6px;opacity:.84;font-size:12px;line-height:1.35;">${escapeHtml(microLine)}</div>` : ''}
-            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                ${badge('neutral', `Camadas: Driver ${escapeHtml(fmt2(w.net))} (${String(w.count)}) • Conf ${escapeHtml(fmt2(c.net))} (${String(c.count)}) • Contexto ${escapeHtml(fmt2(x.net))} (${String(x.count)})`)}
-            </div>
-            <div style="margin-top:10px;opacity:.90;line-height:1.45;">
-                <div style="font-weight:900;letter-spacing:.6px;opacity:.92;margin-bottom:6px;">Plano</div>
-                <div style="opacity:.86;font-size:12px;">${escapeHtml(scalpPlan)}</div>
-            </div>
-        </div>`;
-    };
-
-    const corrLine = (items) => {
-        const xs = Array.isArray(items) ? items.slice(0, 5) : [];
-        if (!xs.length) return 'Correlações: —';
-        return `Correlações: ${xs.map(it => `${it.label} ${formatNumber(it.corr, 2)}${it.n ? ` (n=${String(it.n)})` : ''}`).join(' • ')}`;
-    };
-
-    const news = Array.isArray(usNow.news) ? usNow.news : [];
-    const newsHtml = (() => {
-        if (!news.length) return `<div style="opacity:.78;font-size:12px;">• —</div>`;
-        return news
-            .slice(0, 6)
-            .map(it => {
-                const title = it && it.title ? String(it.title) : '';
-                const url = it && it.url ? String(it.url) : '';
-                const safeUrl = url && /^https?:\/\//i.test(url) ? url : '';
-                const a = safeUrl
-                    ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noreferrer" style="color:rgba(0,243,255,.92);text-decoration:none;">${escapeHtml(title)}</a>`
-                    : escapeHtml(title);
-                return `• ${a}`;
-            })
-            .join('<br>');
-    })();
-
-    const mkMissing = (() => {
-        const miss = usNow.coverage && Array.isArray(usNow.coverage.missing) ? usNow.coverage.missing : [];
-        const labels = usNow.coverage && usNow.coverage.keyLabels ? usNow.coverage.keyLabels : {};
-        const src = usNow.source || {};
-        const futMissing = ['spx', 'ndx', 'dow'].filter(k => src[k] !== 'future');
-        if (!miss.length && !futMissing.length) return badge('positive', 'Drivers: completos');
-        const txt = miss.slice(0, 6).map(k => labels[k] || k).join(' • ');
-        const futTxt = futMissing.length ? `Sem futuro em: ${futMissing.map(k => (labels[k] || k)).join(' • ')}` : '';
-        const msg = [txt ? `Faltando (dados): ${txt}${miss.length > 6 ? `… +${miss.length - 6}` : ''}` : '', futTxt].filter(Boolean).join(' | ');
-        return badge('neutral', msg || 'Cobertura parcial');
-    })();
-
-    const spxSpot = spotOf(usNow.sym.spx);
-    const ndxSpot = spotOf(usNow.sym.ndx);
-    const dowSpot = spotOf(usNow.sym.dow);
-    const asOf = (spxSpot.t || ndxSpot.t || dowSpot.t) ? formatDateTime(String(spxSpot.t || ndxSpot.t || dowSpot.t)) : '—';
-
-    const spxExtras = `${usNow.sym.spx || '—'} • ${spxSpot.spot !== null ? fmt0(spxSpot.spot) : '—'} • ${fmtP(usNow.market.spxPct)} • ${corrLine(usNow.corr && usNow.corr.spx ? usNow.corr.spx.items : [])}`;
-    const ndxExtras = `${usNow.sym.ndx || '—'} • ${ndxSpot.spot !== null ? fmt0(ndxSpot.spot) : '—'} • ${fmtP(usNow.market.ndxPct)} • ${corrLine(usNow.corr && usNow.corr.ndx ? usNow.corr.ndx.items : [])}`;
-    const dowExtras = `${usNow.sym.dow || '—'} • ${dowSpot.spot !== null ? fmt0(dowSpot.spot) : '—'} • ${fmtP(usNow.market.dowPct)} • ${corrLine(usNow.corr && usNow.corr.dow ? usNow.corr.dow.items : [])}`;
-
-    const nScore = usNow.newsMeta && typeof usNow.newsMeta.score === 'number' && Number.isFinite(usNow.newsMeta.score) ? usNow.newsMeta.score : 0;
-    const nTone = nScore > 0.15 ? 'positive' : nScore < -0.15 ? 'negative' : 'neutral';
-
-    const scalperPanel = (() => {
-        const sign = (v, th = 0.08) => (typeof v === 'number' && Number.isFinite(v) ? (v > th ? +1 : v < -th ? -1 : 0) : 0);
-        const ok = (a, b) => {
-            const sa = sign(a);
-            const sb = sign(b);
-            if (!sa || !sb) return null;
-            return sa === sb;
-        };
-        const spx = usNow.market ? usNow.market.spxPct : null;
-        const ndx = usNow.market ? usNow.market.ndxPct : null;
-        const dow = usNow.market ? usNow.market.dowPct : null;
-        const xlf = usNow.sym && usNow.sym.xlf ? getChangePct(data, usNow.sym.xlf) : null;
-        const xlk = usNow.sym && usNow.sym.xlk ? getChangePct(data, usNow.sym.xlk) : null;
-        const iwm = usNow.sym && usNow.sym.iwm ? getChangePct(data, usNow.sym.iwm) : null;
-        const hyg = usNow.sym && usNow.sym.hyg ? getChangePct(data, usNow.sym.hyg) : null;
-        const tlt = usNow.sym && usNow.sym.tlt ? getChangePct(data, usNow.sym.tlt) : null;
-        const eem = usNow.sym && usNow.sym.eem ? getChangePct(data, usNow.sym.eem) : null;
-        const dxy = usNow.sym && usNow.sym.dxy ? getChangePct(data, usNow.sym.dxy) : null;
-        const vix = usNow.sym && usNow.sym.vix ? getChangePct(data, usNow.sym.vix) : null;
-        const us10y = usNow.sym && usNow.sym.us10y ? getChangePct(data, usNow.sym.us10y) : null;
-
-        const p1 = ok(spx, ndx);
-        const p2 = ok(dow, xlf);
-        const riskOn = (() => {
-            const s1 = sign(hyg, 0.06);
-            const s2 = sign(tlt, 0.06);
-            const s3 = sign(dxy, 0.06);
-            const s4 = sign(vix, 0.20);
-            const score = (s1 > 0 ? 1 : s1 < 0 ? -1 : 0) + (s2 > 0 ? 0.5 : s2 < 0 ? -0.5 : 0) + (s3 < 0 ? 0.5 : s3 > 0 ? -0.5 : 0) + (s4 < 0 ? 1 : s4 > 0 ? -1 : 0);
-            if (score >= 1.5) return { label: 'RISK ON', tone: 'positive' };
-            if (score <= -1.5) return { label: 'RISK OFF', tone: 'negative' };
-            return { label: 'MISTO', tone: 'neutral' };
-        })();
-
-        const mk = (label, v, maxAbs = 2.0) => `<span style="font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(label)} ${escapeHtml(typeof v === 'number' && Number.isFinite(v) ? formatPercent(v, 2) : '—')}</span>`;
-        const parityBadge = (name, v) => badge(v === true ? 'positive' : v === false ? 'negative' : 'neutral', `${name}: ${v === true ? 'OK' : v === false ? 'DIVERGE' : '—'}`);
-
-        return `
-            <div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                    <div style="font-weight:900;letter-spacing:.8px;opacity:.95;">⚡ Scalper — Contexto, Paridades, Setores</div>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                        ${badge(riskOn.tone, riskOn.label)}
-                        ${parityBadge('SPX×NDX', p1)}
-                        ${parityBadge('DOW×XLF', p2)}
-                    </div>
-                </div>
-                <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
-                    ${mk('HYG', hyg)} • ${mk('TLT', tlt)} • ${mk('EEM', eem)} • ${mk('DXY', dxy)} • ${mk('VIX', vix, 5)} • ${mk('US10Y', us10y, 1)}
-                </div>
-                <div style="margin-top:8px;opacity:.84;font-size:12px;line-height:1.35;">
-                    Setores: ${mk('XLK', xlk)} • ${mk('XLF', xlf)} • ${mk('IWM', iwm)}
-                </div>
-                <div style="margin-top:8px;opacity:.78;font-size:12px;line-height:1.35;">
-                    Regra de scalp: se paridades divergirem ou RISK OFF forte, reduzir mão e exigir confirmação (rompimento + pullback curto).
-                </div>
-            </div>
-        `;
-    })();
-
-    el.innerHTML = `
-        <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                <div style="font-weight:900;letter-spacing:1px;">EUA — Roteiro Operacional</div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                    ${mkMissing}
-                    ${badge(nTone, `News/Geo score ${escapeHtml(fmt2(nScore))}`)}
-                    ${badge('neutral', `asOf ${escapeHtml(asOf)}`)}
-                </div>
-            </div>
-            <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">
-                ${planFor('S&P 500', usNow.pulse.spx, spxExtras, usNow.execution ? usNow.execution.spx : null, usNow.source ? usNow.source.spx : null, usNow.micro ? usNow.micro.spx : null)}
-                ${planFor('Nasdaq', usNow.pulse.ndx, ndxExtras, usNow.execution ? usNow.execution.ndx : null, usNow.source ? usNow.source.ndx : null, usNow.micro ? usNow.micro.ndx : null)}
-                ${planFor('US30 (Dow)', usNow.pulse.dow, dowExtras, usNow.execution ? usNow.execution.dow : null, usNow.source ? usNow.source.dow : null, usNow.micro ? usNow.micro.dow : null)}
-            </div>
-        </div>
-        ${scalperPanel}
-        <div style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;">
-            <div style="border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
-                    <div style="font-weight:900;letter-spacing:.6px;opacity:.92;">Notícias (macro/geopolítica)</div>
-                    <div style="opacity:.72;font-size:12px;">matched ${escapeHtml(String(usNow.newsMeta && typeof usNow.newsMeta.matched === 'number' ? usNow.newsMeta.matched : 0))}</div>
-                </div>
-                <div style="opacity:.84;font-size:12px;line-height:1.35;">${newsHtml}</div>
-            </div>
-        </div>
-    `;
+    api.render({
+        el,
+        data: getData(),
+        operationalInputs,
+        computeUsEquitiesPulseNow,
+        getChangePct,
+        getMostRecentPointWithPrice,
+        getLastPoint,
+        formatDateTime,
+        formatPercent,
+        formatNumber,
+        escapeHtml,
+        loadScriptFresh,
+        renderWebNewsModule,
+        renderZqCurveBriefing,
+        renderUsTreasuryFuturesBriefing,
+    });
 }
 
 function renderCommoditiesOperationalBriefing() {
@@ -7092,25 +6894,49 @@ async function ensureMarketServiceOnline(force = false) {
         return await marketServiceOnlineInFlight;
     }
 
-    const run = (async () => {
-        const atMs = Date.now();
-        const baseUrl = getMarketServiceBaseUrl();
+    const atMs = Date.now();
+    const baseUrl = getMarketServiceBaseUrl();
+    const url = `${baseUrl}/api/market/health?t=${atMs}`;
+
+    const fetchPromise = (async () => {
         try {
-            await fetchJsonWithTimeout(`${baseUrl}/api/market/health?t=${atMs}`, 1200);
-            marketServiceOnlineCache = { atMs, ok: true };
+            const res = await fetch(url, { method: 'GET' });
+            if (!res || !res.ok) return false;
             return true;
         } catch {
-            marketServiceOnlineCache = { atMs, ok: false };
             return false;
         }
     })();
 
-    marketServiceOnlineInFlight = run;
-    try {
-        return await run;
-    } finally {
-        if (marketServiceOnlineInFlight === run) marketServiceOnlineInFlight = null;
+    marketServiceOnlineInFlight = fetchPromise;
+
+    const timeoutMs = 900;
+    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ kind: 'timeout' }), timeoutMs));
+    const settled = await Promise.race([
+        fetchPromise.then(ok => ({ kind: 'done', ok })),
+        timeoutPromise,
+    ]);
+
+    if (settled && settled.kind === 'done') {
+        marketServiceOnlineCache = { atMs, ok: !!settled.ok };
+        if (marketServiceOnlineInFlight === fetchPromise) marketServiceOnlineInFlight = null;
+        return !!settled.ok;
     }
+
+    marketServiceOnlineCache = { atMs, ok: false };
+
+    fetchPromise
+        .then(ok => {
+            marketServiceOnlineCache = { atMs, ok: !!ok };
+        })
+        .catch(() => {
+            marketServiceOnlineCache = { atMs, ok: false };
+        })
+        .finally(() => {
+            if (marketServiceOnlineInFlight === fetchPromise) marketServiceOnlineInFlight = null;
+        });
+
+    return false;
 }
 
 async function fetchJsonWithTimeout(url, timeoutMs = 3500) {
