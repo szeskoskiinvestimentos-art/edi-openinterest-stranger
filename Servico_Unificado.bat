@@ -28,6 +28,28 @@ if not exist "%COTACOES_DIR%\package.json" (
   goto :END
 )
 
+set "ENABLE_AUTO_GIT_PUSH=true"
+
+set "PY_CMD="
+where py >nul 2>&1
+if not errorlevel 1 set "PY_CMD=py -3"
+if "%PY_CMD%"=="" (
+  where python >nul 2>&1
+  if not errorlevel 1 set "PY_CMD=python"
+)
+
+if not "%PY_CMD%"=="" (
+  echo.
+  echo === Atualizando Opcoes (Python) ===
+  %PY_CMD% export_v1_data.py
+  if errorlevel 1 echo AVISO: export_v1_data.py falhou.
+  %PY_CMD% main.py
+  if errorlevel 1 echo AVISO: main.py falhou.
+) else (
+  echo.
+  echo AVISO: Python nao encontrado (py/python). Pulei Opcoes.
+)
+
 set "MARKET_ALREADY_RUNNING=0"
 powershell -NoProfile -Command "$x=Get-NetTCPConnection -State Listen -LocalPort %MARKET_SERVICE_PORT% -ErrorAction SilentlyContinue | Select-Object -First 1; if($x){exit 0}else{exit 1}" >nul 2>&1
 if not errorlevel 1 set "MARKET_ALREADY_RUNNING=1"
@@ -51,6 +73,10 @@ if "%MARKET_ALREADY_RUNNING%"=="1" (
   start "COTACOES market:service" /D "%COTACOES_DIR%" "%ComSpec%" /k "set MARKET_GIT_SYNC_ENABLED=%MARKET_GIT_SYNC_ENABLED%^& set MARKET_GIT_SYNC_PUSH=%MARKET_GIT_SYNC_PUSH%^& set MARKET_GIT_SYNC_BRANCH=%MARKET_GIT_SYNC_BRANCH%^& set MARKET_SERVICE_HOST=%MARKET_SERVICE_HOST%^& set MARKET_SERVICE_PORT=%MARKET_SERVICE_PORT%^& set MARKET_INTERVAL_MINUTES=%MARKET_INTERVAL_MINUTES%^& set INVESTING_PORTFOLIO_INTERVAL_MINUTES=%INVESTING_PORTFOLIO_INTERVAL_MINUTES%^& set MARKET_UPDATE_MODE=%MARKET_UPDATE_MODE%^& set MARKET_SCHEDULE_MODE=%MARKET_SCHEDULE_MODE%^& set MARKET_RETENTION_DAYS=%MARKET_RETENTION_DAYS%^& if not exist node_modules\\.bin\\tsx.cmd (npm ci --silent)^& npm run -s market:service"
   timeout /t 2 >nul
 )
+
+echo.
+echo Disparando update (manual)...
+powershell -NoProfile -Command "try { $u='http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/update'; $b='{\"\"reason\"\":\"\"manual\"\"}'; Invoke-RestMethod -Method Post -Uri $u -ContentType 'application/json' -Body $b | Out-String | Write-Host } catch { Write-Host ('AVISO: ' + $_.Exception.Message) }"
 
 if exist "%~dp0controle_de_dados.html" start "" "%~dp0controle_de_dados.html"
 if exist "%COTACOES_DIR%\dashboard\index.html" start "" "%COTACOES_DIR%\dashboard\index.html"

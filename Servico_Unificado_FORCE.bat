@@ -28,6 +28,28 @@ if not exist "%COTACOES_DIR%\package.json" (
   goto :END
 )
 
+set "ENABLE_AUTO_GIT_PUSH=true"
+
+set "PY_CMD="
+where py >nul 2>&1
+if not errorlevel 1 set "PY_CMD=py -3"
+if "%PY_CMD%"=="" (
+  where python >nul 2>&1
+  if not errorlevel 1 set "PY_CMD=python"
+)
+
+if not "%PY_CMD%"=="" (
+  echo.
+  echo === Atualizando Opcoes (Python) ===
+  %PY_CMD% export_v1_data.py
+  if errorlevel 1 echo AVISO: export_v1_data.py falhou.
+  %PY_CMD% main.py
+  if errorlevel 1 echo AVISO: main.py falhou.
+) else (
+  echo.
+  echo AVISO: Python nao encontrado (py/python). Pulei Opcoes.
+)
+
 set "MARKET_ALREADY_RUNNING=0"
 powershell -NoProfile -Command "$x=Get-NetTCPConnection -State Listen -LocalPort %MARKET_SERVICE_PORT% -ErrorAction SilentlyContinue | Select-Object -First 1; if($x){exit 0}else{exit 1}" >nul 2>&1
 if not errorlevel 1 set "MARKET_ALREADY_RUNNING=1"

@@ -3353,7 +3353,7 @@ function computeHk50PulseNow(data, web) {
                     ? sym.hshares
                     : w.key === 'AUD/USD'
                         ? sym.audusd
-                        : (findAliasSymbolBest(data, w.key) || aliasSym(w.key) || pickBest(byMatchers(getMatchersForKey(w.key), { limit: 6 })));
+                        : (findAliasSymbolBest(data, w.key) || aliasSym(w.key) || pickBest(byMatchers(assetAliasMatchers(w.key), { limit: 6 })));
             if (!has) out.push(w.label);
         }
         return out;
