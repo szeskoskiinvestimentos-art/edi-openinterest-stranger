@@ -2028,8 +2028,23 @@ class StrangerThingsCharts {
         if (!ctx) return;
 
         const storageKey = `oiStrikeScope:${location.pathname}`;
-        const oiAll = data?.oi_data;
-        const oiNearest = data?.oi_data_nearest;
+        const asOiFromVolumeData = (vd) => {
+            if (
+                !vd ||
+                !Array.isArray(vd.strikes) ||
+                !Array.isArray(vd.call_volume) ||
+                !Array.isArray(vd.put_volume) ||
+                vd.strikes.length === 0 ||
+                vd.call_volume.length !== vd.strikes.length ||
+                vd.put_volume.length !== vd.strikes.length
+            ) {
+                return null;
+            }
+            return { strikes: vd.strikes, call_oi: vd.call_volume, put_oi: vd.put_volume };
+        };
+
+        const oiAll = data?.oi_data ?? data?.v3_data?.oi_data ?? asOiFromVolumeData(data?.volume_data);
+        const oiNearest = data?.oi_data_nearest ?? data?.v3_data?.oi_data_nearest;
         const rowsByExpiry = data && Array.isArray(data.oi_by_expiry) ? data.oi_by_expiry : [];
 
         const hasOiShape = (obj) =>
@@ -3393,9 +3408,167 @@ class StrangerThingsCharts {
             return s.replace(re0, `$1${newBody}$3`);
         };
 
+        const patchWdoEdiMapAndUsdBeta = (raw, data) => {
+            const s = String(raw || '');
+            const alreadyHasEdiMap = s.includes('OpcoesEdiMap_');
+            const alreadyHasUsdBeta = s.includes('UsdBeta_');
+            const canAppend = !alreadyHasEdiMap || !alreadyHasUsdBeta;
+            if (!canAppend) return s;
+
+            const spotWdo = Number(data && (data.spot_price ?? (data.overview && data.overview.spot_price)));
+            const baseHundreds = Number.isFinite(spotWdo) ? Math.floor(spotWdo / 100) * 100 : null;
+            if (baseHundreds === null) return s;
+
+            const selectProxy = () => {
+                const uup = window.yahooUupOptionsData;
+                const usdu = window.yahooUsduOptionsData;
+                if (uup && typeof uup === 'object' && Array.isArray(uup.expiries) && uup.expiries.length) return { key: 'UUP', data: uup };
+                if (usdu && typeof usdu === 'object' && Array.isArray(usdu.expiries) && usdu.expiries.length) return { key: 'USDU', data: usdu };
+                return null;
+            };
+            const proxyPick = selectProxy();
+            if (!proxyPick) return s;
+
+            const fmt = (v) => {
+                const n = Number(v);
+                if (!Number.isFinite(n)) return '0.00';
+                return n.toFixed(2);
+            };
+            const strikeToWdo = (strike) => {
+                const k = Number(strike);
+                if (!Number.isFinite(k)) return null;
+                return baseHundreds + k;
+            };
+
+            const aggregateByStrike = (payload) => {
+                const byExpiry = payload && payload.by_expiry && typeof payload.by_expiry === 'object' ? payload.by_expiry : null;
+                if (!byExpiry) return null;
+                const agg = new Map();
+                for (const exp of Object.keys(byExpiry)) {
+                    const one = byExpiry[exp];
+                    if (!one || !Array.isArray(one.strikes)) continue;
+                    const strikes = one.strikes;
+                    const callOi = Array.isArray(one.call_oi) ? one.call_oi : [];
+                    const putOi = Array.isArray(one.put_oi) ? one.put_oi : [];
+                    for (let i = 0; i < strikes.length; i++) {
+                        const k = Number(strikes[i]);
+                        if (!Number.isFinite(k)) continue;
+                        const c = Number(callOi[i] ?? 0);
+                        const p = Number(putOi[i] ?? 0);
+                        const prev = agg.get(k) || { call: 0, put: 0 };
+                        prev.call += Number.isFinite(c) ? c : 0;
+                        prev.put += Number.isFinite(p) ? p : 0;
+                        agg.set(k, prev);
+                    }
+                }
+                return agg;
+            };
+
+            const agg = aggregateByStrike(proxyPick.data);
+            if (!agg || agg.size === 0) return s;
+
+            const minOi = Math.max(0, Number(document.getElementById('usduMinOiInput')?.value ?? proxyPick.data.min_open_interest ?? 0) || 0);
+            const candidates = [];
+            for (const [k, v] of agg.entries()) {
+                const call = Number(v.call) || 0;
+                const put = Number(v.put) || 0;
+                const total = call + put;
+                if (total < minOi) continue;
+                const w = strikeToWdo(k);
+                if (!Number.isFinite(w)) continue;
+                candidates.push({ strike: k, wdo: w, call, put, total });
+            }
+            if (!candidates.length) return s;
+
+            const top = candidates
+                .slice()
+                .sort((a, b) => b.total - a.total || a.strike - b.strike)
+                .slice(0, 18)
+                .sort((a, b) => a.strike - b.strike);
+
+            const strikes = top.map(x => x.strike);
+            const minK = Math.min(...strikes);
+            const maxK = Math.max(...strikes);
+            const rangeMid = (minK + maxK) / 2;
+            const rangeMidWdo = strikeToWdo(rangeMid);
+
+            let wSum = 0;
+            let kSum = 0;
+            for (const it of top) {
+                const w = Number(it.total) || 0;
+                if (w <= 0) continue;
+                wSum += w;
+                kSum += it.strike * w;
+            }
+            const meanByOi = wSum > 0 ? kSum / wSum : rangeMid;
+            const meanByOiWdo = strikeToWdo(meanByOi);
+
+            const tagStrike = (k) => String(Math.round(Number(k) * 100));
+
+            const ediLines = [];
+            for (const it of top) {
+                const tag = tagStrike(it.strike);
+                if (it.put > 0) ediLines.push(`     HorizontalLineCustom(${fmt(it.wdo)}, clFib, 1, psDot, "OpcoesEdiMap_A_P_${tag}", TamanhoFonte, tpTopRight, 0, 0);`);
+                if (it.call > 0) ediLines.push(`     HorizontalLineCustom(${fmt(it.wdo)}, clEffectiveWall, 1, psDot, "OpcoesEdiMap_A_C_${tag}", TamanhoFonte, tpTopRight, 0, 0);`);
+            }
+            if (Number.isFinite(rangeMidWdo)) ediLines.push(`     HorizontalLineCustom(${fmt(rangeMidWdo)}, clEdiWall, 2, psSolid, "OpcoesEdiMap_A_MediaIntervalo", TamanhoFonte, tpTopRight, 0, 0);`);
+            if (Number.isFinite(meanByOiWdo)) ediLines.push(`     HorizontalLineCustom(${fmt(meanByOiWdo)}, clEffectiveWall, 2, psDashDot, "OpcoesEdiMap_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);`);
+
+            const beta = proxyPick.data.usdbrl_beta;
+            const fxPoints = beta && beta.latest && typeof beta.latest.fx_points === 'number' ? beta.latest.fx_points : null;
+            const betaLinesByWindow = (w) => {
+                const labelW = String(w);
+                const lines = [];
+                if (Number.isFinite(rangeMidWdo)) lines.push(`     HorizontalLineCustom(${fmt(rangeMidWdo)}, clEffectiveWall, 2, psSolid, "UsdBeta_${labelW}_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);`);
+                if (Number.isFinite(meanByOiWdo)) lines.push(`     HorizontalLineCustom(${fmt(meanByOiWdo)}, clFib, 2, psDashDot, "UsdBeta_${labelW}_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);`);
+                if (Number.isFinite(fxPoints)) lines.push(`     HorizontalLineCustom(${fmt(fxPoints)}, clMaxPain, 1, psDot, "UsdBeta_${labelW}_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);`);
+                return lines;
+            };
+
+            const usdBetaBlock = [];
+            usdBetaBlock.push(`   if (ExibirUsdBeta) then`);
+            usdBetaBlock.push(`   begin`);
+            for (const w of [30, 60, 90, 252]) {
+                usdBetaBlock.push(`     if (JanelaUsdBeta = ${w}) then`);
+                usdBetaBlock.push(`     begin`);
+                usdBetaBlock.push(...betaLinesByWindow(w));
+                usdBetaBlock.push(`     end;`);
+            }
+            usdBetaBlock.push(`     if (JanelaUsdBeta = 0) then`);
+            usdBetaBlock.push(`     begin`);
+            usdBetaBlock.push(...betaLinesByWindow(30));
+            usdBetaBlock.push(...betaLinesByWindow(60));
+            usdBetaBlock.push(...betaLinesByWindow(90));
+            usdBetaBlock.push(...betaLinesByWindow(252));
+            usdBetaBlock.push(`     end;`);
+            usdBetaBlock.push(`   end;`);
+
+            const introInputs = [];
+            if (!s.includes('ExibirOpcoesEdi')) introInputs.push(`input ExibirOpcoesEdi(false);`);
+            if (!s.includes('ExibirUsdBeta')) introInputs.push(`input ExibirUsdBeta(false);`);
+            if (!s.includes('JanelaUsdBeta')) introInputs.push(`input JanelaUsdBeta(0);`);
+
+            const blocks = [];
+            if (!alreadyHasEdiMap) {
+                blocks.push(` if (ExibirOpcoesEdi) then`);
+                blocks.push(`   begin`);
+                blocks.push(...ediLines);
+                blocks.push(`   end;`);
+                blocks.push(``);
+            }
+            if (!alreadyHasUsdBeta) {
+                blocks.push(...usdBetaBlock);
+                blocks.push(``);
+            }
+
+            const injected = `${introInputs.length ? `${introInputs.join('\n')}\n\n` : ''}${s.trimEnd()}\n\n${blocks.join('\n')}\n`;
+            return injected;
+        };
+
         if (ntslArea) {
             const raw = data.ntsl_script || '// Código não disponível. Verifique exportação.';
-            ntslArea.innerText = patchUsdBetaAllWindows(raw);
+            const patched = patchUsdBetaAllWindows(raw);
+            ntslArea.innerText = patchWdoEdiMapAndUsdBeta(patched, data);
         }
 
         if (copyBtn && ntslArea) {

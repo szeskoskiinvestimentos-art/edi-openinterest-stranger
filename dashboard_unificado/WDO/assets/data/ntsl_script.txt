@@ -1,4 +1,4 @@
-// NTSL Indicator - Edi OpenInterest Levels - 13/05/2026 21:32
+// NTSL Indicator - Edi OpenInterest Levels - 14/05/2026 08:34
 // Gerado Automaticamente
 
 const
@@ -28,28 +28,28 @@ input
   ExibirMelhoresPontos(false);
   ModeloFlip(7);
   spot(0);
-  // 1 = Classic (5373.78)
-  // 2 = Spline (5377.56)
+  // 1 = Classic (5374.75)
+  // 2 = Spline (5378.48)
   // 3 = HVL (4400.00)
   // 4 = HVL Log (4400.00)
   // 5 = Sigma Kernel (4400.00)
-  // 6 = PVOP (5373.78)
-  // 7 = HVL Gaussian (5354.29)
+  // 6 = PVOP (5374.75)
+  // 7 = HVL Gaussian (5355.59)
 
 var
   GammaVal: Float;
 
 begin
   // Inicializa GammaVal com o primeiro disponivel por seguranca
-  GammaVal := 5373.78;
+  GammaVal := 5374.75;
 
-  if (ModeloFlip = 1) then GammaVal := 5373.78;
-  if (ModeloFlip = 2) then GammaVal := 5377.56;
+  if (ModeloFlip = 1) then GammaVal := 5374.75;
+  if (ModeloFlip = 2) then GammaVal := 5378.48;
   if (ModeloFlip = 3) then GammaVal := 4400.00;
   if (ModeloFlip = 4) then GammaVal := 4400.00;
   if (ModeloFlip = 5) then GammaVal := 4400.00;
-  if (ModeloFlip = 6) then GammaVal := 5373.78;
-  if (ModeloFlip = 7) then GammaVal := 5354.29;
+  if (ModeloFlip = 6) then GammaVal := 5374.75;
+  if (ModeloFlip = 7) then GammaVal := 5355.59;
 
   // --- Linhas Principais (Com Intercalação de Texto) ---
   if (ExibirWalls) then
@@ -117,7 +117,7 @@ begin
   if (ExibirWalls) then
     HorizontalLineCustom(5800.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirEffectiveWalls) then
-    HorizontalLineCustom(5887.88, clEffectiveWall, 2, psDashDot, "Edi Effective Call", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5886.94, clEffectiveWall, 2, psDashDot, "Edi Effective Call", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(5900.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
@@ -143,8 +143,8 @@ begin
   if (ExibirFlips) then begin
     if (GammaVal > 0) then
       HorizontalLineCustom(GammaVal, clGammaFlip, 2, psDash, "Edi_GammaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    if (5346.83 > 0) then
-      HorizontalLineCustom(5346.83, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    if (5345.22 > 0) then
+      HorizontalLineCustom(5345.22, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
   end;
 
   // Edi_Wall (Midpoints) - Grid Completo

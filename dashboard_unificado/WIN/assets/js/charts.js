@@ -817,8 +817,28 @@ class StrangerThingsCharts {
             obj.call_oi.length === obj.strikes.length &&
             obj.put_oi.length === obj.strikes.length;
 
-        const oiAll = hasOiShape(data?.oi_data) ? data.oi_data : null;
-        const oiNearest = hasOiShape(data?.oi_data_nearest) ? data.oi_data_nearest : null;
+        const asOiFromVolumeData = (vd) => {
+            if (
+                !vd ||
+                !Array.isArray(vd.strikes) ||
+                !Array.isArray(vd.call_volume) ||
+                !Array.isArray(vd.put_volume) ||
+                vd.strikes.length === 0 ||
+                vd.call_volume.length !== vd.strikes.length ||
+                vd.put_volume.length !== vd.strikes.length
+            ) {
+                return null;
+            }
+            return { strikes: vd.strikes, call_oi: vd.call_volume, put_oi: vd.put_volume };
+        };
+
+        const oiAll =
+            (hasOiShape(data?.oi_data) ? data.oi_data : null) ??
+            (hasOiShape(data?.v3_data?.oi_data) ? data.v3_data.oi_data : null) ??
+            asOiFromVolumeData(data?.volume_data);
+        const oiNearest =
+            (hasOiShape(data?.oi_data_nearest) ? data.oi_data_nearest : null) ??
+            (hasOiShape(data?.v3_data?.oi_data_nearest) ? data.v3_data.oi_data_nearest : null);
         const oiSrc = oiAll ?? oiNearest;
         if (!oiSrc) return;
 
