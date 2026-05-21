@@ -1,4 +1,4 @@
-// NTSL Indicator - Edi OpenInterest Levels - 14/05/2026 08:34
+// NTSL Indicator - Edi OpenInterest Levels - 21/05/2026 13:47
 // Gerado Automaticamente
 
 const
@@ -26,10 +26,11 @@ input
   MostrarPLUS(false);
   MostrarPLUS2(false);
   ExibirMelhoresPontos(true);
+  ExibirProjecoesWin(true);
   ModeloFlip(7);
   spot(0);
   // 1 = Classic (132687.34)
-  // 2 = Spline (82782.02)
+  // 2 = Spline (83069.71)
   // 3 = HVL (132687.34)
   // 4 = HVL Log (132687.34)
   // 5 = Sigma Kernel (132687.34)
@@ -44,7 +45,7 @@ begin
   GammaVal := 132687.34;
 
   if (ModeloFlip = 1) then GammaVal := 132687.34;
-  if (ModeloFlip = 2) then GammaVal := 82782.02;
+  if (ModeloFlip = 2) then GammaVal := 83069.71;
   if (ModeloFlip = 3) then GammaVal := 132687.34;
   if (ModeloFlip = 4) then GammaVal := 132687.34;
   if (ModeloFlip = 5) then GammaVal := 132687.34;
@@ -102,6 +103,8 @@ begin
     HorizontalLineCustom(132687.34, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(132687.34, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+  if (ExibirEffectiveWalls) then
+    HorizontalLineCustom(134203.41, clEffectiveWall, 2, psDashDot, "Edi Effective Put", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(137601.68, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
@@ -122,16 +125,14 @@ begin
     HorizontalLineCustom(157259.06, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(157259.06, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirEffectiveWalls) then
-    HorizontalLineCustom(159143.58, clEffectiveWall, 2, psDashDot, "Edi Effective Put", TamanhoFonte, tpTopLeft, 0, 0);
+  if (ExibirWalls) then
+    HorizontalLineCustom(159716.24, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(162173.41, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(162173.41, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls) then
-    HorizontalLineCustom(164630.58, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
-  if (ExibirWalls) then
-    HorizontalLineCustom(164630.58, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+    HorizontalLineCustom(164630.58, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(167087.76, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
@@ -162,18 +163,18 @@ begin
     HorizontalLineCustom(181830.79, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(181830.79, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
+  if (ExibirRange) then
+    HorizontalLineCustom(181830.79, clRangeLow, 1, psDot, "Edi_Range_1D", TamanhoFonte, tpBottomRight, 0, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(184287.97, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(184287.97, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirEffectiveWalls) then
-    HorizontalLineCustom(184594.42, clEffectiveWall, 2, psDashDot, "Edi Effective Call", TamanhoFonte, tpBottomRight, 0, 0);
+    HorizontalLineCustom(186604.66, clEffectiveWall, 2, psDashDot, "Edi Effective Call", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
-    HorizontalLineCustom(186745.14, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(186745.14, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirWalls) then
-    HorizontalLineCustom(186745.14, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
-  if (ExibirRange) then
-    HorizontalLineCustom(186745.14, clRangeLow, 1, psDot, "Edi_Range_1D", TamanhoFonte, tpBottomRight, 0, 0);
+    HorizontalLineCustom(186745.14, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpBottomRight, 0, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(189202.31, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirWalls) then
@@ -203,8 +204,8 @@ begin
   if (ExibirFlips) then begin
     if (GammaVal > 0) then
       HorizontalLineCustom(GammaVal, clGammaFlip, 2, psDash, "Edi_GammaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    if (162400.91 > 0) then
-      HorizontalLineCustom(162400.91, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    if (161024.15 > 0) then
+      HorizontalLineCustom(161024.15, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
   end;
 
   // Edi_Wall (Midpoints) - Grid Completo
@@ -295,5 +296,15 @@ begin
     HorizontalLineCustom(185686.67, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
     HorizontalLineCustom(192833.56, clRed, 1, psDash, "Edi_Wall_MelhorVenda", TamanhoFonte, tpTopRight, CurrentDate, 0);
     HorizontalLineCustom(181420.50, clLime, 1, psDash, "Edi_Wall_MelhorCompra", TamanhoFonte, tpTopRight, CurrentDate, 0);
+  end;
+
+  if (ExibirProjecoesWin) then
+  begin
+    HorizontalLineCustom(175369.22, clEffectiveWall, 2, psDashDot, "WIN_PROJ_FERRO_FECH", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(178023.04, clFib, 2, psDot, "WIN_PROJ_FERRO_AJUSTE", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(175315.19, clEffectiveWall, 2, psDashDot, "WIN_PROJ_COBRE_FECH", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(177968.19, clFib, 2, psDot, "WIN_PROJ_COBRE_AJUSTE", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(177883.95, clEffectiveWall, 2, psDashDot, "WIN_PROJ_PETROLEO_FECH", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(180575.82, clFib, 2, psDot, "WIN_PROJ_PETROLEO_AJUSTE", TamanhoFonte, tpTopRight, CurrentDate, 0);
   end;
 end;
