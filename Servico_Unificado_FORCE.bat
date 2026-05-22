@@ -146,7 +146,9 @@ if not "%PY_CMD%"=="" (
 echo.
 call :WAIT_MARKET_UPDATE
 if errorlevel 1 (
-  echo AVISO: timeout aguardando final da atualizacao de cotacoes.
+  echo ERRO: timeout aguardando final da atualizacao de cotacoes. Abortando push para evitar artefatos inconsistentes.
+  call :SHUTDOWN_MARKET_FORCE
+  goto :END
 )
 
 call :GIT_PUSH_UNIFIED
@@ -210,7 +212,7 @@ if "%GEN_HASH%"=="" set "GEN_HASH=na"
 if not "%EDI_ARTIFACTS_BRANCH%"=="" (
   powershell -NoProfile -Command ^
     "try { $branch=[string]$env:EDI_ARTIFACTS_BRANCH; if(-not $branch){ exit 0 }; $root=(Resolve-Path '%~dp0.').Path; $wt=(Join-Path $root '.edi_artifacts_worktree');" ^
-    "try { Set-Location $root; try { git worktree remove --force $wt | Out-Null } catch { } ; try { Remove-Item -Recurse -Force -LiteralPath $wt -ErrorAction SilentlyContinue } catch { };" ^
+    "try { Set-Location $root; try { git worktree remove --force $wt 2>$null | Out-Null } catch { } ; try { Remove-Item -Recurse -Force -LiteralPath $wt -ErrorAction SilentlyContinue } catch { };" ^
     "try { git fetch origin --prune | Out-Null } catch { };" ^
     "git worktree add $wt --detach | Out-Null; Set-Location $wt;" ^
     "$base='origin/main'; try { git rev-parse --verify $base | Out-Null } catch { $base='main'; try { git rev-parse --verify $base | Out-Null } catch { $base='HEAD' } };" ^
