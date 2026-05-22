@@ -506,7 +506,7 @@ async function main() {
   const manualCooldownMs = Math.max(1, manualCooldownMinutes) * 60 * 1000
   const updateMode = String(env('MARKET_UPDATE_MODE', 'once') || 'once').toLowerCase()
 
-  const baseDir = resolveFromProject(env('MARKET_AUTOMATION_DIR', defaultAutomationDir()))
+  const baseDir = requireInsideWorkspace('MARKET_AUTOMATION_DIR', resolveFromProject(env('MARKET_AUTOMATION_DIR', defaultAutomationDir())))
   const logsDir = path.join(baseDir, 'logs')
   let httpServer: ReturnType<express.Express['listen']> | null = null
 
@@ -521,10 +521,17 @@ async function main() {
   const gitSyncTargetDir = env('MARKET_GIT_SYNC_TARGET_DIR', '')
   const sourceDataDir = env('MARKET_SOURCE_DATA_DIR', 'dashboard/MERCADO/assets/data')
 
+  if (gitSyncRepoDir) requireInsideWorkspace('MARKET_GIT_SYNC_REPO_DIR', resolveFromWorkspace(gitSyncRepoDir))
+  if (gitSyncTargetDir) requireInsideWorkspace('MARKET_GIT_SYNC_TARGET_DIR', resolveFromWorkspace(gitSyncTargetDir))
+  requireInsideWorkspace('MARKET_SOURCE_DATA_DIR', resolveFromProject(String(sourceDataDir)))
+
   const marketUpdateTimeoutMinutes = Math.max(3, envNumber('MARKET_UPDATE_TIMEOUT_MINUTES', 25))
 
-  const optionsDashboardDir = resolveFromProject(
+  const optionsDashboardDir = requireInsideWorkspace(
+    'OPTIONS_UNIFIED_DASHBOARD_DIR',
+    resolveFromProject(
     env('OPTIONS_UNIFIED_DASHBOARD_DIR', path.resolve(WORKSPACE_ROOT, 'dashboard_unificado')),
+    ),
   )
 
   function normalizeHttpUrl(raw: string, fallback: string) {
@@ -538,6 +545,7 @@ async function main() {
   const newsHeadlinesRetentionDays = Math.max(1, envNumber('NEWS_HEADLINES_RETENTION_DAYS', 2))
   const newsHeadlinesStoreEnabled = envBool('NEWS_HEADLINES_STORE_ENABLED', true)
   const newsHeadlinesStoreFile = env('NEWS_HEADLINES_STORE_FILE', '')
+  if (newsHeadlinesStoreFile) requireInsideWorkspace('NEWS_HEADLINES_STORE_FILE', resolveFromWorkspace(newsHeadlinesStoreFile))
   const newsWebEnabled = envBool('NEWS_WEB_ENABLED', true)
   const newsWebWindowHours = Math.max(6, envNumber('NEWS_WEB_WINDOW_HOURS', 24))
   const newsWebMaxItems = Math.max(5, envNumber('NEWS_WEB_MAX_ITEMS', 40))

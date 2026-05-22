@@ -1,7 +1,7 @@
 import path from 'node:path'
 
 import { normalizeHttpUrl, parseList } from '../lib/update-service/config-helpers.js'
-import { defaultAutomationDir, resolveFromProject, WORKSPACE_ROOT } from './paths.js'
+import { defaultAutomationDir, requireInsideWorkspace, resolveFromProject, resolveFromWorkspace, WORKSPACE_ROOT } from './paths.js'
 
 export type MarketServiceConfig = {
   host: string
@@ -100,19 +100,21 @@ function buildBaseConfig(deps: {
 
   const updateMode = lower(String(deps.env('MARKET_UPDATE_MODE', 'once') || 'once'))
 
-  const baseDir = resolveFromProject(deps.env('MARKET_AUTOMATION_DIR', defaultAutomationDir()))
+  const baseDir = requireInsideWorkspace('MARKET_AUTOMATION_DIR', resolveFromProject(deps.env('MARKET_AUTOMATION_DIR', defaultAutomationDir())))
   const logsDir = path.join(baseDir, 'logs')
 
   const marketUpdateLogRetentionDays = clampMin(1, deps.envNumber('MARKET_UPDATE_LOG_RETENTION_DAYS', 10))
   const updateTimeoutMinutes = clampMin(3, deps.envNumber('MARKET_UPDATE_TIMEOUT_MINUTES', 25))
 
   const sourceDataDir = deps.env('MARKET_SOURCE_DATA_DIR', 'dashboard/MERCADO/assets/data') || 'dashboard/MERCADO/assets/data'
+  requireInsideWorkspace('MARKET_SOURCE_DATA_DIR', resolveFromProject(sourceDataDir))
 
   const validateBeforeGitSync = deps.envBool('MARKET_VALIDATE_BEFORE_GIT_SYNC', true)
   const validateStrict = deps.envBool('MARKET_VALIDATE_STRICT', false)
 
-  const optionsDashboardDir = resolveFromProject(
-    deps.env('OPTIONS_UNIFIED_DASHBOARD_DIR', path.resolve(WORKSPACE_ROOT, 'dashboard_unificado')),
+  const optionsDashboardDir = requireInsideWorkspace(
+    'OPTIONS_UNIFIED_DASHBOARD_DIR',
+    resolveFromProject(deps.env('OPTIONS_UNIFIED_DASHBOARD_DIR', path.resolve(WORKSPACE_ROOT, 'dashboard_unificado'))),
   )
 
   return {
@@ -144,6 +146,8 @@ function buildGitSyncConfig(deps: {
   const branch = deps.env('MARKET_GIT_SYNC_BRANCH')
   const repoDir = deps.env('MARKET_GIT_SYNC_REPO_DIR')
   const targetDir = deps.env('MARKET_GIT_SYNC_TARGET_DIR', '') || ''
+  if (repoDir) requireInsideWorkspace('MARKET_GIT_SYNC_REPO_DIR', resolveFromWorkspace(repoDir))
+  if (targetDir) requireInsideWorkspace('MARKET_GIT_SYNC_TARGET_DIR', resolveFromWorkspace(targetDir))
 
   return {
     enabled,
@@ -179,6 +183,7 @@ function buildNewsConfig(deps: {
   const headlinesRetentionDays = clampMin(1, deps.envNumber('NEWS_HEADLINES_RETENTION_DAYS', 2))
   const headlinesStoreEnabled = deps.envBool('NEWS_HEADLINES_STORE_ENABLED', true)
   const headlinesStoreFile = deps.env('NEWS_HEADLINES_STORE_FILE', '') || ''
+  if (headlinesStoreFile) requireInsideWorkspace('NEWS_HEADLINES_STORE_FILE', resolveFromWorkspace(headlinesStoreFile))
 
   const webEnabled = deps.envBool('NEWS_WEB_ENABLED', true)
   const webWindowHours = clampMin(6, deps.envNumber('NEWS_WEB_WINDOW_HOURS', 24))

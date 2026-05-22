@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { exportPdfA4FromIndex } from './pdf-export/export-one.js'
 import { purgeOldPdfs } from './pdf-export/purge.js'
+import { requireInsideWorkspace } from '../update-service/paths.js'
 
 export { exportPdfA4FromIndex, purgeOldPdfs }
 
@@ -15,9 +16,14 @@ export async function exportDashboardsPdfBundle(params: {
   const log = params.log || (() => void 0)
   const warn = params.warn || (() => void 0)
 
-  const outDir = params.resolveFromProject(
-    params.env('EXPORT_PDF_OUT_DIR', path.resolve(params.projectRoot, 'dashboard', 'MERCADO', 'exports')),
-  )
+  const fallbackOutDir = params.resolveFromProject(path.resolve(params.projectRoot, 'dashboard', 'MERCADO', 'exports'))
+  const outDirCandidate = params.resolveFromProject(params.env('EXPORT_PDF_OUT_DIR', fallbackOutDir))
+  let outDir = fallbackOutDir
+  try {
+    outDir = requireInsideWorkspace('EXPORT_PDF_OUT_DIR', outDirCandidate)
+  } catch {
+    outDir = fallbackOutDir
+  }
 
   if (params.envBool('EXPORT_DASHBOARD_PDF', true)) {
     const indexPath = path.resolve(params.projectRoot, 'dashboard', 'MERCADO', 'index.html')
@@ -42,9 +48,15 @@ export async function exportDashboardsPdfBundle(params: {
   }
 
   if (params.envBool('EXPORT_WDO_WIN_DASHBOARDS_PDF_LITE', true)) {
-    const optionsDashboardDir = params.resolveFromProject(
+    const optionsFallback = params.resolveFromProject(
       params.env('OPTIONS_UNIFIED_DASHBOARD_DIR', path.resolve(params.projectRoot, '..', 'B3_System', 'dashboard_unificado')),
     )
+    let optionsDashboardDir = optionsFallback
+    try {
+      optionsDashboardDir = requireInsideWorkspace('OPTIONS_UNIFIED_DASHBOARD_DIR', optionsFallback)
+    } catch {
+      optionsDashboardDir = params.resolveFromProject(path.resolve(params.projectRoot, '..', 'dashboard_unificado'))
+    }
     const wdoIndex = path.resolve(optionsDashboardDir, 'WDO', 'index.html')
     const winIndex = path.resolve(optionsDashboardDir, 'WIN', 'index.html')
 

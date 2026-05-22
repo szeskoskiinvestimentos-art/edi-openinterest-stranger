@@ -76,6 +76,7 @@ function envNumber(name: string, fallback: number) {
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = path.resolve(SCRIPT_DIR, '..', '..')
+const WORKSPACE_ROOT = path.resolve(PROJECT_ROOT, '..')
 
 function resolveFromProject(p: string) {
   return path.isAbsolute(p) ? p : path.resolve(PROJECT_ROOT, p)
@@ -83,6 +84,31 @@ function resolveFromProject(p: string) {
 
 function resolveFromBase(baseDir: string, p: string) {
   return path.isAbsolute(p) ? p : path.resolve(baseDir, p)
+}
+
+function isOneDrivePath(p: string) {
+  const s = path.resolve(String(p || ''))
+  return /\\OneDrive(\\|$)/i.test(s) || /\/OneDrive(\/|$)/i.test(s)
+}
+
+function isPathInside(baseDir: string, targetPath: string) {
+  const base = path.resolve(baseDir)
+  const target = path.resolve(targetPath)
+  const normBase = process.platform === 'win32' ? base.toLowerCase() : base
+  const normTarget = process.platform === 'win32' ? target.toLowerCase() : target
+  const baseWithSep = normBase.endsWith(path.sep) ? normBase : normBase + path.sep
+  return normTarget === normBase || normTarget.startsWith(baseWithSep)
+}
+
+function requireInsideWorkspace(label: string, p: string) {
+  const abs = path.resolve(p)
+  if (isOneDrivePath(abs)) {
+    throw new Error(`${label}_blocked_onedrive:${abs}`)
+  }
+  if (!isPathInside(WORKSPACE_ROOT, abs)) {
+    throw new Error(`${label}_outside_workspace_root:${abs}`)
+  }
+  return abs
 }
 
 function defaultAutomationDir() {
@@ -4444,13 +4470,14 @@ function writeSummary(summary: UpdateSummary) {
 async function runOnce(modeRaw: string) {
   const mode = String(modeRaw || 'once').toLowerCase()
   const startedAt = new Date().toISOString()
-  const baseDir = resolveFromProject(env('MARKET_AUTOMATION_DIR', defaultAutomationDir()))
-  const userDataDir = resolveFromBase(baseDir, env('INVESTING_USER_DATA_DIR', path.join(baseDir, 'investing-profile')))
-  const downloadDir = resolveFromBase(baseDir, env('INVESTING_DOWNLOAD_DIR', path.join(baseDir, 'downloads')))
+  const baseDir = requireInsideWorkspace('MARKET_AUTOMATION_DIR', resolveFromProject(env('MARKET_AUTOMATION_DIR', defaultAutomationDir())))
+  const userDataDir = requireInsideWorkspace('INVESTING_USER_DATA_DIR', resolveFromBase(baseDir, env('INVESTING_USER_DATA_DIR', path.join(baseDir, 'investing-profile'))))
+  const downloadDir = requireInsideWorkspace('INVESTING_DOWNLOAD_DIR', resolveFromBase(baseDir, env('INVESTING_DOWNLOAD_DIR', path.join(baseDir, 'downloads'))))
   const debugDir = path.join(baseDir, 'logs')
 
-  const outDir = resolveFromProject(
-    env('MARKET_OUT_DIR', path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'assets', 'data')),
+  const outDir = requireInsideWorkspace(
+    'MARKET_OUT_DIR',
+    resolveFromProject(env('MARKET_OUT_DIR', path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'assets', 'data'))),
   )
   const intervalMinutes = envNumber('MARKET_INTERVAL_MINUTES', 15)
   const retentionDays = envNumber('MARKET_RETENTION_DAYS', 5)
@@ -4752,8 +4779,8 @@ async function main() {
 
   const mode = (args.mode as string) || 'once'
 
-  const baseDir = resolveFromProject(env('MARKET_AUTOMATION_DIR', defaultAutomationDir()))
-  const userDataDir = resolveFromBase(baseDir, env('INVESTING_USER_DATA_DIR', path.join(baseDir, 'investing-profile')))
+  const baseDir = requireInsideWorkspace('MARKET_AUTOMATION_DIR', resolveFromProject(env('MARKET_AUTOMATION_DIR', defaultAutomationDir())))
+  const userDataDir = requireInsideWorkspace('INVESTING_USER_DATA_DIR', resolveFromBase(baseDir, env('INVESTING_USER_DATA_DIR', path.join(baseDir, 'investing-profile'))))
   const url =
     env('INVESTING_PORTFOLIO_URL') ||
     'https://br.investing.com/portfolio/?portfolioID=ZWY2YGY0Mmo3YWFsZjc1NA%3D%3D'

@@ -12,9 +12,47 @@ import type { WebNewsModule } from './lib/petrobras-module.js'
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = path.resolve(SCRIPT_DIR, '..', '..')
+const WORKSPACE_ROOT = path.resolve(PROJECT_ROOT, '..')
 
 function resolveFromProject(p: string) {
   return path.isAbsolute(p) ? p : path.resolve(PROJECT_ROOT, p)
+}
+
+function resolveFromWorkspace(p: string) {
+  return path.isAbsolute(p) ? p : path.resolve(WORKSPACE_ROOT, p)
+}
+
+function isOneDrivePath(p: string) {
+  const s = path.resolve(String(p || ''))
+  return /\\OneDrive(\\|$)/i.test(s) || /\/OneDrive(\/|$)/i.test(s)
+}
+
+function isPathInside(baseDir: string, targetPath: string) {
+  const base = path.resolve(baseDir)
+  const target = path.resolve(targetPath)
+  const normBase = process.platform === 'win32' ? base.toLowerCase() : base
+  const normTarget = process.platform === 'win32' ? target.toLowerCase() : target
+  const baseWithSep = normBase.endsWith(path.sep) ? normBase : normBase + path.sep
+  return normTarget === normBase || normTarget.startsWith(baseWithSep)
+}
+
+function requireInsideWorkspace(label: string, p: string) {
+  const abs = path.resolve(p)
+  if (isOneDrivePath(abs)) {
+    throw new Error(`${label}_blocked_onedrive:${abs}`)
+  }
+  if (!isPathInside(WORKSPACE_ROOT, abs)) {
+    throw new Error(`${label}_outside_workspace_root:${abs}`)
+  }
+  return abs
+}
+
+function safeInsideWorkspace(label: string, p: string, fallbackAbs: string) {
+  try {
+    return requireInsideWorkspace(label, p)
+  } catch {
+    return fallbackAbs
+  }
 }
 
 function env(key: string, fallback = '') {
@@ -949,12 +987,15 @@ async function updateYahooUsdOptionsCaches() {
   const enabled = envBool('YAHOO_USD_OPTIONS_ENABLED', true)
   if (!enabled) return
 
-  const optionsDashboardDir = resolveFromProject(
-    env('OPTIONS_UNIFIED_DASHBOARD_DIR', path.resolve(PROJECT_ROOT, '..', 'B3_System', 'dashboard_unificado')),
+  const defaultOptionsDashboardDir = path.resolve(WORKSPACE_ROOT, 'dashboard_unificado')
+  const optionsDashboardDir = safeInsideWorkspace(
+    'OPTIONS_UNIFIED_DASHBOARD_DIR',
+    resolveFromWorkspace(env('OPTIONS_UNIFIED_DASHBOARD_DIR', defaultOptionsDashboardDir)),
+    defaultOptionsDashboardDir,
   )
   const outDir = path.join(optionsDashboardDir, 'WDO', 'assets', 'data')
   await mkdir(outDir, { recursive: true })
-  const altDashboardDir = resolveFromProject(path.resolve(PROJECT_ROOT, '..', 'dashboard_unificado'))
+  const altDashboardDir = path.resolve(WORKSPACE_ROOT, 'dashboard_unificado')
 
   const today = ymdUtc(new Date())
   const force = envBool('YAHOO_USD_OPTIONS_FORCE_REFRESH', false)
@@ -1040,8 +1081,11 @@ async function exportDashboardPdf() {
   const indexPath = path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'index.html')
   const exists = await fileExists(indexPath)
   if (!exists) return
-  const fallbackOutDir = resolveFromProject(path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'exports'))
-  let outDir = resolveFromProject(env('EXPORT_PDF_OUT_DIR', fallbackOutDir))
+  const fallbackOutDir = requireInsideWorkspace(
+    'EXPORT_PDF_OUT_DIR',
+    resolveFromProject(path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'exports')),
+  )
+  let outDir = safeInsideWorkspace('EXPORT_PDF_OUT_DIR', resolveFromProject(env('EXPORT_PDF_OUT_DIR', fallbackOutDir)), fallbackOutDir)
   try {
     await mkdir(outDir, { recursive: true })
   } catch {
@@ -1114,8 +1158,11 @@ async function exportDashboardPdfLite() {
   const indexPath = path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'index.html')
   const exists = await fileExists(indexPath)
   if (!exists) return
-  const fallbackOutDir = resolveFromProject(path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'exports'))
-  let outDir = resolveFromProject(env('EXPORT_PDF_OUT_DIR', fallbackOutDir))
+  const fallbackOutDir = requireInsideWorkspace(
+    'EXPORT_PDF_OUT_DIR',
+    resolveFromProject(path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'exports')),
+  )
+  let outDir = safeInsideWorkspace('EXPORT_PDF_OUT_DIR', resolveFromProject(env('EXPORT_PDF_OUT_DIR', fallbackOutDir)), fallbackOutDir)
   try {
     await mkdir(outDir, { recursive: true })
   } catch {
@@ -1340,10 +1387,21 @@ async function exportWdoWinDashboardsPdfLite() {
   const enabled = envBool('EXPORT_WDO_WIN_DASHBOARDS_PDF_LITE', true)
   if (!enabled) return
 
-  const outDir = resolveFromProject(env('EXPORT_PDF_OUT_DIR', path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'exports')))
+  const fallbackOutDir = requireInsideWorkspace(
+    'EXPORT_PDF_OUT_DIR',
+    resolveFromProject(path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'exports')),
+  )
+  const outDir = safeInsideWorkspace(
+    'EXPORT_PDF_OUT_DIR',
+    resolveFromProject(env('EXPORT_PDF_OUT_DIR', fallbackOutDir)),
+    fallbackOutDir,
+  )
 
-  const optionsDashboardDir = resolveFromProject(
-    env('OPTIONS_UNIFIED_DASHBOARD_DIR', path.resolve(PROJECT_ROOT, '..', 'B3_System', 'dashboard_unificado')),
+  const defaultOptionsDashboardDir = path.resolve(WORKSPACE_ROOT, 'dashboard_unificado')
+  const optionsDashboardDir = safeInsideWorkspace(
+    'OPTIONS_UNIFIED_DASHBOARD_DIR',
+    resolveFromWorkspace(env('OPTIONS_UNIFIED_DASHBOARD_DIR', defaultOptionsDashboardDir)),
+    defaultOptionsDashboardDir,
   )
 
   const wdoIndex = path.resolve(optionsDashboardDir, 'WDO', 'index.html')
@@ -1419,9 +1477,18 @@ async function buildOptionsGammaSummary() {
     }
   }
 
-  const optionsDashboardDir = resolveFromProject(
-    env('OPTIONS_UNIFIED_DASHBOARD_DIR', path.resolve(PROJECT_ROOT, '..', 'B3_System', 'dashboard_unificado')),
+  const defaultOptionsDashboardDir = path.resolve(WORKSPACE_ROOT, 'dashboard_unificado')
+  const optionsDashboardDir = safeInsideWorkspace(
+    'OPTIONS_UNIFIED_DASHBOARD_DIR',
+    resolveFromWorkspace(env('OPTIONS_UNIFIED_DASHBOARD_DIR', defaultOptionsDashboardDir)),
+    defaultOptionsDashboardDir,
   )
+  const mercadoDir = path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO')
+  const unifiedRel = path.relative(mercadoDir, optionsDashboardDir).split(path.sep).join('/')
+
+  function relLink(parts: string[]) {
+    return [unifiedRel, ...parts].join('/').replace(/\/+/g, '/')
+  }
 
   async function loadOne(symbol: 'WDO' | 'WIN') {
     const jsonPath = path.join(optionsDashboardDir, symbol, 'assets', 'data', 'market_data.json')
@@ -1444,9 +1511,6 @@ async function buildOptionsGammaSummary() {
               ? key.gamma_flip_hvl_gaussian
               : null
 
-    const fileUrl = pathToFileURL(path.join(optionsDashboardDir, symbol, 'index.html')).toString()
-    const dataUrl = pathToFileURL(jsonPath).toString()
-
     return {
       symbol,
       updatedAt: (raw && raw.overview && raw.overview.last_update) || raw.last_updated || null,
@@ -1463,7 +1527,10 @@ async function buildOptionsGammaSummary() {
         rangeLow: key && typeof key.range_low === 'number' ? key.range_low : null,
         rangeHigh: key && typeof key.range_high === 'number' ? key.range_high : null,
       },
-      links: { dashboard: fileUrl, data: dataUrl },
+      links: {
+        dashboard: relLink([symbol, 'index.html']),
+        data: relLink([symbol, 'assets', 'data', 'market_data.json']),
+      },
     }
   }
 
@@ -1484,7 +1551,7 @@ async function buildOptionsGammaSummary() {
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
-    source: { kind: 'dashboard_unificado', dir: optionsDashboardDir },
+    source: { kind: 'dashboard_unificado', dir: path.relative(WORKSPACE_ROOT, optionsDashboardDir) || '.' },
     items,
   }
 }

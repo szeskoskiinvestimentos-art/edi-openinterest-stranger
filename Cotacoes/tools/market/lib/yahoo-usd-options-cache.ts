@@ -5,6 +5,7 @@ import type { YahooCrumbSession } from './yahoo-usd-options/crumb.js'
 import { getYahooCrumbSession, isLikelyInvalidCrumbError } from './yahoo-usd-options/crumb.js'
 import { computeUsdBrlBeta, fetchYahooOptionsAllExpiries } from './yahoo-usd-options/fetch.js'
 import { ymdUtc } from './yahoo-usd-options/utils.js'
+import { requireInsideWorkspace } from '../update-service/paths.js'
 
 export async function updateYahooUsdOptionsCaches(params: {
   projectRoot: string
@@ -22,9 +23,16 @@ export async function updateYahooUsdOptionsCaches(params: {
   const enabled = params.envBool('YAHOO_USD_OPTIONS_ENABLED', true)
   if (!enabled) return
 
-  const optionsDashboardDir = params.resolveFromProject(
+  const optionsFallback = params.resolveFromProject(path.resolve(params.projectRoot, '..', 'dashboard_unificado'))
+  const optionsCandidate = params.resolveFromProject(
     params.env('OPTIONS_UNIFIED_DASHBOARD_DIR', path.resolve(params.projectRoot, '..', 'B3_System', 'dashboard_unificado')),
   )
+  let optionsDashboardDir = optionsFallback
+  try {
+    optionsDashboardDir = requireInsideWorkspace('OPTIONS_UNIFIED_DASHBOARD_DIR', optionsCandidate)
+  } catch {
+    optionsDashboardDir = optionsFallback
+  }
   const outDir = path.join(optionsDashboardDir, 'WDO', 'assets', 'data')
   await mkdir(outDir, { recursive: true })
 
