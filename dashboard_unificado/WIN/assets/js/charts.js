@@ -84,44 +84,52 @@ class StrangerThingsCharts {
     async init() {
         try {
             const data = await this.loadMarketData();
-            this.createDeltaChart(data);
-            this.createGammaChart(data);
-            // this.createVolumeChart(data); // Removido por redundância (Volume Chart era na verdade OI)
-            this.createVolatilityChart(data);
-            
-            // Novos Gráficos
-            this.createOIStrikeChart(data);
-            this.createGexSplitChart(data);
-            this.createVannaChart(data);
-            this.createCharmChart(data);
-            this.createThetaChart(data);
-            this.createVegaChart(data);
-            this.createPinRiskChart(data);
-            
-            // Gregas Acumuladas & R-Gamma
-            this.createCharmCumChart(data);
-            this.createVannaCumChart(data);
-            this.createThetaCumChart(data); // Added
-            this.createRGammaChart(data);
-            this.createRGammaCumChart(data);
+            const safe = (name, fn) => {
+                try {
+                    fn();
+                } catch (err) {
+                    console.error(`Falha ao renderizar: ${name}`, err);
+                }
+            };
+            const hasChartJs = typeof Chart !== 'undefined';
+            if (!hasChartJs) {
+                console.error('Chart.js indisponível (CDN offline/bloqueado). Seções de gráficos foram desativadas.');
+            }
 
-            // V3 Charts
-            this.createMaxPainChart(data);
-            this.createExpectedMoveChart(data);
-            this.createGammaFlipConeChart(data);
-            this.createDeltaFlipProfileChart(data);
-            this.createFlowSentimentChart(data);
-            this.createMMPnLChart(data);
-            this.createDealerPressureChart(data); // Added
-            this.createDeltaAgregadoChart(data); // Added
+            if (hasChartJs) {
+                safe('Delta', () => this.createDeltaChart(data));
+                safe('Gamma', () => this.createGammaChart(data));
+                // this.createVolumeChart(data); // Removido por redundância (Volume Chart era na verdade OI)
+                safe('Volatilidade', () => this.createVolatilityChart(data));
+                safe('OI/Strike', () => this.createOIStrikeChart(data));
+                safe('GEX Split', () => this.createGexSplitChart(data));
+                safe('Vanna', () => this.createVannaChart(data));
+                safe('Charm', () => this.createCharmChart(data));
+                safe('Theta', () => this.createThetaChart(data));
+                safe('Vega', () => this.createVegaChart(data));
+                safe('Pin Risk', () => this.createPinRiskChart(data));
+                safe('Charm (Acum)', () => this.createCharmCumChart(data));
+                safe('Vanna (Acum)', () => this.createVannaCumChart(data));
+                safe('Theta (Acum)', () => this.createThetaCumChart(data));
+                safe('R-Gamma', () => this.createRGammaChart(data));
+                safe('R-Gamma (Acum)', () => this.createRGammaCumChart(data));
+                safe('Max Pain', () => this.createMaxPainChart(data));
+                safe('Expected Move', () => this.createExpectedMoveChart(data));
+                safe('Gamma Flip Cone', () => this.createGammaFlipConeChart(data));
+                safe('Delta Flip Profile', () => this.createDeltaFlipProfileChart(data));
+                safe('Flow Sentiment', () => this.createFlowSentimentChart(data));
+                safe('MM PnL', () => this.createMMPnLChart(data));
+                safe('Dealer Pressure', () => this.createDealerPressureChart(data));
+                safe('Delta Agregado', () => this.createDeltaAgregadoChart(data));
+            }
 
-            this.updateMetrics(data);
-            this.updateKeyLevels(data);
-            this.updateNtslCode(data);
-            this.populateTable(data);
-            this.createFairValueTable(data); // Added
-            this.updateLastUpdate(data);
-            this.updateYahooOptionsPanel();
+            safe('Métricas', () => this.updateMetrics(data));
+            safe('Níveis-chave', () => this.updateKeyLevels(data));
+            safe('NTSL', () => this.updateNtslCode(data));
+            safe('Tabela', () => this.populateTable(data));
+            safe('Fair Value', () => this.createFairValueTable(data));
+            safe('Último update', () => this.updateLastUpdate(data));
+            safe('Painel Yahoo', () => this.updateYahooOptionsPanel());
         } catch (error) {
             console.error('Error initializing charts:', error);
         }
@@ -1452,12 +1460,17 @@ class StrangerThingsCharts {
     }
 
     createFairValueTable(data) {
-        const container = document.getElementById('fair-value-container');
-        if (!container || !data.v3_data || !data.v3_data.fair_value_sims) return;
+        const containers = [
+            document.getElementById('fair-value-container'),
+            document.getElementById('fair-value-container-v3'),
+        ].filter(Boolean);
+        if (containers.length === 0 || !data.v3_data || !data.v3_data.fair_value_sims) return;
 
         const sims = data.v3_data.fair_value_sims;
         if (sims.length === 0) {
-            container.innerHTML = '<p>Nenhuma simulação disponível.</p>';
+            containers.forEach((c) => {
+                c.innerHTML = '<p>Nenhuma simulação disponível.</p>';
+            });
             return;
         }
 
@@ -1485,7 +1498,9 @@ class StrangerThingsCharts {
         });
 
         html += '</tbody></table>';
-        container.innerHTML = html;
+        containers.forEach((c) => {
+            c.innerHTML = html;
+        });
     }
 
     populateTable(data) {

@@ -137,7 +137,7 @@ class EDIApp {
                     break;
                 case '4':
                     e.preventDefault();
-                    this.navigateToSection('volume');
+                    this.navigateToSection('structure');
                     break;
                 case '5':
                     e.preventDefault();
@@ -164,7 +164,7 @@ class EDIApp {
 1 - Visão Geral
 2 - Delta
 3 - Gamma  
-4 - Volume
+4 - Estrutura
 5 - Volatilidade
 H - Ajuda
 R - Atualizar Dados
