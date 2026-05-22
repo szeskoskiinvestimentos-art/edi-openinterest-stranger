@@ -750,4 +750,11 @@
         window.USOperationalEua = { render };
     } catch {
     }
+    try {
+        const w = window;
+        const root = (w.MercadoBlocks && typeof w.MercadoBlocks === 'object') ? w.MercadoBlocks : {};
+        root.usOperationalEua = { render };
+        w.MercadoBlocks = root;
+    } catch {
+    }
 })();

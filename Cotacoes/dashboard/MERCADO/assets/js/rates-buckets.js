@@ -514,5 +514,15 @@
         `;
     };
 
-    window.RatesBucketsModule = { render };
+    try {
+        window.RatesBucketsModule = { render };
+    } catch {
+    }
+    try {
+        const w = window;
+        const root = (w.MercadoBlocks && typeof w.MercadoBlocks === 'object') ? w.MercadoBlocks : {};
+        root.ratesBuckets = { render };
+        w.MercadoBlocks = root;
+    } catch {
+    }
 })();

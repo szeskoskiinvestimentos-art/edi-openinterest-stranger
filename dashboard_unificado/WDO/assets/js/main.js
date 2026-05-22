@@ -129,7 +129,7 @@ class EDIApp {
                     break;
                 case '2':
                     e.preventDefault();
-                    this.navigateToSection('advanced');
+                    this.navigateToSection('delta');
                     break;
                 case '3':
                     e.preventDefault();
@@ -137,11 +137,11 @@ class EDIApp {
                     break;
                 case '4':
                     e.preventDefault();
-                    this.navigateToSection('structure');
+                    this.navigateToSection('volume');
                     break;
                 case '5':
                     e.preventDefault();
-                    this.navigateToSection('delta');
+                    this.navigateToSection('volatility');
                     break;
                 case 'h':
                 case 'H':
@@ -162,10 +162,10 @@ class EDIApp {
 🎮 EDI Market Guardin V1 - Atalhos de Teclado
 
 1 - Visão Geral
-2 - Níveis
-3 - Gamma
-4 - Estrutura
-5 - Delta
+2 - Delta
+3 - Gamma  
+4 - Volume
+5 - Volatilidade
 H - Ajuda
 R - Atualizar Dados
 
@@ -383,16 +383,14 @@ Pressione ESC ou clique fora para fechar.`;
     }
 }
 
-const __ediBootApp = () => {
+// Initialize app when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
     window.ediApp = new EDIApp();
+    
+    // Add welcome message
     setTimeout(() => {
         if (window.ediApp) {
             window.ediApp.showNotification('Bem-vindo ao EDI Market Guardin V1! Pressione H para ajuda. 🚀');
         }
     }, 2000);
-};
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', __ediBootApp);
-} else {
-    __ediBootApp();
-}
+});

@@ -14,7 +14,7 @@
       --warn: #ffcc66;
       --bad: #ff5c77;
       --info: #67b7ff;
-      --risk: #b685ff;
+      --risk: #ff9a3d;
       --border: rgba(255,255,255,0.09);
     }
     body {
@@ -132,6 +132,15 @@
     const dash = (opt.dashboard_unificado || {});
     const dashWdo = fmt(dash.wdo_last_updated);
     const dashWin = fmt(dash.win_last_updated);
+    const pub = (st.last_publish_unified || {});
+    const pubOk = pub && pub.ok === true;
+    const pubErr = pub && pub.error ? fmt(pub.error) : null;
+    const pubSwapped = !!(pub && pub.swapped);
+    const pubFallback = !!(pub && pub.fallback_in_place);
+    const pubKind = pubErr ? 'bad' : (pubOk ? (pubSwapped ? 'ok' : (pubFallback ? 'warn' : 'ok')) : 'warn');
+    const pubBadge = pubErr
+      ? badge('bad', `Publish dashboard_unificado: FAIL`)
+      : badge(pubKind, `Publish dashboard_unificado: OK${pubFallback ? ' (fallback_copy)' : ''}${pubSwapped ? ' (swap)' : ''}`);
 
     const cot = data.cotacoes || {};
     const ms = (cot.market_status || {});
@@ -268,6 +277,88 @@
       fmt(x.reason),
     ]);
 
+    const fmtPct = (n) => (typeof n === 'number' && Number.isFinite(n) ? `${n.toFixed(2)}%` : '-');
+    const fmtPp = (n) => (typeof n === 'number' && Number.isFinite(n) ? `${n.toFixed(2)}pp` : '-');
+    const fmtNum = (n) =>
+      typeof n === 'number' && Number.isFinite(n) ? n.toFixed(6).replace(/0+$/, '').replace(/\.$/, '') : '-';
+    const parseIso = (s) => {
+      const t = Date.parse(String(s || ''));
+      return Number.isFinite(t) ? t : null;
+    };
+    const pickPointNear = (points, targetIso, windowMs) => {
+      const targetMs = parseIso(targetIso);
+      if (!Array.isArray(points) || points.length === 0) return null;
+      if (targetMs === null) return points[points.length - 1];
+      const win = typeof windowMs === 'number' && windowMs > 0 ? windowMs : 15 * 60 * 1000;
+      let best = null;
+      let bestAbs = Infinity;
+      for (let i = points.length - 1; i >= 0; i--) {
+        const p = points[i];
+        const t = parseIso(p && p.t ? p.t : null);
+        if (t === null) continue;
+        const d = Math.abs(t - targetMs);
+        if (d > win) continue;
+        if (d < bestAbs) {
+          bestAbs = d;
+          best = p;
+        }
+        if (d === 0) break;
+        if (t < targetMs - win) break;
+      }
+      return best || points[points.length - 1];
+    };
+    const scoreKind = (absDiffPct) => {
+      const v = typeof absDiffPct === 'number' && Number.isFinite(absDiffPct) ? absDiffPct : null;
+      if (v === null) return 'bad';
+      if (v <= 0.2) return 'ok';
+      if (v <= 0.7) return 'warn';
+      if (v <= 1.5) return 'risk';
+      return 'bad';
+    };
+    const loadScript = (src) => new Promise((resolve) => {
+      const s = document.createElement('script');
+      s.async = true;
+      s.src = src;
+      s.onload = () => resolve(true);
+      s.onerror = () => resolve(false);
+      document.head.appendChild(s);
+    });
+    const ensureMarketQuotes = async () => {
+      if (window.MARKET_QUOTES_DATA) return window.MARKET_QUOTES_DATA;
+      if (location.protocol !== 'file:') return null;
+      const ok = await loadScript(`Cotacoes/dashboard/MERCADO/assets/data/market_quotes.js?v=${Date.now()}`);
+      return ok && window.MARKET_QUOTES_DATA ? window.MARKET_QUOTES_DATA : null;
+    };
+    const cmpCritical = Array.isArray(audit.compareCritical) ? audit.compareCritical : [];
+    const cmpTop = Array.isArray(audit.compareTop) ? audit.compareTop : [];
+    const invSource = fmt(mqMeta.source || '-');
+    const invSourceNorm = String(mqMeta.source || '').toLowerCase();
+    const invSession = invSourceNorm.includes('prem') || invSourceNorm.includes('pré')
+      ? 'Pré-mercado'
+      : (invSourceNorm.includes('after') || invSourceNorm.includes('pos') || invSourceNorm.includes('pós') ? 'After-hours' : '-');
+    const invSessionBadge = badge('info', `Investing source=${invSource} | sessão=${invSession}`);
+    const auditAtBadge = badge('info', `Yahoo audit at=${fmt(audit.generatedAt || '-')}`);
+    const cmpBadgeFor = (x) => {
+      const sev = String((x && x.severity) || '');
+      const kind = sev === 'ok' ? 'ok' : (sev === 'warn' ? 'warn' : (sev === 'risk' ? 'risk' : 'bad'));
+      const diff = x && typeof x.priceDiffPct === 'number' ? Math.abs(x.priceDiffPct) : null;
+      const msg = diff === null ? 'sem diff' : `|diff|=${diff.toFixed(2)}%`;
+      return badge(kind, msg);
+    };
+    const cmpRow = (x) => [
+      fmt(x.assetSymbol),
+      fmt(x.yahooSymbol),
+      fmt(x.status),
+      (typeof x.investingPrice === 'number' ? fmtNum(x.investingPrice) : fmt(x.investingPrice)),
+      (typeof x.yahooPrice === 'number' ? fmtNum(x.yahooPrice) : fmt(x.yahooPrice)),
+      fmtPct(x.priceDiffPct),
+      fmtPct(x.investingChangePct),
+      fmt(x.asOf),
+      (x && x.severity ? String(x.severity) : '-'),
+    ];
+    const cmpCriticalRows = cmpCritical.slice(0, 18).map(cmpRow);
+    const cmpTopRows = cmpTop.slice(0, 18).map(cmpRow);
+
     const zq = data.zq_curve || {};
     const zqExists = !!zq.exists;
     const zqItems = Array.isArray(zq.items) ? zq.items : [];
@@ -364,6 +455,8 @@
       `, 'half'),
 
       card('Dashboard Unificado (saídas)', `
+        <div>${pubBadge}</div>
+        ${pubErr ? `<div class="small muted" style="margin-top:10px">Erro: <span class="mono">${escapeHtml(pubErr)}</span></div>` : ``}
         ${hrow('WDO market_data.json', dashWdo)}
         ${hrow('WIN market_data.json', dashWin)}
         <div class="small muted" style="margin-top:10px">Caminhos:</div>
@@ -395,6 +488,26 @@
         ${ycCatRows.length ? table(['Categoria', 'Assets', 'Tentados', 'Atualizados', 'Ausentes'], ycCatRows) : `<div class="small muted" style="margin-top:10px">Sem dados de categoria (meta.yahooCoverage.byCategory vazio).</div>`}
         ${yMissingSymbols.length ? `<div class="small muted" style="margin-top:10px">Ausentes (top): <span class="mono">${escapeHtml(yMissingSymbols.slice(0, 40).join(', '))}</span></div>` : `<div class="small muted" style="margin-top:10px">Sem ausências relevantes.</div>`}
         ${yOverridesItems.length ? `<div class="small muted" style="margin-top:10px">Overrides (top): <span class="mono">${escapeHtml(yOverridesItems.slice(0, 25).join(' ; '))}</span></div>` : ``}
+      `),
+
+      card('Aderência • Investing x Yahoo (revisão humana)', `
+        <div class="small muted">Objetivo: identificar rapidamente se o Yahoo está “apontando” para o mesmo ativo do Investing, usando diferença relativa de preço (Yahoo vs último ponto do market_quotes).</div>
+        <div style="margin-top:10px">
+          ${badge('ok', '|diff| ≤ 0,20%')} ${badge('warn', '≤ 0,70%')} ${badge('risk', '≤ 1,50%')} ${badge('bad', '> 1,50% / não-updated')}
+        </div>
+        <div style="margin-top:10px">${invSessionBadge} ${auditAtBadge}</div>
+        <div style="margin-top:10px" class="small muted">Críticos (top):</div>
+        ${cmpCriticalRows.length ? table(['Asset', 'Yahoo', 'Status', 'Preço (Inv)', 'Preço (Y)', 'Diff %', 'Var % (Inv)', 'asOf', 'sev'], cmpCriticalRows) : `<div class="small muted" style="margin-top:10px">Sem dados de comparação.</div>`}
+        <div style="margin-top:14px" class="small muted">Maior divergência (top):</div>
+        ${cmpTopRows.length ? table(['Asset', 'Yahoo', 'Status', 'Preço (Inv)', 'Preço (Y)', 'Diff %', 'Var % (Inv)', 'asOf', 'sev'], cmpTopRows) : `<div class="small muted" style="margin-top:10px">Sem divergências registradas.</div>`}
+        <div style="margin-top:16px" class="small muted">Comparativo extra (Último + Var% Pré/After) para revisão humana:</div>
+        <div style="margin-top:10px">
+          ${badge('warn', 'amarelo')} ${badge('risk', 'laranja')} ${badge('bad', 'vermelho')}
+          <span class="small muted"> (score usa pior entre |ΔÚltimo%| e |ΔVar(pp)|; Inv usa Pré/After quando existir)</span>
+        </div>
+        <div id="cmp2_status" class="small muted" style="margin-top:10px">Carregando market_quotes.js local…</div>
+        <div id="cmp2_critical" style="margin-top:10px"></div>
+        <div id="cmp2_top" style="margin-top:14px"></div>
       `),
 
       card('Curva de Juros EUA (Fed Funds • ZQ)', `
@@ -444,6 +557,104 @@
         ${table(['Data/hora', 'Arquivo', 'Caminho'], cotLogs)}
       `),
     ].join('');
+
+    const setHtml = (id, html) => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = html;
+    };
+
+    void (async () => {
+      const quotes = await ensureMarketQuotes();
+      if (!quotes) {
+        setHtml('cmp2_status', 'Indisponível aqui. Abra este arquivo como local (file://) dentro do repositório para carregar Cotacoes/dashboard/MERCADO/assets/data/market_quotes.js.');
+        return;
+      }
+
+      const meta2 = quotes && quotes.meta ? quotes.meta : {};
+      const invAt2 = meta2.portfolioUpdatedAt || meta2.generatedAt || null;
+      const yAt2 = meta2.yahooUpdatedAt || meta2.generatedAt || null;
+      const invAtFmt2 = invAt2 ? fmtLocalIso(invAt2) : '-';
+      const yAtFmt2 = yAt2 ? fmtLocalIso(yAt2) : '-';
+      setHtml('cmp2_status', `Usando market_quotes.js • portfolioAt=${escapeHtml(invAtFmt2)} • yahooAt=${escapeHtml(yAtFmt2)}`);
+
+      const series2 = quotes && quotes.series && typeof quotes.series === 'object' ? quotes.series : {};
+      const buildRow = (x) => {
+        const assetSymbol = fmt(x && x.assetSymbol);
+        const yahooSymbol = fmt(x && x.yahooSymbol);
+        const points = series2[assetSymbol] || null;
+        const invP = pickPointNear(points, invAt2, 40 * 60 * 1000);
+        const yP = pickPointNear(points, yAt2, 40 * 60 * 1000);
+
+        const invPrice = invP && typeof invP.price === 'number' ? invP.price : null;
+        const invVar = invP && typeof invP.changePct === 'number' ? invP.changePct : null;
+        const invExtPrice = invP && typeof invP.extendedPrice === 'number' ? invP.extendedPrice : null;
+        const invExtVar = invP && typeof invP.extendedChangePct === 'number' ? invP.extendedChangePct : null;
+
+        const invEffPrice = invExtPrice !== null ? invExtPrice : invPrice;
+        const invEffVar = invExtVar !== null ? invExtVar : invVar;
+        const invSess = invExtVar !== null || invExtPrice !== null ? 'Pré/After' : 'Regular';
+
+        const yPrice = yP && typeof yP.price === 'number' ? yP.price : null;
+        const yVar = yP && typeof yP.changePct === 'number' ? yP.changePct : null;
+
+        const diffPricePct = invEffPrice !== null && yPrice !== null && invEffPrice !== 0 ? ((yPrice - invEffPrice) / invEffPrice) * 100 : null;
+        const diffVarPp = invEffVar !== null && yVar !== null ? (yVar - invEffVar) : null;
+        const missing = !points || !invP || !yP || invEffPrice === null || yPrice === null || (diffPricePct === null && diffVarPp === null);
+        const score = missing
+          ? null
+          : Math.max(
+              Math.abs(diffPricePct || 0),
+              Math.abs(diffVarPp || 0),
+            );
+        const kind = missing ? 'bad' : scoreKind(score);
+
+        return {
+          kind,
+          row: [
+            assetSymbol,
+            yahooSymbol,
+            invSess,
+            invEffPrice === null ? '-' : fmtNum(invEffPrice),
+            yPrice === null ? '-' : fmtNum(yPrice),
+            diffPricePct === null ? '-' : fmtPct(diffPricePct),
+            invEffVar === null ? '-' : fmtPct(invEffVar),
+            yVar === null ? '-' : fmtPct(yVar),
+            diffVarPp === null ? '-' : fmtPp(diffVarPp),
+          ],
+        };
+      };
+
+      const withScore = (list) => list.map(buildRow).sort((a, b) => {
+        const ka = a.kind;
+        const kb = b.kind;
+        const ord = { bad: 3, risk: 2, warn: 1, ok: 0 };
+        const da = ord[ka] ?? 0;
+        const db = ord[kb] ?? 0;
+        if (db !== da) return db - da;
+        return String(a.row[0]).localeCompare(String(b.row[0]));
+      });
+
+      const decorate = (rows) => rows.map(({ kind, row }) => {
+        const tag = kind === 'ok' ? '' : (kind === 'warn' ? 'AMARELO' : (kind === 'risk' ? 'LARANJA' : 'VERMELHO'));
+        return [
+          tag ? `${row[0]} (${tag})` : row[0],
+          ...row.slice(1),
+        ];
+      });
+
+      const crit2 = withScore(cmpCritical.slice(0, 30));
+      const top2 = withScore(cmpTop.slice(0, 30));
+      const headers2 = ['Asset', 'Yahoo', 'Sessão (Inv)', 'Último (Inv*)', 'Último (Y)', 'ΔÚltimo%', 'Var% (Inv*)', 'Var% (Y)', 'ΔVar (pp)'];
+
+      setHtml(
+        'cmp2_critical',
+        `<div class="small muted">Críticos (recalculado via market_quotes.js):</div>${crit2.length ? table(headers2, decorate(crit2)) : `<div class="small muted" style="margin-top:10px">Sem dados.</div>`}`,
+      );
+      setHtml(
+        'cmp2_top',
+        `<div class="small muted">Maior divergência (recalculado via market_quotes.js):</div>${top2.length ? table(headers2, decorate(top2)) : `<div class="small muted" style="margin-top:10px">Sem dados.</div>`}`,
+      );
+    })();
   </script>
 </body>
 </html>

@@ -3,16 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>EDI Market Guardian V1 - Dashboard Stranger Things</title>
+    <title>EDI Market Guardin V1 - Dashboard Stranger Things</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-    <script defer src="https://cdn.jsdelivr.net/npm/chart.js" onerror="this.onerror=function(){this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'};this.src='https://unpkg.com/chart.js/dist/chart.umd.min.js'"></script>
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
     <div id="particles-js"></div>
@@ -21,7 +18,7 @@
     <header class="header">
         <div class="container">
             <div class="logo">
-                <h1 class="logo-text">EDI MARKET GUARDIAN</h1>
+                <h1 class="logo-text">EDI MARKET GUARDIN</h1>
                 <div class="logo-subtitle">
                     V1 - ANALYTICS LAB
                     <span id="last-update-label"></span>
@@ -37,17 +34,12 @@
             <div class="nav-center" style="flex:1;display:flex;justify-content:center;">
             <ul class="nav-list" style="margin:0">
                 <li><a href="#overview" class="nav-link active">Visão Geral</a></li>
-                <li><a href="#advanced" class="nav-link">Níveis</a></li>
-                <li><a href="#gamma" class="nav-link">Gamma</a></li>
+                <li><a href="#delta" class="nav-link">Essenciais</a></li>
                 <li><a href="#structure" class="nav-link">Estrutura</a></li>
-                <li><a href="#delta" class="nav-link">Delta</a></li>
-                <li><a href="#volatility" class="nav-link">Volatilidade</a></li>
+                <li><a href="#greeks2" class="nav-link">Gregas</a></li>
                 <li><a href="#structure-v3" class="nav-link">V3 Analysis</a></li>
                 <li><a href="#risk" class="nav-link">Risco</a></li>
-                <li><a href="#greeks-cum" class="nav-link">Gregas (Cum)</a></li>
-                <li><a href="#greeks2" class="nav-link">Gregas (2ª)</a></li>
                 <li><a href="#consolidated" class="nav-link">Consolidado</a></li>
-                <li><a href="v3.html" target="_blank" class="nav-link" style="color: #ff00ff; border-bottom: 2px solid #ff00ff;">Dashboard V3 ↗</a></li>
                 <li><a href="#youtube" class="nav-link">YouTube</a></li>
             </ul>
             </div>
@@ -55,7 +47,8 @@
                 <select id="assetSelect" aria-label="Selecionar ativo" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;">
                     <option value="WDO">WDO</option>
                     <option value="WIN" selected>WIN</option>
-                    <option value="MERCADO">EDI Market Guardian</option>
+                    <option value="MERCADO">Cotações</option>
+                    <option value="CORR">Correlações</option>
                 </select>
             </div>
         </div>
@@ -71,12 +64,12 @@
                     <h2 class="section-title">VISÃO GERAL DO MERCADO</h2>
                     <div class="section-glow"></div>
                 </div>
-
+                
                 <div class="metrics-grid">
                     <div class="metric-card">
                         <div class="metric-icon">📊</div>
                         <div class="metric-value" id="total-trades">0</div>
-                        <div class="metric-label">Volume Total</div>
+                        <div class="metric-label">Total de Negócios</div>
                         <div class="metric-change positive">+12.5%</div>
                     </div>
                     <div class="metric-card">
@@ -96,6 +89,85 @@
                         <div class="metric-value" id="delta-position">0</div>
                         <div class="metric-label">Delta Position</div>
                         <div class="metric-change neutral">0.0%</div>
+                    </div>
+                </div>
+
+                <!-- Resumo Executivo (Fair Value) -->
+                <div class="split-layout" style="margin-top: 40px;">
+                    <div class="context-box">
+                        <h3>🎯 Resumo Executivo: Simulação de Valor Justo</h3>
+                        <p>Projeção de preço das opções principais em cenários de teste de estresse (Call Wall, Put Wall, Gamma Flip).</p>
+                    </div>
+                    <div id="fair-value-container" class="table-container">
+                        <p>Carregando simulações...</p>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 24px;">
+                    <div class="context-box">
+                        <h3>🧾 Opções (Yahoo)</h3>
+                        <p>Snapshot local para revisão humana (EWZ). Status considera “stale” quando a captura é antiga.</p>
+                    </div>
+                    <div id="yahoo-options-container" class="table-container">
+                        <p>Carregando...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Delta Section -->
+            <section id="delta" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">DELTA ACUMULADO</h2>
+                    <div class="section-glow"></div>
+                </div>
+                
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>📚 O que é Delta Acumulado?</h3>
+                        <p>O Delta Acumulado representa a soma de todas as posições delta das opções em um determinado preço. Ele nos mostra onde os dealers estão expostos e onde podem haver níveis de suporte ou resistência no mercado.</p>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="deltaChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Gamma Section -->
+            <section id="gamma" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">GAMMA EXPOSURE</h2>
+                    <div class="section-glow"></div>
+                </div>
+                
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>📚 O que é Gamma Exposure?</h3>
+                        <p>O Gamma Exposure indica como o delta muda conforme o preço do ativo se move. Valores positivos sugerem que os dealers precisarão comprar o ativo subjacente se o preço subir, criando um efeito de momentum.</p>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="gammaChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- Volatility Section -->
+            <section id="volatility" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">VOLATILIDADE IMPLÍCITA & SKEW</h2>
+                    <div class="section-glow"></div>
+                </div>
+                
+                <div class="split-layout">
+                    <div class="context-box">
+                        <h3>📚 O que é Volatilidade e Skew?</h3>
+                        <p>A Volatilidade Implícita indica a expectativa de variação futura. O "Skew" (curva de sorriso) mostra como o mercado precifica o risco em diferentes strikes. Um "sorriso" acentuado indica medo de movimentos extremos.</p>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="volatilityChart"></canvas>
                     </div>
                 </div>
             </section>
@@ -141,30 +213,22 @@
                 </div>
             </section>
 
-            <!-- Gamma Section -->
-            <section id="gamma" class="section">
-                <div class="section-header">
-                    <h2 class="section-title">GAMMA EXPOSURE</h2>
-                    <div class="section-glow"></div>
-                </div>
-                
-                <div class="split-layout">
-                    <div class="context-box">
-                        <h3>📚 O que é Gamma Exposure?</h3>
-                        <p>O Gamma Exposure indica como o delta muda conforme o preço do ativo se move. Valores positivos sugerem que os dealers precisarão comprar o ativo subjacente se o preço subir, criando um efeito de momentum.</p>
-                    </div>
-                    
-                    <div class="chart-container">
-                        <canvas id="gammaChart"></canvas>
-                    </div>
-                </div>
-            </section>
-
             <!-- EXPOSIÇÃO & ESTRUTURA -->
             <section id="structure" class="section">
                 <div class="section-header">
                     <h2 class="section-title">EXPOSIÇÃO & ESTRUTURA</h2>
                     <div class="section-glow"></div>
+                </div>
+
+                <!-- Delta Agregado -->
+                <div class="split-layout" style="margin-bottom: 50px;">
+                    <div class="context-box">
+                        <h3>📊 Delta Agregado</h3>
+                        <p>Visão consolidada da exposição de Delta em todo o mercado. Permite identificar o viés direcional macro dos dealers.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="deltaAgregadoChart"></canvas>
+                    </div>
                 </div>
 
                 <!-- OI Strike -->
@@ -179,7 +243,7 @@
                 </div>
 
                 <!-- GEX Call/Put Split -->
-                <div class="split-layout" style="margin-bottom: 50px;">
+                <div class="split-layout">
                     <div class="context-box">
                         <h3>⚡ Gamma Exposure (Call vs Put)</h3>
                         <p>Detalhamento da exposição de Gamma separada por Calls e Puts, permitindo identificar o posicionamento dominante em cada strike.</p>
@@ -188,80 +252,119 @@
                         <canvas id="gexSplitChart"></canvas>
                     </div>
                 </div>
+            </section>
 
-                <!-- Delta Agregado -->
+            <!-- GREGAS DE 2ª ORDEM -->
+            <section id="greeks2" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">GREGAS DE 2ª ORDEM</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <!-- Vanna Exposure -->
                 <div class="split-layout" style="margin-bottom: 50px;">
                     <div class="context-box">
-                        <h3>📊 Delta Agregado</h3>
-                        <p>Visão consolidada da exposição de Delta em todo o mercado. Permite identificar o viés direcional macro dos dealers.</p>
+                        <h3>🌊 Vanna Exposure</h3>
+                        <p>Sensibilidade do Delta em relação à mudança na Volatilidade Implícita. Importante em eventos de volatilidade.</p>
                     </div>
                     <div class="chart-container">
-                        <canvas id="deltaAgregadoChart"></canvas>
+                        <canvas id="vannaChart"></canvas>
                     </div>
                 </div>
 
+                <!-- Charm Exposure -->
+                <div class="split-layout" style="margin-bottom: 50px;">
+                    <div class="context-box">
+                        <h3>📅 Charm Exposure</h3>
+                        <p>Exposição à passagem do tempo. Mostra como as posições dos dealers mudam conforme o vencimento se aproxima.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="charmChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Theta Exposure -->
+                <div class="split-layout" style="margin-bottom: 50px;">
+                    <div class="context-box">
+                        <h3>⏳ Theta Exposure</h3>
+                        <p>Decaimento temporal das opções. Mostra a perda de valor diária das posições devido à passagem do tempo.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="thetaChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Vega Exposure -->
                 <div class="split-layout">
                     <div class="context-box">
-                        <h3>🗓️ Open Interest por Vencimento</h3>
-                        <p>Total de contratos em aberto por vencimento, separando Calls e Puts. Ajuda a ver onde está a concentração de risco temporal.</p>
+                        <h3>💥 Vega Exposure</h3>
+                        <p>Exposição total à volatilidade. Indica quanto o PnL dos dealers muda para cada 1% de alteração na IV.</p>
                     </div>
                     <div class="chart-container">
-                        <canvas id="oiByExpiryChart"></canvas>
-                    </div>
-                </div>
-
-                <div class="split-layout" style="margin-top: 50px;">
-                    <div class="context-box">
-                        <h3>📌 Open Interest por Strike (Proxy via EWZ)</h3>
-                        <p>Open Interest de Calls e Puts por strike usando um proxy de Índice. Os valores são convertidos para a escala do WIN para facilitar leitura junto do SPOT.</p>
-                    </div>
-                    <div class="chart-container">
-                        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
-                            <label style="color:#b3b3b3;font-family:'Share Tech Mono';">Venc:</label>
-                            <select id="ewzOptionsExpirySelect" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;"></select>
-                            <label style="color:#b3b3b3;font-family:'Share Tech Mono';">min OI:</label>
-                            <input id="ewzOptionsMinOi" type="number" value="5" min="0" step="1" style="width:90px;background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;">
-                        </div>
-                        <div id="ewzOptionsMeansAll" style="margin-bottom:10px;color:#b3b3b3;font-family:'Share Tech Mono';"></div>
-                        <canvas id="ewzOptionsOiChart"></canvas>
+                        <canvas id="vegaChart"></canvas>
                     </div>
                 </div>
             </section>
 
-            <!-- Delta & Gamma Section -->
-            <section id="delta" class="section">
+            <!-- GREGAS ACUMULADAS & R-GAMMA -->
+            <section id="greeks-cum" class="section">
                 <div class="section-header">
-                    <h2 class="section-title">DELTA ACUMULADO</h2>
+                    <h2 class="section-title">GREGAS ACUMULADAS & R-GAMMA</h2>
                     <div class="section-glow"></div>
                 </div>
-                
-                <div class="split-layout">
-                    <div class="context-box">
-                        <h3>📚 O que é Delta Acumulado?</h3>
-                        <p>O Delta Acumulado representa a soma de todas as posições delta das opções em um determinado preço. Ele nos mostra onde os dealers estão expostos e onde podem haver níveis de suporte ou resistência no mercado.</p>
-                    </div>
-                    
-                    <div class="chart-container">
-                        <canvas id="deltaChart"></canvas>
-                    </div>
-                </div>
-            </section>
 
-            <!-- Volatility Section -->
-            <section id="volatility" class="section">
-                <div class="section-header">
-                    <h2 class="section-title">VOLATILIDADE IMPLÍCITA & SKEW</h2>
-                    <div class="section-glow"></div>
+                <!-- Charm Acumulado -->
+                <div class="split-layout" style="margin-bottom: 50px;">
+                    <div class="context-box">
+                        <h3>📅 Charm Acumulado</h3>
+                        <p>Visão cumulativa do Charm. Ajuda a identificar níveis de pressão estrutural ao longo do tempo.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="charmCumChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Vanna Acumulado -->
+                <div class="split-layout" style="margin-bottom: 50px;">
+                    <div class="context-box">
+                        <h3>🌊 Vanna Acumulado</h3>
+                        <p>Visão cumulativa do Vanna. Indica zonas onde a mudança na volatilidade tem maior impacto estrutural no Delta.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="vannaCumChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Theta Acumulado -->
+                <div class="split-layout" style="margin-bottom: 50px;">
+                    <div class="context-box">
+                        <h3>⏳ Theta Acumulado</h3>
+                        <p>Visão cumulativa do Theta. Mostra o decaimento temporal agregado ao longo dos strikes.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="thetaCumChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- R-Gamma (PVOP) Exposure -->
+                <div class="split-layout" style="margin-bottom: 50px;">
+                    <div class="context-box">
+                        <h3>⚡ R-Gamma (PVOP) Exposure</h3>
+                        <p>Gamma ajustado pelo fluxo direcional (PVOP). Identifica se o Gamma em um strike é estabilizador ou desestabilizador.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="rGammaChart"></canvas>
+                    </div>
                 </div>
                 
+                 <!-- R-Gamma (PVOP) Cumulativo -->
                 <div class="split-layout">
                     <div class="context-box">
-                        <h3>📚 O que é Volatilidade e Skew?</h3>
-                        <p>A Volatilidade Implícita indica a expectativa de variação futura. O "Skew" (curva de sorriso) mostra como o mercado precifica o risco em diferentes strikes. Um "sorriso" acentuado indica medo de movimentos extremos.</p>
+                        <h3>⚡ R-Gamma Acumulado</h3>
+                        <p>Acumulado do R-Gamma. Mostra o regime de volatilidade predominante (Long/Short Gamma) ajustado pelo fluxo.</p>
                     </div>
-                    
                     <div class="chart-container">
-                        <canvas id="volatilityChart"></canvas>
+                        <canvas id="rGammaCumChart"></canvas>
                     </div>
                 </div>
             </section>
@@ -295,28 +398,6 @@
                     </div>
                 </div>
 
-                <!-- Dealer Pressure Index -->
-                <div class="split-layout" style="margin-bottom: 50px;">
-                    <div class="context-box">
-                        <h3>⚡ Dealer Pressure Index</h3>
-                        <p>Índice de pressão sobre os Dealers. Valores extremos indicam potencial para Gamma Squeeze ou reversão forçada.</p>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="dealerPressureChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Flow Sentiment -->
-                <div class="split-layout" style="margin-bottom: 50px;">
-                    <div class="context-box">
-                        <h3>🌊 Flow Sentiment</h3>
-                        <p>Análise do fluxo de agressão (Bullish vs Bearish) baseado no volume e variação de preço das opções.</p>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="flowSentimentChart"></canvas>
-                    </div>
-                </div>
-
                 <!-- Gamma Flip Cone -->
                 <div class="split-layout" style="margin-bottom: 50px;">
                     <div class="context-box">
@@ -339,6 +420,28 @@
                     </div>
                 </div>
 
+                <!-- Flow Sentiment -->
+                <div class="split-layout" style="margin-bottom: 50px;">
+                    <div class="context-box">
+                        <h3>🌊 Flow Sentiment</h3>
+                        <p>Análise do fluxo de agressão (Bullish vs Bearish) baseado no volume e variação de preço das opções.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="flowSentimentChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Dealer Pressure Index -->
+                <div class="split-layout" style="margin-bottom: 50px;">
+                    <div class="context-box">
+                        <h3>⚡ Dealer Pressure Index</h3>
+                        <p>Índice de pressão sobre os Dealers. Valores extremos indicam potencial para Gamma Squeeze ou reversão forçada.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="dealerPressureChart"></canvas>
+                    </div>
+                </div>
+
                 <!-- Market Maker PnL Simulation -->
                 <div class="split-layout" style="margin-bottom: 50px;">
                     <div class="context-box">
@@ -355,20 +458,9 @@
                     <div class="context-box" style="width: 100%;">
                         <h3>💎 Simulação de Valor Justo (Fair Value)</h3>
                         <p>Preço estimado das opções em cenários de mercado simulados (Call Wall, Put Wall, Gamma Flip). Identifica oportunidades de assimetria.</p>
-                        <div class="data-table-container" id="fair-value-container-v3">
+                        <div class="data-table-container" id="fair-value-container">
                             <!-- Populated by JS -->
                         </div>
-                    </div>
-                </div>
-
-                <!-- Resumo Executivo (Fair Value) -->
-                <div class="split-layout" style="margin-top: 40px;">
-                    <div class="context-box">
-                        <h3>🎯 Resumo Executivo: Simulação de Valor Justo</h3>
-                        <p>Projeção de preço das opções principais em cenários de teste de estresse (Call Wall, Put Wall, Gamma Flip).</p>
-                    </div>
-                    <div id="fair-value-container-overview" class="table-container">
-                        <p>Carregando simulações...</p>
                     </div>
                 </div>
             </section>
@@ -388,120 +480,6 @@
                     </div>
                     <div class="chart-container">
                         <canvas id="pinRiskChart"></canvas>
-                    </div>
-                </div>
-            </section>
-
-            <!-- GREGAS ACUMULADAS & R-GAMMA -->
-            <section id="greeks-cum" class="section">
-                <div class="section-header">
-                    <h2 class="section-title">GREGAS ACUMULADAS & R-GAMMA</h2>
-                    <div class="section-glow"></div>
-                </div>
-
-                <!-- R-Gamma (PVOP) Exposure -->
-                <div class="split-layout" style="margin-bottom: 50px;">
-                    <div class="context-box">
-                        <h3>⚡ R-Gamma (PVOP) Exposure</h3>
-                        <p>Gamma ajustado pelo fluxo direcional (PVOP). Identifica se o Gamma em um strike é estabilizador ou desestabilizador.</p>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="rGammaChart"></canvas>
-                    </div>
-                </div>
-
-                <div class="split-layout" style="margin-bottom: 50px;">
-                    <div class="context-box">
-                        <h3>⚡ R-Gamma Acumulado</h3>
-                        <p>Acumulado do R-Gamma. Mostra o regime de volatilidade predominante (Long/Short Gamma) ajustado pelo fluxo.</p>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="rGammaCumChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Charm Acumulado -->
-                <div class="split-layout" style="margin-bottom: 50px;">
-                    <div class="context-box">
-                        <h3>📅 Charm Acumulado</h3>
-                        <p>Visão cumulativa do Charm. Ajuda a identificar níveis de pressão estrutural ao longo do tempo.</p>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="charmCumChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Vanna Acumulado -->
-                <div class="split-layout" style="margin-bottom: 50px;">
-                    <div class="context-box">
-                        <h3>🌊 Vanna Acumulado</h3>
-                        <p>Visão cumulativa do Vanna. Indica zonas onde a mudança na volatilidade tem maior impacto estrutural no Delta.</p>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="vannaCumChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Theta Acumulado -->
-                <div class="split-layout">
-                    <div class="context-box">
-                        <h3>⏳ Theta Acumulado</h3>
-                        <p>Visão cumulativa do Theta. Mostra o decaimento temporal agregado ao longo dos strikes.</p>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="thetaCumChart"></canvas>
-                    </div>
-                </div>
-            </section>
-
-            <!-- GREGAS DE 2ª ORDEM -->
-            <section id="greeks2" class="section">
-                <div class="section-header">
-                    <h2 class="section-title">GREGAS DE 2ª ORDEM</h2>
-                    <div class="section-glow"></div>
-                </div>
-
-                <!-- Theta Exposure -->
-                <div class="split-layout" style="margin-bottom: 50px;">
-                    <div class="context-box">
-                        <h3>⏳ Theta Exposure</h3>
-                        <p>Decaimento temporal das opções. Mostra a perda de valor diária das posições devido à passagem do tempo.</p>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="thetaChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Vega Exposure -->
-                <div class="split-layout" style="margin-bottom: 50px;">
-                    <div class="context-box">
-                        <h3>💥 Vega Exposure</h3>
-                        <p>Exposição total à volatilidade. Indica quanto o PnL dos dealers muda para cada 1% de alteração na IV.</p>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="vegaChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Vanna Exposure -->
-                <div class="split-layout" style="margin-bottom: 50px;">
-                    <div class="context-box">
-                        <h3>🌊 Vanna Exposure</h3>
-                        <p>Sensibilidade do Delta em relação à mudança na Volatilidade Implícita. Importante em eventos de volatilidade.</p>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="vannaChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Charm Exposure -->
-                <div class="split-layout">
-                    <div class="context-box">
-                        <h3>📅 Charm Exposure</h3>
-                        <p>Exposição à passagem do tempo. Mostra como as posições dos dealers mudam conforme o vencimento se aproxima.</p>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="charmChart"></canvas>
                     </div>
                 </div>
             </section>
@@ -589,73 +567,48 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2026 EDI Market Guardian V1. Stranger Things Edition.</p>
+            <p>&copy; 2026 EDI Market Guardin V1. Stranger Things Edition.</p>
         </div>
     </footer>
 
     <!-- Scripts -->
+    <!-- Carrega dados globais (importante para evitar CORS) -->
+    <script src="assets/data/market_data.js"></script>
+    <script src="assets/data/yahoo_ewz_options.js"></script>
+    
     <!-- Sistema de Partículas Customizado (Stranger Things Theme) -->
     <script src="assets/js/particles.js"></script>
     
     <!-- Gráficos e Lógica Principal -->
-    <script>
-        (function(){
-            const isFile = location.protocol === 'file:';
-            const version = String(Date.now());
-            const suffix = isFile ? '' : `?v=${version}`;
-            const localShared = `../shared/js/chart_data_utils.js${suffix}`;
-            const localUnified = `../shared/js/chart_data_utils.js${suffix}`;
-            const fallback = `https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/dashboard_unificado/shared/js/chart_data_utils.js${suffix}`;
-
-            window.__ediAssetVersion = version;
-
-            const addScript = (src, onerror) => {
-                const s = document.createElement('script');
-                s.src = src;
-                s.async = false;
-                if (onerror) s.onerror = onerror;
-                document.body.appendChild(s);
-                return s;
-            };
-
-            addScript(`assets/data/market_data.js${suffix}`);
-            addScript(`assets/data/yahoo_ewz_options.js${suffix}`);
-            addScript(localShared, function(){
-                this.onerror = function(){
-                    this.onerror = null;
-                    this.src = fallback;
-                };
-                this.src = localUnified;
-            });
-            addScript(`assets/js/charts.js${suffix}`);
-            addScript(`assets/js/main.js${suffix}`);
-        })();
-    </script>
+    <script src="assets/js/charts.js"></script>
+    <script src="assets/js/main.js"></script>
     <script>
         (function(){
             const sel = document.getElementById('assetSelect');
+            if(!sel) return;
             const prodBase = 'https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/dashboard_unificado/';
-            const prodMarket = 'https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/Cotacoes/dashboard/index.html';
             function targetFor(val){
                 const host = location.hostname;
                 const href = location.href;
                 const isProd = host.indexOf('github.io') !== -1 || host.indexOf('sites.google.com') !== -1;
                 if(isProd){
-                    if(val === 'MERCADO') return prodMarket;
-                    return prodBase + (val === 'WDO' ? 'WDO/' : 'WIN/');
-                }
-                if(val === 'MERCADO'){
-                    return '../../Cotacoes/dashboard/index.html';
+                    if(val === 'WDO') return prodBase + 'WDO/';
+                    if(val === 'WIN') return prodBase + 'WIN/';
+                    if(val === 'CORR') return prodBase + 'correlation/';
+                    return href;
                 }
                 const isUnified = href.indexOf('dashboard_unificado') !== -1;
-                if(val === 'WDO'){
-                    return isUnified
-                        ? href.replace('/WIN/', '/WDO/').replace('dashboard_unificado/WIN', 'dashboard_unificado/WDO')
-                        : '../../Edi_OpenInterest - PY - Stranger - WDO/dashboard_v1/index.html';
+                if(isUnified){
+                    if(val === 'WDO') return '../WDO/index.html';
+                    if(val === 'WIN') return '../WIN/index.html';
+                    if(val === 'MERCADO') return '../../Cotacoes/dashboard/MERCADO/index.html';
+                    if(val === 'CORR') return '../correlation/index.html';
+                    return href;
                 }
-                return isUnified
-                    ? href.replace('/WDO/', '/WIN/').replace('dashboard_unificado/WDO', 'dashboard_unificado/WIN')
-                    : '../../Edi_OpenInterest - PY - Stranger - Indice/dashboard_v1/index.html';
+                if(val === 'WDO'){
+                    return '../../Edi_OpenInterest - PY - Stranger - WDO/dashboard_v1/index.html';
+                }
+                return '../../Edi_OpenInterest - PY - Stranger - Indice/dashboard_v1/index.html';
             }
             sel.addEventListener('change', function(e){
                 location.href = targetFor(e.target.value);

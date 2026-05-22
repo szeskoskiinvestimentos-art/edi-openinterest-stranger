@@ -1,51 +1,30 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <title>Dashboard Unificado WDO/WIN</title>
-  <style>
-    body{margin:0;background:#0b0b0b;height:100vh}
-    .shell{height:100vh;display:flex;flex-direction:column}
-    .top{flex:0 0 164px;border-bottom:1px solid rgba(255,255,255,.08);background:#0b0b0b}
-    .main{flex:1 1 auto;display:flex;flex-direction:row}
-    .pane{flex:1 1 50%;min-width:0}
-    .pane + .pane{border-left:1px solid rgba(255,255,255,.08)}
-    iframe{width:100%;height:100%;border:0;display:block;background:#0e0e0e}
-    @media (max-width: 980px){
-      .main{flex-direction:column}
-      .pane + .pane{border-left:0;border-top:1px solid rgba(255,255,255,.08)}
-    }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Dashboard Unificado</title>
+<style>
+body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#0b0d12;color:#e5e7eb}
+header{padding:18px 20px;border-bottom:1px solid #1f2937;background:#0d1117}
+h1{margin:0;font-size:18px;letter-spacing:.5px}
+.wrap{max-width:980px;margin:0 auto;padding:18px 20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+a.card{display:block;border:1px solid #1f2937;background:#0d1117;border-radius:12px;padding:14px 14px;text-decoration:none;color:inherit}
+a.card:hover{border-color:#3b82f6}
+.sym{font-weight:800;font-size:16px}
+.meta{margin-top:8px;color:#9ca3af;font-size:12px;line-height:1.35}
+.meta code{color:#93c5fd}
+</style>
 </head>
 <body>
-  <div class="shell">
-    <div class="top">
-      <iframe id="compass"></iframe>
-    </div>
-    <div class="main">
-      <div class="pane"><iframe id="wdo"></iframe></div>
-      <div class="pane"><iframe id="win"></iframe></div>
-    </div>
-  </div>
-  <script>
-    (function(){
-      const compass = document.getElementById('compass');
-      const wdo = document.getElementById('wdo');
-      const win = document.getElementById('win');
-      if (!wdo || !win) return;
-      const isFile = location.protocol === 'file:';
-      const suffix = isFile ? '' : `?v=${String(Date.now())}`;
-      wdo.src = `WDO/index.html${suffix}`;
-      win.src = `WIN/index.html${suffix}`;
-      if (compass) {
-        const extra = isFile ? '' : `&v=${String(Date.now())}`;
-        const base = `../Cotacoes/dashboard/MERCADO/index.html?embed=compass${extra}`;
-        compass.src = base;
-      }
-    })();
-  </script>
+<header><h1>Dashboard Unificado</h1></header>
+<div class="wrap">
+<div class="grid">
+<a class="card" href="WDO/index.html"><div class="sym">WDO</div><div class="meta">last_update: <code>2026-05-21 14:23:08</code></div></a>
+<a class="card" href="WIN/index.html"><div class="sym">WIN</div><div class="meta">last_update: <code>2026-05-21 14:23:30</code></div></a>
+<a class="card" href="correlation/index.html"><div class="sym">Correlation Matrix</div><div class="meta">Top 20 • ~1h • fonte: <code>MERCADO/market_quotes.json</code></div></a>
+</div>
+</div>
 </body>
 </html>

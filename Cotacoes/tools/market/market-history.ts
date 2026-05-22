@@ -1,11 +1,12 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { parseCsv } from './lib/csv.js'
-import { classifyAsset } from './lib/classify.js'
 import { pruneOldPoints, readExisting } from './lib/history.js'
 import { computeFlowSentinel } from './lib/flow-sentinel.js'
-import { parseNumber, parsePercent, toISO } from './lib/parse.js'
+import { toISO } from './lib/parse.js'
 import type { Asset, MarketPoint, MarketQuotes } from './types.js'
+import { validateCoverageOrThrow } from './market-history/coverage.js'
+import { applyPortfolioParseStats, createPortfolioStats, parsePortfolioRow } from './market-history/portfolio.js'
 
 type BuildMarketHistoryInput = {
   csvPath: string
@@ -13,191 +14,6 @@ type BuildMarketHistoryInput = {
   intervalMinutes?: number
   retentionDays?: number
   timestamp?: string
-}
-
-function getFirst(row: Record<string, string>, keys: string[]) {
-  for (const k of keys) {
-    const v = (row[k] || '').trim()
-    if (v) return v
-  }
-  return ''
-}
-
-function parseAsOfIso(raw: string, referenceIso: string) {
-  const s = String(raw || '').trim()
-  if (!s || s === '-' || s === '--') return null
-  const ref = new Date(referenceIso)
-  if (!Number.isFinite(ref.getTime())) return null
-
-  const time = s.match(/^(\d{2}):(\d{2})(?::(\d{2}))?$/)
-  if (time) {
-    const hh = Number(time[1])
-    const mi = Number(time[2])
-    const ss = Number(time[3] || '0')
-    if (![hh, mi, ss].every(Number.isFinite)) return null
-    const dt = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate(), hh, mi, ss)
-    return Number.isFinite(dt.getTime()) ? dt.toISOString() : null
-  }
-
-  const dmy = s.match(/^(\d{2})\/(\d{2})(?:\/(\d{2}|\d{4}))?$/)
-  if (dmy) {
-    const dd = Number(dmy[1])
-    const mm = Number(dmy[2])
-    const yyRaw = dmy[3]
-    const refYear = ref.getFullYear()
-    let yyyy = refYear
-    if (yyRaw) {
-      const y = Number(yyRaw)
-      if (!Number.isFinite(y)) return null
-      yyyy = yyRaw.length === 2 ? 2000 + y : y
-    }
-    if (![dd, mm, yyyy].every(Number.isFinite)) return null
-    let dt = new Date(yyyy, mm - 1, dd, 0, 0, 0)
-    if (!Number.isFinite(dt.getTime())) return null
-    if (!yyRaw) {
-      const driftDays = (dt.getTime() - ref.getTime()) / (24 * 60 * 60 * 1000)
-      if (driftDays > 7) dt = new Date(refYear - 1, mm - 1, dd, 0, 0, 0)
-    }
-    return Number.isFinite(dt.getTime()) ? dt.toISOString() : null
-  }
-
-  const ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (ymd) {
-    const yyyy = Number(ymd[1])
-    const mm = Number(ymd[2])
-    const dd = Number(ymd[3])
-    if (![dd, mm, yyyy].every(Number.isFinite)) return null
-    const dt = new Date(yyyy, mm - 1, dd, 0, 0, 0)
-    return Number.isFinite(dt.getTime()) ? dt.toISOString() : null
-  }
-
-  return null
-}
-
-function cleanDisplayName(symbol: string, name: string) {
-  const sym = String(symbol || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim()
-  const symCore = sym.split(' - ')[0]?.trim() || sym
-  let out = String(name || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim()
-  if (!out) return out
-
-  for (let i = 0; i < 3; i++) {
-    const m = out.match(/^(.+?)\s+\1$/)
-    if (!m) break
-    out = String(m[1] || '').trim()
-  }
-
-  if (sym && out === sym) {
-    const parts = sym.split(' - ')
-    const tail = parts.length > 1 ? parts.slice(1).join(' - ').trim() : ''
-    if (symCore && tail && symCore !== sym) return `${symCore} — ${tail}`
-    return symCore || out
-  }
-
-  if (symCore && out.startsWith(`${symCore} - `)) {
-    out = `${symCore} — ${out.slice((symCore + ' - ').length).trim()}`
-  }
-
-  return out
-}
-
-function normalizeSymbol(rawSymbol: string, rawName: string) {
-  const sym = String(rawSymbol || '').trim()
-  const up = sym.toUpperCase()
-  const name = String(rawName || '').trim()
-
-  if (
-    up === 'DX' ||
-    up === '.DXY' ||
-    up === 'USDIDX' ||
-    up === 'DX=F' ||
-    /^DXC\d+$/i.test(up) ||
-    (/\b(?:indice|índice)\s+d[oó]lar\b/i.test(name) && (up === 'DX' || up === '.DXY' || up === 'USDIDX'))
-  ) {
-    return 'USDX'
-  }
-
-  return sym
-}
-
-function envBool(name: string, fallback: boolean) {
-  const raw = process.env[name]
-  if (raw === undefined || raw === null || raw === '') return fallback
-  const v = String(raw).trim().toLowerCase()
-  if (v === '1' || v === 'true' || v === 'yes' || v === 'y' || v === 'on') return true
-  if (v === '0' || v === 'false' || v === 'no' || v === 'n' || v === 'off') return false
-  return fallback
-}
-
-function envNumber(name: string, fallback: number) {
-  const raw = process.env[name]
-  if (raw === undefined || raw === null || raw === '') return fallback
-  const n = Number(raw)
-  return Number.isFinite(n) ? n : fallback
-}
-
-function envList(name: string) {
-  const raw = process.env[name]
-  if (raw === undefined || raw === null || raw === '') return []
-  return String(raw)
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean)
-}
-
-function hasAssetMatch(assets: Asset[], re: RegExp) {
-  for (const a of assets) {
-    const sym = String(a && a.symbol ? a.symbol : '')
-    const name = String(a && a.name ? a.name : '')
-    if (re.test(sym) || re.test(name)) return true
-  }
-  return false
-}
-
-function validateCoverageOrThrow(assets: Asset[]) {
-  const enabled = envBool('MARKET_COVERAGE_ENABLED', true)
-  if (!enabled) {
-    return {
-      ok: true,
-      assets: assets.length,
-      requiredCritical: [],
-      missingCritical: [],
-    }
-  }
-
-  const minAssets = Math.max(0, envNumber('MARKET_COVERAGE_MIN_ASSETS', 25))
-  if (minAssets > 0 && assets.length < minAssets) {
-    throw new Error(`Cobertura baixa: assets=${assets.length} (mínimo=${minAssets})`)
-  }
-
-  const patterns = {
-    'USD/BRL': /^USD\/BRL\b/i,
-    WDO: /^WDO/i,
-    WIN: /^WIN/i,
-    IBOV: /(^\.BVSP$|\bIbovespa\b)/i,
-    EWZ: /^EWZ$/i,
-    DXY: /(^\.DXY$|\bDXY\b|US Dollar Index)/i,
-  } as const
-
-  const requiredCritical = envList('MARKET_COVERAGE_CRITICAL').length
-    ? envList('MARKET_COVERAGE_CRITICAL')
-    : ['USD/BRL', 'WDO', 'WIN', 'IBOV']
-
-  const missingCritical = requiredCritical.filter(label => {
-    const re = (patterns as Record<string, RegExp>)[label]
-    if (!re) return false
-    return !hasAssetMatch(assets, re)
-  })
-
-  if (missingCritical.length) {
-    throw new Error(`Críticos ausentes: ${missingCritical.join(', ')}`)
-  }
-
-  return {
-    ok: true,
-    assets: assets.length,
-    requiredCritical,
-    missingCritical: [],
-  }
 }
 
 export async function buildMarketHistory(input: BuildMarketHistoryInput) {
@@ -221,43 +37,17 @@ export async function buildMarketHistory(input: BuildMarketHistoryInput) {
       : undefined
 
   const assetsBySymbol = new Map<string, Asset>()
-  let usdxBestPriority = -1
-  const portfolioStats = {
-    rowsTotal: parsedRows.length,
-    rowsMissingSymbolOrName: 0,
-    rowsInvalidSymbol: 0,
-    rowsSkippedByPriority: 0,
-    rowsMissingPrice: 0,
-    rowsWithPrice: 0,
-    uniqueSymbols: 0,
-    duplicateSymbols: 0,
-    sampleMissingPriceSymbols: [] as string[],
-  }
+  const usdxBestPriority = { value: -1 }
+  const portfolioStats = createPortfolioStats(parsedRows.length)
 
   for (const row of parsedRows) {
-    const rawSymbol = getFirst(row, [
-      'Symbol',
-      'Símbolo',
-      'Simbolo',
-      'Ticker',
-      'Ativo',
-      'Código',
-      'Codigo',
-      'Códigos',
-      'Codigos',
-    ])
-    const name = getFirst(row, ['Name', 'Nome', 'Ativo (Nome)', 'Instrumento'])
-    const exchange = getFirst(row, ['Exchange', 'Bolsa', 'Mercado'])
-    if (!rawSymbol || !name) {
-      portfolioStats.rowsMissingSymbolOrName += 1
-      continue
-    }
+    const parsed = parsePortfolioRow({ row: row as Record<string, string>, generatedAt, usdxBestPriority })
+    applyPortfolioParseStats(portfolioStats, parsed)
+    if (!('symbol' in parsed) || !('asset' in parsed)) continue
 
-    const symbol = normalizeSymbol(rawSymbol, name)
-    if (!symbol) {
-      portfolioStats.rowsInvalidSymbol += 1
-      continue
-    }
+    if (assetsBySymbol.has(parsed.symbol)) portfolioStats.duplicateSymbols += 1
+    assetsBySymbol.set(parsed.symbol, parsed.asset)
+    if (!parsed.ok) continue
 
     if (symbol === 'USDX') {
       const up = String(rawSymbol || '').trim().toUpperCase()
@@ -398,7 +188,7 @@ export async function buildMarketHistory(input: BuildMarketHistoryInput) {
         ? existingPoints.slice(0, -1).concat([point])
         : existingPoints.concat([point])
 
-    series[symbol] = pruneOldPoints(nextPoints, cutoffMs)
+    series[parsed.symbol] = pruneOldPoints(nextPoints, cutoffMs)
   }
 
   portfolioStats.uniqueSymbols = assetsBySymbol.size
@@ -420,6 +210,7 @@ export async function buildMarketHistory(input: BuildMarketHistoryInput) {
       generatedAt,
       intervalMinutes: Number.isFinite(intervalMinutes) ? intervalMinutes : 30,
       retentionDays: Number.isFinite(retentionDays) ? retentionDays : 10,
+      warnings: [],
       source: path.basename(csvPath),
       portfolioUpdatedAt: generatedAt,
       portfolioStats,
