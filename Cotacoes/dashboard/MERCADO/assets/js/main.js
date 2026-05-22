@@ -48,6 +48,33 @@ function toneBadgeHtmlFromTone(tone, valAbs, text, { maxAbs = 5 } = {}) {
     return `<span class="tone ${toneCls} ${textTone}" style="--tone-a:${String(a)};">${escapeHtml(text)}</span>`;
 }
 
+function clamp01(n) {
+    const x = typeof n === 'number' && Number.isFinite(n) ? n : 0;
+    return Math.max(0, Math.min(1, x));
+}
+
+function pillHtml(role, tone, text, strength = 0.75) {
+    const r = String(role || 'signal').toLowerCase() === 'status' ? 'status' : 'signal';
+    const raw = String(tone || 'neutral').toLowerCase().trim();
+    const k = Math.max(0.35, Math.min(1, clamp01(strength)));
+
+    const norm = (() => {
+        if (r === 'status') {
+            if (raw === 'ok' || raw === 'positive' || raw === 'success') return 'ok';
+            if (raw === 'warn' || raw === 'warning') return 'warn';
+            if (raw === 'bad' || raw === 'negative' || raw === 'error' || raw === 'fail') return 'bad';
+            return raw === 'info' ? 'info' : 'info';
+        }
+        if (raw === 'risk_on' || raw === 'risk-on') return 'risk_on';
+        if (raw === 'risk_off' || raw === 'risk-off') return 'risk_off';
+        if (raw === 'buy' || raw === 'positive' || raw === 'pos') return 'pos';
+        if (raw === 'sell' || raw === 'negative' || raw === 'neg') return 'neg';
+        return 'neutral';
+    })();
+
+    return `<span class="edi-pill edi-pill--${r}-${norm}" style="--pill-k:${String(k)};"><span class="edi-pill__dot"></span><span>${escapeHtml(text)}</span></span>`;
+}
+
 function parseISODate(val) {
     const d = new Date(val);
     return Number.isNaN(d.getTime()) ? null : d;
@@ -72,6 +99,18 @@ function getData() {
 function getLastPoint(data, symbol) {
     const series = data.series[symbol] || [];
     return series.length ? series[series.length - 1] : null;
+}
+
+function pointPct(point) {
+    const fn = (typeof window !== 'undefined' && window.MercadoUtils && typeof window.MercadoUtils.pointPct === 'function')
+        ? window.MercadoUtils.pointPct
+        : null;
+    if (fn) return fn(point);
+    if (!point) return null;
+    const ext = point && typeof point.extendedChangePct === 'number' && Number.isFinite(point.extendedChangePct) ? point.extendedChangePct : null;
+    if (ext !== null) return ext;
+    const reg = point && typeof point.changePct === 'number' && Number.isFinite(point.changePct) ? point.changePct : null;
+    return reg;
 }
 
 function getMostRecentPointWithPrice(data, symbol) {
@@ -109,9 +148,11 @@ function buildRows(data, categories, includeMissing = false) {
         })
         .filter(r => includeMissing || (r.last && typeof r.last.price === 'number'))
         .sort((a, b) => {
-            const ap = a.last && typeof a.last.changePct === 'number' ? a.last.changePct : -Infinity;
-            const bp = b.last && typeof b.last.changePct === 'number' ? b.last.changePct : -Infinity;
-            return bp - ap;
+            const ap = pointPct(a.last);
+            const bp = pointPct(b.last);
+            const av = ap === null ? -Infinity : ap;
+            const bv = bp === null ? -Infinity : bp;
+            return bv - av;
         });
 }
 
@@ -451,7 +492,7 @@ function createTable(containerId, rows, data, onSelect, opts = {}) {
         if (!r || r.separator) return null;
         if (key === 'name') return String(r.name || '');
         if (key === 'symbol') return String(r.symbol || '');
-        if (key === 'pct') return r.last && typeof r.last.changePct === 'number' ? r.last.changePct : -Infinity;
+        if (key === 'pct') return pointPct(r.last) ?? -Infinity;
         if (key === 'trend') return getTrendPct(r.symbol);
         if (key === 'time') {
             const t = r.last && r.last.t ? Date.parse(r.last.t) : NaN;
@@ -576,7 +617,7 @@ function createTable(containerId, rows, data, onSelect, opts = {}) {
             out.push(['Ativo', 'Simbolo', 'VariacaoPct', 'TendenciaPct', 'Atualizacao', 'Categoria', 'Exchange'].map(csvEscape).join(','));
             for (const r of list) {
                 if (!r || r.separator) continue;
-                const change = r.last && typeof r.last.changePct === 'number' ? r.last.changePct : null;
+                const change = pointPct(r.last);
                 const trend = getTrendPct(r.symbol);
                 const updatedAt = r.last && r.last.t ? r.last.t : '';
                 out.push(
@@ -642,7 +683,7 @@ function createTable(containerId, rows, data, onSelect, opts = {}) {
                             </tr>`;
                             }
 
-                            const pct = r.last && typeof r.last.changePct === 'number' ? r.last.changePct : null;
+                            const pct = pointPct(r.last);
                             const points = (data && data.series && data.series[r.symbol]) ? data.series[r.symbol] : [];
                             const clickable = typeof onSelect === 'function';
                             const updateTxt = r.last && r.last.t ? formatDateTime(r.last.t) : '—';
@@ -761,7 +802,7 @@ function createTable(containerId, rows, data, onSelect, opts = {}) {
 function computeCategoryAverages(data, categoryGroups) {
     return categoryGroups.map(g => {
         const rows = buildRows(data, g.categories);
-        const changes = rows.map(r => r.last.changePct).filter(v => typeof v === 'number');
+        const changes = rows.map(r => pointPct(r.last)).filter(v => typeof v === 'number');
         const avg = changes.length ? changes.reduce((a, b) => a + b, 0) / changes.length : 0;
         return { key: g.key, label: g.label, avg, count: rows.length };
     });
@@ -820,7 +861,7 @@ function computeFlowScore(data) {
         })();
         if (!sym) return null;
         const last = (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, sym) : null) || getLastPoint(data, sym);
-        const v = last && typeof last.changePct === 'number' ? last.changePct : null;
+        const v = pointPct(last);
         if (v === null || v === undefined || !Number.isFinite(v)) return null;
         return invert ? -v : v;
     };
@@ -903,7 +944,7 @@ function renderTopMovers(data) {
             if (seen.has(key)) continue;
             const last = lastOf(sym);
             if (!last) continue;
-            const pct = last && typeof last.changePct === 'number' ? last.changePct : null;
+            const pct = pointPct(last);
             const price = last && typeof last.price === 'number' ? last.price : null;
             if (!isNum(pct) || !isNum(price) || !(price > 0)) continue;
             if (Math.abs(pct) > hardMaxAbs) continue;
@@ -2264,7 +2305,7 @@ function renderMetalsZone(data) {
 
         const basePrice = base && typeof base.price === 'number' && Number.isFinite(base.price) ? base.price : null;
         const computed = basePrice && basePrice !== 0 ? ((last.price - basePrice) / basePrice) * 100 : null;
-        const fallback = typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+        const fallback = pointPct(last);
         const pct = typeof computed === 'number' && Number.isFinite(computed) && (basePrice === null || basePrice !== last.price) ? computed : fallback ?? computed;
 
         return {
@@ -2301,8 +2342,9 @@ function renderMetalsZone(data) {
             return { price: prev.price, t: prev.t || null, source: 'série' };
         }
 
-        if (typeof last.changePct === 'number' && Number.isFinite(last.changePct) && last.changePct !== -100) {
-            const denom = 1 + (last.changePct / 100);
+        const lastPct = pointPct(last);
+        if (typeof lastPct === 'number' && Number.isFinite(lastPct) && lastPct !== -100) {
+            const denom = 1 + (lastPct / 100);
             if (denom !== 0) {
                 const implied = last.price / denom;
                 if (Number.isFinite(implied) && implied > 0) return { price: implied, t: null, source: 'implícito' };
@@ -2953,7 +2995,8 @@ function computeHk50PulseNow(data, web) {
         if (!series.length) return null;
         const last = series[series.length - 1];
         const lastPrice = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
-        if (last && typeof last.changePct === 'number' && Number.isFinite(last.changePct)) return last.changePct;
+        const lastPct = pointPct(last);
+        if (typeof lastPct === 'number' && Number.isFinite(lastPct)) return lastPct;
         const prev = series.length > 1 ? series[series.length - 2] : null;
         const prevPrice = prev && typeof prev.price === 'number' && Number.isFinite(prev.price) ? prev.price : null;
         const deltaRaw = last && typeof last.change === 'number' && Number.isFinite(last.change)
@@ -3253,8 +3296,8 @@ function computeHk50PulseNow(data, web) {
                 m[k] = 'sem último ponto';
                 continue;
             }
-            if (typeof last.changePct !== 'number') {
-                m[k] = pts.length < 2 ? 'apenas 1 ponto (sem var%)' : 'sem var% (changePct)';
+            if (pointPct(last) === null) {
+                m[k] = pts.length < 2 ? 'apenas 1 ponto (sem var%)' : 'sem var% (changePct/extended)';
                 continue;
             }
             m[k] = 'sem var%';
@@ -3727,9 +3770,9 @@ function computeUsEquitiesPulseNow(data, web) {
     const buildPulse = (baseKey) => {
         const cfgBase = baseKey === 'ndx'
             ? [
-                { key: 'ndx', group: 'driver', weight: 0.85, capAbs: 1.6, sign: +1 },
-                { key: 'spx', group: 'confirm', weight: 0.45, capAbs: 1.2, sign: +1 },
-                { key: 'dow', group: 'confirm', weight: 0.25, capAbs: 1.2, sign: +1 },
+                { key: 'ndx', group: 'driver', weight: 0.85, capAbs: 1.1, sign: +1 },
+                { key: 'spx', group: 'confirm', weight: 0.45, capAbs: 1.0, sign: +1 },
+                { key: 'dow', group: 'confirm', weight: 0.25, capAbs: 1.0, sign: +1 },
                 { key: 'vxn', group: 'driver', weight: 0.55, capAbs: 4.5, sign: -1 },
                 { key: 'vvix', group: 'confirm', weight: 0.25, capAbs: 4.8, sign: -1 },
                 { key: 'vix', group: 'driver', weight: 0.35, capAbs: 4.5, sign: -1 },
@@ -3746,9 +3789,9 @@ function computeUsEquitiesPulseNow(data, web) {
             ]
             : baseKey === 'dow'
                 ? [
-                    { key: 'dow', group: 'driver', weight: 0.85, capAbs: 1.4, sign: +1 },
-                    { key: 'spx', group: 'confirm', weight: 0.45, capAbs: 1.2, sign: +1 },
-                    { key: 'ndx', group: 'confirm', weight: 0.25, capAbs: 1.4, sign: +1 },
+                    { key: 'dow', group: 'driver', weight: 0.85, capAbs: 1.0, sign: +1 },
+                    { key: 'spx', group: 'confirm', weight: 0.45, capAbs: 1.0, sign: +1 },
+                    { key: 'ndx', group: 'confirm', weight: 0.25, capAbs: 1.1, sign: +1 },
                     { key: 'vix', group: 'driver', weight: 0.55, capAbs: 4.5, sign: -1 },
                     { key: 'dxy', group: 'driver', weight: 0.45, capAbs: 0.7, sign: -1 },
                     { key: 'us10y', group: 'driver', weight: 0.25, capAbs: 0.8, sign: -1 },
@@ -3761,7 +3804,7 @@ function computeUsEquitiesPulseNow(data, web) {
                     { key: 'gold', group: 'context', weight: 0.12, capAbs: 1.6, sign: -0.2 },
                 ]
                 : [
-                    { key: 'spx', group: 'driver', weight: 0.9, capAbs: 1.4, sign: +1 },
+                    { key: 'spx', group: 'driver', weight: 0.9, capAbs: 0.9, sign: +1 },
                     { key: 'ndx', group: 'confirm', weight: 0.35, capAbs: 1.4, sign: +1 },
                     { key: 'dow', group: 'confirm', weight: 0.25, capAbs: 1.2, sign: +1 },
                     { key: 'vix', group: 'driver', weight: 0.6, capAbs: 4.5, sign: -1 },
@@ -3815,7 +3858,7 @@ function computeUsEquitiesPulseNow(data, web) {
             rows.push({ key: c.key, group: c.group, label: c.key.toUpperCase(), symbol: s, pct, signed, weight: c.weight, capAbs: c.capAbs, contrib, pnl });
         }
         const net = clamp(contribution.net, -3, 3);
-        const bias = net > 0.25 ? 'buy' : net < -0.25 ? 'sell' : 'neutral';
+        const bias = net > 0.18 ? 'buy' : net < -0.18 ? 'sell' : 'neutral';
         return { bias, net, breadth, contribution, pnlLike, groups, rows };
     };
 
@@ -4678,7 +4721,8 @@ function computeBtcPulseNow(data, web) {
         if (!series.length) return null;
         const last = series[series.length - 1];
         const lastPrice = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
-        if (last && typeof last.changePct === 'number' && Number.isFinite(last.changePct)) return last.changePct;
+        const lastPct = pointPct(last);
+        if (typeof lastPct === 'number' && Number.isFinite(lastPct)) return lastPct;
         const prev = series.length > 1 ? series[series.length - 2] : null;
         const prevPrice = prev && typeof prev.price === 'number' && Number.isFinite(prev.price) ? prev.price : null;
         const deltaRaw = last && typeof last.change === 'number' && Number.isFinite(last.change)
@@ -5092,10 +5136,8 @@ function renderBtcOperationalBriefing() {
     const web = rawWeb && rawWeb.ok === true ? rawWeb : null;
     const btcNow = data ? computeBtcPulseNow(data, web) : null;
 
-    const badge = (tone, text) => {
-        const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
-        return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
-    };
+    const badge = (tone, text, strength) => pillHtml('signal', tone, text, strength);
+    const statusBadge = (tone, text, strength) => pillHtml('status', tone, text, strength);
 
     if (!data || !btcNow) {
         el.innerHTML = `
@@ -5333,8 +5375,8 @@ function renderBtcOperationalBriefing() {
         });
     })();
     const missingLabel = missingPretty.length ? `Faltando (dados): ${missingPretty.slice(0, 10).join(', ')}${missingPretty.length > 10 ? `… +${missingPretty.length - 10}` : ''}` : 'Drivers: completos';
-    const missingBadge = badge(missing.length ? 'neutral' : 'positive', missingLabel);
-    const staleBadge = (btcNow.coverage && btcNow.coverage.staleCore) ? badge('warn', 'Dados: STALE (>4h)') : '';
+    const missingBadge = missing.length ? statusBadge('warn', missingLabel, 0.85) : statusBadge('ok', missingLabel, 0.75);
+    const staleBadge = (btcNow.coverage && btcNow.coverage.staleCore) ? statusBadge('warn', 'Dados: STALE (>4h)', 0.95) : '';
 
     const sugg = btcNow.missingAssetsSuggestion || [];
     const suggestLine = sugg.length ? `Sugestões p/ carteira (Investing): ${sugg.join(' • ')}` : '';
@@ -5441,10 +5483,8 @@ function renderCommoditiesOperationalBriefing() {
     const web = rawWeb && rawWeb.ok === true ? rawWeb : null;
     const cm = data ? computeCommoditiesPulseNow(data, web) : null;
 
-    const badge = (tone, text) => {
-        const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
-        return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
-    };
+    const badge = (tone, text, strength) => pillHtml('signal', tone, text, strength);
+    const statusBadge = (tone, text, strength) => pillHtml('status', tone, text, strength);
 
     if (!data || !cm) {
         el.innerHTML = `<div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);opacity:.88;">Sem dados suficientes para montar o bloco Ouro/Petróleo agora.</div>`;
@@ -5516,7 +5556,7 @@ function renderCommoditiesOperationalBriefing() {
                     ${badge(tone, `Scalp: ${action}`)}
                     ${badge('neutral', `Macro: ${macroTxt}`)}
                     ${badge('neutral', `Drivers net ${escapeHtml(fmt2(p.net))}`)}
-                    ${badge(src === 'future' ? 'positive' : src === 'proxy' ? 'warn' : 'neutral', `Execução: ${escapeHtml(execSym || '—')} (${srcLabel(src)})`)}
+                    ${statusBadge(src === 'future' ? 'ok' : src === 'proxy' ? 'info' : 'warn', `Execução: ${escapeHtml(execSym || '—')} (${srcLabel(src)})`, src === 'future' ? 0.70 : src === 'proxy' ? 0.75 : 0.85)}
                 </div>
             </div>
             <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">${escapeHtml(extras)}</div>
@@ -5763,10 +5803,7 @@ function renderHk50OperationalBriefing() {
         return;
     }
 
-    const badge = (tone, text) => {
-        const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
-        return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
-    };
+    const badge = (tone, text, strength) => pillHtml('signal', tone, text, strength);
 
     if (!data || !hkNow) {
         el.innerHTML = `
@@ -6044,7 +6081,8 @@ function renderHk50OperationalBriefing() {
             if (!series.length) return null;
             const last = series[series.length - 1];
             const lastPrice = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
-            if (last && typeof last.changePct === 'number' && Number.isFinite(last.changePct)) return last.changePct;
+            const lastPct = pointPct(last);
+            if (typeof lastPct === 'number' && Number.isFinite(lastPct)) return lastPct;
             const prev = series.length > 1 ? series[series.length - 2] : null;
             const prevPrice = prev && typeof prev.price === 'number' && Number.isFinite(prev.price) ? prev.price : null;
             const deltaRaw = last && typeof last.change === 'number' && Number.isFinite(last.change)
@@ -7389,7 +7427,7 @@ function renderAssetsCatalog(data) {
             const any = getAnyPoint(symbol);
             const lastT = best && best.t ? best.t : any && any.t ? any.t : null;
             const lastPrice = best && isNum(best.price) ? best.price : null;
-            const lastChangePct = best && isNum(best.changePct) ? best.changePct : null;
+            const lastChangePct = pointPct(best);
             const lastExtChangePct = best && isNum(best.extendedChangePct) ? best.extendedChangePct : null;
             return {
                 symbol,
@@ -8555,6 +8593,8 @@ async function loadOptionsGammaSummary() {
             try {
                 const here = new URL('./', location.href);
                 const candidates = [
+                    new URL(`../../../dashboard_unificado/`, here).toString(),
+                    new URL(`../../../../dashboard_unificado/`, here).toString(),
                     new URL(`../../../B3_System/dashboard_unificado/`, here).toString(),
                     new URL(`../../../../B3_System/dashboard_unificado/`, here).toString(),
                 ];
@@ -8659,10 +8699,7 @@ function renderWebNewsModule(payload) {
     const windowHours = ok && typeof payload.windowHours === 'number' ? payload.windowHours : null;
     const generatedAt = ok && payload.generatedAt ? String(payload.generatedAt) : '';
 
-    const badge = (tone, text) => {
-        const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
-        return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
-    };
+    const badge = (tone, text, strength) => pillHtml('signal', tone, text, strength);
 
     if (!ok) {
         setHtml(elId, `
@@ -9001,10 +9038,7 @@ function renderZqCurveBriefing() {
         }
     })();
 
-    const badge = (tone, text) => {
-        const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
-        return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
-    };
+    const badge = (tone, text, strength) => pillHtml('signal', tone, text, strength);
 
     if (!data || !Array.isArray(data.items) || !data.items.length) {
         el.innerHTML = `
@@ -9019,7 +9053,8 @@ function renderZqCurveBriefing() {
     const count = typeof data.contractCount === 'number' && Number.isFinite(data.contractCount) ? data.contractCount : data.items.length;
     const slope = typeof data.slopePct === 'number' && Number.isFinite(data.slopePct) ? data.slopePct : null;
     const risk = String(data.riskMode || 'N/D');
-    const tone = risk === 'RISK_OFF' ? 'negative' : risk === 'RISK_ON' ? 'positive' : 'neutral';
+    const tone = risk === 'RISK_OFF' ? 'risk_off' : risk === 'RISK_ON' ? 'risk_on' : 'neutral';
+    const strength = slope === null ? 0.65 : Math.max(0.40, Math.min(1, Math.abs(slope) / 0.15));
 
     const first = data.items[0] || null;
     const last = data.items[data.items.length - 1] || null;
@@ -9054,8 +9089,8 @@ function renderZqCurveBriefing() {
             <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
                 <div style="font-weight:900;letter-spacing:1px;">Curva Fed Funds (ZQ)</div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                    ${badge(tone, `Regime: ${risk}`)}
-                    ${badge('neutral', `Contratos: ${String(count)}`)}
+                    ${badge(tone, `Regime: ${risk}`, strength)}
+                    ${badge('neutral', `Contratos: ${String(count)}`, 0.55)}
                 </div>
             </div>
             <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
@@ -9098,10 +9133,7 @@ function renderUsTreasuryFuturesBriefing() {
         }
     })();
 
-    const badge = (tone, text) => {
-        const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
-        return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
-    };
+    const badge = (tone, text, strength) => pillHtml('signal', tone, text, strength);
 
     if (!data) {
         el.innerHTML = `
@@ -9154,7 +9186,8 @@ function renderUsTreasuryFuturesBriefing() {
     const shape = String(data.shape || 'N/D');
     const avg = typeof data.avgChangePct === 'number' && Number.isFinite(data.avgChangePct) ? data.avgChangePct : null;
     const slope = typeof data.slopeChangePct === 'number' && Number.isFinite(data.slopeChangePct) ? data.slopeChangePct : null;
-    const riskTone = risk === 'RISK_OFF' ? 'negative' : risk === 'RISK_ON' ? 'positive' : 'neutral';
+    const riskTone = risk === 'RISK_OFF' ? 'risk_off' : risk === 'RISK_ON' ? 'risk_on' : 'neutral';
+    const riskStrength = slope === null ? 0.65 : Math.max(0.40, Math.min(1, Math.abs(slope) / 0.6));
 
     const headLine = (() => {
         const a = avg !== null ? formatPercent(avg, 2) : '—';
@@ -9275,9 +9308,9 @@ function renderUsTreasuryFuturesBriefing() {
             <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
                 <div style="font-weight:900;letter-spacing:1px;">Treasuries (futuros)</div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                    ${badge(riskTone, `Regime: ${risk}`)}
-                    ${badge('neutral', `Contratos: ${String(items.length)}`)}
-                    ${extras.length ? badge('neutral', `Extras: ${String(extras.length)}`) : ''}
+                    ${badge(riskTone, `Regime: ${risk}`, riskStrength)}
+                    ${badge('neutral', `Contratos: ${String(items.length)}`, 0.55)}
+                    ${extras.length ? badge('neutral', `Extras: ${String(extras.length)}`, 0.55) : ''}
                 </div>
             </div>
             <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
@@ -9488,20 +9521,17 @@ function renderOperationalBriefing() {
     const fmt1 = v => (typeof v === 'number' && Number.isFinite(v) ? formatNumber(v, 1) : '—');
 
     if (!regime && !options && !web && !focus) {
-        const badge = (tone, text) => {
-            const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
-            return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
-        };
-        const st = x => (x ? (x.ok === true ? badge('positive', 'OK') : badge('negative', 'ERRO')) : badge('neutral', '—'));
+        const badge = (tone, text, strength) => pillHtml('status', tone, text, strength);
+        const st = x => (x ? (x.ok === true ? badge('ok', 'OK', 0.75) : badge('bad', 'ERRO', 0.85)) : badge('info', '—', 0.55));
         el.innerHTML = `
             <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
                     <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Roteiro do momento</div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                        ${badge('neutral', 'Regime')} ${st(rawRegime)}
-                        ${badge('neutral', 'Opções')} ${st(rawOptions)}
-                        ${badge('neutral', 'News')} ${st(rawWeb)}
-                        ${badge('neutral', 'Focus')} ${st(rawFocus)}
+                        ${badge('info', 'Regime', 0.55)} ${st(rawRegime)}
+                        ${badge('info', 'Opções', 0.55)} ${st(rawOptions)}
+                        ${badge('info', 'News', 0.55)} ${st(rawWeb)}
+                        ${badge('info', 'Focus', 0.55)} ${st(rawFocus)}
                     </div>
                 </div>
                 <div style="margin-top:10px;opacity:.88;line-height:1.35;">
@@ -10011,7 +10041,7 @@ function renderOperationalBriefing() {
                 const rate = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
                 const chg = last && typeof last.change === 'number' && Number.isFinite(last.change) ? last.change : null;
                 const chgBp10 = typeof chg === 'number' && Number.isFinite(chg) ? (chg * 100) / 10 : null;
-                const chgPct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+                const chgPct = pointPct(last);
                 const y = 2000 + Number(String(symbol).slice(-2));
                 const m = monthNum(String(symbol)[3]);
                 return { symbol, rate, chgBp10, chgPct, year: Number.isFinite(y) ? y : null, month: m };
@@ -10414,8 +10444,59 @@ function renderOperationalBriefing() {
             ? (finalBias.WDO.source === 'PREÇO' || finalBias.WDO.source === 'TENDÊNCIA' || finalBias.WDO.source === 'FITA_LOCAL' || finalBias.WDO.source === 'PULSO'
                 || finalBias.WIN.source === 'PREÇO' || finalBias.WIN.source === 'TENDÊNCIA' || finalBias.WIN.source === 'FITA_LOCAL' || finalBias.WIN.source === 'PULSO')
             : false;
-        const macroWinCompass = forced ? { ...macroWin, bias: 'neutral' } : macroWin;
-        const macroWdoCompass = forced ? { ...macroWdo, bias: 'neutral' } : macroWdo;
+        const b2v = (b, k) => (b === 'buy' ? k : b === 'sell' ? -k : 0);
+        const clamp11 = (x) => Math.max(-1, Math.min(1, typeof x === 'number' && Number.isFinite(x) ? x : 0));
+        const driversFor = (symbol) => {
+            const sym = String(symbol || '').toUpperCase();
+            const isWdo = sym === 'WDO';
+            const isWin = sym === 'WIN';
+            const fb = isWdo ? finalBias.WDO : isWin ? finalBias.WIN : { bias: 'neutral', source: '—' };
+            const nt = isWdo ? newsTilt.wdo : newsTilt.win;
+            const mb = isWdo ? macroWdo : macroWin;
+            const out = [];
+
+            if (fb && fb.source === 'PREÇO' && priceLead && priceLead.active && priceLead.reason) {
+                out.push({ label: `PREÇO: ${String(priceLead.reason)}`, val: b2v(fb.bias, 0.95) });
+            } else if (fb && fb.source === 'TENDÊNCIA' && trendLead && trendLead.active && trendLead.reason) {
+                out.push({ label: `TENDÊNCIA: ${String(trendLead.reason)}`, val: b2v(fb.bias, 0.85) });
+            } else if (fb && fb.source === 'FITA_LOCAL' && localTapeLead && localTapeLead.active && localTapeLead.reason) {
+                out.push({ label: `FITA_LOCAL: ${String(localTapeLead.reason)}`, val: b2v(fb.bias, 0.82) });
+            } else if (fb && fb.source === 'PULSO' && pulseLead && pulseLead.active && pulseLead.reason) {
+                out.push({ label: `PULSO: ${String(pulseLead.reason)}`, val: b2v(fb.bias, 0.78) });
+            }
+
+            if (regime && regimeBias) {
+                const rb = isWdo ? regimeBias.wdo : isWin ? regimeBias.win : 'neutral';
+                if (rb !== 'neutral') out.push({ label: `Regime: ${String(regime.label || '—')}`, val: b2v(rb, 0.60) });
+            }
+            if (web && nt && typeof nt.score === 'number' && Number.isFinite(nt.score)) {
+                const v = clamp11(nt.score) * 0.55;
+                if (Math.abs(v) > 0.001) out.push({ label: `News tilt: ${fmt1(nt.score)}`, val: v });
+            }
+            if (diSignal && diSignal.ok) {
+                const db = isWdo ? diSignal.wdoBias : isWin ? diSignal.winBias : 'neutral';
+                if (db !== 'neutral') out.push({ label: `DI: ${String(diSignal.shape || '—')}`, val: b2v(db, 0.45) });
+            }
+
+            if (fb && fb.source === 'MACRO' && mb && Array.isArray(mb.parts) && mb.parts.length) {
+                const parts = mb.parts
+                    .slice()
+                    .filter(p => p && typeof p.val === 'number' && Number.isFinite(p.val))
+                    .sort((a, b) => Math.abs(b.val) - Math.abs(a.val))
+                    .slice(0, 4)
+                    .map(p => ({ label: String(p.label || 'Macro'), val: clamp11(p.val) * 0.70 }));
+                out.push(...parts);
+            }
+
+            return out;
+        };
+
+        const macroWinCompass = forced
+            ? { ...macroWin, bias: 'neutral' }
+            : (finalBias && finalBias.WIN && finalBias.WIN.source === 'MACRO' ? macroWin : { ...macroWin, bias: 'neutral' });
+        const macroWdoCompass = forced
+            ? { ...macroWdo, bias: 'neutral' }
+            : (finalBias && finalBias.WDO && finalBias.WDO.source === 'MACRO' ? macroWdo : { ...macroWdo, bias: 'neutral' });
         const model = buildOperationalCompassModel({
             regime,
             options,
@@ -10425,16 +10506,14 @@ function renderOperationalBriefing() {
             macroWin: macroWinCompass,
             macroWdo: macroWdoCompass,
             fallbackBias: { win: finalBias.WIN.bias, wdo: finalBias.WDO.bias },
+            drivers: { win: driversFor('WIN'), wdo: driversFor('WDO') },
         });
         renderOperationalCompass(model);
     } catch {
         try { renderOperationalCompass(null); } catch { }
     }
 
-    const badge = (tone, text) => {
-        const cls = tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : 'neutral';
-        return `<span class="${cls}" style="display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:4px 10px;background:rgba(0,0,0,.18);font-family:'Share Tech Mono',monospace;font-weight:900;">${escapeHtml(text)}</span>`;
-    };
+    const badge = (tone, text, strength) => pillHtml('signal', tone, text, strength);
 
     const biasTone = b => (b === 'buy' ? 'positive' : b === 'sell' ? 'negative' : 'neutral');
     const biasLabel = (symbol, b) => {
@@ -11764,7 +11843,7 @@ function renderOperationalBriefing() {
                     ${badge('neutral', `WIN agora: ${header}`)}
                     ${badge('neutral', `Ref Fechamento: ${fmt0(refClose)}`)}
                     ${badge('neutral', `Ref Ajuste: ${fmt0(refAdjust)}`)}
-                    ${badge(typeof prevClose === 'number' ? 'neutral' : 'warn', `Fech (ontem): ${fmt0(prevClose)}`)}
+                    ${pillHtml('status', typeof prevClose === 'number' ? 'info' : 'warn', `Fech (ontem): ${fmt0(prevClose)}`, typeof prevClose === 'number' ? 0.55 : 0.85)}
                 </div>
                 <div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;">
                     <div>
@@ -12325,9 +12404,7 @@ function renderOperationalBriefing() {
                 const asOfVal = last && (last.asOf || last.t) ? (last.asOf || last.t) : null;
                 const tMs = asOfVal ? Date.parse(asOfVal) : NaN;
                 const asOf = Number.isFinite(tMs) ? new Date(tMs) : null;
-                const extPct = last && typeof last.extendedChangePct === 'number' && Number.isFinite(last.extendedChangePct) ? last.extendedChangePct : null;
-                const regularPct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
-                const pct = extPct !== null ? extPct : isRecentPremarketSnapshot(asOf) ? regularPct : null;
+                const pct = pointPct(last);
                 return { symbol: a.symbol, name: a.name, last, pct, asOf, isAdr: isBrazilAdr({ symbol: a.symbol, name: a.name }) };
             }).filter(r => r.isAdr && r.pct !== null && r.asOf && isRecentPremarketSnapshot(r.asOf));
             if (!rows.length) return '';
@@ -12460,21 +12537,21 @@ function renderOperationalBriefing() {
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
                                     const last = getLastPoint(data, 'USDX') || null;
                                     const price = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
-                                    const pct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+                                    const pct = pointPct(last);
                                     const px = price !== null ? mk('neutral', mkNum(price)) : mk('neutral', '—');
                                     const pp = pct !== null ? mk('neutral', mkPct(pct)) : mk('neutral', '—');
                                     return `${px} • ${pp}`;
                                 })()}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
                                     const last = getLastPoint(data, 'USDX') || null;
-                                    const pct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+                                    const pct = pointPct(last);
                                     const t = typeof operationalTuning.threshold.dxy === 'number' && Number.isFinite(operationalTuning.threshold.dxy) ? operationalTuning.threshold.dxy : 0.12;
                                     const dir = typeof pct === 'number' ? (pct > t ? +1 : pct < -t ? -1 : 0) : 0;
                                     return mk(dirTone(dir), dir > 0 ? 'Compra' : dir < 0 ? 'Venda' : 'Neutro');
                                 })()}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
                                     const last = getLastPoint(data, 'USDX') || null;
-                                    const pct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+                                    const pct = pointPct(last);
                                     const t = typeof operationalTuning.threshold.dxy === 'number' && Number.isFinite(operationalTuning.threshold.dxy) ? operationalTuning.threshold.dxy : 0.12;
                                     const dir = typeof pct === 'number' ? (pct > t ? -1 : pct < -t ? +1 : 0) : 0;
                                     return mk(dirTone(dir), dir > 0 ? 'Compra' : dir < 0 ? 'Venda' : 'Neutro');
@@ -12506,21 +12583,21 @@ function renderOperationalBriefing() {
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
                                     const last = getLastPoint(data, 'HTDIX') || null;
                                     const price = last && typeof last.price === 'number' && Number.isFinite(last.price) ? last.price : null;
-                                    const pct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+                                    const pct = pointPct(last);
                                     const px = price !== null ? mk('neutral', mkNum(price)) : mk('neutral', '—');
                                     const pp = pct !== null ? mk('neutral', mkPct(pct)) : mk('neutral', '—');
                                     return `${px} • ${pp}`;
                                 })()}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
                                     const last = getLastPoint(data, 'HTDIX') || null;
-                                    const pct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+                                    const pct = pointPct(last);
                                     const t = 0.25;
                                     const dir = typeof pct === 'number' ? (pct > t ? -1 : pct < -t ? +1 : 0) : 0;
                                     return mk(dirTone(dir), dir > 0 ? 'Compra' : dir < 0 ? 'Venda' : 'Neutro');
                                 })()}</td>
                                 <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.06);">${(() => {
                                     const last = getLastPoint(data, 'HTDIX') || null;
-                                    const pct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+                                    const pct = pointPct(last);
                                     const t = 0.25;
                                     const dir = typeof pct === 'number' ? (pct > t ? +1 : pct < -t ? -1 : 0) : 0;
                                     return mk(dirTone(dir), dir > 0 ? 'Compra' : dir < 0 ? 'Venda' : 'Neutro');
@@ -13147,7 +13224,7 @@ function findAliasSymbolBest(data, key) {
 function getChangePct(data, symbol) {
     if (!symbol) return null;
     const last = getLastPoint(data, symbol);
-    return last && typeof last.changePct === 'number' ? last.changePct : null;
+    return pointPct(last);
 }
 
 function avg(numbers) {
@@ -13692,7 +13769,7 @@ function renderCarryTradeMonitor(data) {
         if (!p) return null;
         const price = typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
         const change = typeof p.change === 'number' && Number.isFinite(p.change) ? p.change : null;
-        const changePct = typeof p.changePct === 'number' && Number.isFinite(p.changePct) ? p.changePct : null;
+        const changePct = pointPct(p);
         const t = p.t ? String(p.t) : '';
         const tMs = t ? Date.parse(t) : NaN;
         return { price, change, changePct, t, tMs: Number.isFinite(tMs) ? tMs : null };
@@ -13731,7 +13808,7 @@ function renderCarryTradeMonitor(data) {
     const hstech = lastOf(symbols.hstech);
     const ewh = lastOf(symbols.ewh);
 
-    const pctOf = x => (x && typeof x.changePct === 'number' ? x.changePct : null);
+    const pctOf = x => pointPct(x);
     const priceOf = x => (x && typeof x.price === 'number' ? x.price : null);
     const changeOf = x => (x && typeof x.change === 'number' ? x.change : null);
 
@@ -14271,7 +14348,7 @@ function renderCarryIntel(data) {
         if (!p) return null;
         const price = typeof p.price === 'number' && Number.isFinite(p.price) ? p.price : null;
         const change = typeof p.change === 'number' && Number.isFinite(p.change) ? p.change : null;
-        const changePct = typeof p.changePct === 'number' && Number.isFinite(p.changePct) ? p.changePct : null;
+        const changePct = pointPct(p);
         return { price, change, changePct };
     };
 
@@ -14294,7 +14371,7 @@ function renderCarryIntel(data) {
     const usdmxn = lastOf(symbols.usdmxn);
     const usdzar = lastOf(symbols.usdzar);
 
-    const pctOf = x => (x && typeof x.changePct === 'number' ? x.changePct : null);
+    const pctOf = x => pointPct(x);
 
     const audusdPct = pctOf(audusd);
     const nzdusdPct = pctOf(nzdusd);
@@ -14524,7 +14601,7 @@ function renderGlobalTicker(data) {
             const asset = (data.assets || []).find(a => String(a.symbol) === String(symbol)) || null;
             const last = getLastPoint(data, symbol);
             if (!last || typeof last.price !== 'number') return null;
-            const pct = typeof last.changePct === 'number' ? last.changePct : null;
+            const pct = pointPct(last);
             const badge = pct === null ? toneBadgeHtmlFromTone('neutral', 0, '—') : toneBadgeHtml(pct, formatPercent(pct, 2), { maxAbs: 5 });
             const priceTxt = formatTickerPrice(symbol, last.price, d.fmt);
             const title = asset && asset.name ? `${asset.name} • ${symbol}` : symbol;
@@ -14575,19 +14652,21 @@ function renderOverview(data) {
 
     const rowsAll = (data.assets || [])
         .map(a => ({ a, last: getLastPoint(data, a.symbol) }))
-        .filter(x => x.last && typeof x.last.changePct === 'number');
+        .filter(x => pointPct(x.last) !== null);
 
-    const sorted = rowsAll.slice().sort((x, y) => (y.last.changePct || 0) - (x.last.changePct || 0));
+    const sorted = rowsAll.slice().sort((x, y) => (pointPct(y.last) ?? 0) - (pointPct(x.last) ?? 0));
     const topUp = sorted.length ? sorted[0] : null;
     const topDown = sorted.length ? sorted[sorted.length - 1] : null;
 
     if (topUp) {
         setMetricMultiline('metric-top-up', topUp.a.name || topUp.a.symbol);
-        setHtml('metric-top-up-pct', toneBadgeHtml(topUp.last.changePct, formatPercent(topUp.last.changePct), { maxAbs: 5 }));
+        const pct = pointPct(topUp.last);
+        setHtml('metric-top-up-pct', toneBadgeHtml(pct, formatPercent(pct), { maxAbs: 5 }));
     }
     if (topDown) {
         setMetricMultiline('metric-top-down', topDown.a.name || topDown.a.symbol);
-        setHtml('metric-top-down-pct', toneBadgeHtml(topDown.last.changePct, formatPercent(topDown.last.changePct), { maxAbs: 5 }));
+        const pct = pointPct(topDown.last);
+        setHtml('metric-top-down-pct', toneBadgeHtml(pct, formatPercent(pct), { maxAbs: 5 }));
     }
 
     const flow = computeFlowScore(data);
@@ -14648,7 +14727,7 @@ function renderBrazilExportBasket(data) {
     if (!el) return;
 
     const mk = (tone, txt) => toneBadgeHtmlFromTone(tone, 0, txt, { maxAbs: 1 });
-    const pctOf = x => (x && typeof x.changePct === 'number' && Number.isFinite(x.changePct) ? x.changePct : null);
+    const pctOf = x => pointPct(x);
     const dc = (typeof window !== 'undefined' && window.DecisionCore) ? window.DecisionCore : null;
     const dcDeps = { findAliasSymbolBest, findAliasSymbol, findAssetSymbol, getLastPoint };
     const assets = data && Array.isArray(data.assets) ? data.assets : [];
@@ -15311,7 +15390,7 @@ function renderMercosul(data) {
     const pick = (label, matchers, { invertForScore = false, aliasKey = null } = {}) => {
         const symbol = aliasKey ? (aliasSym(aliasKey) || pickBestByMatchers(matchers) || null) : (pickBestByMatchers(matchers) || null);
         const last = symbol ? (getMostRecentPointWithPrice(data, symbol) || getLastPoint(data, symbol)) : null;
-        const pct = last && typeof last.changePct === 'number' && Number.isFinite(last.changePct) ? last.changePct : null;
+        const pct = pointPct(last);
         const score = pct === null ? null : (invertForScore ? -pct : pct);
         const a = symbol ? (assetBySymbol.get(symbol) || null) : null;
         return { label, symbol, last, pct, score, asset: a, invertForScore: !!invertForScore };
@@ -16035,7 +16114,7 @@ function renderMarketPanorama(data) {
             .map(symbol => {
                 const last = getMostRecentPointWithPrice(data, symbol);
                 const price = last && typeof last.price === 'number' ? last.price : null;
-                const pct = last && typeof last.changePct === 'number' ? last.changePct : null;
+                const pct = pointPct(last);
                 const t = last && last.t ? String(last.t) : '';
                 const yy = Number(String(symbol).slice(-2));
                 const mm = diMonthNum(String(symbol)[3]);
@@ -16058,7 +16137,7 @@ function renderMarketPanorama(data) {
                 const symbol = String(a && a.symbol ? a.symbol : '');
                 const last = includeMissing ? getLastPoint(data, symbol) : getMostRecentPointWithPrice(data, symbol);
                 const price = last && typeof last.price === 'number' ? last.price : null;
-                const pct = last && typeof last.changePct === 'number' ? last.changePct : null;
+                const pct = pointPct(last);
                 const t = last && last.t ? String(last.t) : '';
                 const label = String(a && a.name ? a.name : symbol);
                 const icon = assetIcon({ symbol, name: label, category: a && a.category ? a.category : 'other', tags: a && a.tags ? a.tags : [] });
@@ -16073,7 +16152,7 @@ function renderMarketPanorama(data) {
                 const a = assetBySymbol.get(String(dxySymbol)) || null;
                 const last = getMostRecentPointWithPrice(data, dxySymbol);
                 const price = last && typeof last.price === 'number' ? last.price : null;
-                const pct = last && typeof last.changePct === 'number' ? last.changePct : null;
+                const pct = pointPct(last);
                 const t = last && last.t ? String(last.t) : '';
                 const label = a && a.name ? String(a.name) : 'DXY';
                 const icon = assetIcon({ symbol: dxySymbol, name: label, category: a && a.category ? a.category : 'other', tags: a && a.tags ? a.tags : [] });
@@ -16121,7 +16200,7 @@ function renderMarketPanorama(data) {
                     const symbol = String(a && a.symbol ? a.symbol : '');
                     const last = getLastPoint(data, symbol);
                     const price = last && typeof last.price === 'number' ? last.price : null;
-                    const pct = last && typeof last.changePct === 'number' ? last.changePct : null;
+                    const pct = pointPct(last);
                     const t = last && last.t ? String(last.t) : '';
                     const label = String(a && a.name ? a.name : symbol);
                     const icon = assetIcon({ symbol, name: label, category: '', tags: a && a.tags ? a.tags : [] });
@@ -16646,7 +16725,7 @@ function setupAssetSwitchNav() {
     function targetFor(val) {
         if (val === 'MERCADO') return location.href;
         if (isProdHost()) return prodBase + (val === 'WDO' ? 'WDO/' : 'WIN/');
-        return '../../../B3_System/dashboard_unificado/' + (val === 'WDO' ? 'WDO/index.html' : 'WIN/index.html');
+        return '../../../dashboard_unificado/' + (val === 'WDO' ? 'WDO/index.html' : 'WIN/index.html');
     }
     sel.addEventListener('change', function (e) {
         const url = targetFor(e.target.value);
@@ -16899,10 +16978,13 @@ function evaluateAlerts(data) {
 
     const threshold = Math.abs(state.threshold);
     const hits = (data.assets || [])
-        .map(a => ({ a, last: getLastPoint(data, a.symbol) }))
-        .filter(x => x.last && typeof x.last.changePct === 'number')
-        .filter(x => Math.abs(x.last.changePct) >= threshold)
-        .sort((x, y) => Math.abs(y.last.changePct) - Math.abs(x.last.changePct))
+        .map(a => {
+            const last = getLastPoint(data, a.symbol);
+            return { a, last, pct: pointPct(last) };
+        })
+        .filter(x => typeof x.pct === 'number' && Number.isFinite(x.pct))
+        .filter(x => Math.abs(x.pct) >= threshold)
+        .sort((x, y) => Math.abs(y.pct) - Math.abs(x.pct))
         .slice(0, 12);
 
     if (!hits.length) {
@@ -16912,7 +16994,7 @@ function evaluateAlerts(data) {
 
     const html = hits
         .map(x => {
-            const pct = x.last.changePct || 0;
+            const pct = x.pct || 0;
             const badge = toneBadgeHtml(pct, formatPercent(pct), { maxAbs: 5 });
             return `
                 <div style="display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;margin-bottom:10px;background:rgba(0,0,0,.35);">
@@ -16936,7 +17018,7 @@ function evaluateAlerts(data) {
     const prev = localStorage.getItem(lastNotifiedKey);
     if (prev !== key && 'Notification' in window && Notification.permission === 'granted') {
         const top = hits[0];
-        const pct = top.last.changePct || 0;
+        const pct = top.pct || 0;
         new Notification('Alerta de Fluxo (MVP)', {
             body: `${top.a.symbol} ${formatPercent(pct)} • ${top.a.category}`,
         });

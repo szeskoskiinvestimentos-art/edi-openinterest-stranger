@@ -1,5 +1,8 @@
 (() => {
     const isNum = v => typeof v === 'number' && Number.isFinite(v);
+    const pointPct = (typeof window !== 'undefined' && window.MercadoUtils && typeof window.MercadoUtils.pointPct === 'function')
+        ? window.MercadoUtils.pointPct
+        : (p => (p && isNum(p.extendedChangePct)) ? p.extendedChangePct : (p && isNum(p.changePct)) ? p.changePct : null);
 
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -32,8 +35,7 @@
 
     const symbolChangePct = (deps, data, symbol) => {
         const last = symbolLast(deps, data, symbol);
-        const v = last && isNum(last.changePct) ? last.changePct : null;
-        return v;
+        return pointPct(last);
     };
 
     const symbolHasChangePct = (deps, data, symbol) => isNum(symbolChangePct(deps, data, symbol));
@@ -69,7 +71,7 @@
             }
             present += 1;
             if (isNum(last.price)) withPrice += 1;
-            if (isNum(last.changePct)) withChange += 1;
+            if (isNum(pointPct(last))) withChange += 1;
             const tMs = last && last.t ? parseTimeMs(last.t) : null;
             if (tMs !== null) {
                 withTime += 1;

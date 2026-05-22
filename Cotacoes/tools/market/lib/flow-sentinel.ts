@@ -17,6 +17,7 @@ function weightedAvg(xs: Array<{ v: number | null; w: number }>) {
 function latestPct(points: MarketPoint[] | undefined | null) {
   if (!points || points.length < 1) return null
   const last = points[points.length - 1]
+  if (last && typeof last.extendedChangePct === 'number' && Number.isFinite(last.extendedChangePct)) return last.extendedChangePct
   if (last && typeof last.changePct === 'number' && Number.isFinite(last.changePct)) return last.changePct
   if (points.length < 2) return null
   const prev = points[points.length - 2]

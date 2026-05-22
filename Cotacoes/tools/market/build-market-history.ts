@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import path from 'node:path'
-import { readdir, stat, mkdir, unlink } from 'node:fs/promises'
+import { readdir, stat, mkdir, unlink, rename, copyFile } from 'node:fs/promises'
 import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from './lib/args.js'
@@ -586,12 +586,14 @@ function parseSinaHqVar(raw: string) {
       .map(x => String(x || '').trim())
       .find(x => /^\d{4}-\d{2}-\d{2}$/.test(x)) || null
 
+  const prevClose = Number(parts[5])
   const price = Number(parts[8])
   if (!Number.isFinite(price)) return null
-  const change = Number(parts[9])
+  const change = Number.isFinite(prevClose) ? price - prevClose : Number(parts[9])
   return {
     name: name || null,
     price,
+    prevClose: Number.isFinite(prevClose) ? prevClose : null,
     change: Number.isFinite(change) ? change : null,
     time,
     date,
@@ -607,11 +609,429 @@ async function fileExists(p: string) {
   }
 }
 
+async function atomicWriteText(finalPath: string, content: string) {
+  const tmp = `${finalPath}.tmp_${String(process.pid)}_${String(Date.now())}_${Math.random().toString(16).slice(2)}`
+  await writeFile(tmp, content, 'utf-8')
+
+  const bak = `${finalPath}.bak`
+  const hasFinal = await fileExists(finalPath)
+  if (hasFinal) {
+    try {
+      await unlink(bak)
+    } catch {
+    }
+    try {
+      await rename(finalPath, bak)
+    } catch (e) {
+      try {
+        await unlink(tmp)
+      } catch {
+      }
+      throw e
+    }
+  }
+
+  try {
+    await rename(tmp, finalPath)
+  } catch (e) {
+    if (hasFinal) {
+      try {
+        await rename(bak, finalPath)
+      } catch {
+      }
+    }
+    try {
+      await unlink(tmp)
+    } catch {
+    }
+    throw e
+  }
+
+  if (hasFinal) {
+    try {
+      await unlink(bak)
+    } catch {
+    }
+  }
+}
+
 async function writeJsonAndJs(outDir: string, baseName: string, windowKey: string, payload: unknown) {
   const jsonPath = path.join(outDir, `${baseName}.json`)
   const jsPath = path.join(outDir, `${baseName}.js`)
-  await writeFile(jsonPath, JSON.stringify(payload, null, 2), 'utf-8')
-  await writeFile(jsPath, `window.${windowKey}=${JSON.stringify(payload)};`, 'utf-8')
+  const jsonText = JSON.stringify(payload, null, 2)
+  JSON.parse(jsonText)
+  await atomicWriteText(jsonPath, jsonText)
+  await atomicWriteText(jsPath, `window.${windowKey}=${JSON.stringify(payload)};`)
+}
+
+function ymdUtc(d: Date) {
+  const yyyy = String(d.getUTCFullYear())
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const dd = String(d.getUTCDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
+function safeNum(v: unknown) {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+function olsStats(x: number[], y: number[]) {
+  const n = Math.min(x.length, y.length)
+  if (n < 10) return null
+  let sx = 0
+  let sy = 0
+  let k = 0
+  for (let i = 0; i < n; i++) {
+    const xi = x[i]
+    const yi = y[i]
+    if (!Number.isFinite(xi) || !Number.isFinite(yi)) continue
+    sx += xi
+    sy += yi
+    k++
+  }
+  if (k < 10) return null
+  const mx = sx / k
+  const my = sy / k
+  let sxx = 0
+  let syy = 0
+  let sxy = 0
+  for (let i = 0; i < n; i++) {
+    const xi = x[i]
+    const yi = y[i]
+    if (!Number.isFinite(xi) || !Number.isFinite(yi)) continue
+    const dx = xi - mx
+    const dy = yi - my
+    sxx += dx * dx
+    syy += dy * dy
+    sxy += dx * dy
+  }
+  if (sxx <= 0 || syy <= 0) return null
+  const beta = sxy / sxx
+  const alpha = my - beta * mx
+  const corr = sxy / Math.sqrt(sxx * syy)
+  const r2 = corr * corr
+  return { n: k, alpha, beta, corr, r2 }
+}
+
+async function fetchYahooChartCloses(ticker: string, range = '1y', interval = '1d') {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}`
+  const headers = { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' }
+  const j = await fetchJsonWithTimeout<any>(url, 12000, headers)
+  const r = j && j.chart && Array.isArray(j.chart.result) ? j.chart.result[0] : null
+  const ts = r && Array.isArray(r.timestamp) ? r.timestamp : null
+  const closes = r && r.indicators && r.indicators.quote && Array.isArray(r.indicators.quote) ? r.indicators.quote[0]?.close : null
+  if (!ts || !closes || !Array.isArray(closes) || ts.length !== closes.length) throw new Error(`Yahoo chart inválido (${ticker})`)
+  const out: Array<{ t: number; c: number }> = []
+  for (let i = 0; i < ts.length; i++) {
+    const t = Number(ts[i])
+    const c = safeNum(closes[i])
+    if (!Number.isFinite(t) || c === null) continue
+    out.push({ t, c })
+  }
+  if (out.length < 30) throw new Error(`Yahoo chart sem dados suficientes (${ticker})`)
+  return out
+}
+
+async function computeUsdBrlBeta(proxyTicker: string) {
+  const [proxy, fx] = await Promise.all([
+    fetchYahooChartCloses(proxyTicker, '1y', '1d'),
+    fetchYahooChartCloses('USDBRL=X', '1y', '1d'),
+  ])
+  const fxByDay = new Map<string, number>()
+  for (const p of fx) {
+    const day = ymdUtc(new Date(p.t * 1000))
+    fxByDay.set(day, p.c)
+  }
+  const aligned: Array<{ day: string; proxy: number; fx: number }> = []
+  for (const p of proxy) {
+    const day = ymdUtc(new Date(p.t * 1000))
+    const fxClose = fxByDay.get(day)
+    if (fxClose === undefined) continue
+    aligned.push({ day, proxy: p.c, fx: fxClose })
+  }
+  aligned.sort((a, b) => a.day.localeCompare(b.day))
+  const proxyRet: number[] = []
+  const fxRet: number[] = []
+  for (let i = 1; i < aligned.length; i++) {
+    const p0 = aligned[i - 1]
+    const p1 = aligned[i]
+    if (p0.proxy <= 0 || p0.fx <= 0) continue
+    proxyRet.push(p1.proxy / p0.proxy - 1)
+    fxRet.push(p1.fx / p0.fx - 1)
+  }
+  const windows: Record<string, unknown> = {}
+  for (const w of [30, 60, 90, 252]) {
+    const n = Math.min(w, proxyRet.length, fxRet.length)
+    const xs = proxyRet.slice(-n)
+    const ys = fxRet.slice(-n)
+    const st = olsStats(xs, ys)
+    if (st) windows[String(w)] = st
+  }
+  const latest = aligned.length ? aligned[aligned.length - 1] : null
+  return {
+    method: 'ols_returns',
+    proxy_ticker: proxyTicker,
+    fx_ticker: 'USDBRL=X',
+    period: '1y',
+    computed_at_utc: new Date().toISOString(),
+    windows,
+    latest: latest
+      ? {
+          proxy_close: latest.proxy,
+          fx_close: latest.fx,
+          fx_points: latest.fx * 1000,
+        }
+      : null,
+  }
+}
+
+async function fetchYahooOptionsAllExpiries(ticker: string) {
+  const headers = { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' }
+  const baseUrl = `https://query2.finance.yahoo.com/v7/finance/options/${encodeURIComponent(ticker)}`
+  const isAuthOrForbidden = (e: unknown) => {
+    const msg = String(e instanceof Error ? e.message : e || '')
+    return /\bHTTP\s+(401|403)\b/.test(msg)
+  }
+
+  const fetchJsonViaPlaywright = async (url: string) => {
+    const { chromium } = await import('playwright')
+    const browser = await chromium.launch({ headless: true })
+    try {
+      const context = await browser.newContext({
+        userAgent: headers['User-Agent'],
+        locale: 'en-US',
+      })
+      const page = await context.newPage()
+      try {
+        await page.goto('https://finance.yahoo.com', { waitUntil: 'domcontentloaded', timeout: 45000 })
+      } catch {
+        void 0
+      }
+      const r = await context.request.get(url, { headers: { Accept: headers.Accept } })
+      if (!r.ok()) throw new Error(`HTTP ${r.status()}`)
+      return await r.json()
+    } finally {
+      await browser.close()
+    }
+  }
+
+  const fetchChainViaPlaywright = async () => {
+    const root = await fetchJsonViaPlaywright(baseUrl)
+    const res0 = root && root.optionChain && Array.isArray(root.optionChain.result) ? root.optionChain.result[0] : null
+    const expirations: number[] = res0 && Array.isArray(res0.expirationDates) ? res0.expirationDates : []
+    const quote = res0 && typeof res0.quote === 'object' ? res0.quote : null
+    const spot =
+      quote && typeof quote.regularMarketPrice === 'number'
+        ? quote.regularMarketPrice
+        : quote && typeof quote.postMarketPrice === 'number'
+          ? quote.postMarketPrice
+          : quote && typeof quote.previousClose === 'number'
+            ? quote.previousClose
+            : null
+
+    const by_expiry: Record<string, unknown> = {}
+    const expiries: string[] = []
+    let rawRows = 0
+
+    const maxExpiries = clamp(Number(env('YAHOO_USD_OPTIONS_MAX_EXPIRIES', '999')) || 999, 1, 999)
+    const picked = expirations.slice(0, maxExpiries)
+
+    for (const exp of picked) {
+      const url = `${baseUrl}?date=${encodeURIComponent(String(exp))}`
+      const j = await fetchJsonViaPlaywright(url)
+      const r = j && j.optionChain && Array.isArray(j.optionChain.result) ? j.optionChain.result[0] : null
+      const opts = r && Array.isArray(r.options) ? r.options[0] : null
+      const calls = opts && Array.isArray(opts.calls) ? opts.calls : []
+      const puts = opts && Array.isArray(opts.puts) ? opts.puts : []
+      rawRows += calls.length + puts.length
+      const expDate = opts && typeof opts.expirationDate === 'number' ? opts.expirationDate : exp
+      const expYmd = ymdUtc(new Date(expDate * 1000))
+      expiries.push(expYmd)
+
+      const map = new Map<number, { call: number; put: number }>()
+      const addOne = (row: any, kind: 'call' | 'put') => {
+        const strike = safeNum(row?.strike)
+        if (strike === null) return
+        const oi = safeNum(row?.openInterest) ?? 0
+        const prev = map.get(strike) || { call: 0, put: 0 }
+        if (kind === 'call') prev.call += oi
+        else prev.put += oi
+        map.set(strike, prev)
+      }
+      for (const row of calls) addOne(row, 'call')
+      for (const row of puts) addOne(row, 'put')
+
+      const strikes = Array.from(map.keys()).sort((a, b) => a - b)
+      const call_oi = strikes.map(k => (map.get(k)?.call ?? 0))
+      const put_oi = strikes.map(k => (map.get(k)?.put ?? 0))
+      const calls_count = call_oi.filter(x => (Number(x) || 0) > 0).length
+      const puts_count = put_oi.filter(x => (Number(x) || 0) > 0).length
+
+      by_expiry[expYmd] = { strikes, call_oi, put_oi, calls_count, puts_count }
+    }
+
+    const uniqExp = Array.from(new Set(expiries)).sort((a, b) => a.localeCompare(b))
+    return { spot, expiries: uniqExp, by_expiry, raw_rows_count: rawRows }
+  }
+
+  let root: any
+  try {
+    root = await fetchJsonWithTimeout<any>(baseUrl, 12000, headers)
+  } catch (e) {
+    if (isAuthOrForbidden(e)) return await fetchChainViaPlaywright()
+    throw e
+  }
+  const res0 = root && root.optionChain && Array.isArray(root.optionChain.result) ? root.optionChain.result[0] : null
+  const expirations: number[] = res0 && Array.isArray(res0.expirationDates) ? res0.expirationDates : []
+  const quote = res0 && typeof res0.quote === 'object' ? res0.quote : null
+  const spot =
+    quote && typeof quote.regularMarketPrice === 'number'
+      ? quote.regularMarketPrice
+      : quote && typeof quote.postMarketPrice === 'number'
+        ? quote.postMarketPrice
+        : quote && typeof quote.previousClose === 'number'
+          ? quote.previousClose
+          : null
+
+  const by_expiry: Record<string, unknown> = {}
+  const expiries: string[] = []
+  let rawRows = 0
+
+  const maxExpiries = clamp(Number(env('YAHOO_USD_OPTIONS_MAX_EXPIRIES', '999')) || 999, 1, 999)
+  const picked = expirations.slice(0, maxExpiries)
+
+  for (const exp of picked) {
+    const url = `${baseUrl}?date=${encodeURIComponent(String(exp))}`
+    let j: any
+    try {
+      j = await fetchJsonWithTimeout<any>(url, 12000, headers)
+    } catch (e) {
+      if (isAuthOrForbidden(e)) return await fetchChainViaPlaywright()
+      throw e
+    }
+    const r = j && j.optionChain && Array.isArray(j.optionChain.result) ? j.optionChain.result[0] : null
+    const opts = r && Array.isArray(r.options) ? r.options[0] : null
+    const calls = opts && Array.isArray(opts.calls) ? opts.calls : []
+    const puts = opts && Array.isArray(opts.puts) ? opts.puts : []
+    rawRows += calls.length + puts.length
+    const expDate = opts && typeof opts.expirationDate === 'number' ? opts.expirationDate : exp
+    const expYmd = ymdUtc(new Date(expDate * 1000))
+    expiries.push(expYmd)
+
+    const map = new Map<number, { call: number; put: number }>()
+    const addOne = (row: any, kind: 'call' | 'put') => {
+      const strike = safeNum(row?.strike)
+      if (strike === null) return
+      const oi = safeNum(row?.openInterest) ?? 0
+      const prev = map.get(strike) || { call: 0, put: 0 }
+      if (kind === 'call') prev.call += oi
+      else prev.put += oi
+      map.set(strike, prev)
+    }
+    for (const row of calls) addOne(row, 'call')
+    for (const row of puts) addOne(row, 'put')
+
+    const strikes = Array.from(map.keys()).sort((a, b) => a - b)
+    const call_oi = strikes.map(k => (map.get(k)?.call ?? 0))
+    const put_oi = strikes.map(k => (map.get(k)?.put ?? 0))
+    const calls_count = call_oi.filter(x => (Number(x) || 0) > 0).length
+    const puts_count = put_oi.filter(x => (Number(x) || 0) > 0).length
+
+    by_expiry[expYmd] = { strikes, call_oi, put_oi, calls_count, puts_count }
+  }
+
+  const uniqExp = Array.from(new Set(expiries)).sort((a, b) => a.localeCompare(b))
+  return { spot, expiries: uniqExp, by_expiry, raw_rows_count: rawRows }
+}
+
+async function updateYahooUsdOptionsCaches() {
+  const enabled = envBool('YAHOO_USD_OPTIONS_ENABLED', true)
+  if (!enabled) return
+
+  const optionsDashboardDir = resolveFromProject(
+    env('OPTIONS_UNIFIED_DASHBOARD_DIR', path.resolve(PROJECT_ROOT, '..', 'B3_System', 'dashboard_unificado')),
+  )
+  const outDir = path.join(optionsDashboardDir, 'WDO', 'assets', 'data')
+  await mkdir(outDir, { recursive: true })
+  const altDashboardDir = resolveFromProject(path.resolve(PROJECT_ROOT, '..', 'dashboard_unificado'))
+
+  const today = ymdUtc(new Date())
+  const force = envBool('YAHOO_USD_OPTIONS_FORCE_REFRESH', false)
+  const defaultMinOi = Math.max(0, Number(env('YAHOO_USD_OPTIONS_DEFAULT_MIN_OI', '0')) || 0)
+
+  const items = [
+    { ticker: 'USDU', baseName: 'yahoo_usdu_options', windowKey: 'yahooUsduOptionsData' },
+    { ticker: 'UUP', baseName: 'yahoo_uup_options', windowKey: 'yahooUupOptionsData' },
+  ] as const
+
+  let blocked = false
+  for (const it of items) {
+    const jsonPath = path.join(outDir, `${it.baseName}.json`)
+    const altJsonPath = path.join(altDashboardDir, 'WDO', 'assets', 'data', `${it.baseName}.json`)
+    if (!(await fileExists(jsonPath)) && (await fileExists(altJsonPath))) {
+      try {
+        await mkdir(path.dirname(jsonPath), { recursive: true })
+        await copyFile(altJsonPath, jsonPath)
+      } catch {
+        void 0
+      }
+    }
+    if (!force && (await fileExists(jsonPath))) {
+      try {
+        const existing = JSON.parse(await readFile(jsonPath, 'utf-8')) as any
+        const cap = existing && typeof existing.captured_at_utc === 'string' ? existing.captured_at_utc : null
+        if (cap) {
+          const day = ymdUtc(new Date(cap))
+          if (day === today) continue
+        }
+      } catch {
+        void 0
+      }
+    }
+
+    try {
+      if (blocked) {
+        if (await fileExists(jsonPath)) {
+          process.stdout.write(`SKIP • ${it.baseName}.json (mantendo último) • Yahoo bloqueado (HTTP 401/403)\n`)
+          continue
+        }
+        blocked = false
+      }
+      const chain = await fetchYahooOptionsAllExpiries(it.ticker)
+      const beta = await computeUsdBrlBeta(it.ticker).catch(() => null)
+      const payload = {
+        source: 'yahoo_finance',
+        ticker_used: it.ticker,
+        ticker_label: it.ticker,
+        captured_at_utc: new Date().toISOString(),
+        spot: chain.spot,
+        min_open_interest: defaultMinOi,
+        expiries: chain.expiries,
+        by_expiry: chain.by_expiry,
+        raw_rows_count: chain.raw_rows_count,
+        usdbrl_beta: beta,
+      }
+      await writeJsonAndJs(outDir, it.baseName, it.windowKey, payload)
+      process.stdout.write(`OK • ${it.baseName}.json (vencimentos=${chain.expiries.length})\n`)
+    } catch (e) {
+      const msg = String(e instanceof Error ? e.message : e)
+      if (/\bHTTP\s+(401|403)\b/.test(msg)) blocked = true
+      if (await fileExists(jsonPath)) {
+        process.stdout.write(`SKIP • ${it.baseName}.json (mantendo último) • ${msg}\n`)
+      } else if (await fileExists(altJsonPath)) {
+        try {
+          await mkdir(path.dirname(jsonPath), { recursive: true })
+          await copyFile(altJsonPath, jsonPath)
+        } catch {
+          void 0
+        }
+        process.stdout.write(`SKIP • ${it.baseName}.json (cache alternativo) • ${msg}\n`)
+      } else {
+        process.stdout.write(`SKIP • ${it.baseName}.json (sem cache) • ${msg}\n`)
+      }
+    }
+  }
 }
 
 async function exportDashboardPdf() {
@@ -620,8 +1040,14 @@ async function exportDashboardPdf() {
   const indexPath = path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'index.html')
   const exists = await fileExists(indexPath)
   if (!exists) return
-  const outDir = resolveFromProject(env('EXPORT_PDF_OUT_DIR', path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'exports')))
-  await mkdir(outDir, { recursive: true })
+  const fallbackOutDir = resolveFromProject(path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'exports'))
+  let outDir = resolveFromProject(env('EXPORT_PDF_OUT_DIR', fallbackOutDir))
+  try {
+    await mkdir(outDir, { recursive: true })
+  } catch {
+    outDir = fallbackOutDir
+    await mkdir(outDir, { recursive: true })
+  }
   const stamp = new Date()
   const yyyy = String(stamp.getFullYear())
   const mm = String(stamp.getMonth() + 1).padStart(2, '0')
@@ -631,7 +1057,7 @@ async function exportDashboardPdf() {
   const ss = String(stamp.getSeconds()).padStart(2, '0')
   const prefix = env('EXPORT_PDF_FILENAME_PREFIX', 'MERCADO')
   const pdfName = `${prefix}_${yyyy}${mm}${dd}_${hh}${mi}${ss}.pdf`
-  const pdfPath = path.join(outDir, pdfName)
+  let pdfPath = path.join(outDir, pdfName)
   const fileUrl = pathToFileURL(indexPath).toString()
   let browser: import('playwright').Browser | null = null
   try {
@@ -645,12 +1071,29 @@ async function exportDashboardPdf() {
     } catch {
       void 0
     }
-    await page.pdf({
-      path: pdfPath,
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '12mm', bottom: '12mm', left: '12mm', right: '12mm' },
-    })
+    try {
+      await page.pdf({
+        path: pdfPath,
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '12mm', bottom: '12mm', left: '12mm', right: '12mm' },
+      })
+    } catch (e) {
+      const msg = String(e instanceof Error ? e.message : e)
+      if (/\bEPERM\b|\bEACCES\b/i.test(msg) && outDir !== fallbackOutDir) {
+        await mkdir(fallbackOutDir, { recursive: true })
+        pdfPath = path.join(fallbackOutDir, pdfName)
+        process.stderr.write(`WARN • PDF sem permissão no destino; salvando em fallback: ${pdfPath}\n`)
+        await page.pdf({
+          path: pdfPath,
+          format: 'A4',
+          printBackground: true,
+          margin: { top: '12mm', bottom: '12mm', left: '12mm', right: '12mm' },
+        })
+      } else {
+        throw e
+      }
+    }
     process.stdout.write(`OK • dashboard PDF exportado: ${pdfPath}\n`)
   } catch (e) {
     process.stderr.write(`WARN • Falha ao exportar PDF do dashboard: ${String(e instanceof Error ? e.message : e)}\n`)
@@ -671,8 +1114,14 @@ async function exportDashboardPdfLite() {
   const indexPath = path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'index.html')
   const exists = await fileExists(indexPath)
   if (!exists) return
-  const outDir = resolveFromProject(env('EXPORT_PDF_OUT_DIR', path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'exports')))
-  await mkdir(outDir, { recursive: true })
+  const fallbackOutDir = resolveFromProject(path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'exports'))
+  let outDir = resolveFromProject(env('EXPORT_PDF_OUT_DIR', fallbackOutDir))
+  try {
+    await mkdir(outDir, { recursive: true })
+  } catch {
+    outDir = fallbackOutDir
+    await mkdir(outDir, { recursive: true })
+  }
   const stamp = new Date()
   const yyyy = String(stamp.getFullYear())
   const mm = String(stamp.getMonth() + 1).padStart(2, '0')
@@ -682,7 +1131,7 @@ async function exportDashboardPdfLite() {
   const ss = String(stamp.getSeconds()).padStart(2, '0')
   const prefix = env('EXPORT_PDF_LITE_PREFIX', 'MERCADO_LITE')
   const pdfName = `${prefix}_${yyyy}${mm}${dd}_${hh}${mi}${ss}.pdf`
-  const pdfPath = path.join(outDir, pdfName)
+  let pdfPath = path.join(outDir, pdfName)
   const fileUrl = pathToFileURL(indexPath).toString()
   let browser: import('playwright').Browser | null = null
   try {
@@ -736,13 +1185,31 @@ async function exportDashboardPdfLite() {
     } catch {
       void 0
     }
-    await page.pdf({
-      path: pdfPath,
-      format: 'A4',
-      printBackground: false,
-      scale: 0.96,
-      margin: { top: '8mm', bottom: '8mm', left: '8mm', right: '8mm' },
-    })
+    try {
+      await page.pdf({
+        path: pdfPath,
+        format: 'A4',
+        printBackground: false,
+        scale: 0.96,
+        margin: { top: '8mm', bottom: '8mm', left: '8mm', right: '8mm' },
+      })
+    } catch (e) {
+      const msg = String(e instanceof Error ? e.message : e)
+      if (/\bEPERM\b|\bEACCES\b/i.test(msg) && outDir !== fallbackOutDir) {
+        await mkdir(fallbackOutDir, { recursive: true })
+        pdfPath = path.join(fallbackOutDir, pdfName)
+        process.stderr.write(`WARN • PDF Lite sem permissão no destino; salvando em fallback: ${pdfPath}\n`)
+        await page.pdf({
+          path: pdfPath,
+          format: 'A4',
+          printBackground: false,
+          scale: 0.96,
+          margin: { top: '8mm', bottom: '8mm', left: '8mm', right: '8mm' },
+        })
+      } else {
+        throw e
+      }
+    }
     process.stdout.write(`OK • dashboard PDF (Lite) exportado: ${pdfPath}\n`)
   } catch (e) {
     process.stderr.write(`WARN • Falha ao exportar PDF Lite do dashboard: ${String(e instanceof Error ? e.message : e)}\n`)
@@ -760,7 +1227,14 @@ async function exportDashboardPdfLite() {
 async function exportPdfLiteFromIndex(input: { indexPath: string; outDir: string; prefix: string; label: string }) {
   const exists = await fileExists(input.indexPath)
   if (!exists) return
-  await mkdir(input.outDir, { recursive: true })
+  const fallbackOutDir = resolveFromProject(path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'exports'))
+  let outDir = input.outDir
+  try {
+    await mkdir(outDir, { recursive: true })
+  } catch {
+    outDir = fallbackOutDir
+    await mkdir(outDir, { recursive: true })
+  }
   const stamp = new Date()
   const yyyy = String(stamp.getFullYear())
   const mm = String(stamp.getMonth() + 1).padStart(2, '0')
@@ -769,7 +1243,7 @@ async function exportPdfLiteFromIndex(input: { indexPath: string; outDir: string
   const mi = String(stamp.getMinutes()).padStart(2, '0')
   const ss = String(stamp.getSeconds()).padStart(2, '0')
   const pdfName = `${input.prefix}_${yyyy}${mm}${dd}_${hh}${mi}${ss}.pdf`
-  const pdfPath = path.join(input.outDir, pdfName)
+  let pdfPath = path.join(outDir, pdfName)
   const fileUrl = pathToFileURL(input.indexPath).toString()
   let browser: import('playwright').Browser | null = null
   try {
@@ -823,13 +1297,31 @@ async function exportPdfLiteFromIndex(input: { indexPath: string; outDir: string
     } catch {
       void 0
     }
-    await page.pdf({
-      path: pdfPath,
-      format: 'A4',
-      printBackground: false,
-      scale: 0.96,
-      margin: { top: '8mm', bottom: '8mm', left: '8mm', right: '8mm' },
-    })
+    try {
+      await page.pdf({
+        path: pdfPath,
+        format: 'A4',
+        printBackground: false,
+        scale: 0.96,
+        margin: { top: '8mm', bottom: '8mm', left: '8mm', right: '8mm' },
+      })
+    } catch (e) {
+      const msg = String(e instanceof Error ? e.message : e)
+      if (/\bEPERM\b|\bEACCES\b/i.test(msg) && outDir !== fallbackOutDir) {
+        await mkdir(fallbackOutDir, { recursive: true })
+        pdfPath = path.join(fallbackOutDir, pdfName)
+        process.stderr.write(`WARN • PDF Lite sem permissão no destino; salvando em fallback: ${pdfPath}\n`)
+        await page.pdf({
+          path: pdfPath,
+          format: 'A4',
+          printBackground: false,
+          scale: 0.96,
+          margin: { top: '8mm', bottom: '8mm', left: '8mm', right: '8mm' },
+        })
+      } else {
+        throw e
+      }
+    }
     process.stdout.write(`OK • ${input.label}: ${pdfPath}\n`)
   } catch (e) {
     process.stderr.write(`WARN • Falha ao exportar PDF Lite (${input.label}): ${String(e instanceof Error ? e.message : e)}\n`)
@@ -1144,7 +1636,7 @@ async function buildWebNewsModule() {
 
 async function mergeSinaQuoteIntoMarketQuotes(
   outDir: string,
-  input: { seriesKey: string; asset: Asset; price: number; change?: number | null },
+  input: { seriesKey: string; asset: Asset; price: number; change?: number | null; basePrice?: number | null },
 ) {
   const jsonPath = path.join(outDir, 'market_quotes.json')
   const raw = await readFile(jsonPath, 'utf-8')
@@ -1164,7 +1656,13 @@ async function mergeSinaQuoteIntoMarketQuotes(
   const prev = points.length ? points[points.length - 1] : null
   const point: MarketPoint = { t: generatedAt, price: input.price }
 
-  if (typeof input.change === 'number' && Number.isFinite(input.change) && input.change !== 0) {
+  const base = typeof input.basePrice === 'number' && Number.isFinite(input.basePrice) && input.basePrice !== 0 ? input.basePrice : null
+  if (base !== null) {
+    const change = input.price - base
+    const pct = (change / base) * 100
+    if (Number.isFinite(change)) point.change = change
+    if (Number.isFinite(pct)) point.changePct = pct
+  } else if (typeof input.change === 'number' && Number.isFinite(input.change) && input.change !== 0) {
     point.change = input.change
     if (prev && typeof prev.price === 'number' && prev.price !== 0) {
       const pct = (input.change / prev.price) * 100
@@ -1184,8 +1682,7 @@ async function mergeSinaQuoteIntoMarketQuotes(
   assets.sort((a, b) => String(a.symbol || '').localeCompare(String(b.symbol || '')))
   parsed.assets = assets
   parsed.series = series
-  await writeFile(jsonPath, JSON.stringify(parsed, null, 2), 'utf-8')
-  await writeFile(path.join(outDir, 'market_quotes.js'), `window.MARKET_QUOTES_DATA=${JSON.stringify(parsed)};`, 'utf-8')
+  await writeJsonAndJs(outDir, 'market_quotes', 'MARKET_QUOTES_DATA', parsed)
 }
 
 function parseWatchlistDateFromFilename(filename: string) {
@@ -1310,6 +1807,8 @@ async function main() {
       )
     }
 
+    await updateYahooUsdOptionsCaches()
+
     try {
       const payload = await buildWebNewsModule()
       webNewsPayload = payload
@@ -1370,6 +1869,8 @@ async function main() {
     timestamp,
   })
 
+  await updateYahooUsdOptionsCaches()
+
   if (envBool('SINA_DCE_IO_ENABLED', true)) {
     try {
       const code = env('SINA_DCE_IO_CODE', 'nf_I0')
@@ -1391,6 +1892,7 @@ async function main() {
         },
         price: parsed.price,
         change: parsed.change,
+        basePrice: parsed.prevClose,
       })
       process.stdout.write(`OK • Dalian I0=${parsed.price} (Sina)\n`)
     } catch (e) {

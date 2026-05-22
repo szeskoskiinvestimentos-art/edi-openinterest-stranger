@@ -17,6 +17,36 @@
             padding: 0 !important;
             margin-top: 0 !important;
         }
+        .edi-pill{
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            padding:4px 10px;
+            border-radius:999px;
+            border:1px solid rgba(255,255,255,.14);
+            background:rgba(0,0,0,.18);
+            font-family:'Share Tech Mono',monospace;
+            font-weight:900;
+            letter-spacing:.2px;
+            --pill-k:.75;
+        }
+        .edi-pill__dot{
+            width:8px;
+            height:8px;
+            border-radius:999px;
+            background:rgba(255,255,255,.55);
+            box-shadow:0 0 calc(18px * var(--pill-k)) rgba(255,255,255,.18);
+            flex:0 0 auto;
+        }
+        .edi-pill--status-ok .edi-pill__dot{background:rgba(0,255,0,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(0,255,0,.35);}
+        .edi-pill--status-warn .edi-pill__dot{background:rgba(255,255,0,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(255,255,0,.30);}
+        .edi-pill--status-bad .edi-pill__dot{background:rgba(255,7,58,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(255,7,58,.35);}
+        .edi-pill--status-info .edi-pill__dot{background:rgba(0,243,255,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(0,243,255,.25);}
+        .edi-pill--signal-risk_on .edi-pill__dot{background:rgba(0,255,0,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(0,255,0,.35);}
+        .edi-pill--signal-risk_off .edi-pill__dot{background:rgba(255,0,255,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(255,0,255,.30);}
+        .edi-pill--signal-pos .edi-pill__dot{background:rgba(0,255,0,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(0,255,0,.35);}
+        .edi-pill--signal-neg .edi-pill__dot{background:rgba(255,7,58,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(255,7,58,.35);}
+        .edi-pill--signal-neutral .edi-pill__dot{background:rgba(0,243,255,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(0,243,255,.22);}
         .market-ticker {
             display: flex;
             align-items: center;
@@ -1772,17 +1802,28 @@
         </div>
     </main>
 
-    <script src="assets/data/market_quotes.js"></script>
-    <script src="assets/data/zq_curve.js"></script>
-    <script src="assets/data/economic_calendar.js"></script>
-    <script src="assets/data/agenda_reports.js"></script>
-    <script src="assets/data/options_gamma_summary.js"></script>
-    <script src="assets/data/web_news_module.js"></script>
-    <script src="assets/data/foreign_flow.js"></script>
-    <script src="assets/data/petrobras_module.js"></script>
+    <script>
+        (function () {
+            var v = String(Date.now());
+            var files = [
+                "assets/data/market_quotes.js",
+                "assets/data/zq_curve.js",
+                "assets/data/economic_calendar.js",
+                "assets/data/agenda_reports.js",
+                "assets/data/options_gamma_summary.js",
+                "assets/data/web_news_module.js",
+                "assets/data/foreign_flow.js",
+                "assets/data/petrobras_module.js"
+            ];
+            for (var i = 0; i < files.length; i++) {
+                document.write('<script src="' + files[i] + '?v=' + v + '"><\/script>');
+            }
+        })();
+    </script>
+    <script src="assets/js/market-utils.js?v=20260514_1"></script>
     <script src="assets/js/charts.js?v=20260416_1"></script>
     <script src="assets/js/operational-compass.js?v=20260428_1"></script>
-    <script src="assets/js/us-operational-eua.js?v=20260504_1"></script>
-    <script src="assets/js/main.js?v=20260416_19"></script>
+    <script src="assets/js/us-operational-eua.js?v=20260514_1"></script>
+    <script src="assets/js/main.js?v=20260514_1"></script>
 </body>
 </html>

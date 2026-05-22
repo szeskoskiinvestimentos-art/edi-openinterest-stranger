@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import dotenv from 'dotenv'
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import { copyFile, mkdir, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -32,6 +32,7 @@ type UpdateState =
         logPath: string
         reason: string
         mode?: string
+        pid?: number
         summary?: unknown
       }
       last?: {
@@ -284,7 +285,7 @@ async function writeControleDeDadosHtml(snapshot: ControleDeDadosSnapshot, baseD
   const markerStart = '<script id="data" type="application/json">'
   const markerEnd = '</script>'
   const payload = JSON.stringify(snapshot)
-  const fallbackHtml = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Controle de Dados</title></head><body><script id="data" type="application/json">${payload}</script><pre style="white-space:pre-wrap;font-family:ui-monospace,Consolas,monospace">controle_de_dados.html foi regenerado automaticamente.\nAbra via HTTP para modo ao vivo: http://127.0.0.1:3033/controle_de_dados.html</pre></body></html>`
+  const fallbackHtml = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Controle de Dados</title></head><body><script id="data" type="application/json">${payload}</script><pre style="white-space:pre-wrap;font-family:ui-monospace,Consolas,monospace">controle_de_dados.html foi regenerado automaticamente.\nAbra o arquivo local: controle_de_dados.html</pre></body></html>`
   if (!(await fileExists(htmlPath))) {
     await writeFile(htmlPath, fallbackHtml, 'utf8')
     return true
@@ -304,6 +305,18 @@ async function writeControleDeDadosHtml(snapshot: ControleDeDadosSnapshot, baseD
   if (next === raw) return false
   await writeFile(htmlPath, next, 'utf8')
   return true
+}
+
+async function injectControleDeDadosOptionsViaPython() {
+  try {
+    const pythonExe = process.platform === 'win32' ? 'py' : 'python3'
+    const pythonArgs = process.platform === 'win32'
+      ? ['-3', path.resolve(WORKSPACE_ROOT, 'gerar_controle.py')]
+      : [path.resolve(WORKSPACE_ROOT, 'gerar_controle.py')]
+    await spawnCapture(pythonExe, pythonArgs, { cwd: WORKSPACE_ROOT, env: process.env })
+  } catch {
+    void 0
+  }
 }
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
@@ -509,7 +522,7 @@ async function main() {
   const marketUpdateTimeoutMinutes = Math.max(3, envNumber('MARKET_UPDATE_TIMEOUT_MINUTES', 25))
 
   const optionsDashboardDir = resolveFromProject(
-    env('OPTIONS_UNIFIED_DASHBOARD_DIR', path.resolve(WORKSPACE_ROOT, 'B3_System', 'dashboard_unificado')),
+    env('OPTIONS_UNIFIED_DASHBOARD_DIR', path.resolve(WORKSPACE_ROOT, 'dashboard_unificado')),
   )
 
   function normalizeHttpUrl(raw: string, fallback: string) {
@@ -540,12 +553,15 @@ async function main() {
   const telegramFinancialJuicePollSeconds = Math.max(15, envNumber('TELEGRAM_FINANCIALJUICE_POLL_SECONDS', 120))
 
   const marketScheduleMode = String(env('MARKET_SCHEDULE_MODE', 'interval') || 'interval').toLowerCase()
+  const schedulerEnabled = envBool('MARKET_SCHEDULER_ENABLED', true)
+  const runOnStart = envBool('MARKET_RUN_ON_START', schedulerEnabled)
 
   let state: UpdateState = { running: false }
   let lastManualStartMs: number | null = null
   let lastUpdateStartMs: number | null = null
   let currentSummary: unknown = null
   let schedulePending = false
+  let currentChild: ChildProcess | null = null
   let lastTelegramOperationalSentMs: number | null = null
 
   let cachedHeadlines: { atMs: number; payload: unknown } | null = null
@@ -1297,6 +1313,7 @@ async function main() {
     if (mode === 'calendar') return 'market:calendar'
     if (mode === 'portfolio') return 'market:portfolio'
     if (mode === 'di') return 'market:di'
+    if (mode === 'all') return 'market:all'
     return 'market:once'
   }
 
@@ -1447,19 +1464,6 @@ async function main() {
       await appendLog(meta.logPath, `GIT_SYNC skip • index has staged changes\n`)
       await finish('index_dirty')
       return
-    }
-
-    try {
-      const gitSync = await readGitSyncStatusFromLog(meta.logPath)
-      const snapshot = await buildControleDeDadosSnapshot({
-        marketStatus: { ok: true, state },
-        logPath: meta.logPath,
-        gitSyncStatus: gitSync?.status ?? null,
-      })
-      snapshot.state.last_cotacoes_finished_iso = meta.finishedAt
-      await writeControleDeDadosHtml(snapshot, repoAbs)
-    } catch {
-      void 0
     }
 
     const statusFiles = [...targetFiles, controleRel]
@@ -1691,7 +1695,7 @@ async function main() {
     const startedAt = nowISO()
     lastUpdateStartMs = Date.now()
     const logPath = path.join(logsDir, `market_update_${safeFileStamp()}.log`)
-    const mode = updateMode
+    const mode = reason === 'force' ? 'all' : updateMode
     currentSummary = null
     state = { running: true, current: { startedAt, logPath, reason, mode, summary: null }, last: state.last }
 
@@ -1704,6 +1708,7 @@ async function main() {
         gitSyncStatus: null,
       })
       await writeControleDeDadosHtml(snapshot, WORKSPACE_ROOT)
+      await injectControleDeDadosOptionsViaPython()
     } catch {
       void 0
     }
@@ -1731,9 +1736,75 @@ async function main() {
             windowsHide: true,
           })
 
+    currentChild = child
+    if (state.running && typeof child.pid === 'number') state.current.pid = child.pid
+
+    let finalized = false
+    let timeoutTimer: NodeJS.Timeout | null = null
+    const finalizeOnce = async (exitCode: number, endedBy: string) => {
+      if (finalized) return
+      finalized = true
+      if (timeoutTimer) clearTimeout(timeoutTimer)
+      currentChild = null
+
+      const finishedAt = nowISO()
+      await appendLog(logPath, `END ${finishedAt} • exit=${exitCode} • ${endedBy}\n`)
+
+      const last = {
+        startedAt,
+        finishedAt,
+        exitCode,
+        logPath,
+        reason,
+        mode,
+        summary: currentSummary,
+      }
+      const finalState: UpdateState = { running: false, last }
+      state = finalState
+
+      try {
+        const snapshot = await buildControleDeDadosSnapshot({
+          marketStatus: { ok: true, state: finalState },
+          logPath,
+          gitSyncStatus: null,
+        })
+        snapshot.state.last_cotacoes_finished_iso = finishedAt
+        await writeControleDeDadosHtml(snapshot, WORKSPACE_ROOT)
+        await injectControleDeDadosOptionsViaPython()
+      } catch {
+        void 0
+      }
+
+      if (exitCode === 0) {
+        try {
+          await runConfiguredSubsystems(logPath)
+        } catch {
+          void 0
+        }
+      }
+
+      await gitSyncAfterUpdate({ logPath, finishedAt, exitCode, reason, mode })
+
+      if (exitCode === 0) {
+        try {
+          await sendTelegramOperationalOnce({ reason, logPath })
+        } catch (err) {
+          await appendLog(logPath, `TELEGRAM operational error • ${String(err instanceof Error ? err.message : err)}\n`)
+        }
+      }
+
+      if (shutdownRequested) {
+        if (state.running) return
+        if (httpServer) httpServer.close(() => process.exit(0))
+        setTimeout(() => process.exit(0), 2500).unref()
+        return
+      }
+      await runScheduledIfDue()
+    }
+
     let timeoutFired = false
     const timeoutMs = marketUpdateTimeoutMinutes * 60 * 1000
-    const timeoutTimer = setTimeout(() => {
+    timeoutTimer = setTimeout(() => {
       if (timeoutFired) return
       timeoutFired = true
       void (async () => {
@@ -1741,92 +1812,50 @@ async function main() {
         const pid = child && typeof child.pid === 'number' ? child.pid : null
         if (!pid) {
           await appendLog(logPath, `TIMEOUT • sem PID para encerrar\n`)
+          await finalizeOnce(-1, 'timeout_no_pid')
           return
         }
         if (process.platform === 'win32') {
           const kill = await spawnCapture('taskkill', ['/PID', String(pid), '/T', '/F'], { cwd: PROJECT_ROOT, env: process.env })
           if (kill.exitCode !== 0) {
             await appendLog(logPath, `TIMEOUT • taskkill falhou\n${kill.stderr || kill.stdout}\n`)
+            await finalizeOnce(-1, 'timeout_taskkill_fail')
           } else {
             await appendLog(logPath, `TIMEOUT • taskkill OK (pid=${pid})\n`)
+            await finalizeOnce(-2, 'timeout_taskkill_ok')
           }
           return
         }
         try {
           child.kill('SIGKILL')
           await appendLog(logPath, `TIMEOUT • kill OK (pid=${pid})\n`)
+          await finalizeOnce(-2, 'timeout_kill_ok')
         } catch (err) {
           await appendLog(logPath, `TIMEOUT • kill falhou (pid=${pid}) • ${String(err instanceof Error ? err.message : err)}\n`)
+          await finalizeOnce(-1, 'timeout_kill_fail')
         }
       })()
     }, timeoutMs).unref()
 
-    child.stdout.on('data', d => {
+    child.stdout?.on('data', d => {
       const s = String(d)
       tryCaptureSummary(s)
       void appendLog(logPath, s)
     })
-    child.stderr.on('data', d => {
+    child.stderr?.on('data', d => {
       const s = String(d)
       tryCaptureSummary(s)
       void appendLog(logPath, s)
+    })
+
+    child.on('error', err => {
+      void finalizeOnce(-1, `spawn_error:${String(err instanceof Error ? err.message : err)}`)
     })
 
     child.on('close', code => {
-      clearTimeout(timeoutTimer)
       void (async () => {
-        const finishedAt = nowISO()
-        await appendLog(logPath, `END ${finishedAt} • exit=${code ?? -1}\n`)
         const exitCode = typeof code === 'number' ? code : -1
-        const last = {
-          startedAt,
-          finishedAt,
-          exitCode,
-          logPath,
-          reason,
-          mode,
-          summary: currentSummary,
-        }
-
-        try {
-          const snapshot = await buildControleDeDadosSnapshot({
-            marketStatus: { ok: true, state },
-            logPath,
-            gitSyncStatus: null,
-          })
-          snapshot.state.last_cotacoes_finished_iso = finishedAt
-          await writeControleDeDadosHtml(snapshot, WORKSPACE_ROOT)
-        } catch {
-          void 0
-        }
-
-        if (exitCode === 0) {
-          try {
-            await runConfiguredSubsystems(logPath)
-          } catch {
-            void 0
-          }
-        }
-
-        await gitSyncAfterUpdate({ logPath, finishedAt, exitCode, reason, mode })
-
-        state = { running: false, last }
-
-        if (exitCode === 0) {
-          try {
-            await sendTelegramOperationalOnce({ reason, logPath })
-          } catch (err) {
-            await appendLog(logPath, `TELEGRAM operational error • ${String(err instanceof Error ? err.message : err)}\n`)
-          }
-        }
-
-        if (shutdownRequested) {
-          if (state.running) return
-          if (httpServer) httpServer.close(() => process.exit(0))
-          setTimeout(() => process.exit(0), 2500).unref()
-          return
-        }
-        await runScheduledIfDue()
+        await finalizeOnce(exitCode, 'close')
       })()
     })
 
@@ -2285,7 +2314,7 @@ async function main() {
       (req.body && typeof req.body.reason === 'string' && req.body.reason.trim()) ||
       'manual'
 
-    if (reason !== 'schedule') {
+    if (reason !== 'schedule' && reason !== 'force') {
       const info = manualCooldownInfo()
       if (info.remainingSec > 0) {
         res.setHeader('Retry-After', String(info.remainingSec))
@@ -2300,8 +2329,34 @@ async function main() {
 
     const ok = await runUpdate(reason)
     if (!ok) return res.status(409).json({ ok: false, error: 'update_in_progress', state })
-    if (reason !== 'schedule') lastManualStartMs = Date.now()
+    if (reason !== 'schedule' && reason !== 'force') lastManualStartMs = Date.now()
     res.status(202).json({ ok: true, state })
+  })
+
+  app.post('/api/market/abort', async (_req, res) => {
+    if (!state.running || !currentChild || typeof currentChild.pid !== 'number') {
+      return res.status(409).json({ ok: false, error: 'not_running', state })
+    }
+    const pid = currentChild.pid
+    const logPath = state.current.logPath
+    await appendLog(logPath, `ABORT • requested • pid=${pid}\n`)
+    if (process.platform === 'win32') {
+      const kill = await spawnCapture('taskkill', ['/PID', String(pid), '/T', '/F'], { cwd: PROJECT_ROOT, env: process.env })
+      if (kill.exitCode !== 0) {
+        await appendLog(logPath, `ABORT • taskkill falhou\n${kill.stderr || kill.stdout}\n`)
+        return res.status(500).json({ ok: false, error: 'taskkill_failed', state })
+      }
+      await appendLog(logPath, `ABORT • taskkill OK (pid=${pid})\n`)
+      return res.status(202).json({ ok: true, pid, state })
+    }
+    try {
+      currentChild.kill('SIGKILL')
+      await appendLog(logPath, `ABORT • kill OK (pid=${pid})\n`)
+      return res.status(202).json({ ok: true, pid, state })
+    } catch (err) {
+      await appendLog(logPath, `ABORT • kill falhou (pid=${pid}) • ${String(err instanceof Error ? err.message : err)}\n`)
+      return res.status(500).json({ ok: false, error: 'kill_failed', state })
+    }
   })
 
   app.post('/api/market/shutdown', async (_req, res) => {
@@ -2316,14 +2371,16 @@ async function main() {
     process.stdout.write(`Market updater em http://${host}:${port}\n`)
     process.stdout.write(`Intervalo: ${intervalMinutes} min\n`)
     process.stdout.write(`Logs: ${logsDir}\n`)
-    if (marketScheduleMode === 'cron') {
+    if (!schedulerEnabled) {
+      process.stdout.write(`Scheduler: desabilitado (MARKET_SCHEDULER_ENABLED=false)\n`)
+    } else if (marketScheduleMode === 'cron') {
       process.stdout.write(`Scheduler: cron (8:30, a cada ${Math.max(5, Math.min(60, intervalMinutes))}min até 17:00, e 20:00 • seg-sex)\n`)
-      schedulePending = true
-      void runScheduledIfDue()
+      schedulePending = runOnStart
+      if (schedulePending) void runScheduledIfDue()
       startCronScheduler()
     } else {
-      schedulePending = true
-      void runScheduledIfDue()
+      schedulePending = runOnStart
+      if (schedulePending) void runScheduledIfDue()
     }
 
     if (telegramFinancialJuiceConfigured()) {
@@ -2346,7 +2403,7 @@ async function main() {
     process.exitCode = 1
   })
 
-  if (marketScheduleMode !== 'cron') {
+  if (schedulerEnabled && marketScheduleMode !== 'cron') {
     setInterval(() => {
       schedulePending = true
       void runScheduledIfDue()

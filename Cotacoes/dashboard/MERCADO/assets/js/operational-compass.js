@@ -263,14 +263,30 @@
           ? `Divergente (${divergence.reason}): reduzir lote e esperar confirmação.`
           : 'Siga o lado de maior probabilidade; divergências = reduzir lote.'
 
-    const drivers = (Array.isArray(macroWin.parts) ? macroWin.parts : [])
-      .slice()
-      .sort((a, b) => Math.abs(Number((b && b.val) || 0)) - Math.abs(Number((a && a.val) || 0)))
-      .slice(0, 3)
-      .map((p) => {
-        const val = typeof p.val === 'number' && Number.isFinite(p.val) ? p.val : 0
-        return { label: String(p.label || '—'), dir: val > 0 ? '↑' : val < 0 ? '↓' : '≈' }
-      })
+    const pickDrivers = (items) => {
+      return (Array.isArray(items) ? items : [])
+        .slice()
+        .map((p) => {
+          const rawLabel = p && (p.label || p.text) ? (p.label || p.text) : '—'
+          const rawVal = p && typeof p.val === 'number' && Number.isFinite(p.val) ? p.val : null
+          return { label: String(rawLabel || '—'), val: rawVal === null ? 0 : rawVal }
+        })
+        .filter((p) => typeof p.val === 'number' && Number.isFinite(p.val))
+        .sort((a, b) => Math.abs(Number(b.val)) - Math.abs(Number(a.val)))
+        .slice(0, 3)
+        .map((p) => {
+          const val = typeof p.val === 'number' && Number.isFinite(p.val) ? p.val : 0
+          return { label: String(p.label || '—'), dir: val > 0 ? '↑' : val < 0 ? '↓' : '≈', val }
+        })
+    }
+
+    const explicitDrivers = input && input.drivers ? input.drivers : null
+    const driversWin = explicitDrivers && Array.isArray(explicitDrivers.win)
+      ? pickDrivers(explicitDrivers.win)
+      : pickDrivers(macroWin && Array.isArray(macroWin.parts) ? macroWin.parts : [])
+    const driversWdo = explicitDrivers && Array.isArray(explicitDrivers.wdo)
+      ? pickDrivers(explicitDrivers.wdo)
+      : pickDrivers(macroWdo && Array.isArray(macroWdo.parts) ? macroWdo.parts : [])
 
     return {
       title,
@@ -280,6 +296,14 @@
       mode,
       confidence: conf,
       confidenceLabel,
+      edge: {
+        pct: Math.round(100 * clamp01(conf)),
+        win: { bias: winBias, score: typeof macroWin.score === 'number' && Number.isFinite(macroWin.score) ? macroWin.score : 0 },
+        wdo: { bias: wdoBias, score: typeof macroWdo.score === 'number' && Number.isFinite(macroWdo.score) ? macroWdo.score : 0 },
+        regimeConviction: baseConv,
+        freshnessFactor,
+        magnitude: mag,
+      },
       freshnessText: oldestModule
         ? `Atualizado ${ageText(ageNewestMin)} • mais antigo (${flowDailyStale ? 'Flow' : oldestModule.label}) ${ageText(flowDailyStale ? flowAgeMin : oldestModule.ageMin)}`
         : `Atualizado ${ageText(ageNewestMin)} • mais antigo ${ageText(ageOldestMin)}`,
@@ -288,7 +312,7 @@
       staleModule: flowDailyStale ? 'Flow' : oldestModule ? oldestModule.label : null,
       divergent: divergence.ok,
       divergenceReason: divergence.reason,
-      drivers,
+      drivers: { win: driversWin, wdo: driversWdo },
       tuningVersion: tuning.version,
     }
   }
@@ -310,16 +334,26 @@
     const warnCls = model.stale ? 'op-compass__badge--warn' : ''
     const pinLeft = `${pct}%`
 
-    const badges = (model.drivers || [])
-      .slice(0, 3)
-      .map((it) => {
-        const dir = it && it.dir ? String(it.dir) : '≈'
-        const label = it && it.label ? String(it.label) : '—'
-        return `<span class="op-compass__badge">${escapeHtml(dir)} ${escapeHtml(label)}</span>`
-      })
-      .join('')
+    const renderBadges = (items) => {
+      return (Array.isArray(items) ? items : [])
+        .slice(0, 3)
+        .map((it) => {
+          const dir = it && it.dir ? String(it.dir) : '≈'
+          const label = it && it.label ? String(it.label) : '—'
+          return `<span class="op-compass__badge">${escapeHtml(dir)} ${escapeHtml(label)}</span>`
+        })
+        .join('')
+    }
 
-    const whyBlock = badges ? `<div class="op-compass__why"><span>Por quê (top 3):</span>${badges}</div>` : ''
+    const badgesWin = renderBadges(model.drivers && model.drivers.win ? model.drivers.win : [])
+    const badgesWdo = renderBadges(model.drivers && model.drivers.wdo ? model.drivers.wdo : [])
+    const whyBlock =
+      badgesWin || badgesWdo
+        ? `<div class="op-compass__why">
+             ${badgesWin ? `<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;"><span>Por quê (WIN):</span>${badgesWin}</div>` : ``}
+             ${badgesWdo ? `<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-top:8px;"><span>Por quê (WDO):</span>${badgesWdo}</div>` : ``}
+           </div>`
+        : ''
     const isConservative = model.mode === 'conservative'
     const normalCls = isConservative ? 'op-compass__toggle' : 'op-compass__toggle op-compass__toggle--active'
     const consCls = isConservative ? 'op-compass__toggle op-compass__toggle--active' : 'op-compass__toggle'
@@ -330,6 +364,17 @@
     const divergenceBadge = model.divergent
       ? `<span class="op-compass__badge op-compass__badge--div op-compass__badge--div-inline" title="${escapeHtml(model.divergenceReason || 'Divergente')}">⚠ Divergente</span>`
       : ''
+
+    const edgeTitle = `EDGE = convicção do setup do par WIN×WDO (não é PnL). Para o lado, veja o título HOJE. Para os motivos, veja “Por quê” separado em WIN e WDO.`
+    const edge = model.edge || {}
+    const edgeWin = edge.win || {}
+    const edgeWdo = edge.wdo || {}
+    const biasLabel = (b) => (b === 'buy' ? 'COMPRA' : b === 'sell' ? 'VENDA' : 'NEUTRO')
+    const scoreFmt = (n) => (typeof n === 'number' && Number.isFinite(n) ? (Math.round(n * 100) / 100).toFixed(2) : '0.00')
+    const edgeLine =
+      edgeWin && edgeWdo
+        ? `WIN: ${biasLabel(edgeWin.bias)} (${scoreFmt(edgeWin.score)}) • WDO: ${biasLabel(edgeWdo.bias)} (${scoreFmt(edgeWdo.score)})`
+        : ''
 
     el.innerHTML = `
       <div class="op-compass__row">
@@ -345,8 +390,9 @@
         </div>
         <div class="op-compass__mid">
           <div class="op-compass__meta">
-            <div title="EDGE = força/convicção do setup (não é PnL). É a combinação dos sinais + recência (delay) para dizer quão claro está o lado do dia.">EDGE ${escapeHtml(String(pct))}%</div>
+            <div title="${escapeHtml(edgeTitle)}">EDGE (setup) ${escapeHtml(String(pct))}%</div>
             <small>${escapeHtml(model.confidenceLabel || '—')}${model.planLabel ? ` • ${escapeHtml(model.planLabel)}` : ''}</small>
+            ${edgeLine ? `<small style="display:block;opacity:.85;margin-top:3px;">${escapeHtml(edgeLine)}</small>` : ``}
           </div>
           <div class="op-compass__thermo">
             <div class="op-compass__fill" style="width:${escapeHtml(String(pct))}%;"></div>

@@ -1,4 +1,5 @@
 import * as dotenv from 'dotenv'
+import crypto from 'node:crypto'
 import { mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -12,6 +13,32 @@ dotenv.config({ override: true, quiet: true })
 
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  const ms = Math.max(250, Number(timeoutMs) || 0)
+  return new Promise<T>((resolve, reject) => {
+    let done = false
+    const t = setTimeout(() => {
+      if (done) return
+      done = true
+      reject(new Error(`${label}: timeout ${ms}ms`))
+    }, ms)
+    promise.then(
+      v => {
+        if (done) return
+        done = true
+        clearTimeout(t)
+        resolve(v)
+      },
+      e => {
+        if (done) return
+        done = true
+        clearTimeout(t)
+        reject(e)
+      },
+    )
+  })
 }
 
 function safeFileStamp(d = new Date()) {
@@ -168,6 +195,16 @@ function looksLikeInvestingCsvHeaderLine(headerLine: string) {
   const hasName = headers.some(h => ['name', 'nome'].includes(h))
   const hasLast = headers.some(h => ['last', 'ultimo', 'preco', 'preco de fechamento', 'price'].includes(h)) || headers.some(h => h.includes('ultimo') || h.includes('preco') || h.includes('price'))
   return hasSymbol && (hasLast || hasName)
+}
+
+async function auditCsv(csvPath: string) {
+  const buf = await readFile(csvPath)
+  const textHead = buf.toString('utf-8', 0, Math.min(buf.length, 8192))
+  const headerLine = String(textHead.split(/\r?\n/)[0] || '').trim()
+  const lines = buf.toString('utf-8').split(/\r?\n/).filter(l => String(l).trim().length > 0)
+  const rows = Math.max(0, lines.length - 1)
+  const sha = crypto.createHash('sha256').update(buf).digest('hex').slice(0, 16)
+  return { bytes: buf.length, rows, headerLine, sha16: sha }
 }
 
 async function validateInvestingCsvOrThrow(csvPath: string) {
@@ -1150,8 +1187,9 @@ async function launchPersistentContextWithRetry(userDataDir: string, headless: b
   const exePath = executablePath()
   const channel = browserChannel()
   process.stdout.write(`BROWSER • ${exePath ? `exe=${exePath}` : `channel=${channel || 'chromium'}`}\n`)
+  const hardTimeoutMs = Math.max(10000, envNumber('INVESTING_PERSISTENT_CONTEXT_TIMEOUT_MS', 120000))
   try {
-    return await chromium.launchPersistentContext(userDataDir, options)
+    return await withTimeout(chromium.launchPersistentContext(userDataDir, options), hardTimeoutMs, 'launchPersistentContext')
   } catch (err) {
     void err
     const altDir = `${userDataDir}-alt`
@@ -1161,7 +1199,7 @@ async function launchPersistentContextWithRetry(userDataDir: string, headless: b
       void renameErr
     }
     process.stdout.write(`RETRY • profile=${altDir}\n`)
-    return await chromium.launchPersistentContext(altDir, options)
+    return await withTimeout(chromium.launchPersistentContext(altDir, options), hardTimeoutMs, 'launchPersistentContext(retry)')
   }
 }
 
@@ -1171,11 +1209,33 @@ async function dumpDebug(page: import('playwright').Page, debugDir: string, pref
   const pngPath = path.join(debugDir, `${prefix}_${stamp}.png`)
   const htmlPath = path.join(debugDir, `${prefix}_${stamp}.html`)
   const txtPath = path.join(debugDir, `${prefix}_${stamp}.txt`)
-  await page.screenshot({ path: pngPath, fullPage: true })
-  const html = await page.content()
-  await writeFile(htmlPath, html, 'utf-8')
-  await writeFile(txtPath, `url=${page.url()}\n`, 'utf-8')
-  process.stdout.write(`DEBUG • ${pngPath}\n`)
+  const closed = page.isClosed()
+  let url = ''
+  try {
+    url = page.url()
+  } catch {
+    url = ''
+  }
+  let screenshotOk = false
+  if (!closed) {
+    try {
+      await page.screenshot({ path: pngPath, fullPage: true })
+      screenshotOk = true
+    } catch {
+      screenshotOk = false
+    }
+  }
+  let html = ''
+  if (!closed) {
+    try {
+      html = await page.content()
+    } catch {
+      html = ''
+    }
+  }
+  await writeFile(htmlPath, html || '<html><body>debug_unavailable</body></html>', 'utf-8')
+  await writeFile(txtPath, `url=${url}\nclosed=${closed}\nscreenshot=${screenshotOk}\n`, 'utf-8')
+  if (screenshotOk) process.stdout.write(`DEBUG • ${pngPath}\n`)
   process.stdout.write(`DEBUG • ${htmlPath}\n`)
   process.stdout.write(`DEBUG • ${txtPath}\n`)
 }
@@ -3852,10 +3912,11 @@ function isRetryableNavigationError(err: unknown) {
 }
 
 async function gotoWithRetries(page: import('playwright').Page, url: string) {
+  const timeoutMs = Math.max(15000, envNumber('INVESTING_GOTO_TIMEOUT_MS', 90000))
   let lastErr: unknown = null
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 })
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs })
       return
     } catch (e) {
       lastErr = e
@@ -4185,7 +4246,7 @@ async function ensurePortfolioPage(page: import('playwright').Page, brUrl: strin
     }
   }
   try {
-    await page.goto(brUrl, { waitUntil: 'domcontentloaded', timeout: 60000 })
+    await gotoWithRetries(page, brUrl)
     try {
       await page.waitForLoadState('networkidle', { timeout: 15000 })
     } catch {
@@ -4452,8 +4513,17 @@ async function runOnce(modeRaw: string) {
 
   if (enablePortfolio) {
     try {
+      process.stdout.write(`RUN • Portfolio Investing: exportando CSV (headless=${headless ? 'true' : 'false'})\n`)
       csvPath = await clickExportAndDownloadCsv(url, userDataDir, downloadDir, debugDir, headless)
       await validateInvestingCsvOrThrow(csvPath)
+      try {
+        const a = await auditCsv(csvPath)
+        process.stdout.write(
+          `OK • Portfolio Investing: method=investing csv=${csvPath} bytes=${a.bytes} rows=${a.rows} sha256=${a.sha16}\n`,
+        )
+      } catch {
+        void 0
+      }
       await buildMarketHistory({
         csvPath,
         outDir,
@@ -4494,8 +4564,16 @@ async function runOnce(modeRaw: string) {
             summary.portfolio.csvPath = latest.path
             summary.portfolio.method = 'seed'
             summary.portfolio.seedAgeMinutes = Math.round(ageMs / (60 * 1000))
+            csvPath = latest.path
             portfolioError = null
-            process.stdout.write(`OK • Seed CSV=${latest.path}\n`)
+            try {
+              const a = await auditCsv(latest.path)
+              process.stdout.write(
+                `OK • Portfolio Investing: method=seed csv=${latest.path} ageMin=${summary.portfolio.seedAgeMinutes} bytes=${a.bytes} rows=${a.rows} sha256=${a.sha16}\n`,
+              )
+            } catch {
+              process.stdout.write(`OK • Seed CSV=${latest.path}\n`)
+            }
           } catch (seedErr) {
             process.stderr.write(
               `WARN • Seed falhou (CSV local): ${String(seedErr instanceof Error ? seedErr.message : seedErr)}\n`,
@@ -4657,7 +4735,8 @@ async function runOnce(modeRaw: string) {
 
   if (portfolioError && exportRequired) throw portfolioError
 
-  process.stdout.write(`OK • CSV=${csvPath} • OUT=${outDir}\n`)
+  const usedCsv = summary.portfolio && summary.portfolio.status === 'ok' ? summary.portfolio.csvPath : csvPath
+  process.stdout.write(`OK • CSV=${usedCsv || 'null'} • OUT=${outDir}\n`)
 }
 
 async function main() {

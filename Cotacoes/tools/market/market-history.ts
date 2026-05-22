@@ -294,13 +294,30 @@ export async function buildMarketHistory(input: BuildMarketHistoryInput) {
     }
     portfolioStats.rowsWithPrice += 1
 
-    const extendedPriceRaw = getFirst(row, [
+    const preMarketPriceRaw = getFirst(row, [
+      'Pré-mercado',
+      'Pre-market',
+      'Pre Market',
+      'Premarket',
+      'Pré Mercado',
+      'PreMarket',
+    ])
+    const afterHoursPriceRaw = getFirst(row, [
       'Negociação Estendida',
       'Negociacao Estendida',
       'Extended Hours',
       'Extended',
+      'After Hours',
+      'After-Hours',
+      'After hours',
+      'Pós-mercado',
+      'Pos-mercado',
+      'Pós Mercado',
+      'Pos Mercado',
     ])
-    const extendedPrice = parseNumber(extendedPriceRaw)
+    const preMarketPrice = parseNumber(preMarketPriceRaw)
+    const afterHoursPrice = parseNumber(afterHoursPriceRaw)
+    const extendedPrice = preMarketPrice !== null ? preMarketPrice : afterHoursPrice
 
     const changeRaw = getFirst(row, ['Chg.', 'Var.', 'Variação', 'Variacao', 'Var'])
     const changePctRaw = getFirst(row, [
@@ -321,13 +338,41 @@ export async function buildMarketHistory(input: BuildMarketHistoryInput) {
     const change = parseNumber(changeRaw)
     const changePct = parsePercent(changePctRaw)
 
-    const extendedChangePctRaw = getFirst(row, [
+    const preMarketChangePctRaw = getFirst(row, [
+      'Pré-mercado (%)',
+      'Pre-market (%)',
+      'Pre Market (%)',
+      'Premarket (%)',
+      'Pré Mercado (%)',
+      'PreMarket (%)',
+      'Pré-mercado %',
+      'Pre-market %',
+      'Pre Market %',
+      'Premarket %',
+      'Pré Mercado %',
+      'PreMarket %',
+    ])
+    const afterHoursChangePctRaw = getFirst(row, [
       'Negociação Estendida (%)',
       'Negociacao Estendida (%)',
       'Extended Hours (%)',
       'Extended (%)',
+      'After Hours (%)',
+      'After-Hours (%)',
+      'Pós-mercado (%)',
+      'Pos-mercado (%)',
+      'Pós Mercado (%)',
+      'Pos Mercado (%)',
+      'After Hours %',
+      'After-Hours %',
+      'Pós-mercado %',
+      'Pos-mercado %',
+      'Pós Mercado %',
+      'Pos Mercado %',
     ])
-    let extendedChangePct = parsePercent(extendedChangePctRaw)
+    const preMarketChangePct = parsePercent(preMarketChangePctRaw)
+    const afterHoursChangePct = parsePercent(afterHoursChangePctRaw)
+    let extendedChangePct = preMarketChangePct !== null ? preMarketChangePct : afterHoursChangePct
     if (extendedChangePct === null && typeof extendedPrice === 'number' && Number.isFinite(extendedPrice)) {
       const prevRaw = getFirst(row, ['Prévio', 'Prev', 'Previous', 'Previous Close', 'Prev Close'])
       const prev = parseNumber(prevRaw)
