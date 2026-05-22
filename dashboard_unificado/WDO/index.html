@@ -587,7 +587,9 @@
     <script>
         (function(){
             const sel = document.getElementById('assetSelect');
-            const prodBase = 'https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/dashboard_unificado/';
+            const prodRoot = 'https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/';
+            const prodBase = prodRoot + 'dashboard_unificado/';
+            const prodMercado = prodRoot + 'Cotacoes/dashboard/MERCADO/';
             function targetFor(val){
                 const host = location.hostname;
                 const href = location.href;
@@ -596,6 +598,7 @@
                     if(val === 'WDO') return prodBase + 'WDO/';
                     if(val === 'WIN') return prodBase + 'WIN/';
                     if(val === 'CORR') return prodBase + 'correlation/';
+                    if(val === 'MERCADO') return prodMercado;
                     return href;
                 }
                 const isUnified = href.indexOf('dashboard_unificado') !== -1;

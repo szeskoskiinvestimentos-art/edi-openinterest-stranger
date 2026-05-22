@@ -13195,41 +13195,47 @@ function renderNavigationFromDefinition() {
 function setupAssetSwitchNav() {
     const sel = document.getElementById('assetSelect');
     if (!sel) return;
-    const prodBase = 'https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/dashboard_unificado/';
-    function isProdHost() {
-        const host = location.hostname || '';
-        return host.indexOf('github.io') !== -1 || host.indexOf('sites.google.com') !== -1;
-    }
-    function targetFor(val) {
-        if (val === 'MERCADO') return location.href;
-        if (isProdHost()) return prodBase + (val === 'WDO' ? 'WDO/' : 'WIN/');
-        return '../../../dashboard_unificado/' + (val === 'WDO' ? 'WDO/index.html' : 'WIN/index.html');
-    }
-    sel.addEventListener('change', function (e) {
-        const url = targetFor(e.target.value);
-        try {
-            mod.render({
-                deps: {
-                    NAVIGATION_DEFINITION,
-                    filterNavigationItemsByExistingTargets,
-                    escapeHtml,
-                },
-            });
-        } catch {
-        }
-    }
-}
-
-function setupAssetSwitchNav() {
     const mod = (typeof window !== 'undefined' && window.MercadoBlocks && window.MercadoBlocks.assetSwitchNav)
         ? window.MercadoBlocks.assetSwitchNav
         : null;
     if (mod && typeof mod.setup === 'function') {
         try {
             mod.setup();
+            return;
         } catch {
         }
     }
+    const prodRoot = 'https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/';
+    const prodUnified = prodRoot + 'dashboard_unificado/';
+    const prodMercado = prodRoot + 'Cotacoes/dashboard/MERCADO/';
+    function isProdHost() {
+        const host = location.hostname || '';
+        return host.indexOf('github.io') !== -1 || host.indexOf('sites.google.com') !== -1;
+    }
+    function toUrl(pathOrUrl) {
+        try {
+            return new URL(pathOrUrl, location.href).toString();
+        } catch {
+            return String(pathOrUrl || location.href);
+        }
+    }
+    function targetFor(val) {
+        if (val === 'MERCADO') return isProdHost() ? prodMercado : location.href;
+        if (val === 'CORR') return isProdHost() ? prodUnified + 'correlation/' : toUrl('../../../dashboard_unificado/correlation/index.html');
+        if (val === 'WDO') return isProdHost() ? prodUnified + 'WDO/' : toUrl('../../../dashboard_unificado/WDO/index.html');
+        if (val === 'WIN') return isProdHost() ? prodUnified + 'WIN/' : toUrl('../../../dashboard_unificado/WIN/index.html');
+        return location.href;
+    }
+    function go(url) {
+        try {
+            window.top.location.href = url;
+        } catch {
+            location.href = url;
+        }
+    }
+    sel.addEventListener('change', function (e) {
+        go(targetFor(e.target.value));
+    });
 }
 
 function setupQuickNavDrawer() {
