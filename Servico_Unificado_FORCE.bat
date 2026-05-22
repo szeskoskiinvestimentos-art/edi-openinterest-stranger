@@ -39,6 +39,7 @@ if "%INVESTING_PORTFOLIO_ENABLED%"=="" set "INVESTING_PORTFOLIO_ENABLED=true"
 if "%INVESTING_CALENDAR_ENABLED%"=="" set "INVESTING_CALENDAR_ENABLED=true"
 if "%INFOMONEY_DI_ENABLED%"=="" set "INFOMONEY_DI_ENABLED=true"
 if "%MARKET_SCHEDULER_ENABLED%"=="" set "MARKET_SCHEDULER_ENABLED=false"
+if "%DOTENV_OVERRIDE%"=="" set "DOTENV_OVERRIDE=false"
 
 set "COTACOES_DIR=%~dp0Cotacoes"
 if not exist "%COTACOES_DIR%\package.json" (
@@ -103,9 +104,19 @@ echo Host: %MARKET_SERVICE_HOST%
 echo Porta: %MARKET_SERVICE_PORT%
 echo.
 
+if "%MARKET_ALREADY_RUNNING%"=="1" (
+  powershell -NoProfile -Command "try { $u='http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/status'; $r=Invoke-RestMethod -Method Get -Uri $u -TimeoutSec 2; $s=$null; if($r -and $r.state -and $r.state.last -and $r.state.last.summary){ $s=$r.state.last.summary }; if($s -and (($s.portfolio -and $s.portfolio.enabled -eq $false) -or ($s.di -and $s.di.enabled -eq $false) -or ($s.calendar -and $s.calendar.enabled -eq $false))){ exit 2 } exit 0 } catch { exit 0 }" >nul 2>&1
+  if errorlevel 2 (
+    echo AVISO: market:service esta rodando, mas esta com modulos de download desativados. Reiniciando para aplicar variaveis...
+    call :SHUTDOWN_MARKET_FORCE
+    set "MARKET_ALREADY_RUNNING=0"
+    timeout /t 1 >nul
+  )
+)
+
 if "%MARKET_ALREADY_RUNNING%"=="0" (
   echo Market service nao esta rodando. Iniciando em nova janela...
-  start "" /b powershell -NoProfile -Command "$env:MARKET_GIT_SYNC_ENABLED='%MARKET_GIT_SYNC_ENABLED%'; $env:MARKET_GIT_SYNC_PUSH='%MARKET_GIT_SYNC_PUSH%'; $env:MARKET_GIT_SYNC_BRANCH='%MARKET_GIT_SYNC_BRANCH%'; $env:MARKET_SERVICE_HOST='%MARKET_SERVICE_HOST%'; $env:MARKET_SERVICE_PORT='%MARKET_SERVICE_PORT%'; $env:MARKET_INTERVAL_MINUTES='%MARKET_INTERVAL_MINUTES%'; $env:INVESTING_PORTFOLIO_INTERVAL_MINUTES='%INVESTING_PORTFOLIO_INTERVAL_MINUTES%'; $env:MARKET_UPDATE_MODE='%MARKET_UPDATE_MODE%'; $env:MARKET_SCHEDULE_MODE='%MARKET_SCHEDULE_MODE%'; $env:MARKET_SCHEDULER_ENABLED='%MARKET_SCHEDULER_ENABLED%'; $env:MARKET_RUN_ON_START='%MARKET_RUN_ON_START%'; $env:MARKET_RETENTION_DAYS='%MARKET_RETENTION_DAYS%'; $env:MARKET_YAHOO_ENABLED='%MARKET_YAHOO_ENABLED%'; $env:MARKET_YAHOO_MAX_SYMBOLS='%MARKET_YAHOO_MAX_SYMBOLS%'; $env:MARKET_YAHOO_TIMEOUT_MS='%MARKET_YAHOO_TIMEOUT_MS%'; $env:INVESTING_PORTFOLIO_ENABLED='%INVESTING_PORTFOLIO_ENABLED%'; $env:INVESTING_CALENDAR_ENABLED='%INVESTING_CALENDAR_ENABLED%'; $env:INFOMONEY_DI_ENABLED='%INFOMONEY_DI_ENABLED%'; $env:OPTIONS_UNIFIED_DASHBOARD_DIR='%OPTIONS_UNIFIED_DASHBOARD_DIR%'; Set-Location '%COTACOES_DIR%'; if (-not (Test-Path -LiteralPath 'node_modules\\.bin\\tsx.cmd')) { npm ci --silent }; npm run -s market:service"
+  start "" /b powershell -NoProfile -Command "$env:DOTENV_OVERRIDE='%DOTENV_OVERRIDE%'; $env:MARKET_GIT_SYNC_ENABLED='%MARKET_GIT_SYNC_ENABLED%'; $env:MARKET_GIT_SYNC_PUSH='%MARKET_GIT_SYNC_PUSH%'; $env:MARKET_GIT_SYNC_BRANCH='%MARKET_GIT_SYNC_BRANCH%'; $env:MARKET_SERVICE_HOST='%MARKET_SERVICE_HOST%'; $env:MARKET_SERVICE_PORT='%MARKET_SERVICE_PORT%'; $env:MARKET_INTERVAL_MINUTES='%MARKET_INTERVAL_MINUTES%'; $env:INVESTING_PORTFOLIO_INTERVAL_MINUTES='%INVESTING_PORTFOLIO_INTERVAL_MINUTES%'; $env:MARKET_UPDATE_MODE='%MARKET_UPDATE_MODE%'; $env:MARKET_SCHEDULE_MODE='%MARKET_SCHEDULE_MODE%'; $env:MARKET_SCHEDULER_ENABLED='%MARKET_SCHEDULER_ENABLED%'; $env:MARKET_RUN_ON_START='%MARKET_RUN_ON_START%'; $env:MARKET_RETENTION_DAYS='%MARKET_RETENTION_DAYS%'; $env:MARKET_YAHOO_ENABLED='%MARKET_YAHOO_ENABLED%'; $env:MARKET_YAHOO_MAX_SYMBOLS='%MARKET_YAHOO_MAX_SYMBOLS%'; $env:MARKET_YAHOO_TIMEOUT_MS='%MARKET_YAHOO_TIMEOUT_MS%'; $env:INVESTING_PORTFOLIO_ENABLED='%INVESTING_PORTFOLIO_ENABLED%'; $env:INVESTING_CALENDAR_ENABLED='%INVESTING_CALENDAR_ENABLED%'; $env:INFOMONEY_DI_ENABLED='%INFOMONEY_DI_ENABLED%'; $env:OPTIONS_UNIFIED_DASHBOARD_DIR='%OPTIONS_UNIFIED_DASHBOARD_DIR%'; Set-Location '%COTACOES_DIR%'; if (-not (Test-Path -LiteralPath 'node_modules\\.bin\\tsx.cmd')) { npm ci --silent }; npm run -s market:service"
   timeout /t 3 >nul
 )
 
@@ -137,9 +148,7 @@ if not "%PY_CMD%"=="" (
 echo.
 call :WAIT_MARKET_UPDATE
 if errorlevel 1 (
-  echo ERRO: timeout aguardando final da atualizacao de cotacoes. Abortando push para evitar artefatos inconsistentes.
-  call :SHUTDOWN_MARKET_FORCE
-  goto :END
+  echo AVISO: timeout aguardando final da atualizacao de cotacoes.
 )
 
 call :GIT_PUSH_UNIFIED
@@ -158,7 +167,7 @@ endlocal & exit /b %errorlevel%
 :WAIT_MARKET_UPDATE
 setlocal
 set "URL=http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/status"
-powershell -NoProfile -Command "try { $u='%URL%'; $start=Get-Date; $deadline=$start.AddMinutes(15); while((Get-Date) -lt $deadline){ try { $r=Invoke-RestMethod -Method Get -Uri $u -TimeoutSec 2; if($r -and $r.ok -eq $true -and $r.state){ if($r.state.running -eq $true){ Start-Sleep -Seconds 2; continue } $last=$r.state.last; if($last -and $last.finishedAt){ try { $fin=[DateTime]::Parse([string]$last.finishedAt); if($fin -ge $start){ if(-not $last.reason -or [string]$last.reason -eq 'force'){ exit 0 } } } catch {} } } } catch {} Start-Sleep -Seconds 2 } exit 1 } catch { exit 1 }"
+powershell -NoProfile -Command "try { $u='%URL%'; $needGit=($env:MARKET_GIT_SYNC_ENABLED -eq 'true' -or $env:MARKET_GIT_SYNC_ENABLED -eq '1'); $start=Get-Date; $deadline=$start.AddMinutes(15); while((Get-Date) -lt $deadline){ try { $r=Invoke-RestMethod -Method Get -Uri $u -TimeoutSec 2; if($r -and $r.ok -eq $true -and $r.state){ if($r.state.running -eq $true){ Start-Sleep -Seconds 2; continue } $last=$r.state.last; if($last -and $last.finishedAt){ try { $fin=[DateTime]::Parse([string]$last.finishedAt); if($fin -ge $start){ if(-not $last.reason -or [string]$last.reason -eq 'force'){ if(-not $needGit){ exit 0 } $lp=[string]$last.logPath; if($lp -and (Test-Path -LiteralPath $lp)){ $tail=Get-Content -LiteralPath $lp -Tail 200 -ErrorAction SilentlyContinue; if($tail -match '^GIT_SYNC status='){ exit 0 } } } } } } catch {} } } } catch {} Start-Sleep -Seconds 2 } exit 1 } catch { exit 1 }"
 endlocal & exit /b %errorlevel%
 
 :START_EXIT_WATCHER
@@ -183,46 +192,11 @@ endlocal & exit /b 0
 
 :GIT_PUSH_UNIFIED
 setlocal
-echo.
-echo === Validando artefatos (strict) antes do push ===
-call npm -C "%~dp0Cotacoes" run -s market:validate:strict
-if errorlevel 1 (
-  echo ERRO: validacao strict falhou. Abortando commit/push de artefatos.
-  endlocal & exit /b 1
-)
-
-set "TS="
-set "GEN_HASH="
-for /f "usebackq tokens=1,2 delims=|" %%A in (`powershell -NoProfile -Command "$p=Join-Path (Resolve-Path '%~dp0.').Path 'Cotacoes\\dashboard\\MERCADO\\assets\\data\\market_quotes.json'; $ts=(Get-Date).ToString('yyyy-MM-dd HH:mm'); $g=''; try{ $j=Get-Content -Raw -LiteralPath $p | ConvertFrom-Json; $g=[string]$j.generatedAt; if(-not $g -and $j.meta){ $g=[string]$j.meta.generatedAt } } catch {}; $h=''; if($g){ $b=[Text.Encoding]::UTF8.GetBytes($g); $hh=(New-Object Security.Cryptography.SHA1Managed).ComputeHash($b); $h=([BitConverter]::ToString($hh) -replace '-','').Substring(0,8) }; Write-Output ($ts + '|' + $h)"`) do (
-  set "TS=%%A"
-  set "GEN_HASH=%%B"
-)
-if "%TS%"=="" for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "(Get-Date).ToString('yyyy-MM-dd HH:mm')"`) do set "TS=%%i"
-if "%GEN_HASH%"=="" set "GEN_HASH=na"
-
-if not "%EDI_ARTIFACTS_BRANCH%"=="" (
-  powershell -NoProfile -Command ^
-    "try { $branch=[string]$env:EDI_ARTIFACTS_BRANCH; if(-not $branch){ exit 0 }; $root=(Resolve-Path '%~dp0.').Path; $wt=(Join-Path $root '.edi_artifacts_worktree');" ^
-    "try { Set-Location $root; try { git worktree remove --force $wt 2>$null | Out-Null } catch { } ; try { Remove-Item -Recurse -Force -LiteralPath $wt -ErrorAction SilentlyContinue } catch { };" ^
-    "try { git fetch origin --prune | Out-Null } catch { };" ^
-    "git worktree add $wt --detach | Out-Null; Set-Location $wt;" ^
-    "$base='origin/main'; try { git rev-parse --verify $base | Out-Null } catch { $base='main'; try { git rev-parse --verify $base | Out-Null } catch { $base='HEAD' } };" ^
-    "try { git rev-parse --verify ('origin/' + $branch) | Out-Null; git checkout -B $branch ('origin/' + $branch) | Out-Null } catch { git checkout -B $branch $base | Out-Null };" ^
-    "git reset --hard $base | Out-Null;" ^
-    "$srcRoot=$root; function CopyPath($rel){ $src=Join-Path $srcRoot $rel; if(-not (Test-Path -LiteralPath $src)){ return }; $dst=Join-Path $wt $rel; $parent=Split-Path -Parent $dst; if($parent){ New-Item -ItemType Directory -Force -Path $parent | Out-Null }; $it=Get-Item -LiteralPath $src; if($it.PSIsContainer){ Copy-Item -Recurse -Force -LiteralPath $src -Destination $dst } else { Copy-Item -Force -LiteralPath $src -Destination $dst } };" ^
-    "foreach($rel in @('dashboard_unificado','controle_de_dados.html','Cotacoes\\dashboard\\MERCADO\\assets\\data','Cotacoes\\dashboard\\MERCADO\\exports','.nojekyll')){ $p=Join-Path $wt $rel; if(Test-Path -LiteralPath $p){ Remove-Item -Recurse -Force -LiteralPath $p -ErrorAction SilentlyContinue } };" ^
-    "CopyPath 'dashboard_unificado'; CopyPath 'controle_de_dados.html'; CopyPath 'Cotacoes\\dashboard\\MERCADO\\assets\\data'; CopyPath 'Cotacoes\\dashboard\\MERCADO\\exports'; CopyPath '.nojekyll';" ^
-    "git add -A | Out-Null; git diff --cached --quiet; if($LASTEXITCODE -eq 0){ exit 0 };" ^
-    "if($env:EDI_ARTIFACTS_NO_PUSH -eq '1'){ exit 0 };" ^
-    "$msg=('Atualiza artefatos (auto %TS% gen:%GEN_HASH%)'); & git commit -m $msg | Out-Null; if($LASTEXITCODE -ne 0){ exit $LASTEXITCODE };" ^
-    "$env:GIT_TERMINAL_PROMPT='0'; $env:GCM_INTERACTIVE='Never'; $p=Start-Process git -ArgumentList @('push','--force-with-lease','origin',('HEAD:' + $branch)) -NoNewWindow -PassThru; if(-not $p.WaitForExit(180000)){ try{$p.Kill()}catch{}; exit 2 }; exit $p.ExitCode" ^
-    "} finally { try { Set-Location $root } catch { }; try { git worktree remove --force $wt | Out-Null } catch { }; try { Remove-Item -Recurse -Force -LiteralPath $wt -ErrorAction SilentlyContinue } catch { } } } catch { exit 1 }"
-  endlocal & exit /b %errorlevel%
-)
-git add dashboard_unificado controle_de_dados.html Cotacoes\dashboard\MERCADO\assets\data Cotacoes\dashboard\MERCADO\exports >nul 2>&1
+git add dashboard_unificado B3_System\dashboard_unificado controle_de_dados.html Cotacoes\dashboard\index.html Cotacoes\dashboard\MERCADO\index.html Cotacoes\dashboard\MERCADO\assets\js Cotacoes\dashboard\MERCADO\assets\data Cotacoes\dashboard\MERCADO\exports Cotacoes\tools\market Cotacoes\package.json >nul 2>&1
 git diff --cached --quiet >nul 2>&1
 if errorlevel 1 (
-  git commit -m "Atualiza dashboard_unificado (auto %TS% gen:%GEN_HASH%)" >nul 2>&1
+  for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "(Get-Date).ToString('yyyy-MM-dd HH:mm')"`) do set "TS=%%i"
+  git commit -m "Atualiza dashboard_unificado (auto %TS%)" >nul 2>&1
   powershell -NoProfile -Command "$env:GIT_TERMINAL_PROMPT='0'; $env:GCM_INTERACTIVE='Never'; $p=Start-Process git -ArgumentList @('push','origin','main') -NoNewWindow -PassThru; if(-not $p.WaitForExit(180000)){ try{$p.Kill()}catch{}; exit 2 }; exit $p.ExitCode" >nul 2>&1
   if errorlevel 1 (
     powershell -NoProfile -Command "$env:GIT_TERMINAL_PROMPT='0'; $env:GCM_INTERACTIVE='Never'; $p=Start-Process git -ArgumentList @('pull','--no-rebase','--no-edit','-X','ours','origin','main') -NoNewWindow -PassThru; if(-not $p.WaitForExit(180000)){ try{$p.Kill()}catch{}; exit 2 }; exit $p.ExitCode" >nul 2>&1

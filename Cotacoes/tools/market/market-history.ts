@@ -45,19 +45,20 @@ export async function buildMarketHistory(input: BuildMarketHistoryInput) {
     applyPortfolioParseStats(portfolioStats, parsed)
     if (!('symbol' in parsed) || !('asset' in parsed)) continue
 
-    if (assetsBySymbol.has(parsed.symbol)) portfolioStats.duplicateSymbols += 1
-    assetsBySymbol.set(parsed.symbol, parsed.asset)
+    const sym = parsed.symbol
+    if (assetsBySymbol.has(sym)) portfolioStats.duplicateSymbols += 1
+    assetsBySymbol.set(sym, parsed.asset)
     if (!parsed.ok) continue
 
-    const point: MarketPoint = parsed.point
-    const existingPoints = series[parsed.symbol] || []
+    const point = parsed.point
+    const existingPoints = series[sym] || []
     const last = existingPoints.length ? existingPoints[existingPoints.length - 1] : null
     const nextPoints =
       last && last.t === point.t
         ? existingPoints.slice(0, -1).concat([point])
         : existingPoints.concat([point])
 
-    series[parsed.symbol] = pruneOldPoints(nextPoints, cutoffMs)
+    series[sym] = pruneOldPoints(nextPoints, cutoffMs)
   }
 
   portfolioStats.uniqueSymbols = assetsBySymbol.size
