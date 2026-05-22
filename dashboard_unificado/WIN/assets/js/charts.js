@@ -121,6 +121,7 @@ class StrangerThingsCharts {
             this.populateTable(data);
             this.createFairValueTable(data); // Added
             this.updateLastUpdate(data);
+            this.updateYahooOptionsPanel();
         } catch (error) {
             console.error('Error initializing charts:', error);
         }
@@ -226,6 +227,75 @@ class StrangerThingsCharts {
         } catch {
             label.textContent = `• Último update: ${raw}`;
         }
+    }
+
+    updateYahooOptionsPanel() {
+        const container = document.getElementById('yahoo-options-container');
+        if (!container) return;
+
+        const rows = [
+            { ticker: 'EWZ', data: window.yahooEwzOptionsData },
+        ];
+
+        const nowMs = Date.now();
+        const staleDays = 7;
+        const msPerDay = 24 * 60 * 60 * 1000;
+
+        function parseCapturedAtUtc(obj) {
+            const raw = obj && (obj.captured_at_utc || obj.capturedAtUtc || obj.capturedAt || (obj.meta && obj.meta.capturedAtUtc));
+            if (!raw) return null;
+            const dt = new Date(raw);
+            return isNaN(dt.getTime()) ? null : dt;
+        }
+
+        const norm = rows.map((r) => {
+            const obj = r.data;
+            if (!obj || typeof obj !== 'object') {
+                return { ticker: r.ticker, ok: false, status: 'MISSING', spot: null, capturedAt: null, ageDays: null, warnings: [] };
+            }
+            const capturedAt = parseCapturedAtUtc(obj);
+            const ageDays = capturedAt ? (nowMs - capturedAt.getTime()) / msPerDay : null;
+            const warnings = Array.isArray(obj.warnings) ? obj.warnings : [];
+            const spot = typeof obj.spot === 'number' ? obj.spot : null;
+            const isStale = ageDays != null && ageDays > staleDays;
+            const status = isStale ? 'STALE' : 'OK';
+            return { ticker: r.ticker, ok: true, status, spot, capturedAt, ageDays, warnings };
+        });
+
+        const statusColor = (s) => {
+            if (s === 'OK') return '#00f3ff';
+            if (s === 'STALE') return '#ffb000';
+            return '#ff073a';
+        };
+
+        const td = (v) => `<td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.08);">${v}</td>`;
+        const th = (v) => `<th style="text-align:left;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.14);color:#b3b3b3;font-family:'Share Tech Mono',monospace;font-size:12px;">${v}</th>`;
+
+        const body = norm.map((r) => {
+            const spot = r.spot == null ? '—' : this.formatNumberBr(r.spot, 2);
+            const captured = r.capturedAt ? r.capturedAt.toLocaleString('pt-BR') : '—';
+            const age = r.ageDays == null ? '—' : `${this.formatNumberBr(r.ageDays, 1)}d`;
+            const status = `<span style="font-weight:900;color:${statusColor(r.ok ? r.status : 'MISSING')};">${r.ok ? r.status : 'MISSING'}</span>`;
+            const warnings = r.warnings && r.warnings.length ? this.escapeHtml(String(r.warnings[0])) : '—';
+            return `<tr>${td(r.ticker)}${td(spot)}${td(captured)}${td(age)}${td(status)}${td(warnings)}</tr>`;
+        }).join('');
+
+        container.innerHTML =
+            `<div style="overflow:auto;">` +
+            `<table style="width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;">` +
+            `<thead><tr>${th('Ticker')}${th('Spot')}${th('Captura')}${th('Idade')}${th('Status')}${th('Aviso')}</tr></thead>` +
+            `<tbody>${body}</tbody>` +
+            `</table>` +
+            `</div>`;
+    }
+
+    escapeHtml(text) {
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
 
     createDeltaChart(data) {
