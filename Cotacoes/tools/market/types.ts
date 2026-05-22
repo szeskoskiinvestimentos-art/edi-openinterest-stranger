@@ -90,6 +90,7 @@ export type MarketQuotes = {
     generatedAt: string
     intervalMinutes: number
     retentionDays: number
+    warnings?: string[]
     source: string
     portfolioUpdatedAt?: string
     portfolioStats?: PortfolioStats

@@ -1,5 +1,8 @@
 const MercadoCharts = (() => {
     const charts = new Map();
+    const pointPct = (typeof window !== 'undefined' && window.MercadoUtils && typeof window.MercadoUtils.pointPct === 'function')
+        ? window.MercadoUtils.pointPct
+        : ((p) => (p && typeof p.extendedChangePct === 'number' && Number.isFinite(p.extendedChangePct)) ? p.extendedChangePct : (p && typeof p.changePct === 'number' && Number.isFinite(p.changePct)) ? p.changePct : null);
 
     function destroyIfExists(key) {
         const existing = charts.get(key);
@@ -31,7 +34,7 @@ const MercadoCharts = (() => {
         });
         const values = points.map(p => p.price);
         const meta = points.length ? points[points.length - 1] : null;
-        const subtitle = meta ? `${formatNumber(meta.price)} (${formatPercent(meta.changePct)})` : '—';
+        const subtitle = meta ? `${formatNumber(meta.price)} (${formatPercent(pointPct(meta))})` : '—';
         return { labels, values, subtitle, label };
     }
 

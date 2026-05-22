@@ -17,6 +17,36 @@
             padding: 0 !important;
             margin-top: 0 !important;
         }
+        .edi-pill{
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            padding:4px 10px;
+            border-radius:999px;
+            border:1px solid rgba(255,255,255,.14);
+            background:rgba(0,0,0,.18);
+            font-family:'Share Tech Mono',monospace;
+            font-weight:900;
+            letter-spacing:.2px;
+            --pill-k:.75;
+        }
+        .edi-pill__dot{
+            width:8px;
+            height:8px;
+            border-radius:999px;
+            background:rgba(255,255,255,.55);
+            box-shadow:0 0 calc(18px * var(--pill-k)) rgba(255,255,255,.18);
+            flex:0 0 auto;
+        }
+        .edi-pill--status-ok .edi-pill__dot{background:rgba(0,255,0,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(0,255,0,.35);}
+        .edi-pill--status-warn .edi-pill__dot{background:rgba(255,255,0,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(255,255,0,.30);}
+        .edi-pill--status-bad .edi-pill__dot{background:rgba(255,7,58,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(255,7,58,.35);}
+        .edi-pill--status-info .edi-pill__dot{background:rgba(0,243,255,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(0,243,255,.25);}
+        .edi-pill--signal-risk_on .edi-pill__dot{background:rgba(0,255,0,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(0,255,0,.35);}
+        .edi-pill--signal-risk_off .edi-pill__dot{background:rgba(255,0,255,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(255,0,255,.30);}
+        .edi-pill--signal-pos .edi-pill__dot{background:rgba(0,255,0,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(0,255,0,.35);}
+        .edi-pill--signal-neg .edi-pill__dot{background:rgba(255,7,58,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(255,7,58,.35);}
+        .edi-pill--signal-neutral .edi-pill__dot{background:rgba(0,243,255,.95);box-shadow:0 0 calc(18px * var(--pill-k)) rgba(0,243,255,.22);}
         .market-ticker {
             display: flex;
             align-items: center;
@@ -1008,6 +1038,7 @@
                 <select id="assetSelect" aria-label="Selecionar dashboard" title="Troca de dashboard: MERCADO, WDO ou WIN. Em produção abre o link publicado; no uso local aponta para a pasta do dashboard_unificado." style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 12px;border-radius:999px;font-weight:900;letter-spacing:1px;">
                     <option value="WDO">WDO</option>
                     <option value="WIN">WIN</option>
+                    <option value="CORR">Correlações</option>
                     <option value="MERCADO" selected>EDI Market Guardian</option>
                 </select>
                 <button id="reloadDataBtn" type="button" title="Atualiza os dados. Se o atualizador local estiver rodando, ele tenta capturar (Investing/InfoMoney) e salvar em assets/data. Se estiver offline, apenas recarrega o arquivo atual." style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 12px;border-radius:999px;font-weight:900;letter-spacing:1px;cursor:pointer;white-space:nowrap;">
@@ -1780,9 +1811,64 @@
     <script src="assets/data/web_news_module.js"></script>
     <script src="assets/data/foreign_flow.js"></script>
     <script src="assets/data/petrobras_module.js"></script>
+    <script src="assets/js/market-utils.js?v=20260515_1"></script>
     <script src="assets/js/charts.js?v=20260416_1"></script>
+    <script src="assets/js/instruments-catalog.js?v=20260515_1"></script>
+    <script src="assets/js/rates-buckets.js?v=20260515_1"></script>
     <script src="assets/js/operational-compass.js?v=20260428_1"></script>
-    <script src="assets/js/us-operational-eua.js?v=20260504_1"></script>
-    <script src="assets/js/main.js?v=20260416_19"></script>
+    <script src="assets/js/us-operational-eua.js?v=20260514_1"></script>
+    <script src="assets/js/blocks/top-movers.js?v=20260514_1"></script>
+    <script src="assets/js/blocks/regime-conviction.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/china-brazil.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/metals-zone.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/agenda-matrix.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/brazil-market.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/all-assets-table.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/category-table.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/quick-nav-drawer.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/navigation-definition.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/nav-more-panel.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/asset-switch-nav.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/overview.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/investing-calendar-widget.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/split-layout-adapter.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/script-loader.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/status-ui.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/market-client.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/market-service.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/boot.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/updater.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/updater-summary.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/smooth-scroll-nav.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/sector-heatmap.js?v=20260514_1"></script>
+    <script src="assets/js/blocks/data-audit.js?v=20260514_1"></script>
+    <script src="assets/js/blocks/assets-catalog.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/market-panorama.js?v=20260514_1"></script>
+    <script src="assets/js/blocks/alerts.js?v=20260514_1"></script>
+    <script src="assets/js/blocks/favorites.js?v=20260514_1"></script>
+    <script src="assets/js/blocks/mercosul.js?v=20260514_1"></script>
+    <script src="assets/js/blocks/options-gamma-summary.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/financial-juice.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/web-news-module.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/flow-sentinel.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/fx-carry.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/carry-intel.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/commodities-briefing.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/btc-briefing.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/hk50-briefing.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/zq-curve.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/us-treasury-futures.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/global-ticker.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/brazil-export-basket.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/brazil-fixed-income-flow.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/petrobras.js?v=20260515_1"></script>
+    <script src="assets/js/blocks/op-briefing-br-flow.js?v=20260521_1"></script>
+    <script src="assets/js/blocks/op-briefing-br-breadth.js?v=20260521_1"></script>
+    <script src="assets/js/blocks/op-briefing-corr.js?v=20260521_1"></script>
+    <script src="assets/js/blocks/op-briefing-macro.js?v=20260521_1"></script>
+    <script src="assets/js/blocks/op-briefing-pulse.js?v=20260521_1"></script>
+    <script src="assets/js/blocks/op-briefing-helpers.js?v=20260521_4"></script>
+    <script src="assets/js/blocks/operational-briefing.js?v=20260515_2"></script>
+    <script src="assets/js/main.js?v=20260518_2"></script>
 </body>
 </html>

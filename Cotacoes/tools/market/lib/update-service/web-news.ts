@@ -1,0 +1,5 @@
+export type { WebNewsItem } from './web-news/types.js'
+export { classifyWebNewsItem } from './web-news/classify.js'
+export { parseRssItems } from './web-news/rss.js'
+export { hostnameOf, normalizeWebItemId, sanitizeNoNumbers } from './web-news/text.js'
+export { summarizeWebNews } from './web-news/summarize.js'

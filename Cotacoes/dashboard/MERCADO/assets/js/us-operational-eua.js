@@ -86,14 +86,33 @@
         const micro = usNow && usNow.micro ? usNow.micro[key] : null;
         const pulse = usNow && usNow.pulse ? usNow.pulse[key] : null;
         const scalp = micro && micro.scalp ? micro.scalp : null;
-        const scalpSig = scalp && scalp.signal ? String(scalp.signal) : 'neutral';
-        const strength = scalp && isNum(scalp.strength) ? scalp.strength : 0;
+        const scalpSigRaw = scalp && scalp.signal ? String(scalp.signal) : 'neutral';
+        const scalpStrength = scalp && isNum(scalp.strength) ? scalp.strength : 0;
+        const pulseStrength = pulse && isNum(pulse.net) ? clamp(Math.abs(pulse.net) / 1.2, 0, 1) : 0;
+        const scalpStrong = (scalpSigRaw === 'buy' || scalpSigRaw === 'sell') && scalpStrength >= 0.62;
+        const scalpSig = scalpStrong ? scalpSigRaw : 'neutral';
+
+        const tapePct = (() => {
+            const m = usNow && usNow.market ? usNow.market : null;
+            if (!m) return null;
+            if (key === 'spx') return isNum(m.spxPct) ? m.spxPct : null;
+            if (key === 'ndx') return isNum(m.ndxPct) ? m.ndxPct : null;
+            if (key === 'dow') return isNum(m.dowPct) ? m.dowPct : null;
+            return null;
+        })();
+        const tapeTh = key === 'ndx' ? 0.22 : 0.18;
+        const tapeSig = isNum(tapePct) ? (tapePct > tapeTh ? 'buy' : tapePct < -tapeTh ? 'sell' : 'neutral') : 'neutral';
+        const tapeStrength = isNum(tapePct) ? clamp(Math.abs(tapePct) / 0.45, 0, 1) : 0;
+
         const sig = (scalpSig === 'buy' || scalpSig === 'sell')
             ? scalpSig
-            : (pulse && (pulse.bias === 'buy' || pulse.bias === 'sell') ? pulse.bias : 'neutral');
+            : (pulse && (pulse.bias === 'buy' || pulse.bias === 'sell') ? pulse.bias : (tapeSig === 'buy' || tapeSig === 'sell' ? tapeSig : 'neutral'));
+        const strength = Math.max(scalpStrength, pulseStrength, tapeStrength);
+        const src = (scalpSig === 'buy' || scalpSig === 'sell') ? 'micro' : ((pulse && (pulse.bias === 'buy' || pulse.bias === 'sell')) ? 'macro' : (tapeSig !== 'neutral' ? 'tape' : 'n/d'));
         const min = assetProfiles[key] ? assetProfiles[key].microStrengthMin : 0.5;
-        const ok = sig !== 'neutral' && strength >= min;
-        return { key, sig, strength, min, ok };
+        const minUsed = src === 'macro' ? Math.min(min, 0.30) : (src === 'tape' ? Math.min(min, 0.22) : min);
+        const ok = sig !== 'neutral' && strength >= minUsed;
+        return { key, sig, strength, min: minUsed, ok, src };
     };
 
     const majorityBiasOf = (usNow) => {
@@ -101,7 +120,14 @@
         const active = votes.filter(v => v.ok).map(v => v.sig);
         const buys = active.filter(x => x === 'buy').length;
         const sells = active.filter(x => x === 'sell').length;
-        const bias = buys >= 2 ? 'buy' : sells >= 2 ? 'sell' : 'neutral';
+        const bias = (() => {
+            if (buys >= 2) return 'buy';
+            if (sells >= 2) return 'sell';
+            const strong = votes.filter(v => v.ok).slice().sort((a, b) => (b.strength || 0) - (a.strength || 0))[0] || null;
+            if (buys === 1 && sells === 0 && strong && strong.sig === 'buy' && strong.strength >= 0.78) return 'buy';
+            if (sells === 1 && buys === 0 && strong && strong.sig === 'sell' && strong.strength >= 0.78) return 'sell';
+            return 'neutral';
+        })();
         return { bias, votes };
     };
 
@@ -233,7 +259,7 @@
             const k = best || 'spx';
             const prof = assetProfiles[k] || assetProfiles.spx;
             const mv = majority.votes.find(x => x.key === k) || { sig: 'neutral', strength: 0, min: 0.5, ok: false };
-            return { key: k, label: prof.label, sig: mv.sig, strength: mv.strength, min: mv.min };
+            return { key: k, label: prof.label, sig: mv.sig, strength: mv.strength, min: mv.min, src: mv.src || 'n/d' };
         })();
 
         const edge = (() => {
@@ -412,7 +438,9 @@
 
         const planFor = (name, p, extras, execSym, src, micro) => {
             const scalp = micro && micro.scalp ? micro.scalp : { signal: 'neutral', strength: 0, label: 'n/d' };
-            const scalpBias = scalp && scalp.signal ? String(scalp.signal) : 'neutral';
+            const scalpStrength = scalp && isNum(scalp.strength) ? scalp.strength : 0;
+            const scalpStrong = (scalp && (scalp.signal === 'buy' || scalp.signal === 'sell')) ? (scalpStrength >= 0.62) : false;
+            const scalpBias = scalpStrong ? String(scalp.signal) : 'neutral';
             const primaryBias = scalpBias !== 'neutral' ? scalpBias : (p && p.bias ? p.bias : 'neutral');
             const tone = primaryBias === 'buy' ? 'positive' : primaryBias === 'sell' ? 'negative' : 'neutral';
             const action = primaryBias === 'buy' ? 'Compra' : primaryBias === 'sell' ? 'Venda' : 'Neutro';
@@ -584,7 +612,9 @@
         const edgeTitle = `EDGE ${String(model.edgePct)}%`;
 
         const whyHtml = (model.whyTop || []).map(x => `<span class="usop-pill usop-pill--why">${deps.escapeHtml(x)}</span>`).join('');
-        const leadHtml = model.lead && model.lead.label ? `<span class="usop-pill">Lead ${deps.escapeHtml(String(model.lead.label))} • thr ${deps.escapeHtml(String(model.threshold || '—'))}%</span>` : '';
+        const leadSrc = model.lead && model.lead.src ? String(model.lead.src) : 'n/d';
+        const leadSrcLabel = leadSrc === 'micro' ? 'micro' : leadSrc === 'macro' ? 'macro' : 'n/d';
+        const leadHtml = model.lead && model.lead.label ? `<span class="usop-pill">Lead ${deps.escapeHtml(String(model.lead.label))} (${deps.escapeHtml(leadSrcLabel)}) • thr ${deps.escapeHtml(String(model.threshold || '—'))}%</span>` : '';
         const conflictHtml = model.blocked && (model.conflicts || []).length
             ? `
                 <div class="usop-why">
@@ -718,6 +748,13 @@
 
     try {
         window.USOperationalEua = { render };
+    } catch {
+    }
+    try {
+        const w = window;
+        const root = (w.MercadoBlocks && typeof w.MercadoBlocks === 'object') ? w.MercadoBlocks : {};
+        root.usOperationalEua = { render };
+        w.MercadoBlocks = root;
     } catch {
     }
 })();

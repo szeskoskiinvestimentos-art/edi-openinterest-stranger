@@ -1,5 +1,8 @@
 (() => {
     const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+    const pointPct = (typeof window !== 'undefined' && window.MercadoUtils && typeof window.MercadoUtils.pointPct === 'function')
+        ? window.MercadoUtils.pointPct
+        : ((p) => (p && typeof p.extendedChangePct === 'number' && Number.isFinite(p.extendedChangePct)) ? p.extendedChangePct : (p && typeof p.changePct === 'number' && Number.isFinite(p.changePct)) ? p.changePct : null);
 
     const render = ({ data, el, deps } = {}) => {
         if (!el) return;
@@ -18,7 +21,7 @@
             const rate = last && isNum(last.price) ? last.price : null;
             const chg = last && isNum(last.change) ? last.change : null;
             const chgBps = (kind === 'yield') && isNum(chg) ? chg * 100 : null;
-            const pct = last && isNum(last.changePct) ? last.changePct : null;
+            const pct = pointPct(last);
             const ref = (pct !== null ? pct : (chgBps !== null ? chgBps : null));
             const cls = ref === null ? 'neutral' : ref > 0 ? 'positive' : ref < 0 ? 'negative' : 'neutral';
             return { label, symbol, rate, pct, cls, kind: kind || 'yield', chg, chgBps };
@@ -94,7 +97,7 @@
                 const rate = last && isNum(last.price) ? last.price : null;
                 const chg = last && isNum(last.change) ? last.change : null;
                 const chgBps = isNum(chg) ? chg * 100 : null;
-                const chgPct = last && isNum(last.changePct) ? last.changePct : null;
+                const chgPct = pointPct(last);
                 const cls = chgPct === null ? 'neutral' : chgPct > 0 ? 'positive' : chgPct < 0 ? 'negative' : 'neutral';
                 const y = 2000 + Number(String(symbol).slice(-2));
                 const m = monthNum(String(symbol)[3]);
@@ -511,5 +514,15 @@
         `;
     };
 
-    window.RatesBucketsModule = { render };
+    try {
+        window.RatesBucketsModule = { render };
+    } catch {
+    }
+    try {
+        const w = window;
+        const root = (w.MercadoBlocks && typeof w.MercadoBlocks === 'object') ? w.MercadoBlocks : {};
+        root.ratesBuckets = { render };
+        w.MercadoBlocks = root;
+    } catch {
+    }
 })();

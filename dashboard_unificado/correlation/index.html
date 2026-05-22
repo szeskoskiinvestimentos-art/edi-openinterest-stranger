@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Correlation Matrix • Top 20 (~1h)</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="title">Correlation Matrix</div>
+      <div class="subtitle">Top 20 • ~1h • MERCADO/market_quotes.json</div>
+    </div>
+    <div class="actions">
+      <select id="assetSelect" class="navsel" aria-label="Selecionar dashboard">
+        <option value="WDO">WDO</option>
+        <option value="WIN">WIN</option>
+        <option value="MERCADO">Cotações</option>
+        <option value="CORR" selected>Correlações</option>
+      </select>
+      <button id="btn-refresh" class="btn">Atualizar</button>
+      <a class="btn ghost" href="../index.html">Voltar</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="panel">
+      <div class="meta" id="meta">Carregando…</div>
+      <div class="legend">
+        <div class="legend-row">
+          <span class="legend-swatch neg"></span><span class="legend-label">-1</span>
+          <span class="legend-swatch mid"></span><span class="legend-label">0</span>
+          <span class="legend-swatch pos"></span><span class="legend-label">+1</span>
+        </div>
+        <div class="legend-note">Passe o mouse para ver o par. Clique para fixar no topo.</div>
+      </div>
+      <div class="pin" id="pin" aria-live="polite"></div>
+      <div class="matrix-wrap">
+        <div id="matrix" class="matrix" role="table" aria-label="Matriz de correlação"></div>
+      </div>
+      <div class="status" id="status"></div>
+    </section>
+  </main>
+
+  <script src="../../Cotacoes/dashboard/MERCADO/assets/data/market_quotes.js"></script>
+  <script src="assets/js/main.js"></script>
+</body>
+</html>
