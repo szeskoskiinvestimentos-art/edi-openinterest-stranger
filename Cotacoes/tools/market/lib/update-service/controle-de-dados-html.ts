@@ -35,11 +35,10 @@ export async function injectControleDeDadosOptionsViaPython(workspaceRoot: strin
   try {
     const pythonExe = process.platform === 'win32' ? 'py' : 'python3'
     const pythonArgs = process.platform === 'win32'
-      ? ['-3', path.resolve(workspaceRoot, 'gerar_controle.py')]
-      : [path.resolve(workspaceRoot, 'gerar_controle.py')]
+      ? ['-3', path.resolve(workspaceRoot, 'Cotacoes', 'tools', 'market', 'gerar_controle.py')]
+      : [path.resolve(workspaceRoot, 'Cotacoes', 'tools', 'market', 'gerar_controle.py')]
     await spawnCapture(pythonExe, pythonArgs, { cwd: workspaceRoot, env: process.env })
   } catch {
     void 0
   }
 }
-
