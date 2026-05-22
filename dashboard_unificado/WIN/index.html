@@ -30,9 +30,8 @@
 
     <!-- Navigation -->
     <nav class="nav">
-        <div class="container" style="display:flex;align-items:center;position:relative;">
-            <div class="nav-center" style="flex:1;display:flex;justify-content:center;">
-            <ul class="nav-list" style="margin:0">
+        <div class="container">
+            <ul class="nav-list">
                 <li><a href="#overview" class="nav-link active">Visão Geral</a></li>
                 <li><a href="#delta" class="nav-link">Essenciais</a></li>
                 <li><a href="#structure" class="nav-link">Estrutura</a></li>
@@ -42,15 +41,6 @@
                 <li><a href="#consolidated" class="nav-link">Consolidado</a></li>
                 <li><a href="#youtube" class="nav-link">YouTube</a></li>
             </ul>
-            </div>
-            <div class="nav-actions" style="position:absolute;right:0;top:50%;transform:translateY(-50%);">
-                <select id="assetSelect" aria-label="Selecionar ativo" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;">
-                    <option value="WDO">WDO</option>
-                    <option value="WIN" selected>WIN</option>
-                    <option value="MERCADO">Cotações</option>
-                    <option value="CORR">Correlações</option>
-                </select>
-            </div>
         </div>
     </nav>
 
@@ -571,38 +561,5 @@
     <!-- Gráficos e Lógica Principal -->
     <script src="assets/js/charts.js"></script>
     <script src="assets/js/main.js"></script>
-    <script>
-        (function(){
-            const sel = document.getElementById('assetSelect');
-            if(!sel) return;
-            const prodBase = 'https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/dashboard_unificado/';
-            function targetFor(val){
-                const host = location.hostname;
-                const href = location.href;
-                const isProd = host.indexOf('github.io') !== -1 || host.indexOf('sites.google.com') !== -1;
-                if(isProd){
-                    if(val === 'WDO') return prodBase + 'WDO/';
-                    if(val === 'WIN') return prodBase + 'WIN/';
-                    if(val === 'CORR') return prodBase + 'correlation/';
-                    return href;
-                }
-                const isUnified = href.indexOf('dashboard_unificado') !== -1;
-                if(isUnified){
-                    if(val === 'WDO') return '../WDO/index.html';
-                    if(val === 'WIN') return '../WIN/index.html';
-                    if(val === 'MERCADO') return '../../Cotacoes/dashboard/MERCADO/index.html';
-                    if(val === 'CORR') return '../correlation/index.html';
-                    return href;
-                }
-                if(val === 'WDO'){
-                    return '../../Edi_OpenInterest - PY - Stranger - WDO/dashboard_v1/index.html';
-                }
-                return '../../Edi_OpenInterest - PY - Stranger - Indice/dashboard_v1/index.html';
-            }
-            sel.addEventListener('change', function(e){
-                location.href = targetFor(e.target.value);
-            });
-        })();
-    </script>
 </body>
 </html>
