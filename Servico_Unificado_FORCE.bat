@@ -62,15 +62,6 @@ if exist "%AUTO_B3_DIR%\\CSV_Dolar\\*.csv" set "CSV_DOLAR_DIR=%AUTO_B3_DIR%\\CSV
 if "%CSV_INDICE_DIR%"=="" (
   if exist "%~dp0CSV_Indice\\*.csv" set "CSV_INDICE_DIR=%~dp0CSV_Indice"
 )
-if "%CSV_INDICE_DIR%"=="" (
-  if exist "%USERPROFILE%\\OneDrive - 12s1y\\Edi_Sistamas\\Sistema\\B3_System\\CSV_Indice\\*.csv" set "CSV_INDICE_DIR=%USERPROFILE%\\OneDrive - 12s1y\\Edi_Sistamas\\Sistema\\B3_System\\CSV_Indice"
-)
-if "%CSV_INDICE_DIR%"=="" (
-  if exist "%USERPROFILE%\\OneDrive\\Edi_Sistamas\\Sistema\\B3_System\\CSV_Indice\\*.csv" set "CSV_INDICE_DIR=%USERPROFILE%\\OneDrive\\Edi_Sistamas\\Sistema\\B3_System\\CSV_Indice"
-)
-if "%CSV_INDICE_DIR%"=="" (
-  if exist "%USERPROFILE%\\OneDrive - 12s1y (1)\\Edi_Sistamas\\Sistema\\B3_System\\CSV_Indice\\*.csv" set "CSV_INDICE_DIR=%USERPROFILE%\\OneDrive - 12s1y (1)\\Edi_Sistamas\\Sistema\\B3_System\\CSV_Indice"
-)
 
 set "PY_CMD="
 py -3 -c "import sys" >nul 2>&1

@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { fileExists } from './io.js'
 
 export async function buildOptionsGammaSummary(params: {
@@ -28,9 +27,36 @@ export async function buildOptionsGammaSummary(params: {
     }
   }
 
-  const optionsDashboardDir = params.resolveFromProject(
-    params.env('OPTIONS_UNIFIED_DASHBOARD_DIR', path.resolve(params.projectRoot, '..', 'B3_System', 'dashboard_unificado')),
-  )
+  const workspaceRoot = path.resolve(params.projectRoot, '..')
+
+  function isPathInside(baseDir: string, targetPath: string) {
+    const base = path.resolve(baseDir)
+    const target = path.resolve(targetPath)
+    const normBase = process.platform === 'win32' ? base.toLowerCase() : base
+    const normTarget = process.platform === 'win32' ? target.toLowerCase() : target
+    const baseWithSep = normBase.endsWith(path.sep) ? normBase : normBase + path.sep
+    return normTarget === normBase || normTarget.startsWith(baseWithSep)
+  }
+
+  function resolveInsideWorkspace(label: string, p: string) {
+    const abs = params.resolveFromProject(p)
+    if (!isPathInside(workspaceRoot, abs)) {
+      throw new Error(`${label}_outside_workspace_root:${abs}`)
+    }
+    return abs
+  }
+
+  const envOverride = String(params.env('OPTIONS_UNIFIED_DASHBOARD_DIR', '') || '').trim()
+  const optionsDashboardDir = envOverride
+    ? resolveInsideWorkspace('OPTIONS_UNIFIED_DASHBOARD_DIR', envOverride)
+    : path.resolve(workspaceRoot, 'dashboard_unificado')
+
+  const mercadoDir = path.resolve(workspaceRoot, 'Cotacoes', 'dashboard', 'MERCADO')
+  const unifiedRel = path.relative(mercadoDir, optionsDashboardDir).split(path.sep).join('/')
+
+  function relLink(parts: string[]) {
+    return [unifiedRel, ...parts].join('/').replace(/\/+/g, '/')
+  }
 
   async function loadOne(symbol: 'WDO' | 'WIN') {
     const jsonPath = path.join(optionsDashboardDir, symbol, 'assets', 'data', 'market_data.json')
@@ -53,9 +79,6 @@ export async function buildOptionsGammaSummary(params: {
               ? key.gamma_flip_hvl_gaussian
               : null
 
-    const fileUrl = pathToFileURL(path.join(optionsDashboardDir, symbol, 'index.html')).toString()
-    const dataUrl = pathToFileURL(jsonPath).toString()
-
     return {
       symbol,
       updatedAt: (raw && raw.overview && raw.overview.last_update) || raw.last_updated || null,
@@ -72,7 +95,10 @@ export async function buildOptionsGammaSummary(params: {
         rangeLow: key && typeof key.range_low === 'number' ? key.range_low : null,
         rangeHigh: key && typeof key.range_high === 'number' ? key.range_high : null,
       },
-      links: { dashboard: fileUrl, data: dataUrl },
+      links: {
+        dashboard: relLink([symbol, 'index.html']),
+        data: relLink([symbol, 'assets', 'data', 'market_data.json']),
+      },
     }
   }
 
@@ -93,7 +119,7 @@ export async function buildOptionsGammaSummary(params: {
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
-    source: { kind: 'dashboard_unificado', dir: optionsDashboardDir },
+    source: { kind: 'dashboard_unificado', dir: path.relative(workspaceRoot, optionsDashboardDir) || '.' },
     items,
   }
 }
