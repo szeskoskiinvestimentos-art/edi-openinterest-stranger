@@ -151,6 +151,12 @@ def _preserve_extras_from_previous(current_dir: str, staging_dir: str) -> int:
     if os.path.exists(src):
       _copy_file(src, dst)
       copied += 1
+
+  corr_src = os.path.join(current_dir, "correlation")
+  corr_dst = os.path.join(staging_dir, "correlation")
+  if (not os.path.exists(corr_dst)) and os.path.isdir(corr_src):
+    copied_info = _copy_tree(corr_src, corr_dst, ignore_dirs=set())
+    copied += int(copied_info.get("copied") or 0)
   return copied
 
 

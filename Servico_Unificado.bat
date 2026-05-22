@@ -236,7 +236,7 @@ if not "%EDI_ARTIFACTS_BRANCH%"=="" (
     "CopyPath 'dashboard_unificado'; CopyPath 'controle_de_dados.html'; CopyPath 'Cotacoes\\dashboard\\MERCADO\\assets\\data'; CopyPath 'Cotacoes\\dashboard\\MERCADO\\exports'; CopyPath '.nojekyll';" ^
     "git add -A | Out-Null; git diff --cached --quiet; if($LASTEXITCODE -eq 0){ exit 0 };" ^
     "if($env:EDI_ARTIFACTS_NO_PUSH -eq '1'){ exit 0 };" ^
-    "$msg=('Atualiza artefatos (auto %TS% gen:%GEN_HASH%)'); $c=Start-Process git -ArgumentList @('commit','-m',$msg) -NoNewWindow -PassThru; $c.WaitForExit() | Out-Null;" ^
+    "$msg=('Atualiza artefatos (auto %TS% gen:%GEN_HASH%)'); & git commit -m $msg | Out-Null; if($LASTEXITCODE -ne 0){ exit $LASTEXITCODE };" ^
     "$env:GIT_TERMINAL_PROMPT='0'; $env:GCM_INTERACTIVE='Never'; $p=Start-Process git -ArgumentList @('push','--force-with-lease','origin',('HEAD:' + $branch)) -NoNewWindow -PassThru; if(-not $p.WaitForExit(180000)){ try{$p.Kill()}catch{}; exit 2 }; exit $p.ExitCode" ^
     "} finally { try { Set-Location $root } catch { }; try { git worktree remove --force $wt | Out-Null } catch { }; try { Remove-Item -Recurse -Force -LiteralPath $wt -ErrorAction SilentlyContinue } catch { } } } catch { exit 1 }"
   endlocal & exit /b %errorlevel%
