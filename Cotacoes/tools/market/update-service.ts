@@ -67,6 +67,8 @@ function envBool(name: string, fallback: boolean) {
   return fallback
 }
 
+const DOTENV_OVERRIDE = envBool('DOTENV_OVERRIDE', true)
+
 async function readGitSyncStatusFromLog(logPath: string) {
   try {
     const raw = await readFile(logPath, 'utf8')
@@ -577,7 +579,7 @@ async function main() {
       const st = await stat(dotenvPath)
       if (!st || typeof st.mtimeMs !== 'number' || !Number.isFinite(st.mtimeMs)) return
       if (st.mtimeMs <= lastDotenvMtimeMs) return
-      dotenv.config({ path: dotenvPath, override: true })
+      dotenv.config({ path: dotenvPath, override: DOTENV_OVERRIDE })
       lastDotenvMtimeMs = st.mtimeMs
     } catch {
       void 0

@@ -42,6 +42,7 @@ if "%MARKET_YAHOO_TIMEOUT_MS%"=="" set "MARKET_YAHOO_TIMEOUT_MS=8000"
 if "%INVESTING_PORTFOLIO_ENABLED%"=="" set "INVESTING_PORTFOLIO_ENABLED=true"
 if "%INVESTING_CALENDAR_ENABLED%"=="" set "INVESTING_CALENDAR_ENABLED=true"
 if "%INFOMONEY_DI_ENABLED%"=="" set "INFOMONEY_DI_ENABLED=true"
+if "%DOTENV_OVERRIDE%"=="" set "DOTENV_OVERRIDE=false"
 
 set "COTACOES_DIR=%~dp0Cotacoes"
 if not exist "%COTACOES_DIR%\package.json" (
@@ -120,10 +121,16 @@ echo.
 
 if "%MARKET_ALREADY_RUNNING%"=="1" (
   echo Market service ja esta rodando.
+  powershell -NoProfile -Command "try { $u='http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/status'; $r=Invoke-RestMethod -Method Get -Uri $u -TimeoutSec 2; $s=$null; if($r -and $r.state -and $r.state.last -and $r.state.last.summary){ $s=$r.state.last.summary }; if($s -and (($s.portfolio -and $s.portfolio.enabled -eq $false) -or ($s.di -and $s.di.enabled -eq $false) -or ($s.calendar -and $s.calendar.enabled -eq $false))){ exit 2 } exit 0 } catch { exit 0 }" >nul 2>&1
+  if errorlevel 2 (
+    echo AVISO: market:service esta rodando, mas esta com modulos de download desativados. Reiniciando para aplicar variaveis...
+    call :SHUTDOWN_MARKET_IF_STARTED
+    set "MARKET_ALREADY_RUNNING=0"
+  )
 ) else (
   echo Iniciando market:service em nova janela...
   set "MARKET_STARTED_HERE=1"
-  start "" /b powershell -NoProfile -Command "$env:MARKET_GIT_SYNC_ENABLED='%MARKET_GIT_SYNC_ENABLED%'; $env:MARKET_GIT_SYNC_PUSH='%MARKET_GIT_SYNC_PUSH%'; $env:MARKET_GIT_SYNC_BRANCH='%MARKET_GIT_SYNC_BRANCH%'; $env:MARKET_SERVICE_HOST='%MARKET_SERVICE_HOST%'; $env:MARKET_SERVICE_PORT='%MARKET_SERVICE_PORT%'; $env:MARKET_INTERVAL_MINUTES='%MARKET_INTERVAL_MINUTES%'; $env:INVESTING_PORTFOLIO_INTERVAL_MINUTES='%INVESTING_PORTFOLIO_INTERVAL_MINUTES%'; $env:MARKET_UPDATE_MODE='%MARKET_UPDATE_MODE%'; $env:MARKET_SCHEDULE_MODE='%MARKET_SCHEDULE_MODE%'; $env:MARKET_SCHEDULER_ENABLED='%MARKET_SCHEDULER_ENABLED%'; $env:MARKET_RUN_ON_START='%MARKET_RUN_ON_START%'; $env:MARKET_RETENTION_DAYS='%MARKET_RETENTION_DAYS%'; $env:MARKET_YAHOO_ENABLED='%MARKET_YAHOO_ENABLED%'; $env:MARKET_YAHOO_MAX_SYMBOLS='%MARKET_YAHOO_MAX_SYMBOLS%'; $env:MARKET_YAHOO_TIMEOUT_MS='%MARKET_YAHOO_TIMEOUT_MS%'; $env:INVESTING_PORTFOLIO_ENABLED='%INVESTING_PORTFOLIO_ENABLED%'; $env:INVESTING_CALENDAR_ENABLED='%INVESTING_CALENDAR_ENABLED%'; $env:INFOMONEY_DI_ENABLED='%INFOMONEY_DI_ENABLED%'; $env:OPTIONS_UNIFIED_DASHBOARD_DIR='%OPTIONS_UNIFIED_DASHBOARD_DIR%'; Set-Location '%COTACOES_DIR%'; if (-not (Test-Path -LiteralPath 'node_modules\\.bin\\tsx.cmd')) { npm ci --silent }; npm run -s market:service"
+  start "" /b powershell -NoProfile -Command "$env:DOTENV_OVERRIDE='%DOTENV_OVERRIDE%'; $env:MARKET_GIT_SYNC_ENABLED='%MARKET_GIT_SYNC_ENABLED%'; $env:MARKET_GIT_SYNC_PUSH='%MARKET_GIT_SYNC_PUSH%'; $env:MARKET_GIT_SYNC_BRANCH='%MARKET_GIT_SYNC_BRANCH%'; $env:MARKET_SERVICE_HOST='%MARKET_SERVICE_HOST%'; $env:MARKET_SERVICE_PORT='%MARKET_SERVICE_PORT%'; $env:MARKET_INTERVAL_MINUTES='%MARKET_INTERVAL_MINUTES%'; $env:INVESTING_PORTFOLIO_INTERVAL_MINUTES='%INVESTING_PORTFOLIO_INTERVAL_MINUTES%'; $env:MARKET_UPDATE_MODE='%MARKET_UPDATE_MODE%'; $env:MARKET_SCHEDULE_MODE='%MARKET_SCHEDULE_MODE%'; $env:MARKET_SCHEDULER_ENABLED='%MARKET_SCHEDULER_ENABLED%'; $env:MARKET_RUN_ON_START='%MARKET_RUN_ON_START%'; $env:MARKET_RETENTION_DAYS='%MARKET_RETENTION_DAYS%'; $env:MARKET_YAHOO_ENABLED='%MARKET_YAHOO_ENABLED%'; $env:MARKET_YAHOO_MAX_SYMBOLS='%MARKET_YAHOO_MAX_SYMBOLS%'; $env:MARKET_YAHOO_TIMEOUT_MS='%MARKET_YAHOO_TIMEOUT_MS%'; $env:INVESTING_PORTFOLIO_ENABLED='%INVESTING_PORTFOLIO_ENABLED%'; $env:INVESTING_CALENDAR_ENABLED='%INVESTING_CALENDAR_ENABLED%'; $env:INFOMONEY_DI_ENABLED='%INFOMONEY_DI_ENABLED%'; $env:OPTIONS_UNIFIED_DASHBOARD_DIR='%OPTIONS_UNIFIED_DASHBOARD_DIR%'; Set-Location '%COTACOES_DIR%'; if (-not (Test-Path -LiteralPath 'node_modules\\.bin\\tsx.cmd')) { npm ci --silent }; npm run -s market:service"
   timeout /t 2 >nul
 )
 
@@ -206,7 +213,7 @@ goto :OPCOES_LOOP_RUN
 
 :GIT_PUSH_UNIFIED
 setlocal
-git add dashboard_unificado B3_System\dashboard_unificado controle_de_dados.html Cotacoes\dashboard\index.html Cotacoes\dashboard\MERCADO\index.html Cotacoes\dashboard\MERCADO\assets\js Cotacoes\dashboard\MERCADO\assets\data Cotacoes\dashboard\MERCADO\exports >nul 2>&1
+git add dashboard_unificado B3_System\dashboard_unificado controle_de_dados.html Cotacoes\dashboard\index.html Cotacoes\dashboard\MERCADO\index.html Cotacoes\dashboard\MERCADO\assets\js Cotacoes\dashboard\MERCADO\assets\data Cotacoes\dashboard\MERCADO\exports Cotacoes\tools\market Cotacoes\package.json >nul 2>&1
 git diff --cached --quiet >nul 2>&1
 if errorlevel 1 (
   for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "(Get-Date).ToString('yyyy-MM-dd HH:mm')"`) do set "TS=%%i"
