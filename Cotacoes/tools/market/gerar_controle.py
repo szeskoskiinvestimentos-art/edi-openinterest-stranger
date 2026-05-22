@@ -134,7 +134,7 @@ def _inject_b3_usd_caches(b3_dashboard_dir: str, staging_dir: str) -> int:
   return copied
 
 
-def _preserve_extras_from_previous(current_dir: str, staging_dir: str) -> int:
+def _preserve_extras_from_previous(source_dirs: List[str], staging_dir: str) -> int:
   extras = [
     os.path.join("WDO", "assets", "data", "yahoo_ewz_options.js"),
     os.path.join("WDO", "assets", "data", "yahoo_ewz_options.json"),
@@ -144,19 +144,24 @@ def _preserve_extras_from_previous(current_dir: str, staging_dir: str) -> int:
 
   copied = 0
   for rel in extras:
-    src = os.path.join(current_dir, rel)
     dst = os.path.join(staging_dir, rel)
     if os.path.exists(dst):
       continue
-    if os.path.exists(src):
-      _copy_file(src, dst)
-      copied += 1
+    for base in source_dirs:
+      src = os.path.join(base, rel)
+      if os.path.exists(src):
+        _copy_file(src, dst)
+        copied += 1
+        break
 
-  corr_src = os.path.join(current_dir, "correlation")
   corr_dst = os.path.join(staging_dir, "correlation")
-  if (not os.path.exists(corr_dst)) and os.path.isdir(corr_src):
-    copied_info = _copy_tree(corr_src, corr_dst, ignore_dirs=set())
-    copied += int(copied_info.get("copied") or 0)
+  if not os.path.exists(corr_dst):
+    for base in source_dirs:
+      corr_src = os.path.join(base, "correlation")
+      if os.path.isdir(corr_src):
+        copied_info = _copy_tree(corr_src, corr_dst, ignore_dirs=set())
+        copied += int(copied_info.get("copied") or 0)
+        break
   return copied
 
 
@@ -238,6 +243,7 @@ def main() -> int:
   b3 = _join(workspace_root, "B3_System", "dashboard_unificado")
   dst = _join(workspace_root, "dashboard_unificado")
   staging = _join(workspace_root, "dashboard_unificado._staging")
+  prev_hint = _join(workspace_root, "dashboard_unificado._previous")
   market_quotes = _join(workspace_root, "Cotacoes", "dashboard", "MERCADO", "assets", "data", "market_quotes.json")
 
   started_ms = int(time.time() * 1000)
@@ -245,6 +251,7 @@ def main() -> int:
     "ok": False,
     "source": src,
     "destination": dst,
+    "previous_hint": prev_hint,
     "checked": 0,
     "copied": 0,
     "skipped": 0,
@@ -276,8 +283,13 @@ def main() -> int:
   if os.path.isdir(b3):
     summary["b3_usd_caches_injected"] = _inject_b3_usd_caches(b3, staging)
 
+  preserve_sources: List[str] = []
   if os.path.isdir(dst):
-    summary["extras_preserved"] = _preserve_extras_from_previous(dst, staging)
+    preserve_sources.append(dst)
+  if os.path.isdir(prev_hint):
+    preserve_sources.append(prev_hint)
+  if preserve_sources:
+    summary["extras_preserved"] = _preserve_extras_from_previous(preserve_sources, staging)
 
   missing = _validate_staging(staging)
   summary["checked"] = len(missing)
