@@ -6577,25 +6577,22 @@ function renderAssetsCatalog(data) {
             .join(' ');
     };
 
-    const storageKey = 'edi_market_assets_catalog_v1';
-    const prev = (() => {
-        try {
-            mod.render({
-                data,
-                el,
-                deps: {
-                    ...buildCommonBlockDeps(),
-                    badge,
-                    computeOperationalPulseNow: (typeof computeOperationalPulseNow === 'function') ? computeOperationalPulseNow : null,
-                    computeHk50PulseNow: (typeof computeHk50PulseNow === 'function') ? computeHk50PulseNow : null,
-                    assetAliasMatchers: (typeof assetAliasMatchers === 'function') ? assetAliasMatchers : null,
-                },
-            });
-            return;
-        } catch {
-            el.innerHTML = fallbackCard('CatÃ¡logo', 'Falha ao renderizar o mÃ³dulo.');
-            return;
-        }
+    try {
+        mod.render({
+            data,
+            el,
+            deps: {
+                ...buildCommonBlockDeps(),
+                badge,
+                computeOperationalPulseNow: (typeof computeOperationalPulseNow === 'function') ? computeOperationalPulseNow : null,
+                computeHk50PulseNow: (typeof computeHk50PulseNow === 'function') ? computeHk50PulseNow : null,
+                assetAliasMatchers: (typeof assetAliasMatchers === 'function') ? assetAliasMatchers : null,
+            },
+        });
+        return;
+    } catch {
+        el.innerHTML = fallbackCard('CatÃ¡logo', 'Falha ao renderizar o mÃ³dulo.');
+        return;
     }
     el.innerHTML = fallbackCard('CatÃ¡logo', 'MÃ³dulo indisponÃ­vel (nÃ£o carregado).');
 }
@@ -7200,6 +7197,14 @@ function renderZqCurveBriefing() {
             el.innerHTML = fallbackCard('Curva ZQ', 'Falha ao renderizar o mÃ³dulo.');
             return;
         }
+    }
+
+    const data = (() => {
+        try {
+            return window.ZQ_CURVE_DATA || null;
+        } catch {
+            return null;
+        }
     })();
 
     const badge = (tone, text, strength) => pillHtml('signal', tone, text, strength);
@@ -7302,6 +7307,14 @@ function renderUsTreasuryFuturesBriefing() {
         } catch {
             el.innerHTML = fallbackCard('Treasuries (futuros)', 'Falha ao renderizar o mÃ³dulo.');
             return;
+        }
+    }
+
+    const data = (() => {
+        try {
+            return window.US_TSY_FUTURES_DATA || null;
+        } catch {
+            return null;
         }
     })();
 
