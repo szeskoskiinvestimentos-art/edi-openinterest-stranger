@@ -392,6 +392,10 @@ def test_flips_and_walls_integration(golden: dict) -> tuple[bool, str]:
     from tests.test_calculator_core import test_flips_and_walls_integration
     return _wrap_test("flips_walls_int", test_flips_and_walls_integration)
 
+def test_flips_and_walls_autoloads_greeks(golden: dict) -> tuple[bool, str]:
+    from tests.test_calculator_core import test_flips_and_walls_autoloads_greeks
+    return _wrap_test("flips_walls_auto", test_flips_and_walls_autoloads_greeks)
+
 def test_find_zero_cross(golden: dict) -> tuple[bool, str]:
     from tests.test_calculator_core import test_find_zero_cross
     return _wrap_test("zero_cross", test_find_zero_cross)
@@ -432,6 +436,7 @@ TESTS = {
     "flow": ("Flow Sentiment", test_flow_sentiment),
     "pinning": ("Pinning Risk", test_pinning_risk),
     "flips_walls_int": ("Flips & Walls integração", test_flips_and_walls_integration),
+    "flips_walls_auto": ("Flips & Walls auto-load greeks (regressão)", test_flips_and_walls_autoloads_greeks),
     "zero_cross": ("Find Zero Cross", test_find_zero_cross),
     # --- Regressão Phase 4G (E8, E10) ---
     "e8_broadcast": ("E8: Greeks Broadcast (S scalar + K array)", test_e8_greeks_broadcast_scalar_s),

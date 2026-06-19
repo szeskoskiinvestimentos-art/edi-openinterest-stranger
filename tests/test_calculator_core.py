@@ -206,6 +206,36 @@ def test_flips_and_walls_integration():
     return True, "Integração OK"
 
 
+def test_flips_and_walls_autoloads_greeks():
+    """Regressao: calculate_flips_and_walls deve auto-carregar greeks_exposure.
+
+    Bug latente: antes, chamar calculate_flips_and_walls() sem antes ter
+    chamado calculate_greeks_exposure() causava AttributeError em
+    self.gex_cum_signed / self.gex_flip_base. Agora auto-chama.
+    """
+    calc = _make_calc(spot=100.0)
+
+    # NUNCA chamar calculate_greeks_exposure() antes
+    assert not hasattr(calc, "gex_cum_signed") or calc.gex_cum_signed is None, \
+        "Setup invalido: gex_cum_signed ja existe"
+
+    # Deve funcionar sem erro
+    try:
+        calc.calculate_flips_and_walls()
+    except Exception as e:
+        return False, f"calculate_flips_and_walls falhou sem auto-load: {e}"
+
+    # Apos chamada, gex_cum_signed deve existir
+    if not hasattr(calc, "gex_cum_signed") or calc.gex_cum_signed is None:
+        return False, "gex_cum_signed nao foi criado mesmo apos auto-load"
+
+    # Atributos principais devem estar calculados
+    if calc.gamma_flip is None:
+        return False, "gamma_flip ficou None apos auto-load"
+
+    return True, "Auto-load de greeks_exposure OK"
+
+
 def test_find_zero_cross():
     """_find_zero_cross deve encontrar raizes corretamente."""
     calc = _make_calc(spot=100.0)
@@ -231,6 +261,7 @@ if __name__ == "__main__":
         ("Flow Sentiment", test_flow_sentiment),
         ("Pinning Risk", test_pinning_risk),
         ("Flips and Walls Integration", test_flips_and_walls_integration),
+        ("Flips and Walls Auto-Load", test_flips_and_walls_autoloads_greeks),
         ("Find Zero Cross", test_find_zero_cross),
     ]
 

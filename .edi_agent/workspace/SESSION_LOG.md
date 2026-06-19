@@ -208,3 +208,41 @@ Edi_Market_Guardian_V0/
 ### Prioridade BAIXA
 - [ ] Otimizar performance do calculator
 - [ ] Adicionar type hints completos
+
+---
+
+## 2026-06-19 13:30 - Bug Latente + IMPLEMENTACOES_FUTURAS.md
+
+### Diagnóstico
+- Auditoria pós-commit 18232d38 revelou **bug latente**: calculate_flips_and_walls() falhava se chamado sem calculate_greeks_exposure() antes
+- Causa: depende de self.gex_cum_signed e self.gex_flip_base que só existem apos calculate_greeks_exposure()
+- Testes formais nao pegavam porque sempre chamavam greeks_exposure antes
+
+### Correcao (E21+ no escopo)
+- src/calculator/core.py: adicionado auto-chamada de calculate_greeks_exposure() se atributos nao existem
+- tests/test_calculator_core.py: adicionado test_flips_and_walls_autoloads_greeks
+- Resultado: 31/31 testes passando (era 30/30, +1 regressao)
+
+### Criacao de IMPLEMENTACOES_FUTURAS.md
+- Arquivo: .edi_agent/IMPLEMENTACOES_FUTURAS.md (~600 linhas)
+- Conteudo: 45 evolucoes (E21-E65) divididas em 6 fases:
+  - **Fase A**: Evolucao matematica (E21-E25)
+  - **Fase B**: Aprimoramento MERCADO (E26-E30)
+  - **Fase C**: Outros dashboards (E31-E34)
+  - **Fase D**: Estrutura e processo (E35-E40)
+  - **Fase E**: Automacao e produtividade (E41-E44)
+  - **Fase F (NOVA)**: Migracao v3 → v1 (E45) - destaque do usuario
+- Cada evolucao tem: ID, embasamento teorico/tecnico, formula, como fazer (passo a passo), risco, esforco
+- Priorizacao Q1 (8-13h), Q2 (28-37h), Q3 (40-55h), Backlog
+- Metricas-alvo de 12 meses documentadas
+
+### Decisao do usuario
+- "Criar arquivo + Q1 docs (Recomendado)" - EXECUTADO
+- Auto-chamar greeks_exposure - EXECUTADO
+- Auditoria WIN tbm - AUDITADO (5.26 MB confirmado)
+- Manter Chart.js (v1 style) - DOCUMENTADO no E45
+
+### Pendencias para proxima sessao
+- Escolher Q1 (quick wins) ou Q2 (foundation) ou comecar E45
+- E45 (migrar v3) ja tem plano detalhado - ~8h
+- Q1 soma 8-13h em 6 evolucoes pequenas

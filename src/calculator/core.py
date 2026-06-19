@@ -260,6 +260,7 @@ class OptionsCalculator(FlipsMixin, GreeksExposureMixin, VolatilityMixin, WallsM
         """Calcula Gamma Flip, Max Pain, Walls e métricas derivadas.
 
         Executa a sequência completa de cálculos:
+        0. (Auto) GEX acumulado via calculate_greeks_exposure (se ainda nao calculado)
         1. Gamma Flip (interpolação linear do zero-crossing do GEX cumulado)
         2. Gamma Flip HVL (High Volatility Level, ponderado por volatilidade)
         3. Zero Gamma Level (mesmo que Gamma Flip com fallback)
@@ -278,6 +279,15 @@ class OptionsCalculator(FlipsMixin, GreeksExposureMixin, VolatilityMixin, WallsM
         Raises:
             Exception: Erros são logados mas não propagados (pipeline continua).
         """
+        # Auto-chamar calculate_greeks_exposure se ainda nao foi calculado
+        # Isso garante que gex_cum_signed, gex_flip_base, etc. existam.
+        if not hasattr(self, "gex_cum_signed") or self.gex_cum_signed is None:
+            try:
+                self.calculate_greeks_exposure()
+            except Exception as e:
+                logger.error(f"Erro ao calcular greeks_exposure automaticamente: {e}")
+                return
+
         try:
             self.gamma_flip = self._find_zero_cross(self.strikes_ref, self.gex_cum_signed, self.spot)
         except Exception as e:
