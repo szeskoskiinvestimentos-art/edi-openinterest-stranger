@@ -163,16 +163,22 @@ def test_vega_convention(golden: dict) -> tuple[bool, str]:
 
 def test_odte_any_weekday(golden: dict) -> tuple[bool, str]:
     """0DTE deve funcionar em qualquer dia da semana (R12)."""
-    src = (ROOT / "src" / "calculator.py").read_text(encoding="utf-8")
+    src = (ROOT / "src" / "calculator" / "core.py").read_text(encoding="utf-8")
     if "weekday() == 4" in src:
-        return False, "BUG: weekday==4 ainda presente em calculator.py (R12 NAO corrigido)"
+        return False, "BUG: weekday==4 ainda presente em calculator/core.py (R12 NAO corrigido)"
     return True, "Restricao weekday==4 ausente (R12 OK)"
 
 
 def test_syntax_all(golden: dict) -> tuple[bool, str]:
     """Todos os arquivos .py do projeto devem ser sintaticamente validos."""
     import ast
-    files = ["src/calculator.py", "src/greeks.py", "src/ntsl.py", "scripts/export_v1_data.py"]
+    files = [
+        "src/calculator/__init__.py",
+        "src/calculator/core.py",
+        "src/greeks.py",
+        "src/ntsl.py",
+        "scripts/export_v1_data.py",
+    ]
     bad = []
     for f in files:
         p = ROOT / f
@@ -187,7 +193,7 @@ def test_syntax_all(golden: dict) -> tuple[bool, str]:
 
 def test_gamma_cone_no_global_mutation(golden: dict) -> tuple[bool, str]:
     """Gamma Cone nao deve mutar settings.SIGMA_FACTOR (R13)."""
-    src = (ROOT / "src" / "calculator.py").read_text(encoding="utf-8")
+    src = (ROOT / "src" / "calculator" / "core.py").read_text(encoding="utf-8")
     if "settings.SIGMA_FACTOR" in src and "alpha" in src:
         # Heurística: a presença de ambos não é conclusiva, mas a ausência de SIGMA_FACTOR
         # perto de Gamma Cone é um sinal positivo
