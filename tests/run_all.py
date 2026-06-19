@@ -20,6 +20,8 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
@@ -217,6 +219,72 @@ def test_snapshot_script_exists(golden: dict) -> tuple[bool, str]:
 
 
 # ===========================================================================
+# Testes de regressão Phase 4G: validar E8 (Broadcast) e E10 (IV per-strike)
+# ===========================================================================
+
+def test_e8_greeks_broadcast_scalar_s(golden: dict) -> tuple[bool, str]:
+    """E8: S escalar + K array deve funcionar sem IndexError."""
+    from src.greeks import GreeksEngine
+
+    S_scalar = 100.0
+    K_array = np.array([80.0, 90.0, 100.0, 110.0, 120.0])
+    T, r, sigma = 0.25, 0.05, 0.20
+
+    try:
+        # Antes do E8: IndexError
+        vega = GreeksEngine.calculate_vega(S_scalar, K_array, T, r, sigma)
+        theta = GreeksEngine.calculate_theta(S_scalar, K_array, T, r, sigma, 'C')
+    except IndexError as e:
+        return False, f"IndexError (E8 nao corrigido): {e}"
+
+    # Vega deve ser array de 5 elementos
+    if not hasattr(vega, '__len__') or len(vega) != 5:
+        return False, f"Vega esperado array de 5, got {type(vega)} len={getattr(vega, '__len__', lambda: 0)()}"
+
+    # Todos os valores devem ser finitos
+    if not (np.all(np.isfinite(vega)) and np.all(np.isfinite(theta))):
+        return False, f"Valores nao finitos: vega={vega}, theta={theta}"
+
+    return True, f"E8 broadcast OK: vega[0]={vega[0]:.4f}, vega[-1]={vega[-1]:.4f}"
+
+
+def test_e10_iv_per_strike_used_in_greeks(golden: dict) -> tuple[bool, str]:
+    """E10: Quando iv_strike_ref existe, Greeks usam per-strike (não flat)."""
+    import pandas as pd
+    from src.calculator import OptionsCalculator
+
+    strikes = np.array([80.0, 90.0, 100.0, 110.0, 120.0])
+    spot = 100.0
+
+    # IV Smile: 25% ATM, 35% OTM
+    iv_per_strike = np.array([0.35, 0.30, 0.25, 0.30, 0.35])
+
+    data = []
+    for k, iv in zip(strikes, iv_per_strike):
+        data.append({'StrikeK': k, 'OptionType': 'CALL', 'Open Int': 500,
+                     'Last': max(0.1, spot - k + 5), 'IV': iv, 'Volume': 50})
+        data.append({'StrikeK': k, 'OptionType': 'PUT', 'Open Int': 500,
+                     'Last': max(0.1, k - spot + 5), 'IV': iv, 'Volume': 50})
+
+    df = pd.DataFrame(data)
+    calc = OptionsCalculator(
+        options_df=df, spot=spot, expiry_date='2026-06-25',
+        iv_annual=0.25,  # IV flat declarado
+        risk_free=0.05,
+    )
+
+    # Verificar que iv_strike_ref foi extraído
+    if not hasattr(calc, 'iv_strike_ref') or calc.iv_strike_ref is None:
+        return False, "iv_strike_ref nao foi extraido do DataFrame"
+
+    # iv_strike_ref deve ser igual ao que colocamos
+    if not np.allclose(calc.iv_strike_ref, iv_per_strike, atol=1e-6):
+        return False, f"iv_strike_ref={calc.iv_strike_ref} != esperado={iv_per_strike}"
+
+    return True, f"E10 OK: iv_strike_ref={np.round(calc.iv_strike_ref, 3).tolist()}"
+
+
+# ===========================================================================
 # Wrappers para testes paralelos (Phase 4B: integração de 15 testes órfãos)
 # Cada arquivo paralelo tem suas próprias funções de teste que retornam
 # (ok: bool, msg: str) ou levantam exceções. Wrappers normalizam.
@@ -333,6 +401,9 @@ TESTS = {
     "pinning": ("Pinning Risk", test_pinning_risk),
     "flips_walls_int": ("Flips & Walls integração", test_flips_and_walls_integration),
     "zero_cross": ("Find Zero Cross", test_find_zero_cross),
+    # --- Regressão Phase 4G (E8, E10) ---
+    "e8_broadcast": ("E8: Greeks Broadcast (S scalar + K array)", test_e8_greeks_broadcast_scalar_s),
+    "e10_iv_per_strike": ("E10: IV per-strike extraído do DataFrame", test_e10_iv_per_strike_used_in_greeks),
 }
 
 

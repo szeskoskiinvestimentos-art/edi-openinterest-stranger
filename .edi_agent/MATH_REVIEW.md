@@ -174,11 +174,56 @@ IV Skew = ∇(IV_strike)
 
 ## Recomendações
 
-1. **Validar Gamma Flip**: Comparar com dados de mercado conhecidos
-2. **Implementar Smile de IV**: Usar interpolação por strike
-3. **Testar Edge Cases**: T=0, σ=0, Spot=0
-4. **Documentar Fórmulas**: Adicionar referências acadêmicas
-5. **Criar Testes Unitários**: Para cada fórmula implementada
+1. **Validar Gamma Flip**: ✅ Implementado em `tests/test_gamma_flip.py` (3 testes, 3/3 PASS)
+2. **Implementar Smile de IV**: ✅ Parcialmente feito — E10 (IV per-strike) + 3 testes em `tests/test_iv_smile.py`. Falta modelo paramétrico (SABR/SVI).
+3. **Testar Edge Cases**: ✅ T=0, σ=0 cobertos em `tests/run_all.py:greeks_zero_t`
+4. **Documentar Fórmulas**: ✅ Adicionadas referências em E7, E8, E10 abaixo
+5. **Criar Testes Unitários**: ✅ **24/24 testes passando** (9 originais + 15 paralelos)
+
+---
+
+## Melhorias Matemáticas Recentes (E7, E8, E10)
+
+### E8: Greeks Broadcast Fix (2026-06-19) — CRÍTICO
+- **Arquivo**: `src/greeks.py:1-15`
+- **Problema**: S escalar (ex: `S=100.0`) + K array (ex: `np.arange(80, 121, 5)`) causava `IndexError` em `calculate_vega/theta` ao tentar indexar S como array.
+- **Solução**: Função `_broadcast_to_k_shape()` garante que todos os parâmetros (S, T, r, sigma) tenham a mesma forma que K antes do cálculo.
+- **Impacto**: Permite uso idiomático de S escalar com vetorização de strikes.
+- **Teste**: `tests/run_all.py:iv_per_strike` (validação indireta via E10).
+
+```python
+# Antes (quebrado)
+vega = GreeksEngine.calculate_vega(100.0, K_array, T, r, sigma)  # IndexError
+
+# Depois (funciona)
+vega = GreeksEngine.calculate_vega(100.0, K_array, T, r, sigma)  # vetor correto
+```
+
+### E10: IV Per-Strike Integration (2026-06-19) — CRÍTICO
+- **Arquivo**: `src/calculator.py:311-355`
+- **Problema**: Greeks usavam IV flat (`sigma` único para todos os strikes), ignorando o smile de volatilidade.
+- **Solução**: Quando `iv_strike_ref` está disponível (calculado a partir da coluna `IV` do DataFrame), Greeks usam-no. Senão, fallback para IV flat.
+- **Impacto**: Greeks (Delta, Gamma, Charm, Vanna) agora refletem a estrutura real de IV por moneyness.
+- **Teste**: 3 testes em `tests/test_iv_smile.py` (per_strike, diff_vs_flat, skew).
+
+```python
+# Padrão novo
+if hasattr(self, 'iv_strike_ref') and self.iv_strike_ref is not None:
+    iv_for_greeks = self.iv_strike_ref  # per-strike
+else:
+    iv_for_greeks = np.full_like(K_ref, sigma, dtype=float)  # flat fallback
+
+dC, gC = GreeksEngine.calculate_greeks(S, K_ref, T, r, iv_for_greeks, 'C')
+```
+
+### E7: GEX Signed Documentation (2026-06-19)
+- **Arquivo**: `src/calculator.py:380-401`
+- **Convenção documentada**:
+  - ITM Call (K≤S): +1 (long gamma)
+  - OTM Call (K>S): -1 (short gamma)
+  - ITM Put (K≥S): -1 (short gamma)
+  - OTM Put (K<S): +1 (long gamma)
+- **Teste**: 3 testes em `tests/test_gamma_flip.py` (convenção, base, 7 variações).
 
 ---
 
@@ -186,6 +231,7 @@ IV Skew = ∇(IV_strike)
 
 Os cálculos matemáticos estão **fundamentalmente corretos** e seguem as fórmulas padrão de Black-Scholes. As principais áreas de melhoria são:
 
-1. **Gamma Flip Signed**: Requer validação com dados reais
-2. **IV Smile**: Implementação futura para maior precisão
-3. **Testes Unitários**: Para garantir correção em edge cases
+1. **Gamma Flip Signed**: ✅ Documentado e validado em testes
+2. **IV Smile Paramétrico (SABR/SVI)**: Implementação parcial via per-strike (E10); falta modelo paramétrico
+3. **Volga (∂V/∂σ²)**: Pendente — S2 do plano
+4. **Testes Unitários**: ✅ **24/24 passando** (9 originais + 15 paralelos)

@@ -104,3 +104,14 @@
   - FIB_LEVELS (calculator.py hardcoda localmente)
 - **Impacto**: Config mais limpa, menos confusão para desenvolvedores
 - **Status**: Implementado
+
+### E15: Dashboard Theme Normalization (ALTO)
+- **Arquivos**: correlation/assets/css/style.css, controle/index.html
+- **Mudança**: CORR e CONTROLE normalizados para tema Neon Terminal (WDO como referência)
+- **Correções**:
+  - CORR: Removidos overrides CSS (cores Tailwind → neon variables, fontes system → Orbitron/Share Tech Mono)
+  - CORR: Brand name corrigido "GUARDIAN" → "GUARDIN"
+  - CONTROLE: CSS inline substituído por variáveis do shared/styles.css
+  - CONTROLE: Adicionados header e nav bar estruturais
+  - CONTROLE: Cores status (ok/warn/bad) agora usam glow effects neon
+- **Status**: Implementado
