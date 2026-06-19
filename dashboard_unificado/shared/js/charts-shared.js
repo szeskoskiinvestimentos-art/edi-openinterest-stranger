@@ -1,512 +1,149 @@
 /**
- * WIN Charts Module — Extends BaseCharts with WIN-specific methods
+ * Base Charts Module — Métodos compartilhados entre WDO e WIN
  * 
- * Métodos específicos do WIN:
- * - createEwzOptionsOiChart()
- * - Custom tooltip callbacks com formatNumberBr
+ * Classe base com todos os métodos de criação de gráficos.
+ * WDO e WIN extendem esta classe e adicionam métodos específicos.
  */
-
-class StrangerThingsCharts extends BaseCharts {
+class BaseCharts {
     constructor() {
-        super();
-        
-        // WIN-specific customizations
-        this.chartOptions.plugins.tooltip.callbacks = {
-            label: (context) => {
-                const dataset = context.dataset || {};
-                const label = dataset.label ? dataset.label : '';
-                const raw = context.raw;
-                const isNumber = typeof raw === 'number' && !isNaN(raw);
-                const value = isNumber ? this.formatNumberBr(raw, 2) : raw;
-                return label ? label + ': ' + value : value;
-            }
-        };
-
-        this.chartOptions.scales.y.ticks.callback = (value) => this.formatNumberBr(value, 2);
-        
-        this.init();
-    }
-
-    async init() {
-        try {
-            const data = await this.loadMarketData();
-            this.data = data;
-
-            if (window.ChartDataUtils) {
-                window.ChartDataUtils.registerSpotLinePlugin?.();
-                window.ChartDataUtils.registerVLinesPlugin?.();
-            }
-            this.createDeltaChart(data);
-            this.createGammaChart(data);
-            // this.createVolumeChart(data); // Removido por redundância (Volume Chart era na verdade OI)
-            this.createVolatilityChart(data);
-            
-            // Novos Gráficos
-            this.createOIStrikeChart(data);
-            this.createOIExpiryChart(data);
-            this.createMostActivesTables(data);
-            this.createVolumeVolatilityChart(data);
-            this.createGexSplitChart(data);
-            this.createVannaChart(data);
-            this.createCharmChart(data);
-            this.createThetaChart(data);
-            this.createVegaChart(data);
-            this.createPinRiskChart(data);
-            
-            // Gregas Acumuladas & R-Gamma
-            this.createCharmCumChart(data);
-            this.createVannaCumChart(data);
-            this.createThetaCumChart(data); // Added
-            this.createRGammaChart(data);
-            this.createRGammaCumChart(data);
-
-            // V3 Charts
-            this.createMaxPainChart(data);
-            this.createExpectedMoveChart(data);
-            this.createGammaFlipConeChart(data);
-            this.createDeltaFlipProfileChart(data);
-            this.createFlowSentimentChart(data);
-            this.createMMPnLChart(data);
-            this.createDealerPressureChart(data); // Added
-            this.createDeltaAgregadoChart(data); // Added
-
-            this.updateMetrics(data);
-            this.updateKeyLevels(data);
-            this.updateNtslCode(data);
-            this.populateTable(data);
-            this.createFairValueTable(data); // Added
-            this.updateLastUpdate(data);
-            this.createEwzOptionsOiChart();
-        } catch (error) {
-            console.error('Error initializing charts:', error);
-        }
-    }
-
-    async loadMarketData() {
-        try {
-            // Tenta usar variável global primeiro (funciona sem servidor/CORS)
-            if (window.marketData) {
-                console.log('Carregando dados da variável global (marketData)...');
-                return window.marketData;
-            }
-
-            // Fallback para fetch (caso o arquivo JS falhe ou não exista)
-            console.log('Variável global não encontrada, tentando fetch...');
-            const response = await fetch('assets/data/market_data.json');
-            if (!response.ok) {
-                throw new Error('Failed to load market data');
-            }
-            return await response.json();
-        } catch (error) {
-            console.error('Error loading market data:', error);
-            // Fallback data
-            this.showFallbackWarning();
-            return this.getFallbackData();
-        }
-    }
-
-    showFallbackWarning() {
-        const warning = document.createElement('div');
-        warning.style.position = 'fixed';
-        warning.style.top = '0';
-        warning.style.left = '0';
-        warning.style.width = '100%';
-        warning.style.backgroundColor = '#ff0000';
-        warning.style.color = '#ffffff';
-        warning.style.textAlign = 'center';
-        warning.style.padding = '10px';
-        warning.style.zIndex = '9999';
-        warning.style.fontWeight = 'bold';
-        warning.style.fontFamily = 'Orbitron';
-        warning.innerText = '⚠️ MODO DEMONSTRAÇÃO: Dados reais não encontrados. Verifique se export_v1_data.py foi executado.';
-        document.body.prepend(warning);
-    }
-
-    getFallbackData() {
-        return {
-            delta_data: {
-                strikes: [5.6, 5.7, 5.8, 5.9, 6.0, 6.1, 6.2, 6.3, 6.4, 6.5],
-                delta_cumulative: [-1200, -2000, -2400, -2500, -2300, -1800, -1000, 100, 1500, 3100]
-            },
-            gamma_data: {
-                strikes: [5.6, 5.7, 5.8, 5.9, 6.0, 6.1, 6.2, 6.3, 6.4, 6.5],
-                gamma_exposure: [5400, 8160, 10680, 14400, 17400, 15840, 12960, 10200, 7440, 4560],
-                gamma_call: [3000, 4000, 5000, 7000, 9000, 8000, 6000, 5000, 4000, 2000],
-                gamma_put: [-2400, -4160, -5680, -7400, -8400, -7840, -6960, -5200, -3440, -2560]
-            },
-            volume_data: {
-                strikes: [5.6, 5.7, 5.8, 5.9, 6.0, 6.1, 6.2, 6.3, 6.4, 6.5],
-                call_volume: [1200, 1800, 2400, 2100, 3200, 2800, 3600, 4200, 3800, 2400],
-                put_volume: [800, 1200, 1600, 1400, 2100, 1900, 2400, 2800, 2600, 1600]
-            },
-            volatility_data: {
-                strikes: [5.6, 5.7, 5.8, 5.9, 6.0, 6.1, 6.2, 6.3, 6.4, 6.5],
-                iv_values: [18.5, 17.8, 17.2, 16.8, 16.5, 16.3, 16.4, 16.7, 17.1, 17.6]
-            },
-            greeks_2nd_order: {
-                strikes: [5.6, 5.7, 5.8, 5.9, 6.0, 6.1, 6.2, 6.3, 6.4, 6.5],
-                charm: [10, 20, 30, 40, 50, 40, 30, 20, 10, 5],
-                vanna: [5, 10, 15, 20, 25, 20, 15, 10, 5, 2],
-                theta: [-100, -200, -300, -400, -500, -400, -300, -200, -100, -50]
-            },
-            overview: {
-                total_trades: 15420,
-                total_volume: 1258400,
-                gamma_exposure: -45000,
-                delta_position: 23000
-            },
-            detailed_data: [
-                { strike: 5.6, delta: -0.85, gamma: 0.045, volume: 1200, oi: 8500, iv: 18.5 }
-            ]
-        };
-    }
-
-    updateLastUpdate(data) {
-        const label = document.getElementById('last-update-label');
-        if (!label) return;
-
-        let raw = data.last_updated;
-        if (!raw && data.overview && data.overview.last_update) {
-            raw = data.overview.last_update;
-        }
-        if (!raw) return;
-
-        try {
-            const date = new Date(raw);
-            if (!isNaN(date.getTime())) {
-                const formatted = date.toLocaleString('pt-BR');
-                label.textContent = `• Último update: ${formatted}`;
-            } else {
-                label.textContent = `• Último update: ${raw}`;
-            }
-        } catch {
-            label.textContent = `• Último update: ${raw}`;
-        }
-    }
-
-    updateYahooOptionsPanel() {
-        const container = document.getElementById('yahoo-options-container');
-        if (!container) return;
-
-        const rows = [{ ticker: 'EWZ', data: window.yahooEwzOptionsData }];
-
-        const nowMs = Date.now();
-        const staleDays = 7;
-        const msPerDay = 24 * 60 * 60 * 1000;
-
-        function parseCapturedAtUtc(obj) {
-            const raw =
-                obj &&
-                (obj.captured_at_utc ||
-                    obj.capturedAtUtc ||
-                    obj.capturedAt ||
-                    (obj.meta && obj.meta.capturedAtUtc));
-            if (!raw) return null;
-            const dt = new Date(raw);
-            return isNaN(dt.getTime()) ? null : dt;
-        }
-
-        const norm = rows.map((r) => {
-            const obj = r.data;
-            if (!obj || typeof obj !== 'object') {
-                return {
-                    ticker: r.ticker,
-                    ok: false,
-                    status: 'MISSING',
-                    spot: null,
-                    capturedAt: null,
-                    ageDays: null,
-                    warnings: [],
-                };
-            }
-            const capturedAt = parseCapturedAtUtc(obj);
-            const ageDays = capturedAt ? (nowMs - capturedAt.getTime()) / msPerDay : null;
-            const warnings = Array.isArray(obj.warnings) ? obj.warnings : [];
-            const spot = typeof obj.spot === 'number' ? obj.spot : null;
-            const isStale = ageDays != null && ageDays > staleDays;
-            const status = isStale ? 'STALE' : 'OK';
-            return { ticker: r.ticker, ok: true, status, spot, capturedAt, ageDays, warnings };
-        });
-
-        const statusColor = (s) => {
-            if (s === 'OK') return '#00f3ff';
-            if (s === 'STALE') return '#ffb000';
-            return '#ff073a';
-        };
-
-        const td = (v) =>
-            `<td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.08);">${v}</td>`;
-        const th = (v) =>
-            `<th style="text-align:left;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.14);color:#b3b3b3;font-family:'Share Tech Mono',monospace;font-size:12px;">${v}</th>`;
-
-        const body = norm
-            .map((r) => {
-                const spot = r.spot == null ? '—' : this.formatNumberBr(r.spot, 2);
-                const captured = r.capturedAt ? r.capturedAt.toLocaleString('pt-BR') : '—';
-                const age = r.ageDays == null ? '—' : `${this.formatNumberBr(r.ageDays, 1)}d`;
-                const status = `<span style="font-weight:900;color:${statusColor(
-                    r.ok ? r.status : 'MISSING'
-                )};">${r.ok ? r.status : 'MISSING'}</span>`;
-                const warnings =
-                    r.warnings && r.warnings.length ? this.escapeHtml(String(r.warnings[0])) : '—';
-                return `<tr>${td(r.ticker)}${td(spot)}${td(captured)}${td(age)}${td(status)}${td(
-                    warnings
-                )}</tr>`;
-            })
-            .join('');
-
-        container.innerHTML =
-            `<div style="overflow:auto;">` +
-            `<table style="width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;">` +
-            `<thead><tr>${th('Ticker')}${th('Spot')}${th('Captura')}${th('Idade')}${th(
-                'Status'
-            )}${th('Aviso')}</tr></thead>` +
-            `<tbody>${body}</tbody>` +
-            `</table>` +
-            `</div>`;
-    }
-
-    createEwzOptionsOiChart() {
-        const payload = window.yahooEwzOptionsData;
-        if (!payload) return;
-        const runPreferred = () => {
-            if (!window.ChartDataUtils || !window.ChartDataUtils.renderEwzOptionsOiChart) return false;
-            window.ChartDataUtils.renderEwzOptionsOiChart({
-                payload,
-                marketData: this.data,
-                canvasId: 'ewzOptionsOiChart',
-                selectId: 'ewzOptionsExpirySelect',
-                minOiId: 'ewzOptionsMinOi',
-                meansAllId: 'ewzOptionsMeansAll',
-                chartKey: 'EWZ',
-                chartOptions: {
-                    ...this.chartOptions,
-                    plugins: {
-                        ...this.chartOptions.plugins,
-                        title: {
-                            display: true,
-                            text: 'Open Interest por Strike (EWZ - Yahoo, escala WIN)',
-                            color: '#ff00ff',
-                            font: { family: 'Orbitron', size: 14, weight: 'bold' },
-                        },
-                    },
+        this.charts = {};
+        this.chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#ffffff',
+                        font: {
+                            family: 'Share Tech Mono',
+                            size: 12
+                        }
+                    }
                 },
-            });
-            return true;
-        };
-
-        const renderFallback = () => {
-            const canvas = document.getElementById('ewzOptionsOiChart');
-            const select = document.getElementById('ewzOptionsExpirySelect');
-            const minOiEl = document.getElementById('ewzOptionsMinOi');
-            const meansAllEl = document.getElementById('ewzOptionsMeansAll');
-            if (!canvas || !select || !minOiEl || !meansAllEl) return;
-
-            const formatCompactBr = (value) => {
-                const abs = Math.abs(Number(value));
-                if (!Number.isFinite(abs)) return '-';
-                if (abs < 1000) return this.formatNumberBr(abs, 0);
-                const units = [
-                    { v: 1e12, s: 'T' },
-                    { v: 1e9, s: 'B' },
-                    { v: 1e6, s: 'M' },
-                    { v: 1e3, s: 'K' },
-                ];
-                for (const u of units) {
-                    if (abs >= u.v) return this.formatNumberBr(abs / u.v, 1) + u.s;
+                tooltip: {
+                    backgroundColor: 'rgba(26, 26, 26, 0.9)',
+                    titleColor: '#00f3ff',
+                    bodyColor: '#ffffff',
+                    borderColor: '#ff073a',
+                    borderWidth: 1,
+                    titleFont: {
+                        family: 'Orbitron',
+                        size: 14
+                    },
+                    bodyFont: {
+                        family: 'Share Tech Mono',
+                        size: 12
+                    }
                 }
-                return this.formatNumberBr(abs, 0);
-            };
-
-            const expiries = Array.isArray(payload.expiries) ? payload.expiries.map((e) => String(e)) : [];
-            const byExpiry = payload.by_expiry && typeof payload.by_expiry === 'object' ? payload.by_expiry : {};
-            if (!expiries.length) {
-                meansAllEl.textContent = 'Sem dados de vencimentos (EWZ).';
-                return;
-            }
-
-            if (!select.__ewzFallbackFilled) {
-                select.innerHTML = '';
-                expiries.forEach((e) => {
-                    const o = document.createElement('option');
-                    o.value = e;
-                    o.textContent = e;
-                    select.appendChild(o);
-                });
-                select.value = expiries[0];
-                select.__ewzFallbackFilled = true;
-            }
-
-            const toIndexScale = (strike) => {
-                const s = Number(strike);
-                if (!Number.isFinite(s)) return null;
-                const scaleFactor =
-                    window.ChartDataUtils && window.ChartDataUtils.getDisplayScaleFactor
-                        ? window.ChartDataUtils.getDisplayScaleFactor(this.data)
-                        : 1;
-                if (!Number.isFinite(scaleFactor) || scaleFactor <= 0 || scaleFactor === 1) return s;
-                if (s < 0 || s > 1000) return s;
-                return s * scaleFactor;
-            };
-
-            const buildPoints = () => {
-                const expiry = String(select.value || expiries[0] || '');
-                const row = byExpiry[expiry];
-                const strikesIn = row && row.strikes;
-                const callOiIn = row && row.call_oi;
-                const putOiIn = row && row.put_oi;
-                const minOi = Math.max(0, Number(minOiEl.value || 0));
-                if (!Array.isArray(strikesIn) || !Array.isArray(callOiIn) || !Array.isArray(putOiIn)) return [];
-                const n = Math.min(strikesIn.length, callOiIn.length, putOiIn.length);
-                const pts = [];
-                for (let i = 0; i < n; i++) {
-                    const strike = toIndexScale(strikesIn[i]);
-                    const call = Math.max(0, Number(callOiIn[i] || 0));
-                    const put = Math.max(0, Number(putOiIn[i] || 0));
-                    if (!Number.isFinite(strike) || (!Number.isFinite(call) && !Number.isFinite(put))) continue;
-                    if (call < minOi && put < minOi) continue;
-                    pts.push({ strike, call, put, total: call + put });
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        color: '#b3b3b3',
+                        font: {
+                            family: 'Share Tech Mono',
+                            size: 11
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)',
+                        borderColor: 'rgba(255, 255, 255, 0.2)'
+                    }
+                },
+                y: {
+                    ticks: {
+                        color: '#b3b3b3',
+                        font: {
+                            family: 'Share Tech Mono',
+                            size: 11
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)',
+                        borderColor: 'rgba(255, 255, 255, 0.2)'
+                    }
                 }
-                pts.sort((a, b) => a.strike - b.strike);
-                return pts;
-            };
-
-            const calcMeans = (pts) => {
-                if (!pts.length) return null;
-                const min = pts[0].strike;
-                const max = pts[pts.length - 1].strike;
-                const midRange = (min + max) / 2;
-                let sumW = 0;
-                let sumWX = 0;
-                pts.forEach((p) => {
-                    const w = Number(p.total);
-                    const x = Number(p.strike);
-                    if (!Number.isFinite(w) || !Number.isFinite(x) || w <= 0) return;
-                    sumW += w;
-                    sumWX += w * x;
-                });
-                const meanByOi = sumW > 0 ? sumWX / sumW : midRange;
-                return { midRange, meanByOi };
-            };
-
-            const points = buildPoints();
-            if (!points.length) {
-                meansAllEl.textContent = 'Sem dados para o filtro atual (EWZ).';
-                return;
             }
-
-            const means = calcMeans(points);
-            const expiry = String(select.value || expiries[0] || '');
-            meansAllEl.innerHTML =
-                means
-                    ? `Médias (contrato atual ${expiry}): Intervalo ${this.formatNumberBr(means.midRange, 0)} | Por OI ${this.formatNumberBr(means.meanByOi, 0)}`
-                    : '';
-
-            if (this.charts.ewzProxy) this.charts.ewzProxy.destroy();
-
-            const spot =
-                (this.data && (Number(this.data.overview && this.data.overview.spot_price) || Number(this.data.spot_price))) ||
-                null;
-
-            this.charts.ewzProxy = new Chart(canvas, {
-                type: 'bar',
-                data: {
-                    labels: points.map((p) => this.formatNumberBr(p.strike, 0)),
-                    datasets: [
-                        {
-                            label: 'Call OI',
-                            data: points.map((p) => p.call),
-                            backgroundColor: 'rgba(0, 255, 0, 0.6)',
-                            borderColor: '#00ff00',
-                            borderWidth: 1,
-                        },
-                        {
-                            label: 'Put OI',
-                            data: points.map((p) => p.put),
-                            backgroundColor: 'rgba(255, 7, 58, 0.6)',
-                            borderColor: '#ff073a',
-                            borderWidth: 1,
-                        },
-                    ],
-                },
-                options: {
-                    ...this.chartOptions,
-                    plugins: {
-                        ...this.chartOptions.plugins,
-                        title: {
-                            display: true,
-                            text: 'Open Interest por Strike (EWZ - Yahoo, escala WIN)',
-                            color: '#ff00ff',
-                            font: { family: 'Orbitron', size: 14, weight: 'bold' },
-                        },
-                        spotLine: Number.isFinite(spot)
-                            ? { value: spot, color: 'lime', labelText: `SPOT ${this.formatNumberBr(spot, 0)}` }
-                            : undefined,
-                        vLines:
-                            window.ChartDataUtils && window.ChartDataUtils.registerVLinesPlugin
-                                ? {
-                                      lines: [
-                                          {
-                                              value: means && means.midRange,
-                                              color: '#00f3ff',
-                                              dash: [6, 4],
-                                              width: 2,
-                                              labelText: means ? `Média (intervalo): ${this.formatNumberBr(means.midRange, 0)}` : '',
-                                          },
-                                          {
-                                              value: means && means.meanByOi,
-                                              color: '#ff00ff',
-                                              dash: [2, 6],
-                                              width: 2,
-                                              labelText: means ? `Média (por OI): ${this.formatNumberBr(means.meanByOi, 0)}` : '',
-                                          },
-                                      ].filter((l) => Number.isFinite(l.value)),
-                                  }
-                                : undefined,
-                    },
-                    scales: {
-                        ...this.chartOptions.scales,
-                        x: { ...this.chartOptions.scales.x, stacked: true },
-                        y: {
-                            ...this.chartOptions.scales.y,
-                            stacked: true,
-                            ticks: {
-                                ...this.chartOptions.scales.y.ticks,
-                                callback: (v) => formatCompactBr(v),
-                            },
-                        },
-                    },
-                },
-            });
-
-            if (window.ChartDataUtils && window.ChartDataUtils.registerVLinesPlugin) window.ChartDataUtils.registerVLinesPlugin();
-            if (window.ChartDataUtils && window.ChartDataUtils.registerSpotLinePlugin) window.ChartDataUtils.registerSpotLinePlugin();
-
-            select.onchange = () => renderFallback();
-            minOiEl.onchange = () => renderFallback();
         };
+    }
 
-        const ok = runPreferred();
-        setTimeout(() => {
-            const host = window.__ewzOptionsChartsHost;
-            if (host && host.EWZ) return;
-            if (!ok) renderFallback();
-            else {
-                const retryHost = window.__ewzOptionsChartsHost;
-                if (!(retryHost && retryHost.EWZ)) renderFallback();
+    /**
+     * Formata valor numérico para formato brasileiro
+     * @param {number} value - Valor a formatar
+     * @param {number} decimals - Casas decimais
+     * @returns {string} Valor formatado
+     */
+    formatNumberBr(value, decimals = 2) {
+        if (value === null || value === undefined || isNaN(value)) return '-';
+        const factor = Math.pow(10, decimals);
+        const rounded = Math.round(value * factor) / factor;
+        return rounded.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    }
+
+    /**
+     * Formata valor numérico de forma compacta (K, M, B, T)
+     * @param {number} value - Valor a formatar
+     * @returns {string} Valor formatado compactamente
+     */
+    formatCompactBr(value) {
+        if (value === null || value === undefined || isNaN(value)) return '-';
+        const abs = Math.abs(value);
+        let divisor = 1;
+        let suffix = '';
+        if (abs >= 1e12) {
+            divisor = 1e12;
+            suffix = 'T';
+        } else if (abs >= 1e9) {
+            divisor = 1e9;
+            suffix = 'B';
+        } else if (abs >= 1e6) {
+            divisor = 1e6;
+            suffix = 'M';
+        } else if (abs >= 1e3) {
+            divisor = 1e3;
+            suffix = 'K';
+        } else {
+            return this.formatNumberBr(value, 0);
+        }
+        const scaled = value / divisor;
+        const formatted = scaled.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+        return `${formatted}${suffix}`;
+    }
+
+    /**
+     * Anima valor de um elemento
+     */
+    animateValue(elementId, start, end, duration) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+
+        const startTime = performance.now();
+        const isNegative = end < 0;
+        const absEnd = Math.abs(end);
+
+        const animate = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            const current = Math.floor(start + (absEnd - start) * this.easeOutQuart(progress));
+            const signed = isNegative ? -current : current;
+            element.textContent = this.formatCompactBr(signed);
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
             }
-        }, 0);
+        };
+        
+        requestAnimationFrame(animate);
     }
 
-    escapeHtml(text) {
-        return String(text)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
+    easeOutQuart(t) {
+        return 1 - Math.pow(1 - t, 4);
     }
 
+    /**
+     * Cria gráfico de Delta Acumulado
+     */
     createDeltaChart(data) {
         const ctx = document.getElementById('deltaChart');
         if (!ctx) return;
@@ -514,7 +151,7 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.delta = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.delta_data.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: data.delta_data.strikes,
                 datasets: [{
                     label: 'Delta Acumulado',
                     data: data.delta_data.delta_cumulative,
@@ -549,6 +186,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de Gamma Exposure
+     */
     createGammaChart(data) {
         const ctx = document.getElementById('gammaChart');
         if (!ctx) return;
@@ -556,7 +196,7 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.gamma = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.gamma_data.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: data.gamma_data.strikes,
                 datasets: [{
                     label: 'Gamma Exposure',
                     data: data.gamma_data.gamma_exposure,
@@ -585,12 +225,13 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
-
+    /**
+     * Cria gráfico de Volatilidade Implícita
+     */
     createVolatilityChart(data) {
         const ctx = document.getElementById('volatilityChart');
         if (!ctx) return;
 
-        // Check if skew data exists
         const hasSkew = data.volatility_data.skew && data.volatility_data.skew.length > 0;
 
         const datasets = [{
@@ -626,7 +267,7 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.volatility = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.volatility_data.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: data.volatility_data.strikes,
                 datasets: datasets
             },
             options: {
@@ -666,7 +307,7 @@ class StrangerThingsCharts extends BaseCharts {
                         display: hasSkew,
                         position: 'right',
                         grid: {
-                            drawOnChartArea: false, // only want the grid lines for one axis to show up
+                            drawOnChartArea: false,
                             color: 'rgba(255, 0, 255, 0.2)'
                         },
                         ticks: {
@@ -684,40 +325,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
-    // NOVOS GRÁFICOS
-
-    formatNumberBr(value, decimals = 2) {
-        if (value === null || value === undefined || isNaN(value)) return '-';
-        const factor = Math.pow(10, decimals);
-        const rounded = Math.round(value * factor) / factor;
-        return rounded.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-    }
-
-    formatCompactBr(value) {
-        if (value === null || value === undefined || isNaN(value)) return '-';
-        const abs = Math.abs(value);
-        let divisor = 1;
-        let suffix = '';
-        if (abs >= 1e12) {
-            divisor = 1e12;
-            suffix = 'T';
-        } else if (abs >= 1e9) {
-            divisor = 1e9;
-            suffix = 'B';
-        } else if (abs >= 1e6) {
-            divisor = 1e6;
-            suffix = 'M';
-        } else if (abs >= 1e3) {
-            divisor = 1e3;
-            suffix = 'K';
-        } else {
-            return this.formatNumberBr(value, 0);
-        }
-        const scaled = value / divisor;
-        const formatted = scaled.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-        return `${formatted}${suffix}`;
-    }
-
+    /**
+     * Cria gráfico de OI por Vencimento
+     */
     createOIExpiryChart(data) {
         const ctx = document.getElementById('oiExpiryChart');
         if (!ctx) return;
@@ -783,6 +393,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria tabelas de Most Actives
+     */
     createMostActivesTables(data) {
         const container = document.getElementById('most-actives-container');
         if (!container) return;
@@ -829,7 +442,7 @@ class StrangerThingsCharts extends BaseCharts {
         const fmtStrike = (v) => this.formatNumberBr(Number(v), 0);
         const fmtVal = (v) => this.formatNumberBr(Number(v), 0);
         const fmtIv = (v) => (Number.isFinite(Number(v)) ? this.formatNumberBr(Number(v), 1) + '%' : '—');
-        const tipoColor = (t) => (t === 'C' ? 'style=\"color:#00ff00;font-weight:700;\"' : 'style=\"color:#ff073a;font-weight:700;\"');
+        const tipoColor = (t) => (t === 'C' ? 'style="color:#00ff00;font-weight:700;"' : 'style="color:#ff073a;font-weight:700;"');
 
         const renderTable = (title, rows, valueLabel) => {
             const body =
@@ -839,7 +452,7 @@ class StrangerThingsCharts extends BaseCharts {
                               return (
                                   `<tr>` +
                                   td(fmtStrike(r.strike)) +
-                                  `<td ${tipoColor(r.tipo)} style=\"padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.08);font-family:'Share Tech Mono',monospace;font-size:12px;\">${r.tipo}</td>` +
+                                  `<td ${tipoColor(r.tipo)} style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.08);font-family:'Share Tech Mono',monospace;font-size:12px;">${r.tipo}</td>` +
                                   td(fmtVal(r.val)) +
                                   td(fmtIv(r.iv)) +
                                   `</tr>`
@@ -848,9 +461,9 @@ class StrangerThingsCharts extends BaseCharts {
                           .join('')
                     : `<tr>${td('—')}${td('—')}${td('—')}${td('—')}</tr>`;
             return (
-                `<div style=\"flex:1;min-width:320px;\">` +
-                `<div style=\"font-family:'Orbitron',sans-serif;color:#ff073a;font-weight:700;margin:4px 0 10px 0;\">${title}</div>` +
-                `<table style=\"width:100%;border-collapse:collapse;\">` +
+                `<div style="flex:1;min-width:320px;">` +
+                `<div style="font-family:'Orbitron',sans-serif;color:#ff073a;font-weight:700;margin:4px 0 10px 0;">${title}</div>` +
+                `<table style="width:100%;border-collapse:collapse;">` +
                 `<thead><tr>${th('STRIKE')}${th('TIPO')}${th(valueLabel)}${th('IV')}</tr></thead>` +
                 `<tbody>${body}</tbody>` +
                 `</table>` +
@@ -859,12 +472,15 @@ class StrangerThingsCharts extends BaseCharts {
         };
 
         container.innerHTML =
-            `<div style=\"display:flex;gap:16px;flex-wrap:wrap;\">` +
+            `<div style="display:flex;gap:16px;flex-wrap:wrap;">` +
             renderTable('🔥 Top Open Interest', topOi, 'OPEN INT') +
             renderTable('🌊 Top Volume', topVol, 'VOLUME') +
             `</div>`;
     }
 
+    /**
+     * Cria gráfico de Volume vs Volatilidade
+     */
     createVolumeVolatilityChart(data) {
         const ctx = document.getElementById('volumeVolatilityChart');
         if (!ctx) return;
@@ -890,7 +506,7 @@ class StrangerThingsCharts extends BaseCharts {
         const volumePoints = strikes.map((k, i) => ({ x: k, y: totalVol[i] }));
         const ivPoints = strikes.map((k, i) => ({ x: k, y: ivSeries[i] }));
 
-        const spot = (data && ((data.overview && Number(data.overview.spot_price)) || Number(data.spot_price))) || null;
+        const spot = (data && (Number(data.spot_price) || (data.overview && Number(data.overview.spot_price)))) || null;
         if (this.charts.volumeVolatility) this.charts.volumeVolatility.destroy();
         this.charts.volumeVolatility = new Chart(ctx, {
             type: 'bar',
@@ -966,28 +582,15 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de OI por Strike
+     */
     createOIStrikeChart(data) {
         const ctx = document.getElementById('oiStrikeChart');
         if (!ctx) return;
 
         const modeEl = document.getElementById('oiExpiryMode');
         const infoEl = document.getElementById('oiExpiryInfo');
-
-        const formatCompactBr = (value) => {
-            const abs = Math.abs(Number(value));
-            if (!Number.isFinite(abs)) return '-';
-            if (abs < 1000) return this.formatNumberBr(abs, 0);
-            const units = [
-                { v: 1e12, s: 'T' },
-                { v: 1e9, s: 'B' },
-                { v: 1e6, s: 'M' },
-                { v: 1e3, s: 'K' },
-            ];
-            for (const u of units) {
-                if (abs >= u.v) return this.formatNumberBr(abs / u.v, 1) + u.s;
-            }
-            return this.formatNumberBr(abs, 0);
-        };
 
         const pickOiData = () => {
             const mode = modeEl ? String(modeEl.value || 'all') : 'all';
@@ -1001,7 +604,7 @@ class StrangerThingsCharts extends BaseCharts {
         };
 
         const spot =
-            (data && ((data.overview && Number(data.overview.spot_price)) || Number(data.spot_price))) || null;
+            (data && (Number(data.spot_price) || (data.overview && Number(data.overview.spot_price)))) || null;
 
         const render = () => {
             const oi = pickOiData();
@@ -1096,7 +699,7 @@ class StrangerThingsCharts extends BaseCharts {
                             stacked: true,
                             ticks: {
                                 ...this.chartOptions.scales.y.ticks,
-                                callback: (value) => formatCompactBr(value),
+                                callback: (value) => this.formatCompactBr(Math.abs(Number(value))),
                             },
                         },
                     },
@@ -1112,6 +715,9 @@ class StrangerThingsCharts extends BaseCharts {
         render();
     }
 
+    /**
+     * Cria gráfico de GEX Split (Call vs Put)
+     */
     createGexSplitChart(data) {
         const ctx = document.getElementById('gexSplitChart');
         if (!ctx) return;
@@ -1119,7 +725,7 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.gexSplit = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.gamma_data.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: data.gamma_data.strikes,
                 datasets: [
                     {
                         label: 'Gamma Call',
@@ -1156,7 +762,7 @@ class StrangerThingsCharts extends BaseCharts {
                     ...this.chartOptions.scales,
                     x: {
                         ...this.chartOptions.scales.x,
-                        stacked: false // Lado a lado para melhor comparação
+                        stacked: false
                     },
                     y: {
                         ...this.chartOptions.scales.y,
@@ -1167,6 +773,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de Vanna Exposure
+     */
     createVannaChart(data) {
         const ctx = document.getElementById('vannaChart');
         if (!ctx) return;
@@ -1174,7 +783,7 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.vanna = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: data.greeks_2nd_order.strikes,
                 datasets: [{
                     label: 'Vanna',
                     data: data.greeks_2nd_order.vanna,
@@ -1204,6 +813,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de Charm Exposure
+     */
     createCharmChart(data) {
         const ctx = document.getElementById('charmChart');
         if (!ctx) return;
@@ -1211,7 +823,7 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.charm = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: data.greeks_2nd_order.strikes,
                 datasets: [{
                     label: 'Charm',
                     data: data.greeks_2nd_order.charm,
@@ -1241,14 +853,17 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de Theta Exposure
+     */
     createThetaChart(data) {
         const ctx = document.getElementById('thetaChart');
         if (!ctx) return;
 
         this.charts.theta = new Chart(ctx, {
-            type: 'bar', // Theta geralmente é melhor visualizado como barra negativa
+            type: 'bar',
             data: {
-                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: data.greeks_2nd_order.strikes,
                 datasets: [{
                     label: 'Theta',
                     data: data.greeks_2nd_order.theta,
@@ -1276,43 +891,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
-
-
-    updateMetrics(data) {
-        this.animateValue('total-trades', 0, data.overview.total_trades, 2000);
-        this.animateValue('volume-total', 0, data.overview.total_volume, 2000);
-        this.animateValue('gamma-exposure', 0, data.overview.gamma_exposure, 2000);
-        this.animateValue('delta-position', 0, data.overview.delta_position, 2000);
-    }
-
-    animateValue(elementId, start, end, duration) {
-        const element = document.getElementById(elementId);
-        if (!element) return;
-
-        const startTime = performance.now();
-        const isNegative = end < 0;
-        const absEnd = Math.abs(end);
-
-        const animate = (currentTime) => {
-            const elapsed = currentTime - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            
-            const current = Math.floor(start + (absEnd - start) * this.easeOutQuart(progress));
-            const signed = isNegative ? -current : current;
-            element.textContent = this.formatNumberBr(signed, 0);
-            
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            }
-        };
-        
-        requestAnimationFrame(animate);
-    }
-
-    easeOutQuart(t) {
-        return 1 - Math.pow(1 - t, 4);
-    }
-
+    /**
+     * Cria gráfico de Vega Exposure
+     */
     createVegaChart(data) {
         const ctx = document.getElementById('vegaChart');
         if (!ctx) return;
@@ -1320,7 +901,7 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.vega = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: data.greeks_2nd_order.strikes,
                 datasets: [{
                     label: 'Vega Exposure',
                     data: data.greeks_2nd_order.vex,
@@ -1344,18 +925,19 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de Pin Risk
+     */
     createPinRiskChart(data) {
         const ctx = document.getElementById('pinRiskChart');
         if (!ctx) return;
 
-        // Simplificado: OI Call + OI Put próximo ao vencimento
-        // Aqui usamos Total OI como proxy
         const totalOI = data.volume_data.call_volume.map((v, i) => v + data.volume_data.put_volume[i]);
 
         this.charts.pinRisk = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.volume_data.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: data.volume_data.strikes,
                 datasets: [{
                     label: 'Pin Risk Potential (Total OI)',
                     data: totalOI,
@@ -1380,6 +962,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de Charm Acumulado
+     */
     createCharmCumChart(data) {
         const ctx = document.getElementById('charmCumChart');
         if (!ctx || !data.greeks_2nd_order.charm_cum) return;
@@ -1387,7 +972,7 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.charmCum = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: data.greeks_2nd_order.strikes,
                 datasets: [{
                     label: 'Charm Acumulado',
                     data: data.greeks_2nd_order.charm_cum,
@@ -1414,6 +999,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de Vanna Acumulado
+     */
     createVannaCumChart(data) {
         const ctx = document.getElementById('vannaCumChart');
         if (!ctx || !data.greeks_2nd_order.vanna_cum) return;
@@ -1421,7 +1009,7 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.vannaCum = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: data.greeks_2nd_order.strikes,
                 datasets: [{
                     label: 'Vanna Acumulado',
                     data: data.greeks_2nd_order.vanna_cum,
@@ -1448,6 +1036,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de R-Gamma (PVOP)
+     */
     createRGammaChart(data) {
         const ctx = document.getElementById('rGammaChart');
         if (!ctx || !data.greeks_2nd_order.r_gamma) return;
@@ -1455,7 +1046,7 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.rGamma = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: data.greeks_2nd_order.strikes,
                 datasets: [{
                     label: 'R-Gamma (PVOP)',
                     data: data.greeks_2nd_order.r_gamma,
@@ -1485,6 +1076,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de R-Gamma Acumulado
+     */
     createRGammaCumChart(data) {
         const ctx = document.getElementById('rGammaCumChart');
         if (!ctx || !data.greeks_2nd_order.r_gamma_cum) return;
@@ -1492,7 +1086,7 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.rGammaCum = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: data.greeks_2nd_order.strikes,
                 datasets: [{
                     label: 'R-Gamma Acumulado',
                     data: data.greeks_2nd_order.r_gamma_cum,
@@ -1523,6 +1117,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de Theta Acumulado
+     */
     createThetaCumChart(data) {
         const ctx = document.getElementById('thetaCumChart');
         if (!ctx || !data.greeks_2nd_order.theta_cum) return;
@@ -1530,7 +1127,7 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.thetaCum = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.greeks_2nd_order.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: data.greeks_2nd_order.strikes,
                 datasets: [{
                     label: 'Theta Acumulado',
                     data: data.greeks_2nd_order.theta_cum,
@@ -1557,6 +1154,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de Max Pain
+     */
     createMaxPainChart(data) {
         const ctx = document.getElementById('maxPainChart');
         if (!ctx || !data.v3_data || !data.v3_data.max_pain_profile) return;
@@ -1566,7 +1166,7 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.maxPain = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: profile.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: profile.strikes,
                 datasets: [{
                     label: 'Perda dos Compradores (Valor Intrínseco)',
                     data: profile.loss,
@@ -1594,8 +1194,9 @@ class StrangerThingsCharts extends BaseCharts {
                     y: {
                         ...this.chartOptions.scales.y,
                         ticks: {
-                            ...this.chartOptions.scales.y.ticks,
-                            callback: (value) => 'R$ ' + this.formatNumberBr(value / 1000000, 1) + 'M'
+                            callback: function(value) {
+                                return '$' + (value / 1000000).toFixed(1) + 'M';
+                            }
                         }
                     }
                 }
@@ -1603,6 +1204,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de Gamma Flip Cone
+     */
     createGammaFlipConeChart(data) {
         const ctx = document.getElementById('gammaFlipConeChart');
         if (!ctx || !data.v3_data || !data.v3_data.gamma_flip_cone) return;
@@ -1640,6 +1244,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de Delta Flip Profile
+     */
     createDeltaFlipProfileChart(data) {
         const ctx = document.getElementById('deltaFlipProfileChart');
         if (!ctx || !data.v3_data || !data.v3_data.delta_flip_profile) return;
@@ -1649,7 +1256,7 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.deltaFlipProfile = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: profileData.spots.map(s => this.formatNumberBr(s, 2)),
+                labels: profileData.spots.map(s => s.toFixed(2)),
                 datasets: [{
                     label: 'Net Delta',
                     data: profileData.deltas,
@@ -1658,8 +1265,8 @@ class StrangerThingsCharts extends BaseCharts {
                     borderWidth: 2,
                     fill: {
                         target: 'origin',
-                        above: 'rgba(0, 243, 255, 0.1)',   // Area above origin
-                        below: 'rgba(255, 7, 58, 0.1)'    // Area below origin
+                        above: 'rgba(0, 243, 255, 0.1)',
+                        below: 'rgba(255, 7, 58, 0.1)'
                     },
                     tension: 0.4,
                     pointRadius: 0
@@ -1680,6 +1287,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de Flow Sentiment
+     */
     createFlowSentimentChart(data) {
         const ctx = document.getElementById('flowSentimentChart');
         if (!ctx || !data.v3_data || !data.v3_data.flow_sentiment) return;
@@ -1690,7 +1300,7 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.flowSentiment = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: labels.map(s => this.formatNumberBr(s, 0)),
+                labels: labels,
                 datasets: [
                     {
                         label: 'Bullish Flow',
@@ -1728,12 +1338,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
-
-
-
-
-
-
+    /**
+     * Cria gráfico de Expected Move
+     */
     createExpectedMoveChart(data) {
         const ctx = document.getElementById('expectedMoveChart');
         if (!ctx || !data.key_levels || !data.key_levels.expected_moves) return;
@@ -1748,7 +1355,6 @@ class StrangerThingsCharts extends BaseCharts {
         const upper2 = moves.map(m => m.sigma_2_up);
         const lower2 = moves.map(m => m.sigma_2_down);
         
-        // Add current spot as point 0
         const spot = data.overview.spot_price;
         const allDays = [0, ...days];
         const allUpper1 = [spot, ...upper1];
@@ -1775,7 +1381,7 @@ class StrangerThingsCharts extends BaseCharts {
                         data: allUpper1,
                         borderColor: '#00ff00',
                         backgroundColor: 'rgba(0, 255, 0, 0.1)',
-                        fill: 3, // Fill to dataset index 3 (-1σ)
+                        fill: 3,
                         pointRadius: 3
                     },
                     {
@@ -1791,7 +1397,7 @@ class StrangerThingsCharts extends BaseCharts {
                         data: allLower1,
                         borderColor: '#00ff00',
                         backgroundColor: 'rgba(0, 255, 0, 0.1)',
-                        fill: false, // Already filled from +1σ
+                        fill: false,
                         pointRadius: 3
                     },
                     {
@@ -1826,6 +1432,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de MM PnL Simulation
+     */
     createMMPnLChart(data) {
         const ctx = document.getElementById('mmPnlChart');
         if (!ctx || !data.v3_data || !data.v3_data.mm_pnl) return;
@@ -1835,7 +1444,7 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.mmPnl = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: pnlData.spots.map(s => this.formatNumberBr(s, 2)),
+                labels: pnlData.spots.map(s => s.toFixed(2)),
                 datasets: [{
                     label: 'MM PnL Simulation',
                     data: pnlData.pnl,
@@ -1866,6 +1475,9 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Cria gráfico de Dealer Pressure
+     */
     createDealerPressureChart(data) {
         const ctx = document.getElementById('dealerPressureChart');
         if (!ctx || !data.v3_data || !data.v3_data.dealer_pressure_profile) return;
@@ -1876,16 +1488,16 @@ class StrangerThingsCharts extends BaseCharts {
         this.charts.dealerPressure = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: strikes,
                 datasets: [{
-                    label: 'Dealer Pressure Index (DPI)',
+                    label: 'Dealer Pressure',
                     data: profile,
-                    borderColor: '#ff9900', // Laranja Neon
-                    backgroundColor: 'rgba(255, 153, 0, 0.1)',
-                    borderWidth: 2,
+                    borderColor: '#9ca3af',
+                    backgroundColor: 'rgba(156, 163, 175, 0.1)',
+                    borderWidth: 3,
                     fill: true,
                     tension: 0.4,
-                    pointRadius: 2
+                    pointRadius: 0
                 }]
             },
             options: {
@@ -1898,44 +1510,31 @@ class StrangerThingsCharts extends BaseCharts {
                         color: '#ff00ff',
                         font: { family: 'Orbitron', size: 16, weight: 'bold' }
                     }
-                },
-                scales: {
-                    ...this.chartOptions.scales,
-                    y: {
-                        ...this.chartOptions.scales.y,
-                        grid: {
-                            color: (context) => context.tick.value === 0 ? '#ffffff' : 'rgba(255, 255, 255, 0.1)',
-                            lineWidth: (context) => context.tick.value === 0 ? 2 : 1
-                        }
-                    }
                 }
             }
         });
     }
 
+    /**
+     * Cria gráfico de Delta Agregado
+     */
     createDeltaAgregadoChart(data) {
         const ctx = document.getElementById('deltaAgregadoChart');
         if (!ctx) return;
 
-        // Delta Exposure por Strike (Net)
-        // Diferente do Delta Acumulado (Cumulative)
+        const strikes = data.delta_data.strikes;
+        const deltaValues = data.delta_data.delta_values;
+
         this.charts.deltaAgregado = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.delta_data.strikes.map(s => this.formatNumberBr(s, 0)),
+                labels: strikes,
                 datasets: [{
-                    label: 'Delta Exposure Net',
-                    data: data.delta_data.delta_values,
-                    backgroundColor: (context) => {
-                        const val = context.raw;
-                        return val >= 0 ? 'rgba(0, 255, 0, 0.6)' : 'rgba(255, 0, 0, 0.6)';
-                    },
-                    borderColor: (context) => {
-                        const val = context.raw;
-                        return val >= 0 ? '#00ff00' : '#ff0000';
-                    },
-                    borderWidth: 1,
-                    borderRadius: 2
+                    label: 'Delta Agregado',
+                    data: deltaValues,
+                    backgroundColor: deltaValues.map(v => v >= 0 ? 'rgba(0, 255, 0, 0.6)' : 'rgba(255, 0, 0, 0.6)'),
+                    borderColor: deltaValues.map(v => v >= 0 ? '#00ff00' : '#ff0000'),
+                    borderWidth: 1
                 }]
             },
             options: {
@@ -1944,7 +1543,7 @@ class StrangerThingsCharts extends BaseCharts {
                     ...this.chartOptions.plugins,
                     title: {
                         display: true,
-                        text: 'Delta Exposure por Strike (Net)',
+                        text: 'Delta Agregado por Strike',
                         color: '#ff00ff',
                         font: { family: 'Orbitron', size: 16, weight: 'bold' }
                     }
@@ -1953,146 +1552,105 @@ class StrangerThingsCharts extends BaseCharts {
         });
     }
 
+    /**
+     * Atualiza métricas do overview
+     */
+    updateMetrics(data) {
+        this.animateValue('total-trades', 0, data.overview.total_trades, 2000);
+        this.animateValue('volume-total', 0, data.overview.total_volume, 2000);
+        this.animateValue('gamma-exposure', 0, data.overview.gamma_exposure, 2000);
+        this.animateValue('delta-position', 0, data.overview.delta_position, 2000);
+    }
+
+    /**
+     * Atualiza níveis-chave
+     */
     updateKeyLevels(data) {
-        if (!data.key_levels) return;
-        
-        const setText = (id, value) => {
+        const levels = data.key_levels || {};
+        const setEl = (id, val) => {
             const el = document.getElementById(id);
-            if (el) el.innerText = value !== null ? this.formatNumberBr(value, 2) : 'N/A';
+            if (el) el.textContent = val;
         };
-
-        setText('gamma-flip', data.key_levels.gamma_flip);
-        setText('call-wall', data.key_levels.call_wall);
-        setText('put-wall', data.key_levels.put_wall);
-        setText('edi-effective-call', data.key_levels.effective_call_wall);
-        setText('edi-effective-put', data.key_levels.effective_put_wall);
-        setText('max-pain', data.key_levels.max_pain);
+        setEl('gamma-flip', levels.gamma_flip != null ? this.formatNumberBr(levels.gamma_flip, 2) : 'N/A');
+        setEl('call-wall', levels.call_wall != null ? this.formatNumberBr(levels.call_wall, 2) : 'N/A');
+        setEl('put-wall', levels.put_wall != null ? this.formatNumberBr(levels.put_wall, 2) : 'N/A');
+        setEl('edi-effective-call', levels.effective_call_wall != null ? this.formatNumberBr(levels.effective_call_wall, 2) : 'N/A');
+        setEl('edi-effective-put', levels.effective_put_wall != null ? this.formatNumberBr(levels.effective_put_wall, 2) : 'N/A');
+        setEl('max-pain', levels.max_pain != null ? this.formatNumberBr(levels.max_pain, 2) : 'N/A');
     }
 
+    /**
+     * Atualiza código NTSL
+     */
     updateNtslCode(data) {
-        const ntslArea = document.getElementById('ntsl-code-block');
-        const copyBtn = document.getElementById('copy-ntsl');
-        // const feedback = document.getElementById('copyFeedback'); // Removed in new HTML
-
-        if (ntslArea) {
-            ntslArea.innerText = data.ntsl_script || '// Código não disponível. Verifique exportação.';
-        }
-
-        if (copyBtn && ntslArea) {
-            // Remove previous listeners to avoid duplicates if re-init
-            const newBtn = copyBtn.cloneNode(true);
-            copyBtn.parentNode.replaceChild(newBtn, copyBtn);
-            
-            newBtn.addEventListener('click', () => {
-                const textToCopy = ntslArea.innerText.replace(/\n/g, '\r\n');
-                
-                navigator.clipboard.writeText(textToCopy).then(() => {
-                    newBtn.innerText = 'CÓDIGO COPIADO!';
-                    newBtn.style.backgroundColor = '#00ff00';
-                    newBtn.style.color = '#000000';
-                    setTimeout(() => { 
-                        newBtn.innerText = 'COPIAR CÓDIGO'; 
-                        newBtn.style.backgroundColor = '';
-                        newBtn.style.color = '';
-                    }, 2000);
-                }).catch(err => {
-                    console.error('Failed to copy: ', err);
-                });
-            });
+        const el = document.getElementById('ntsl-code');
+        if (el && data.ntsl_script) {
+            el.textContent = data.ntsl_script;
         }
     }
 
+    /**
+     * Preenche tabela detalhada
+     */
+    populateTable(data) {
+        const tbody = document.querySelector('#data-table tbody');
+        if (!tbody || !data.detailed_data) return;
+        tbody.innerHTML = data.detailed_data.map(row => `
+            <tr>
+                <td>${this.formatNumberBr(row.strike, 0)}</td>
+                <td>${row.iv != null ? this.formatNumberBr(row.iv, 2) + '%' : '—'}</td>
+                <td>${this.formatNumberBr(row.delta, 4)}</td>
+                <td>${this.formatNumberBr(row.gamma, 6)}</td>
+                <td>${this.formatNumberBr(row.volume, 0)}</td>
+                <td>${this.formatNumberBr(row.oi, 0)}</td>
+            </tr>
+        `).join('');
+    }
+
+    /**
+     * Cria tabela de Fair Value
+     */
     createFairValueTable(data) {
-        const containers = [document.getElementById('fair-value-container'), document.getElementById('fair-value-container-overview')].filter(Boolean);
-        if (!containers.length) return;
+        const container = document.getElementById('fair-value-container');
+        if (!container || !data.fair_value) return;
 
-        const sims = data && data.v3_data && Array.isArray(data.v3_data.fair_value_sims) ? data.v3_data.fair_value_sims : [];
-        if (!sims.length) {
-            containers.forEach((c) => (c.innerHTML = '<p>Nenhuma simulação disponível.</p>'));
-            return;
-        }
+        const scenarios = data.fair_value;
+        let html = '<table style="width:100%;border-collapse:collapse;">';
+        html += '<thead><tr>';
+        html += '<th style="text-align:left;padding:8px;border-bottom:1px solid rgba(255,255,255,.14);color:#b3b3b3;">Cenário</th>';
+        html += '<th style="text-align:right;padding:8px;border-bottom:1px solid rgba(255,255,255,.14);color:#b3b3b3;">Call Now</th>';
+        html += '<th style="text-align:right;padding:8px;border-bottom:1px solid rgba(255,255,255,.14);color:#b3b3b3;">Call Sim</th>';
+        html += '<th style="text-align:right;padding:8px;border-bottom:1px solid rgba(255,255,255,.14);color:#b3b3b3;">Put Now</th>';
+        html += '<th style="text-align:right;padding:8px;border-bottom:1px solid rgba(255,255,255,.14);color:#b3b3b3;">Put Sim</th>';
+        html += '</tr></thead><tbody>';
 
-        const fmt2 = (v) => this.formatNumberBr(Number(v), 2);
-        const fmtPct = (v) => (Number.isFinite(Number(v)) ? this.formatNumberBr(Number(v), 1) + '%' : '—');
-
-        let html =
-            '<table class="neon-table"><thead><tr><th>Cenário</th><th>Alvo (Spot)</th><th>Strike</th><th>Call (Hoje)</th><th>Call (Sim)</th><th>Var %</th><th>Put (Hoje)</th><th>Put (Sim)</th><th>Var %</th></tr></thead><tbody>';
-
-        sims.forEach((sim) => {
-            const scenario = sim && sim.scenario ? String(sim.scenario) : '—';
-            const target = fmt2(sim && sim.target_spot);
-            const opts = sim && Array.isArray(sim.options) ? sim.options : [];
-            opts.forEach((opt) => {
-                const callChg = Number(opt && opt.Call_Chg);
-                const putChg = Number(opt && opt.Put_Chg);
-                const callClass = Number.isFinite(callChg) && callChg >= 0 ? 'positive-val' : 'negative-val';
-                const putClass = Number.isFinite(putChg) && putChg >= 0 ? 'positive-val' : 'negative-val';
-                html +=
-                    `<tr>` +
-                    `<td class="font-bold">${this.escapeHtml(scenario)}</td>` +
-                    `<td>${target}</td>` +
-                    `<td class="font-bold text-center" style="color: var(--secondary-neon);">${fmt2(opt && opt.Strike)}</td>` +
-                    `<td>${fmt2(opt && opt.Call_Now)}</td>` +
-                    `<td>${fmt2(opt && opt.Call_Sim)}</td>` +
-                    `<td class="${callClass}">${fmtPct(opt && opt.Call_Chg)}</td>` +
-                    `<td>${fmt2(opt && opt.Put_Now)}</td>` +
-                    `<td>${fmt2(opt && opt.Put_Sim)}</td>` +
-                    `<td class="${putClass}">${fmtPct(opt && opt.Put_Chg)}</td>` +
-                    `</tr>`;
-            });
+        scenarios.forEach(scenario => {
+            html += `<tr>
+                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.08);color:#00f3ff;">${scenario.label}</td>
+                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.08);text-align:right;">${this.formatNumberBr(scenario.call_now, 2)}</td>
+                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.08);text-align:right;color:${scenario.call_change >= 0 ? '#00ff00' : '#ff0000'};">${this.formatNumberBr(scenario.call_sim, 2)}</td>
+                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.08);text-align:right;">${this.formatNumberBr(scenario.put_now, 2)}</td>
+                <td style="padding:8px;border-bottom:1px solid rgba(255,255,255,.08);text-align:right;color:${scenario.put_change >= 0 ? '#00ff00' : '#ff0000'};">${this.formatNumberBr(scenario.put_sim, 2)}</td>
+            </tr>`;
         });
 
         html += '</tbody></table>';
-        containers.forEach((c) => (c.innerHTML = html));
+        container.innerHTML = html;
     }
 
-    populateTable(data) {
-        const tableBody = document.querySelector('#data-table tbody');
-        if (!tableBody) return;
-
-        tableBody.innerHTML = '';
-        
-        // Helper to format numbers cleanly
-        const fmt = (val, decimals = 0) => {
-            if (val === null || val === undefined) return '-';
-            return val.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-        };
-        
-        data.detailed_data.forEach((row, index) => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="text-center font-bold" style="color: var(--secondary-neon);">${fmt(row.strike, 2)}</td>
-                <td class="text-right">${fmt(row.delta, 0)}</td>
-                <td class="text-right">${fmt(row.gamma, 0)}</td>
-                <td class="text-right">${fmt(row.volume, 0)}</td>
-                <td class="text-right">${fmt(row.oi, 0)}</td>
-                <td class="text-center">${fmt(row.iv, 1)}%</td>
-            `;
-            
-            // Add fade-in animation
-            tr.style.opacity = '0';
-            tr.style.transform = 'translateY(20px)';
-            tableBody.appendChild(tr);
-            
-            setTimeout(() => {
-                tr.style.transition = 'all 0.5s ease';
-                tr.style.opacity = '1';
-                tr.style.transform = 'translateY(0)';
-            }, index * 50); // Faster animation
-        });
+    /**
+     * Atualiza timestamp da última atualização
+     */
+    updateLastUpdate(data) {
+        const el = document.getElementById('last-update-label');
+        if (el && data.last_updated) {
+            el.textContent = `Atualizado: ${data.last_updated}`;
+        }
     }
 
-    // Method to update charts with new data
-    updateCharts(newData) {
-        Object.keys(this.charts).forEach(chartKey => {
-            if (this.charts[chartKey] && newData[chartKey]) {
-                this.charts[chartKey].data = newData[chartKey];
-                this.charts[chartKey].update('active');
-            }
-        });
-    }
-
-    // Method to destroy all charts (cleanup)
+    /**
+     * Destrói todos os gráficos (cleanup)
+     */
     destroy() {
         Object.keys(this.charts).forEach(chartKey => {
             if (this.charts[chartKey]) {
@@ -2103,7 +1661,7 @@ class StrangerThingsCharts extends BaseCharts {
     }
 }
 
-// Initialize charts when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    window.strangerThingsCharts = new StrangerThingsCharts();
-});
+// Exportar para uso global
+if (typeof window !== 'undefined') {
+    window.BaseCharts = BaseCharts;
+}
