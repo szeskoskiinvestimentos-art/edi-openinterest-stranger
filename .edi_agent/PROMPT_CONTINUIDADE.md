@@ -1,8 +1,8 @@
 # PROMPT DE CONTINUIDADE - EDI Market Guardian V0
 
 > **Data de criação**: 2026-06-19
-> **Última atualização**: 2026-06-19 (v1.1 - correção URLs e estrutura)
-> **Versão do prompt**: 1.1
+> **Última atualização**: 2026-06-19 (v1.2 - 28 evoluções, WIN scaling doc)
+> **Versão do prompt**: 1.2
 
 ---
 
@@ -20,6 +20,49 @@ O **EDI Market Guardian V0** é um sistema de análise de opções financeiras p
 - **Dashboard unificado** com 6 telas de acesso (+ 1 legado)
 - **Pipeline de dados** automatizado (Barchart → Python → Dashboards)
 - **Cálculos matemáticos** (Black-Scholes, Greeks, Gamma Flip, Max Pain, etc.)
+
+---
+
+## MODELO DE CÁLCULO WIN (EWZ → Índice)
+
+### Fator de Escala Diário
+O fator de escala é recalculado diariamente conforme o cronograma de aquisição de dados da Barchart:
+
+```
+fator_escala = WIN_SCALING_INDEX_REF_CLOSE / WIN_SCALING_EWZ_REF_CLOSE
+             = 170.560 / 33.88
+             ≈ 5034 (varia diariamente)
+```
+
+### Fontes de Dados
+| Componente | Fonte | Variável | Descrição |
+|------------|-------|----------|-----------|
+| **EWZ Spot** | Barchart | `WIN_SCALING_EWZ_REF_CLOSE` | Preço de fechamento do EWZ (USD) |
+| **WIN Index** | TradingView (IND1!) | `WIN_SCALING_INDEX_REF_CLOSE` | Preço de ajuste do índice quando fecha na B3 |
+| **Fator de Escala** | Cálculo | `DISPLAY_SCALE_FACTOR` | Razão entre os dois |
+
+### Fluxo Diário
+1. `automacao_dados.py` roda via Barchart automation
+2. Busca preço spot do EWZ no Barchart
+3. Busca preço de ajuste do IND1! no TradingView (quando fecha na B3)
+4. Salva em `.env.auto`:
+   - `WIN_SCALING_EWZ_REF_CLOSE=34.41`
+   - `WIN_SCALING_INDEX_REF_CLOSE=169578`
+5. `src/config.py` calcula: `DISPLAY_SCALE_FACTOR = 169578 / 34.41 ≈ 4928`
+6. Strikes EWZ são multiplicados por este fator
+
+### Por que Escalar?
+- WIN é ~5000× maior que EWZ (170K pts vs $34 USD)
+- Gamma, walls, max_pain precisam estar em escala WIN para o dashboard
+- EWZ e WIN são correlacionados (~0.95), mas em magnitudes diferentes
+
+### Proteção contra Double-Scaling
+- Se `EWZ_TO_INDEX_SCALE_ENABLED=false` → fator = 1.0
+- Se `DISPLAY_SCALE_FACTOR` está setado → usa direto
+- Senão → calcula de `SCALING_*/WIN_SCALING_*`
+
+### Nota sobre Strikes
+Os strikes "não-naturais" (68800, 73715, etc.) são **comportamento correto por design**. São strikes EWZ multiplicados pelo fator de escala diário.
 
 ---
 
@@ -117,7 +160,7 @@ O projeto tem 5 modos automáticos que devem ser mantidos:
 2. Implementar mudança
 3. Rodar testes: `python tests/run_all.py`
 4. Se testes passaram, marcar tarefa como done
-5. Atualizar `evolution_log.md` com nova evolução (E21, E22, ...)
+5. Atualizar `evolution_log.md` com nova evolução (E29, E30, ...)
 6. Atualizar `SESSION_LOG.md` com resumo
 
 ### Ao Finalizar Sessão
@@ -146,7 +189,7 @@ Edi_Market_Guardian_V0/
 │   ├── ntsl.py                   # Geração de scripts NTSL
 │   ├── charts.py                 # Gráficos Plotly
 │   ├── tables.py                 # Tabelas Plotly
-│   ├── tradingview_fetcher.py    # Captura spot prices
+│   ├── tradingview_fetcher.py    # Captura spot prices (paralelo)
 │   ├── utils.py                  # Utilitários
 │   └── utils_fmt.py              # Formatação brasileira
 ├── tests/                        # Suite de testes (30 testes)
@@ -167,22 +210,24 @@ Edi_Market_Guardian_V0/
 │       └── clean_chrome_profile.py
 ├── dashboard_unificado/          # Dashboards HTML
 │   ├── shared/                   # CSS + JS compartilhados
-│   ├── WIN/                      # Dashboard WIN
+│   │   ├── styles.css            # Tema Neon Terminal
+│   │   ├── unified-nav.js        # Navegação global (7 dashboards)
+│   │   ├── main-shared.js        # Módulo compartilhado
+│   │   ├── charts-shared.js      # BaseCharts (WDO/WIN)
+│   │   └── js/                   # Particles, ChartDataUtils
 │   ├── WDO/                      # Dashboard WDO
+│   ├── WIN/                      # Dashboard WIN
 │   ├── correlation/              # Dashboard CORR
-│   └── controle/                 # Dashboard CONTROLE (principal)
+│   └── controle/                 # Dashboard CONTROLE
 ├── controle_de_dados.html        # Dashboard CONTROLE_DADOS (legado)
 ├── Cotacoes/                     # Serviço Node.js
 ├── Auto_B3_System/               # Automação Barchart
 ├── docs/                         # Documentação
 ├── .edi_agent/                   # Sistema de auto-aprendizado
 │   ├── workspace/                # Registro persistente
-│   │   ├── auto_evolution/       # Log de evolução
-│   │   ├── auto_learning/        # Aprendizados
-│   │   └── skills/               # Habilidades
-│   ├── CHECKPOINT.md             # Último checkpoint
-│   ├── EVOLUTION.md              # Evolução consolidada
-│   └── PLAN.md                   # Plano de trabalho
+│   │   ├── auto_evolution/       # Log de evoluções (E1-E28)
+│   │   └── auto_learning/        # Aprendizados
+│   └── skills/                   # Habilidades
 ├── Servico_Unificado.bat         # Wrapper Python
 ├── Servico_Unificado_FORCE.bat   # Wrapper FORCE
 ├── Servico_Unificado_SAFE.bat    # Wrapper SAFE
@@ -195,10 +240,10 @@ Edi_Market_Guardian_V0/
 ## COMANDOS ESSENCIAIS
 
 ```bash
-# Rodar suite de testes
+# Rodar suite de testes (30 testes)
 python tests/run_all.py
 
-# Atualizar spot prices
+# Atualizar spot prices (paralelo, ~1s)
 python scripts/update_spot_prices.py --target ALL
 
 # Pipeline completo (Greeks + export)
@@ -220,20 +265,20 @@ python scripts/hooks/pre_run_snapshot.py restore
 ## PRIORIDADES ATUAIS
 
 ### Prioridade ALTA
-- [ ] Paralelizar WDO + EWZ scraping
-- [ ] Commit das mudanças pendentes
+- [x] ~~Paralelizar WDO + EWZ scraping~~ ✅ (E21)
+- [x] ~~Commit das mudanças pendentes~~ ✅
 
 ### Prioridade MÉDIA
-- [ ] Documentar APIs internas (docstrings)
-- [ ] Atualizar READMEs
+- [x] ~~Documentar APIs internas (docstrings)~~ ✅ (E22)
+- [x] ~~Atualizar READMEs~~ ✅ (E23)
 
 ### Prioridade BAIXA
-- [ ] Otimizar performance do calculator
-- [ ] Adicionar type hints completos
+- [x] ~~Otimizar performance do calculator~~ ✅ (E24, ~25% mais rápido)
+- [x] ~~Adicionar type hints completos~~ ✅ (E25)
 
 ---
 
-## HISTÓRICO DE EVOLUÇÕES
+## HISTÓRICO DE EVOLUÇÕES (E1-E28)
 
 | ID | Descrição | Status |
 |----|-----------|--------|
@@ -243,8 +288,16 @@ python scripts/hooks/pre_run_snapshot.py restore
 | E10 | Matemática IV | ✅ |
 | E13-E14, E18-E19 | Limpeza | ✅ |
 | E15-E16 | UI & Navegação | ✅ |
+| E21 | Scraping Paralelo (~93% mais rápido) | ✅ |
+| E22 | Docstrings para APIs internas | ✅ |
+| E23 | Atualização dos READMEs | ✅ |
+| E24 | Otimização do calculator (~25% mais rápido) | ✅ |
+| E25 | Type hints completos | ✅ |
+| E26 | Fix WIN spot_price upstream | ✅ |
+| E27 | Fix ewz_meta.expiration stale | ✅ |
+| E28 | Shared BaseCharts WDO/WIN (70% redução) | ✅ |
 
-**Total: 20 evoluções implementadas, 30/30 testes passando**
+**Total: 28 evoluções implementadas, 30/30 testes passando**
 
 ---
 
@@ -256,6 +309,9 @@ python scripts/hooks/pre_run_snapshot.py restore
 4. **Testes**: 30 testes cobrindo calculator, greeks, IV, flip, charts, ntsl
 5. **Modular**: Calculator split em 6 submodules (mixin pattern)
 6. **Legado**: `controle_de_dados.html` é a versão antiga do CONTROLE - manter para compatibilidade
+7. **WIN Scaling**: Fator de escala recalculado diariamente (EWZ → WIN). Strikes "não-naturais" são correto por design.
+8. **Shared Charts**: `shared/charts-shared.js` contém BaseCharts (1570 linhas). WDO/WIN extendem esta classe.
+9. **Performance**: Scraping paralelo (~1s vs ~15s), calculator otimizado (~72ms vs ~96ms)
 
 ---
 
