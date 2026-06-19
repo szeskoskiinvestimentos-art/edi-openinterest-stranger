@@ -2,7 +2,7 @@
 
 ## Atualizado: 2026-06-19
 
-## ✅ CONCLUÍDOS NESTA SESSÃO (26 evoluções)
+## ✅ CONCLUÍDOS NESTA SESSÃO (27 evoluções)
 - [x] Consolidar orquestração em Python (orquestrador.py criado)
 - [x] Migrar .bat para Python (wrappers simplificados)
 - [x] Adicionar testes para calculator.py (9 testes core)
@@ -23,6 +23,7 @@
 - [x] Docstrings para APIs internas (calculator, greeks, charts, ntsl)
 - [x] Atualizar READMEs (principal, WDO, WIN, MERCADO)
 - [x] Fix WIN spot_price upstream (export_v1_data.py)
+- [x] Fix ewz_meta.expiration stale (DTE dinâmico)
 
 ## Prioridade ALTA
 - [x] ~~Paralelizar WDO + EWZ scraping~~ ✅
