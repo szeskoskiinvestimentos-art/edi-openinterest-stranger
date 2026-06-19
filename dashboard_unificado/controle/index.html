@@ -117,23 +117,6 @@
   </nav>
 
   <div class="wrap">
-            <option value="WDO">WDO</option>
-            <option value="WIN">WIN</option>
-            <option value="CORR">Correlações</option>
-            <option value="CONTROLE" selected>Controle de Dados</option>
-          </optgroup>
-          <optgroup label="Mercado">
-            <option value="MERCADO">Cotações</option>
-          </optgroup>
-        </select>
-      </div>
-      <div class="nav-actions">
-        <a class="navlink" href="../index.html">Menu principal</a>
-      </div>
-    </div>
-  </nav>
-
-  <div class="wrap">
     <div class="meta" id="meta"></div>
     <div class="grid" id="grid"></div>
   </div>
@@ -144,31 +127,6 @@
     const data = JSON.parse(document.getElementById('data').textContent || '{}');
     const grid = document.getElementById('grid');
     const meta = document.getElementById('meta');
-
-    // Auto-detect project root from page location
-    function detectProjectRoot() {
-      const path = window.location.pathname;
-      // Pattern: /dashboard_unificado/controle/index.html -> remove dashboard_unificado/controle/index.html
-      const match = path.match(/^(.*\/dashboard_unificado)\/controle\/index\.html$/);
-      if (match) return match[1];
-      // Fallback: try to find dashboard_unificado in path
-      const idx = path.indexOf('/dashboard_unificado/');
-      if (idx >= 0) return path.substring(0, idx + '/dashboard_unificado'.length);
-      return null;
-    }
-
-    // Replace hardcoded root_dir with detected path
-    if (data.root_dir === 'AUTO_DETECT' || !data.root_dir) {
-      const detectedRoot = detectProjectRoot();
-      if (detectedRoot) {
-        data.root_dir = detectedRoot;
-        meta.textContent = `Projeto detectado: ${detectedRoot}`;
-      } else {
-        meta.textContent = 'Caminho do projeto não detectado';
-      }
-    } else {
-      meta.textContent = `Gerado em ${fmt(data.generated_at)}`;
-    }
 
     const fmt = (v) => (v === null || v === undefined || v === '' ? '-' : String(v));
     const escapeHtml = (s) => String(s ?? '')
@@ -186,6 +144,28 @@
       const tr = rows.map(r => `<tr>${r.map(c => `<td class="mono">${escapeHtml(fmt(c))}</td>`).join('')}</tr>`).join('');
       return `<table><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>`;
     };
+
+    // Auto-detect project root from page location
+    function detectProjectRoot() {
+      const path = window.location.pathname;
+      const match = path.match(/^(.*\/dashboard_unificado)\/controle\/index\.html$/);
+      if (match) return match[1];
+      const idx = path.indexOf('/dashboard_unificado/');
+      if (idx >= 0) return path.substring(0, idx + '/dashboard_unificado'.length);
+      return null;
+    }
+
+    if (data.root_dir === 'AUTO_DETECT' || !data.root_dir) {
+      const detectedRoot = detectProjectRoot();
+      if (detectedRoot) {
+        data.root_dir = detectedRoot;
+        meta.textContent = `Projeto detectado: ${detectedRoot}`;
+      } else {
+        meta.textContent = 'Caminho do projeto não detectado';
+      }
+    } else {
+      meta.textContent = `Gerado em ${fmt(data.generated_at)}`;
+    }
 
     const parseDateTime = (raw) => {
       const s = String(raw || '').trim();

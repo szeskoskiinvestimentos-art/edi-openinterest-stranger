@@ -1,6 +1,4 @@
 import pandas as pd
-import numpy as np
-import datetime as dt
 import re
 
 def _num(s):
@@ -41,9 +39,3 @@ def _num(s):
         return s.apply(_parse_one)
     return pd.Series(s).apply(_parse_one)
 
-def get_business_days(start_date, end_date):
-    """Calcula dias úteis entre duas datas."""
-    try:
-        return int(np.busday_count(start_date, end_date))
-    except Exception:
-        return 1

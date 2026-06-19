@@ -1,152 +1,210 @@
 # Session Log - EDI Agent
 
-> **Sessão atual**: 2026-06-19 09:09 → 09:35 (Estabilização + Auto-purge + Testes)
-> **Anterior**: 2026-06-19 (TradingView, sessão de refatoração)
+> **Sessão atual**: 2026-06-19 08:00 → 12:40 (Refatoração Completa)
+> **Anterior**: 2026-06-19 (Estabilização, snapshots, testes iniciais)
 
 ---
 
-## 2026-06-19 (Sessão Atual) — Estabilização, Snapshot, Organização, Testes
+## Resumo da Sessão
 
-### Diagnóstico Inicial (09:09)
-- Mapeamento completo via `git status` descobriu **272 arquivos modificados/não commitados**
-- Última commit: 2026-05-26 (24 dias atrás)
-- Trabalho do usuário em risco iminente
-
-### Fase 1 — Proteção do Trabalho (CRÍTICA)
-- ✅ Reforçado `.gitignore` (ordem das regras `/*` vs `!Cotacoes/**/*`)
-- ✅ `git add -A && git commit` → commit `7d9fcca9`
-  - 284 arquivos, 39.312 inserções, 369.196 deleções
-
-### Fase 1 — Mapeamento de Regeneração
-- ✅ `scripts/export_v1_data.py` → escreve em `dashboard_unificado/WIN/assets/data/market_data.{js,json}` + `ntsl_script.txt`
-- ✅ `scripts/update_spot_prices.py` → escreve em `dashboard_unificado/{WIN,WDO}/assets/data/market_data.{js,json}`
-- ✅ `servico_unificado.py` → escreve em `controle_de_dados.html` + `.edi_service_state.json`
-- ✅ `Cotacoes/tools/market/gerar_controle.py` → escreve em `Cotacoes/dashboard/MERCADO/assets/data/*.{js,json}`
-
-### Fase 1 — Sistema de Snapshot (CRIAÇÃO)
-- ✅ `scripts/hooks/pre_run_snapshot.py` (250 linhas) — Python com 5 comandos
-- ✅ `Servico_Unificado_SAFE.bat` — wrapper que executa snapshot antes
-- ✅ Snapshot baseline criado: `snap-20260619-090920-baseline-pre-cleanup` (39 arquivos)
-
-### Fase 1.4 — Correção de Path
-- ✅ `.edi_service_state.json` corrigido
-- ✅ Campo `migration_note` adicionado
-
-### Fase 2 — Limpeza Residual
-- ✅ `__pycache__/servico_unificado.cpython-314.pyc` removido da raiz
-- ✅ `scripts/hooks/clean_chrome_profile.py`
-- ✅ Chrome profile: 698 MB → 18 MB (**680 MB liberados**)
-
-### Fase 3 — Consolidação de Documentação
-- ✅ `.edi_agent/README.md` reescrito (v3.0)
-- ✅ `skills/INDEX.md` criado
-- ✅ `SKILLS.md` legado removido
-
-### Fase 4 — Skills Aprendidas (LA1, LA2, LA3)
-- ✅ `skills/impact-analyzer.md`, `priority-sorter.md`, `regression-detector.md`
-
-### Fase 5 — Templates
-- ✅ `templates/checkpoint.md`, `skill.md`, `evolution.md`
-
-### Fase 6 — Estado Atualizado
-- ✅ `CHECKPOINT.md`, `workspace/CURRENT_STATE.md`, este log
-
-### Fase 7 — Auto-purge (09:25)
-- ✅ Auto-purge integrado em `pre_run_snapshot.py` (max 7 dias, mantém 10)
-- ✅ Bug argparse corrigido (--label, --days, --snap movidos para subparsers)
-- ✅ Testado: `python scripts/hooks/pre_run_snapshot.py create --label "test"`
-
-### Fase 8 — Test Runner + Golden Values (09:30)
-- ✅ `tests/run_all.py` criado (9 testes, ~280 linhas)
-- ✅ `.edi_agent/tests/golden_values.json` (BS Greeks, T=0, charm, vega, 0DTE, etc)
-- ✅ Implementa a skill `regression-detector` (LA3)
-
-### Fase 9 — BUGS CRÍTICOS ENCONTRADOS PELOS TESTES (09:32)
-- ✅ **BUG-001**: SyntaxError em `src/calculator.py:807` — `try:` sem `except` (calculator.py nao importava).
-  - **Causa**: Edição de sessão anterior deixou código quebrado.
-  - **Correção**: Adicionado `except Exception as e: flips = [None] * len(alphas)` antes do `self.gamma_flip_cone = {...}`.
-  - **Impacto**: IMPEDIA importação de `OptionsCalculator`, quebrando TODO o pipeline Python.
-
-- ✅ **BUG-002**: R12 REAPARECIDO em `src/calculator.py:964` — `weekday() == 4` foi readicionado.
-  - **Causa**: Provavelmente merge/rebase ou edição manual após o commit da "correção" R12.
-  - **Correção**: Removida a condição `and (self.expiry_date.weekday() == 4)`.
-  - **Impacto**: 0DTE só funcionava em sexta-feira, ignorando outros dias.
-
-- ✅ **BUG-003**: Golden values de gamma/vega/theta estavam com valores de mercado (divididos por 100/365)
-  - mas o código retorna valores por unidade (sigma 100%, theta anual). Atualizado `golden_values.json` v1.1.0.
-
-### Resultado Final dos Testes
-```
-[OK ] Sintaxe Python (4 arquivos)
-[OK ] Black-Scholes Greeks (delta=0.5694, gamma=0.0393, vega=19.64/unit, theta=-10.47/year)
-[OK ] T=0 Greeks (delta=intrinseco, gamma=0, vega=0, theta=0)
-[OK ] Charm sign (R10)
-[OK ] Vega documentation (R17)
-[OK ] 0DTE any weekday (R12) - BUG R12 corrigido novamente
-[OK ] Gamma Cone thread-safety (R13)
-[OK ] Navigation 6 dashboards
-[OK ] Snapshot/Chrome scripts
-
-Total: 9, Passou: 9, Falhou: 0
-```
+### Objetivos Alcançados
+1. ✅ Organizar estrutura de pasta e arquivos
+2. ✅ Otimizar código e pipeline
+3. ✅ Revisar cálculos e modelos matemáticos
+4. ✅ Limpar arquivos órfãos e resíduos
+5. ✅ Organizar navegação entre telas
+6. ✅ Normalizar tema visual dos dashboards
+7. ✅ Modularizar sistemas complexos
+8. ✅ Criar sistema de auto-aprendizado e evolução
 
 ---
 
-## Arquivos Criados/Modificados — Sessão Atual
+## Evoluções Implementadas (E1-E20)
 
-### Criados
-| Arquivo | Descrição |
-|---|---|
-| `scripts/hooks/pre_run_snapshot.py` | Snapshot CLI (create/list/restore/purge + auto-purge) |
-| `scripts/hooks/clean_chrome_profile.py` | Limpeza segura Chrome (preserva auth) |
-| `Servico_Unificado_SAFE.bat` | Wrapper que snapshot antes |
-| `.edi_agent/snapshots/snap-*` | Snapshots baseline |
-| `.edi_agent/skills/INDEX.md` | Índice consolidado de skills |
-| `.edi_agent/skills/impact-analyzer.md` | LA1 |
-| `.edi_agent/skills/priority-sorter.md` | LA2 |
-| `.edi_agent/skills/regression-detector.md` | LA3 |
-| `.edi_agent/templates/{checkpoint,skill,evolution}.md` | Templates |
-| `.edi_agent/tests/golden_values.json` | Golden values v1.1.0 |
-| `tests/run_all.py` | Test runner com 9 testes |
+### Pipeline & Dados (E1-E5)
+| ID | Mudança | Arquivo | Severidade |
+|----|---------|---------|------------|
+| E1 | Atomic .env.auto write | automacao_dados.py | CRÍTICO |
+| E2 | Spot Price Validation (WDO 3000-10k, IND 50k-300k) | automacao_dados.py | CRÍTICO |
+| E3 | Decouple WDO/WIN (ambos rodam independentemente) | config.py | CRÍTICO |
+| E4 | Tight Loop Fix (time.sleep(30) antes de continue) | servico_unificado.py | CRÍTICO |
+| E5 | math Import Fix (movido para topo) | automacao_dados.py | BAIXO |
 
-### Modificados
+### Código & Bug Fixes (E6-E8, E17)
+| ID | Mudança | Arquivo | Severidade |
+|----|---------|---------|------------|
+| E6 | Duplicate max_pain init removida | calculator.py | BAIXO |
+| E7 | GEX Signed documentation (convenção de sinal documentada) | calculator.py | MÉDIO |
+| E8 | Greeks Broadcast Fix (_broadcast_to_k_shape) | greeks.py | CRÍTICO |
+| E17 | BS Price Broadcast Fix (bs_price agora faz broadcast) | greeks.py | CRÍTICO |
+
+### Testes (E9-E12, E20)
+| ID | Mudança | Arquivo | Testes |
+|----|---------|---------|--------|
+| E9 | Gamma Flip Tests | test_gamma_flip.py | 3 |
+| E11 | IV Smile Tests | test_iv_smile.py | 3 |
+| E12 | Calculator Core Tests | test_calculator_core.py | 9 |
+| E20 | Charts + NTSL Tests + conftest.py | test_charts.py, test_ntsl.py, conftest.py | 4 |
+
+### Matemática & IV (E10)
+| ID | Mudança | Arquivo | Severidade |
+|----|---------|---------|------------|
+| E10 | IV Per-Strike Integration (Delta/Gamma usam IV por strike) | calculator.py | CRÍTICO |
+
+### Limpeza & Organização (E13-E14, E18-E19)
+| ID | Mudança | Arquivo |
+|----|---------|---------|
+| E13 | Print→Logger (8 chamadas) | calculator.py |
+| E14 | Dead Config Flags removidas (6 flags) | config.py |
+| E18 | Calculator Split em 6 submodules (mixin pattern) | src/calculator/ |
+| E19 | 3 arquivos órfãos deletados + dead function + cache | múltiplos |
+
+### UI & Navegação (E15-E16)
+| ID | Mudança | Arquivo |
+|----|---------|---------|
+| E15 | Dashboard Theme Normalization (CORR + CONTROLE → Neon Terminal) | correlation/style.css, controle/index.html |
+| E16 | Hardcoded Paths Fix (AUTO_DETECT) | controle_de_dados.html, servico_unificado.py |
+
+---
+
+## Arquivos Criados/Modificados/Deletados
+
+### Criados (esta sessão)
+| Arquivo | Linhas | Descrição |
+|---------|--------|-----------|
+| src/tradingview_fetcher.py | 134 | Captura spot prices TradingView |
+| src/tradingview_options.py | 243 | Captura opções Yahoo Finance (deletado depois) |
+| scripts/update_spot_prices.py | 155 | Atualização leve spot prices |
+| scripts/orquestrador.py | 1128 | Orquestrador Python (substitui .bat) |
+| tests/test_gamma_flip.py | ~100 | Testes GEX sign + 7 variações |
+| tests/test_iv_smile.py | ~120 | Testes IV per-strike + smile |
+| tests/test_calculator_core.py | ~200 | Testes core methods |
+| tests/conftest.py | ~50 | Fixtures compartilhados |
+| tests/test_charts.py | ~40 | Testes Plotly charts |
+| tests/test_ntsl.py | ~40 | Testes NTSL script |
+| .edi_agent/workspace/* | ~200 | Workspace de evolução |
+| COMANDOS.txt | ~100 | Manual de comandos |
+
+### Modificados (esta sessão)
 | Arquivo | Mudança |
-|---|---|
-| `.gitignore` | Reorganizado: regras Chrome + __pycache__ + exports movidas para após `!Cotacoes/**/*` |
-| `.edi_service_state.json` | Corrigido path antigo, adicionado `project_root` e `migration_note` |
-| `.edi_agent/README.md` | Reescrito como índice v3.0 |
-| `.edi_agent/CHECKPOINT.md` | Atualizado CP-003 a CP-019 |
-| `.edi_agent/workspace/CURRENT_STATE.md` | Atualizado com métricas |
-| `src/calculator.py:807` | **BUG FIX**: try/except completo |
-| `src/calculator.py:964` | **BUG FIX**: removido weekday==4 (R12 reaparecido) |
+|---------|---------|
+| src/greeks.py | +_broadcast_to_k_shape(), broadcast em calculate_greeks/vega/theta/bs_price |
+| src/calculator/core.py | Split em 6 submodules, print→logger, IV per-strike |
+| src/calculator/__init__.py | Import de mixins |
+| src/config.py | -6 dead flags, -2 dead constants |
+| src/utils.py | -get_business_days() |
+| scripts/export_v1_data.py | Verificado OK |
+| servico_unificado.py | root_dir AUTO_DETECT, spot price refresh 5min |
+| Servico_Unificado.bat | Wrapper simplificado para orquestrador.py |
+| Servico_Unificado_FORCE.bat | Wrapper simplificado para orquestrador.py --force |
+| dashboard_unificado/correlation/style.css | Tema Neon Terminal |
+| dashboard_unificado/controle/index.html | Tema Neon Terminal + nav + AUTO_DETECT |
+| controle_de_dados.html | AUTO_DETECT paths |
+| tests/run_all.py | +4 novos testes (charts, ntsl) |
 
-### Deletados
-| Item | Motivo |
-|---|---|
-| `__pycache__/servico_unificado.cpython-314.pyc` | Cache Python órfão da raiz |
-| `Auto_B3_System/chrome_profile/*/Cache/` (340 MB) | Cache regenerável |
-| `Auto_B3_System/chrome_profile/*/Code Cache/` (136 MB) | Cache regenerável |
-| `~38 outros diretórios` | ~204 MB |
-| `.edi_agent/SKILLS.md` | Substituído por `skills/INDEX.md` |
-| 4 diretórios stub vazios | `auto_evolution`, `auto_learning`, `auto_refactoring`, `refactoring` |
+### Deletados (esta sessão)
+| Arquivo | Motivo |
+|---------|--------|
+| src/tradingview_options.py | Orphan (zero referências) |
+| scripts/gerar_controle.py | Superseded por Cotacoes version |
+| scripts/verify_update.py | Orphan (sem callers) |
+| src/__pycache__/ | Stale artifacts |
+| src/calculator/__pycache__/ | Stale artifacts |
+| Auto_B3_System/debug_*.txt | Debug artifacts |
+| Auto_B3_System/ideia.txt | Informal notes |
+| src/config_debug.py | Incomplete orphan |
+| Script_ProfitChart_NTSL.txt | Generated output |
+| shared/js/main.js | Orphan (EDIApp antigo) |
 
 ---
 
-## Próximos Passos
+## Estrutura Final do Projeto
 
-1. **Commit final** das mudanças (Fase 10)
-2. **IV Smile** (próxima evolução)
-3. **Validar Gamma Flip Signed**
-4. **Auto-purge** já implementado
+```
+Edi_Market_Guardian_V0/
+├── src/
+│   ├── calculator/
+│   │   ├── __init__.py          # OptionsCalculator
+│   │   ├── core.py              # __init, orchestrator, summary (373 linhas)
+│   │   ├── flips.py             # Gamma flip, 7 variações (319 linhas)
+│   │   ├── greeks_exposure.py   # Delta/gamma/charm/vanna (129 linhas)
+│   │   ├── volatility.py        # VRP, expected moves (138 linhas)
+│   │   ├── walls.py             # Max pain, effective walls (71 linhas)
+│   │   └── fair_value.py        # MM PnL, fair value (106 linhas)
+│   ├── greeks.py                # Black-Scholes engine
+│   ├── config.py                # Configuração
+│   ├── data_loader.py           # CSV loading
+│   ├── ntsl.py                  # NTSL script
+│   ├── charts.py                # Plotly charts
+│   ├── tables.py                # Plotly tables
+│   ├── tradingview_fetcher.py   # Spot prices TradingView
+│   ├── utils.py                 # Utilities
+│   └── utils_fmt.py             # Brazilian formatting
+├── tests/
+│   ├── conftest.py              # Fixtures compartilhados
+│   ├── run_all.py               # Suite principal (30 testes)
+│   ├── test_greeks.py           # Greeks engine
+│   ├── test_gamma_flip.py       # GEX sign + 7 variações
+│   ├── test_iv_smile.py         # IV per-strike + smile
+│   ├── test_calculator_core.py  # Core methods
+│   ├── test_charts.py           # Plotly charts
+│   └── test_ntsl.py             # NTSL script
+├── scripts/
+│   ├── orquestrador.py          # Orquestrador Python (1128 linhas)
+│   ├── update_spot_prices.py    # Spot prices update
+│   ├── export_v1_data.py        # Pipeline export
+│   └── hooks/
+│       ├── pre_run_snapshot.py  # Snapshot system
+│       └── clean_chrome_profile.py
+├── dashboard_unificado/
+│   ├── shared/styles.css        # Tema Neon Terminal
+│   ├── shared/unified-nav.js    # Navegação global
+│   ├── WIN/                     # Dashboard WIN
+│   ├── WDO/                     # Dashboard WDO
+│   ├── correlation/             # Dashboard CORR (normalizado)
+│   └── controle/                # Dashboard CONTROLE (normalizado)
+├── Cotacoes/                    # Serviço Node.js
+├── Auto_B3_System/              # Automação Barchart
+├── docs/                        # Documentação
+├── .edi_agent/                  # Sistema de auto-aprendizado
+│   ├── workspace/               # Registro persistente
+│   ├── auto_evolution/          # Log de evolução
+│   ├── auto_learning/           # Aprendizados
+│   └── skills/                  # Habilidades
+├── Servico_Unificado.bat        # Wrapper Python
+├── Servico_Unificado_FORCE.bat  # Wrapper FORCE
+├── Servico_Unificado_SAFE.bat   # Wrapper SAFE (snapshot)
+└── COMANDOS.txt                 # Manual de comandos
+```
 
-## Estatísticas da Sessão
+---
 
-- **Duração total**: ~26 minutos (09:09 → 09:35)
-- **Commits feitos**: 2 (proteção + organização)
-- **Commits pendentes**: 1 (correção de bugs + auto-purge + testes)
-- **Bugs críticos corrigidos**: 3 (SyntaxError, R12 reaparecido, golden values errados)
-- **Espaço recuperado**: 680 MB
-- **Trabalho protegido**: 39.312 linhas de 284 arquivos
-- **Skills/total**: 11
-- **Testes passando**: 9/9
-- **Linhas de código adicionadas**: ~580 (pre_run, clean_chrome, run_all, 3 skills, 3 templates, golden)
+## Métricas Finais
+
+| Métrica | Valor |
+|---------|-------|
+| **Evoluções implementadas** | 20 |
+| **Testes passando** | 30/30 |
+| **Arquivos criados** | 12 |
+| **Arquivos modificados** | 12 |
+| **Arquivos deletados** | 10 |
+| **Linhas de código adicionadas** | ~2500 |
+| **Bugs críticos corrigidos** | 5 (broadcast x2, tight loop, spot validation, atomic write) |
+| **Módulos split** | calculator.py → 6 submodules |
+| **Dashboards normalizados** | 2 (CORR + CONTROLE) |
+
+---
+
+## Pendências para Próxima Sessão
+
+### Prioridade ALTA
+- [ ] Paralelizar WDO + EWZ scraping
+- [ ] Commit das mudanças
+
+### Prioridade MÉDIA
+- [ ] Documentar APIs internas (docstrings)
+- [ ] Atualizar READMEs
+
+### Prioridade BAIXA
+- [ ] Otimizar performance do calculator
+- [ ] Adicionar type hints completos

@@ -339,6 +339,26 @@ def test_gamma_flip_variations_consistency(golden: dict) -> tuple[bool, str]:
     return _wrap_test("flip_variations", test_gamma_flip_variations_consistency)
 
 
+# --- test_charts.py (2 testes) ---
+def test_dashboard_figure_is_plotly(golden: dict) -> tuple[bool, str]:
+    from tests.test_charts import test_create_dashboard_figure_is_plotly
+    return _wrap_test("chart_dash", test_create_dashboard_figure_is_plotly)
+
+def test_dashboard_figure_no_exceptions(golden: dict) -> tuple[bool, str]:
+    from tests.test_charts import test_create_dashboard_figure_no_exceptions
+    return _wrap_test("chart_dash_exc", test_create_dashboard_figure_no_exceptions)
+
+
+# --- test_ntsl.py (2 testes) ---
+def test_ntsl_script_returns_string(golden: dict) -> tuple[bool, str]:
+    from tests.test_ntsl import test_generate_ntsl_script_returns_string
+    return _wrap_test("ntsl_str", test_generate_ntsl_script_returns_string)
+
+def test_ntsl_script_contains_keywords(golden: dict) -> tuple[bool, str]:
+    from tests.test_ntsl import test_generate_ntsl_script_contains_keywords
+    return _wrap_test("ntsl_kw", test_generate_ntsl_script_contains_keywords)
+
+
 # --- test_calculator_core.py (9 testes) ---
 def test_max_pain_basic(golden: dict) -> tuple[bool, str]:
     from tests.test_calculator_core import test_max_pain_basic
@@ -397,6 +417,12 @@ TESTS = {
     "gex_sign": ("GEX Sign Convention (E7)", test_gex_sign_convention),
     "gex_base": ("GEX Flip Base Consistency (E7)", test_gex_flip_base_consistency),
     "flip_variations": ("Gamma Flip 7 Variations (E7)", test_gamma_flip_variations_consistency),
+    # --- Charts (2) ---
+    "chart_dash": ("Dashboard Figure é Plotly", test_dashboard_figure_is_plotly),
+    "chart_dash_exc": ("Dashboard Figure sem exceções", test_dashboard_figure_no_exceptions),
+    # --- NTSL (2) ---
+    "ntsl_str": ("NTSL script retorna string", test_ntsl_script_returns_string),
+    "ntsl_kw": ("NTSL script contém keywords", test_ntsl_script_contains_keywords),
     # --- Calculator Core (9) — cobertura de methods ---
     "max_pain_basic": ("Max Pain basic", test_max_pain_basic),
     "max_pain_sym": ("Max Pain simétrico", test_max_pain_symmetric),

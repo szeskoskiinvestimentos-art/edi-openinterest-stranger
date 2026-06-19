@@ -1,173 +1,53 @@
 # Auto-Registro - Estado Atual do Projeto
 
-> **Última atualização**: 2026-06-19 09:15 (Fim da Fase de Estabilização)
+> **Última atualização**: 2026-06-19 12:40 (Refatoração Completa)
 > **Próxima revisão**: após cada commit
 
 ---
 
-## Estado do Sistema (Pós-Fase de Estabilização)
+## Estado do Sistema
 
-### Arquitetura (CONFIRMADA)
+### Arquitetura (ATUALIZADA)
 ```
 Edi_Market_Guardian_V0/
-├── .edi_agent/                    # Sistema de auto-aprendizado
-│   ├── snapshots/                 # NOVO - snapshots pre-run
-│   ├── skills/                    # 11 skills (3 novas em 2026-06-19)
-│   ├── templates/                 # NOVO - templates reutilizáveis
-│   ├── tests/                     # NOVO - golden values
-│   ├── evolution/                 # Histórico de evolução
-│   ├── learning/                  # Aprendizados
-│   ├── workspace/                 # Estado vivo
-│   └── checkpoint_history/        # Histórico de checkpoints
-├── dashboard_unificado/           # HUB central - 6 dashboards
-│   ├── index.html                 # Painel principal
-│   ├── shared/                    # CSS, JS compartilhados (4 files)
-│   ├── WDO/                       # Opções dólar
-│   ├── WIN/                       # Opções índice
-│   ├── correlation/               # Matriz + supergraphics (14 páginas)
-│   └── controle/                  # NOVO - Painel de controle
-├── Cotacoes/                      # Sistema de Cotações (TypeScript)
-│   ├── dashboard/MERCADO/         # Painel de mercado
-│   └── tools/market/              # Pipeline TypeScript
-├── src/                           # Motor Python (Black-Scholes)
-├── Auto_B3_System/                # Automação Barchart (com Chrome)
-├── docs/                          # Documentação
-├── scripts/
-│   ├── export_v1_data.py          # Gerador market_data
-│   ├── update_spot_prices.py      # Atualizador spot (5min)
-│   ├── gerar_controle.py
-│   ├── publish-artifacts.ps1
-│   ├── verify_update.py
-│   └── hooks/                     # NOVO
-│       ├── pre_run_snapshot.py    # Snapshot pre-execução
-│       └── clean_chrome_profile.py # Limpeza Chrome
-├── tests/                         # Testes Python
-├── docs/                          # Documentação
-├── exports/                       # Outputs gerados
-└── *.bat / *.py                   # Wrappers de inicialização
+├── src/
+│   ├── calculator/          # MODULAR (6 submodules mixin)
+│   │   ├── core.py          # __init, orchestrator, summary
+│   │   ├── flips.py         # Gamma flip, 7 variações
+│   │   ├── greeks_exposure.py
+│   │   ├── volatility.py
+│   │   ├── walls.py
+│   │   └── fair_value.py
+│   ├── greeks.py            # Black-Scholes engine (broadcast fix)
+│   ├── config.py            # Config (dead flags removed)
+│   └── [outros módulos]
+├── tests/                   # 30 testes (6 arquivos)
+├── scripts/                 # orquestrador.py + hooks
+├── dashboard_unificado/     # 6 dashboards (tema normalizado)
+├── Cotacoes/                # Serviço Node.js
+├── Auto_B3_System/          # Automação Barchart
+├── .edi_agent/              # Auto-aprendizado
+└── [arquivos raiz]          # .bat wrappers, COMANDOS.txt
 ```
 
-### Dashboards Ativos (6)
-| Dashboard | Caminho | Status |
-|---|---|---|
-| HUB | `dashboard_unificado/index.html` | ✅ Funcional |
-| WDO | `dashboard_unificado/WDO/index.html` | ✅ Funcional |
-| WIN | `dashboard_unificado/WIN/index.html` | ✅ Funcional |
-| MERCADO | `Cotacoes/dashboard/MERCADO/index.html` | ✅ Funcional |
-| CORR | `dashboard_unificado/correlation/index.html` | ✅ Funcional |
-| CONTROLE | `dashboard_unificado/controle/index.html` | ✅ Funcional |
-| CONTROLE_DADOS | `controle_de_dados.html` (raiz) | ✅ Funcional |
+### Métricas
+| Métrica | Valor |
+|---------|-------|
+| Evoluções implementadas | 20 |
+| Testes passando | 30/30 |
+| Arquivos criados | 12 |
+| Arquivos modificados | 12 |
+| Arquivos deletados | 10 |
+| Bugs críticos corrigidos | 5 |
+| Módulos split | 6 (calculator) |
+| Dashboards normalizados | 2 (CORR + CONTROLE) |
 
-### Navegação
-- **Sistema unificado**: `dashboard_unificado/shared/unified-nav.js`
-- **Seletor dropdown**: Com `<optgroup>` em todas as 7 telas
-- **Painel Ctrl+K**: Auto-inject em todas as telas
-- **Status**: ✅ Robusto (detecta HUB mesmo em URL `/dashboard_unificado/`)
+### Pendências
+1. Paralelizar WDO + EWZ scraping
+2. Commit das mudanças
+3. Documentar APIs internas
+4. Atualizar READMEs
 
-### Pipeline de Regeneração
-**Arquivos regenerados pelo pipeline (NÃO EDITAR MANUALMENTE):**
-- `dashboard_unificado/WIN/assets/data/market_data.{js,json}` — por `export_v1_data.py` + `update_spot_prices.py`
-- `dashboard_unificado/WDO/assets/data/market_data.{js,json}` — por `update_spot_prices.py`
-- `dashboard_unificado/WIN/assets/data/ntsl_script.txt` — por `export_v1_data.py`
-- `controle_de_dados.html` — por `scripts/orquestrador.py` + `Cotacoes/tools/market/gerar_controle.py`
-- `Cotacoes/dashboard/MERCADO/assets/data/*.{js,json}` — por `Cotacoes/tools/market/*`
-- `.edi_service_state.json` — por `scripts/orquestrador.py`
-
-**Decisão Phase 4C**: `servico_unificado.py` (100KB, 2141 linhas) era DEAD CODE. BATs sempre chamaram `scripts/orquestrador.py`. Removido do working tree (movido para `archive/servico_unificado_legacy_2141linhas.py.bak`).
-
-**Solução para "voltar para versões antigas"**: Use `Servico_Unificado_SAFE.bat` em vez de `Servico_Unificado.bat` para criar snapshot automático pré-execução. Snapshots em `.edi_agent/snapshots/snap-YYYYMMDD-HHMMSS/`.
-
----
-
-## Tarefas Concluídas — Sessão 2026-06-19
-
-### Fase CRÍTICA: Estabilização (Concluída 09:15)
-- ✅ **CP-003**: 24 dias de trabalho acumulado **protegido** (commit 7d9fcca9, 284 arquivos)
-- ✅ **CP-004**: Sistema de snapshot pre-run implementado (`scripts/hooks/pre_run_snapshot.py`)
-- ✅ **CP-005**: Wrapper `Servico_Unificado_SAFE.bat` criado
-- ✅ **CP-006**: `.edi_service_state.json` corrigido (path antigo → atual)
-- ✅ **CP-007**: Chrome profile limpo (698 MB → 18 MB, **680 MB liberados**)
-- ✅ **CP-008**: `__pycache__` da raiz removido
-- ✅ **CP-009**: `.gitignore` reforçado (PDFs exports, Chrome profile, __pycache__)
-
-### Fase: Documentação e Skills
-- ✅ **CP-010**: `.edi_agent/README.md` consolidado (índice único)
-- ✅ **CP-011**: `skills/INDEX.md` criado (índice de 11 skills)
-- ✅ **CP-012**: 3 skills aprendidas criadas (impact-analyzer, priority-sorter, regression-detector)
-- ✅ **CP-013**: Templates criados (`checkpoint.md`, `skill.md`, `evolution.md`)
-
-### Fase: Auto-purge + Testes (Concluída 09:30)
-- ✅ **CP-014**: Auto-purge integrado ao `pre_run_snapshot.py` (max 7 dias, mantém 10)
-- ✅ **CP-015**: Test runner criado (`tests/run_all.py` com 9 testes)
-- ✅ **CP-016**: Golden values em `.edi_agent/tests/golden_values.json`
-- ✅ **CP-017**: **BUG CRÍTICO ENCONTRADO**: SyntaxError em `src/calculator.py:807` — `try:` sem `except`. **CORRIGIDO** com `except Exception as e`.
-- ✅ **CP-018**: **BUG R12 REAPARECIDO**: `weekday() == 4` voltou em `calculator.py:964` — **CORRIGIDO** (removido)
-- ✅ **CP-019**: 9/9 testes passando (sintaxe, BS Greeks, T=0, charm sign, vega doc, 0DTE, gamma cone, navigation, safety scripts)
-
-### Fase 4A: Comitar trabalho paralelo (Concluída)
-- ✅ **CP-020**: 14 evoluções paralelas (E1-E14) aplicadas + 3 arquivos de teste (test_iv_smile, test_gamma_flip, test_calculator_core) — **pronto para comitar**
-- ✅ **CP-021**: EVOLUTION.md sincronizado: E1, E2, E3, P1 marcados como RESOLVIDOS
-- ✅ **CP-022**: M4 (Greeks Broadcast) e M5 (IV Per-Strike) documentados em M* (Melhorias Matemáticas)
-- ✅ **CP-023**: 6 dead flags removidas do `config.py` (E14)
-
-### Fase 4B: Integrar testes órfãos (Concluída)
-- ✅ **CP-024**: 15 testes paralelos integrados ao `run_all.py` (24/24 PASS)
-- ✅ **CP-025**: `tests/__init__.py` criado para permitir import como módulo
-
-### Fase 4G: Validação matemática (Concluída)
-- ✅ **CP-026**: MATH_REVIEW.md atualizado com seções E7, E8, E10
-- ✅ **CP-027**: 2 testes de regressão adicionados (E8 broadcast, E10 IV per-strike) — **26/26 PASS**
-
-### Fase 4F: Auditoria de navegação (Concluída)
-- ✅ **CP-028**: REFACTOR_LOG.md criado com mapeamento dos 7 dashboards
-- ✅ **CP-029**: Audit corrigido (WDO estava padronizado, falso alarme)
-
-### Fase 4E: Consolidação de charts.js (Concluída — pivotado)
-- ✅ **CP-030**: `CONTROLE_DADOS` adicionado ao `unified-nav.js` (7 dashboards no seletor)
-- ✅ **CP-031**: `test_navigation_paths` espera 7 dashboards agora
-- ⚠️ **Pivot**: charts.js WDO/WIN não é duplicação simples — manter separados
-
-### Fase 4D: Modularizar calculator.py (Concluída)
-- ✅ **CP-032**: `src/calculator.py` (1178 linhas) → `src/calculator/` package com shim
-- ✅ **CP-033**: `__init__.py` re-exporta `OptionsCalculator` de `core.py`
-- ✅ **CP-034**: 26/26 testes ainda passam (zero regressões)
-
-### Fase 4C: Modularizar servico_unificado.py (Concluída — pivotado)
-- ✅ **CP-035**: **Descoberta**: `servico_unificado.py` (100KB, 2141 linhas) era DEAD CODE
-  - Nunca foi commitado
-  - BATs sempre chamaram `scripts/orquestrador.py` (986 linhas, mais novo)
-- ✅ **CP-036**: Movido para `archive/servico_unificado_legacy_2141linhas.py.bak`
-- ✅ **CP-037**: CHECKPOINT.md e REFACTOR_LOG.md atualizados com a descoberta
-- ⚠️ **Pivot**: ao invés de modularizar (trabalho caro), **removemos 100KB de dead code**
-
----
-
-## Arquivos Críticos (NÃO MODIFICAR SEM TESTE)
-
-1. `dashboard_unificado/shared/unified-nav.js` — Navegação central
-2. `dashboard_unificado/shared/main-shared.js` — Módulo compartilhado
-3. `dashboard_unificado/shared/styles.css` — Estilos globais
-4. `src/calculator.py` — Motor Black-Scholes
-5. `src/greeks.py` — Cálculo de gregas
-6. `src/config.py` — Configurações do backend
-7. `scripts/export_v1_data.py` — Gerador de market_data
-8. `scripts/update_spot_prices.py` — Spot price (5min)
-9. `servico_unificado.py` — Daemon principal
-10. `Cotacoes/tools/market/gerar_controle.py` — Gerador controle_de_dados.html
-
----
-
-## Próximos Passos
-
-Ver [`workspace/PLAN.md`](workspace/PLAN.md) para o plano ativo detalhado.
-
-Imediato:
-1. **IV Smile** (E3/P3 do MATH_REVIEW) — melhorar precisão de gregas
-2. **Validar Gamma Flip Signed** (P1) — não padrão de mercado
-3. **Expandir `tests/run_all.py`** com mais casos (charm, HVL flip, smile)
-4. **Auto-purge já implementado** em `pre_run_snapshot.py`
-
-Backlog:
-- F1: Limpar snapshots Auto_B3_System
-- F2: Criar shared/charts.js
-- F3: Remover dados hardcoded
+### Commits Pendentes
+- Mudanças desta sessão ainda não commitadas
+- Último commit: `fa1bcb80` (2026-06-19 09:15)

@@ -2,7 +2,7 @@
 
 ## Atualizado: 2026-06-19
 
-## ✅ CONCLUÍDOS NESTA SESSÃO
+## ✅ CONCLUÍDOS NESTA SESSÃO (20 evoluções)
 - [x] Consolidar orquestração em Python (orquestrador.py criado)
 - [x] Migrar .bat para Python (wrappers simplificados)
 - [x] Adicionar testes para calculator.py (9 testes core)
@@ -12,18 +12,21 @@
 - [x] Cache de Barchart CSRF tokens (30min TTL)
 - [x] Normalização visual dos dashboards (CORR + CONTROLE → Neon Terminal)
 - [x] Correção de caminhos hardcoded (AUTO_DETECT)
+- [x] Fix MM PnL broadcast bug (bs_price + calculate_greeks)
+- [x] Calculator split em 6 submodules (mixin pattern)
+- [x] 3 arquivos órfãos deletados
+- [x] Dead function removida (get_business_days)
+- [x] __pycache__ limpo
+- [x] conftest.py com fixtures compartilhados
+- [x] Testes charts.py (2) e ntsl.py (2) adicionados
 
 ## Prioridade ALTA
-- [ ] Fix MM PnL broadcast bug (numpy boolean indexing)
 - [ ] Paralelizar WDO + EWZ scraping
-- [ ] Documentar APIs internas
 
 ## Prioridade MÉDIA
-- [ ] Adicionar testes para charts.py
+- [ ] Documentar APIs internas (docstrings)
 - [ ] Atualizar READMEs
-- [ ] Adicionar testes para ntsl.py
 
 ## Prioridade BAIXA
-- [ ] Otimizar performance do calculator.py
+- [ ] Otimizar performance do calculator
 - [ ] Adicionar type hints completos
-- [ ] Criar conftest.py para fixtures compartilhados

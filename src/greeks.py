@@ -148,6 +148,9 @@ class GreeksEngine:
         r = np.asarray(r, dtype=float)
         sigma = np.asarray(sigma, dtype=float)
         
+        # Broadcast all inputs to match K's shape
+        S, K, T, r, sigma = _broadcast_to_k_shape(S, K, T, r, sigma)
+        
         # Preço é intrinsic value quando T=0 ou sigma=0
         intrinsic = np.maximum(0.0, S - K) if typ == 'C' else np.maximum(0.0, K - S)
         

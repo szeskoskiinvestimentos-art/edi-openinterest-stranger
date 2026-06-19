@@ -125,3 +125,42 @@
   - controle_de_dados.html: Mesma detecção dinâmica
 - **Impacto**: Sistema agora é portável - funciona de qualquer localização
 - **Status**: Implementado
+
+### E17: BS Price Broadcast Fix (CRÍTICO)
+- **Arquivo**: greeks.py:143-154
+- **Problema**: bs_price() tinha o mesmo bug de broadcast que calculate_greeks() - S escalar + K array causava IndexError
+- **Mudança**: Adicionado _broadcast_to_k_shape() para alinhar shapes antes do cálculo
+- **Impacto**: MM PnL simulation agora funciona sem erros
+- **Resultado**: 35/35 testes passando
+- **Status**: Implementado
+
+### E18: Calculator Module Split (ALTO)
+- **Arquivo**: src/calculator/core.py (1272 linhas → 6 submodules)
+- **Mudança**: Split em mixin pattern:
+  - core.py (373 linhas): __init__, orchestrator, summary
+  - flips.py (319 linhas): gamma flip, delta flip, flip cone, 7 variações
+  - greeks_exposure.py (129 linhas): delta/gamma/charm/vanna accumulation
+  - volatility.py (138 linhas): VRP, expected moves, pinning risk
+  - walls.py (71 linhas): max pain, effective walls
+  - fair_value.py (106 linhas): MM PnL, fair value scenario
+- **Impacto**: Código mais modular, testável, legível
+- **Resultado**: 26/26 testes passando
+- **Status**: Implementado
+
+### E19: Orphan Files Cleanup (MÉDIO)
+- **Arquivos deletados**:
+  - src/tradingview_options.py (243 linhas, zero referências)
+  - scripts/gerar_controle.py (335 linhas, superseded por Cotacoes version)
+  - scripts/verify_update.py (20 linhas, sem callers)
+- **Cache limpo**: src/__pycache__/, src/calculator/__pycache__/
+- **Dead function removida**: get_business_days() de utils.py
+- **Status**: Implementado
+
+### E20: Test Infrastructure (ALTO)
+- **Arquivos criados**:
+  - tests/conftest.py: fixtures compartilhados (synthetic_options_data, simple_calc, spot_100_strikes)
+  - tests/test_charts.py: 2 testes (create_dashboard_figure retorna Figure, sem exceções)
+  - tests/test_ntsl.py: 2 testes (generate_ntsl_script retorna string, contém keywords)
+- **run_all.py atualizado**: 4 novos testes integrados
+- **Resultado**: 30/30 testes passando
+- **Status**: Implementado
