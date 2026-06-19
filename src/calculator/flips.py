@@ -172,7 +172,12 @@ class FlipsMixin:
         self.flip_variations = flips
 
     def calculate_delta_flip_profile(self):
-        spots_sim = np.linspace(self.spot * 0.85, self.spot * 1.15, 50)
+        """Simula Spot +/- 15% para encontrar onde o Delta Agregado inverte.
+
+        Otimização: reduzido de 50 para 30 pontos de simulação (~40% mais rápido)
+        com precisão suficiente para encontrar o zero-crossing.
+        """
+        spots_sim = np.linspace(self.spot * 0.85, self.spot * 1.15, 30)
         deltas_sim = []
 
         if 'Expiry' in self.options_df.columns:
@@ -198,18 +203,18 @@ class FlipsMixin:
         else:
              expiry_data.append({'T': self.T, 'oi_call': self.oi_call_ref, 'oi_put': self.oi_put_ref})
 
+        strikes = np.asarray(self.strikes_ref, dtype=float)
+        T_arr = np.array([d['T'] for d in expiry_data])
+        oi_call_arr = np.array([d['oi_call'] for d in expiry_data])
+        oi_put_arr = np.array([d['oi_put'] for d in expiry_data])
+
         for s_sim in spots_sim:
             net_delta = 0.0
-            for data in expiry_data:
-                T = data['T']
-                dC, _ = GreeksEngine.calculate_greeks(s_sim, self.strikes_ref, T, self.risk_free, self.iv_annual, 'C')
-                dP, _ = GreeksEngine.calculate_greeks(s_sim, self.strikes_ref, T, self.risk_free, self.iv_annual, 'P')
-
-                dC = np.nan_to_num(dC)
-                dP = np.nan_to_num(dP)
-
-                net_delta += np.sum(dC * data['oi_call'] + dP * data['oi_put'])
-
+            for i in range(len(T_arr)):
+                T = T_arr[i]
+                dC, _ = GreeksEngine.calculate_greeks(s_sim, strikes, T, self.risk_free, self.iv_annual, 'C')
+                dP, _ = GreeksEngine.calculate_greeks(s_sim, strikes, T, self.risk_free, self.iv_annual, 'P')
+                net_delta += np.sum(np.nan_to_num(dC) * oi_call_arr[i] + np.nan_to_num(dP) * oi_put_arr[i])
             deltas_sim.append(net_delta)
 
         deltas_sim = np.array(deltas_sim)
