@@ -716,7 +716,7 @@ def main():
     
     market_data = {
         "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "spot_price": spot,
+        "spot_price": index_spot,  # Usar preço do índice (WIN), não o EWZ raw
         "ntsl_script": ntsl_code,
         "market_sentiment": {
             "score": 65,
