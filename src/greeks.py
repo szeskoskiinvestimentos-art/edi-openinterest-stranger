@@ -1,6 +1,20 @@
 import numpy as np
 from scipy.stats import norm
 
+
+def _broadcast_to_k_shape(*args):
+    """Broadcast all arrays to match the shape of the largest array (typically K)."""
+    arrays = [np.asarray(a, dtype=float) for a in args]
+    target_shape = max((a.shape for a in arrays), key=lambda s: len(s))
+    result = []
+    for a in arrays:
+        if a.shape != target_shape:
+            result.append(np.broadcast_to(a, target_shape).copy())
+        else:
+            result.append(a)
+    return result
+
+
 class GreeksEngine:
     """
     Motor de cálculo vetorizado para Gregas de Black-Scholes.
@@ -28,6 +42,9 @@ class GreeksEngine:
         T = np.asarray(T, dtype=float)
         r = np.asarray(r, dtype=float)
         sigma = np.asarray(sigma, dtype=float)
+        
+        # Broadcast all inputs to match K's shape
+        S, K, T, r, sigma = _broadcast_to_k_shape(S, K, T, r, sigma)
         
         # Inicializa arrays de resultado com zeros
         delta = np.zeros_like(S, dtype=float)
@@ -70,11 +87,7 @@ class GreeksEngine:
     @staticmethod
     def calculate_vega(S, K, T, r, sigma):
         """Cálculo vetorizado de Vega."""
-        S = np.asarray(S, dtype=float)
-        K = np.asarray(K, dtype=float)
-        T = np.asarray(T, dtype=float)
-        r = np.asarray(r, dtype=float)
-        sigma = np.asarray(sigma, dtype=float)
+        S, K, T, r, sigma = _broadcast_to_k_shape(S, K, T, r, sigma)
         
         # Vega é 0 quando T=0 ou sigma=0
         vega = np.zeros_like(S, dtype=float)
@@ -100,11 +113,7 @@ class GreeksEngine:
     @staticmethod
     def calculate_theta(S, K, T, r, sigma, typ):
         """Cálculo vetorizado de Theta."""
-        S = np.asarray(S, dtype=float)
-        K = np.asarray(K, dtype=float)
-        T = np.asarray(T, dtype=float)
-        r = np.asarray(r, dtype=float)
-        sigma = np.asarray(sigma, dtype=float)
+        S, K, T, r, sigma = _broadcast_to_k_shape(S, K, T, r, sigma)
         
         # Theta é 0 quando T=0 ou sigma=0
         theta = np.zeros_like(S, dtype=float)

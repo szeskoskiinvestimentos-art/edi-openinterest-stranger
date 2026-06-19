@@ -35,9 +35,7 @@ MANUAL_IV_CONTEXT_METHOD = ""
 MANUAL_SPOT_PRICE        = 38.06     # Preço Spot Atual do EWZ (Se 0, tenta ler do CSV)
 MANUAL_RISK_FREE_RATE    = 0.05      # Taxa Livre de Risco (EUA) - 5% = 0.05
 MANUAL_TAXA_SELIC_PCT    = 15.00     # Selic (% a.a.) usada no índice
-MANUAL_TAXA_FED_PCT      = 3.50      # Fed Funds (%) se necessário em cálculos externos
 MANUAL_DIVIDEND_YIELD_BR = 2.61      # Dividend Yield médio BR (% a.a.)
-MANUAL_IPCA_PCT          = 4.50      # IPCA anualizado (%) para análises macro
 
 # ==============================================================================
 # FIM DA ÁREA DE INPUT MANUAL - NÃO ALTERE ABAIXO DESTA LINHA
@@ -66,7 +64,6 @@ def get_val(manual_val: Any, env_key: str, default: T = None, cast: Optional[Cal
 # 1. Escala
 SCALING_EWZ_REF_CLOSE: float = get_val(MANUAL_EWZ_REF_CLOSE, "SCALING_EWZ_REF_CLOSE", 0.0, cast=float)
 SCALING_INDEX_REF_CLOSE: float = get_val(MANUAL_INDEX_REF_CLOSE, "SCALING_INDEX_REF_CLOSE", 0.0, cast=float)
-EWZ_TO_INDEX_SCALE_ENABLED = True # Força ligado se houver valores manuais
 
 def _compute_display_scale() -> float:
     direct_scale = os.getenv("DISPLAY_SCALE_FACTOR")
@@ -121,19 +118,14 @@ else:
 SIGMA_FACTOR = float(os.getenv("SIGMA_FACTOR", 1.0))
 
 # Flags
-USE_IMPLIED_VOL = os.getenv("USE_IMPLIED_VOL", "False").lower() == "true"
 USE_CSV_SPOT = os.getenv("USE_CSV_SPOT", "False").lower() == "true"
 USE_HVL_FLIP = os.getenv("USE_HVL_FLIP", "True").lower() == "true"
 USE_ODTE_MODE = os.getenv("USE_ODTE_MODE", "False").lower() == "true"
 CSV_INDICE_DIR = os.getenv("CSV_INDICE_DIR", "")
 
-ATM_BAND_STEPS = 0.5
-
 # NTSL / Macros de Índice (prioriza bloco manual, com fallback para .env)
 TAXA_SELIC = get_val(MANUAL_TAXA_SELIC_PCT, "TAXA_SELIC", 15.0)
-TAXA_FED = get_val(MANUAL_TAXA_FED_PCT, "TAXA_FED", 3.5)
 DIVIDEND_YIELD_BR = get_val(MANUAL_DIVIDEND_YIELD_BR, "DIVIDEND_YIELD_BR", 2.61)
-IPCA_PCT = get_val(MANUAL_IPCA_PCT, "IPCA_PCT", 4.5)
 
 DPI_WEIGHTS = {'delta': 0.25, 'gamma': 0.25, 'charm': 0.25, 'vanna': 0.25}
 DPI_WINDOW_STRIKES = 2
@@ -152,7 +144,6 @@ DT_DAILY = 1.0 / 252.0
 DSIGMA = 0.01
 EPSILON = 1e-6
 MIN_T_EXPIRY = 0.0004    # Tempo mínimo de expiração (aprox 0.1 dia / 2h de pregão)
-FIB_LEVELS = [0.236, 0.382, 0.618, 0.764]
 SIM_SPOT_RANGE_LOWER = 0.85
 SIM_SPOT_RANGE_UPPER = 1.15
 SIM_STEPS = 50

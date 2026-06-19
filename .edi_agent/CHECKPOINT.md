@@ -102,6 +102,12 @@ Edi_Market_Guardian_V0/
 - ✅ **CP-018**: **BUG R12 REAPARECIDO**: `weekday() == 4` voltou em `calculator.py:964` — **CORRIGIDO** (removido)
 - ✅ **CP-019**: 9/9 testes passando (sintaxe, BS Greeks, T=0, charm sign, vega doc, 0DTE, gamma cone, navigation, safety scripts)
 
+### Fase 4A: Comitar trabalho paralelo (Concluída)
+- ✅ **CP-020**: 14 evoluções paralelas (E1-E14) aplicadas + 3 arquivos de teste (test_iv_smile, test_gamma_flip, test_calculator_core) — **pronto para comitar**
+- ✅ **CP-021**: EVOLUTION.md sincronizado: E1, E2, E3, P1 marcados como RESOLVIDOS
+- ✅ **CP-022**: M4 (Greeks Broadcast) e M5 (IV Per-Strike) documentados em M* (Melhorias Matemáticas)
+- ✅ **CP-023**: 6 dead flags removidas do `config.py` (E14)
+
 ---
 
 ## Arquivos Críticos (NÃO MODIFICAR SEM TESTE)

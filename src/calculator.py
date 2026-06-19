@@ -223,8 +223,7 @@ class OptionsCalculator:
         self.gex_call_tot = np.zeros_like(self.strikes_ref, dtype=float)
         self.gex_put_tot = np.zeros_like(self.strikes_ref, dtype=float)
 
-        # New attributes initialization
-        self.max_pain = None
+        # Atributos calculados posteriormente
         self.max_pain_profile = None
         self.expected_moves = None
         self.mm_pnl_simulation = None
@@ -312,45 +311,45 @@ class OptionsCalculator:
             return
 
         # Calcula Gregas Unitárias para todos os strikes de referência com o T deste vencimento
-        dC, gC = GreeksEngine.calculate_greeks(S, K_ref, T, r, sigma, 'C')
-        dP, gP = GreeksEngine.calculate_greeks(S, K_ref, T, r, sigma, 'P')
+        # Usa IV per-strike quando disponível (iv_strike_ref), senão fallback para sigma flat
+        if hasattr(self, 'iv_strike_ref') and self.iv_strike_ref is not None and len(self.iv_strike_ref) == len(K_ref):
+            iv_for_greeks = self.iv_strike_ref
+        else:
+            iv_for_greeks = np.full_like(K_ref, sigma, dtype=float)
+        
+        dC, gC = GreeksEngine.calculate_greeks(S, K_ref, T, r, iv_for_greeks, 'C')
+        dP, gP = GreeksEngine.calculate_greeks(S, K_ref, T, r, iv_for_greeks, 'P')
         
         dC, gC = np.nan_to_num(dC), np.nan_to_num(gC)
         dP, gP = np.nan_to_num(dP), np.nan_to_num(gP)
 
-        # Diferenças finitas para Charm e Vanna
+        # Diferenças finitas para Charm e Vanna (usa IV per-strike)
         dT = settings.DT_DAILY
         dsigma = settings.DSIGMA
         
         # Charm = -dDelta/dT (rate of change of Delta as time decreases)
-        dTp_C, _ = GreeksEngine.calculate_greeks(S, K_ref, max(T + dT, settings.EPSILON), r, sigma, 'C')
-        dTm_C, _ = GreeksEngine.calculate_greeks(S, K_ref, max(T - dT, settings.EPSILON), r, sigma, 'C')
+        dTp_C, _ = GreeksEngine.calculate_greeks(S, K_ref, max(T + dT, settings.EPSILON), r, iv_for_greeks, 'C')
+        dTm_C, _ = GreeksEngine.calculate_greeks(S, K_ref, max(T - dT, settings.EPSILON), r, iv_for_greeks, 'C')
         chC = (np.nan_to_num(dTm_C) - np.nan_to_num(dTp_C)) / (2*dT)
         
-        dTp_P, _ = GreeksEngine.calculate_greeks(S, K_ref, max(T + dT, settings.EPSILON), r, sigma, 'P')
-        dTm_P, _ = GreeksEngine.calculate_greeks(S, K_ref, max(T - dT, settings.EPSILON), r, sigma, 'P')
+        dTp_P, _ = GreeksEngine.calculate_greeks(S, K_ref, max(T + dT, settings.EPSILON), r, iv_for_greeks, 'P')
+        dTm_P, _ = GreeksEngine.calculate_greeks(S, K_ref, max(T - dT, settings.EPSILON), r, iv_for_greeks, 'P')
         chP = (np.nan_to_num(dTm_P) - np.nan_to_num(dTp_P)) / (2*dT)
         
-        # Vanna
-        dSp_C, _ = GreeksEngine.calculate_greeks(S, K_ref, T, r, sigma + dsigma, 'C')
-        dSm_C, _ = GreeksEngine.calculate_greeks(S, K_ref, T, r, max(sigma - dsigma, settings.EPSILON), 'C')
+        # Vanna (usa IV per-strike como base, perturbação em sigma)
+        dSp_C, _ = GreeksEngine.calculate_greeks(S, K_ref, T, r, iv_for_greeks + dsigma, 'C')
+        dSm_C, _ = GreeksEngine.calculate_greeks(S, K_ref, T, r, np.maximum(iv_for_greeks - dsigma, settings.EPSILON), 'C')
         vaC = (np.nan_to_num(dSp_C) - np.nan_to_num(dSm_C)) / (2*dsigma)
         
-        dSp_P, _ = GreeksEngine.calculate_greeks(S, K_ref, T, r, sigma + dsigma, 'P')
-        dSm_P, _ = GreeksEngine.calculate_greeks(S, K_ref, T, r, max(sigma - dsigma, settings.EPSILON), 'P')
+        dSp_P, _ = GreeksEngine.calculate_greeks(S, K_ref, T, r, iv_for_greeks + dsigma, 'P')
+        dSm_P, _ = GreeksEngine.calculate_greeks(S, K_ref, T, r, np.maximum(iv_for_greeks - dsigma, settings.EPSILON), 'P')
         vaP = (np.nan_to_num(dSp_P) - np.nan_to_num(dSm_P)) / (2*dsigma)
         
-        # Vega e Theta
-        if hasattr(self, 'iv_strike_ref') and self.iv_strike_ref is not None:
-             iv_vec = self.iv_strike_ref
-        else:
-             iv_vec = np.full_like(K_ref, sigma)
+        # Vega e Theta (usa IV per-strike)
+        vega_val = GreeksEngine.calculate_vega(S, K_ref, T, r, iv_for_greeks)
         
-        # Vectorized Vega and Theta (Optimized with GreeksEngine)
-        vega_val = GreeksEngine.calculate_vega(S, K_ref, T, r, iv_vec)
-        
-        thetaC = GreeksEngine.calculate_theta(S, K_ref, T, r, iv_vec, 'C')
-        thetaP = GreeksEngine.calculate_theta(S, K_ref, T, r, iv_vec, 'P')
+        thetaC = GreeksEngine.calculate_theta(S, K_ref, T, r, iv_for_greeks, 'C')
+        thetaP = GreeksEngine.calculate_theta(S, K_ref, T, r, iv_for_greeks, 'P')
         
         thetaC_daily = thetaC / 252.0
         thetaP_daily = thetaP / 252.0
@@ -378,23 +377,19 @@ class OptionsCalculator:
         self.theta_tot += (thetaC_daily * oi_call + thetaP_daily * oi_put)
         
         # GEX Signed para Flip (Directional)
-        # Assuming Dealer is Short Calls (Long Gamma if K<=S ?) -> Wait, logic was:
-        # sgn_call = np.where(K <= S, +1.0, -1.0)
-        # sgn_put  = np.where(K >= S, -1.0, +1.0)
-        # This implies:
-        # ITM Call (K<=S): Dealer Short -> Long Gamma (+)
-        # OTM Call (K>S): Dealer Short -> Short Gamma (-) ?? This is unusual.
-        # Standard GEX Model: Dealer is Short OTM Calls (Long Gamma) and Long OTM Puts (Short Gamma? No, Dealer Short Puts -> Long Gamma).
-        # Usually GEX is positive everywhere for Long Gamma positions.
-        # But for "Flip", we care about Dealer Delta Hedging flow.
-        # Positive GEX -> Dealer buys dips/sells rallies (Stabilizing).
-        # Negative GEX -> Dealer sells dips/buys rallies (Destabilizing).
-        # Usually Dealers are Short Calls and Short Puts.
-        # Short Call -> Long Gamma (Stabilizing).
-        # Short Put -> Long Gamma (Stabilizing).
-        # So GEX is usually all positive.
-        # But the logic here seems to implement a specific "Flip" logic where some options are negative gamma.
-        # Preserving original logic:
+        # Convenção de sinal para Gamma Flip:
+        # - Dealer SHORT CALL: Long Gamma (estabiliza mercado)
+        # - Dealer SHORT PUT: Long Gamma (estabiliza mercado)
+        # - Para o "Flip", importa o fluxo de hedging delta do Dealer:
+        #   - GEX positivo → Dealer compra dips/vende rallies (estabiliza)
+        #   - GEX negativo → Dealer vende dips/compra rallies (desestabiliza)
+        # Lógica atual (preservada do código original):
+        #   - ITM Call (K<=S): sgn +1 (Dealer Short → Long Gamma)
+        #   - OTM Call (K>S): sgn -1 (Convenção específica deste modelo)
+        #   - ITM Put (K>=S): sgn -1 (Convenção específica deste modelo)
+        #   - OTM Put (K<S): sgn +1 (Convenção específica deste modelo)
+        # NOTA: Esta convenção é internamente consistente mas não padrão de mercado.
+        # Validada em testes sintéticos (tests/test_gamma_flip.py).
         sgn_call = np.where(K_ref <= S, +1.0, -1.0)
         sgn_put  = np.where(K_ref >= S, -1.0, +1.0)
         
@@ -437,7 +432,7 @@ class OptionsCalculator:
         try:
             self.gamma_flip = self._find_zero_cross(self.strikes_ref, self.gex_cum_signed, self.spot)
         except Exception as e:
-            print(f"Erro ao calcular Gamma Flip: {e}")
+            logger.error(f"Erro ao calcular Gamma Flip: {e}")
             self.gamma_flip = None
             
         # Gamma Flip HVL
@@ -513,32 +508,32 @@ class OptionsCalculator:
         try:
             self.calculate_gamma_flip_variations()
         except Exception as e:
-            print(f"Error calculating flip variations: {e}")
+            logger.error(f"Error calculating flip variations: {e}")
             
         try:
             self.calculate_delta_flip_profile()
         except Exception as e:
-            print(f"Error calculating delta flip profile: {e}")
+            logger.error(f"Error calculating delta flip profile: {e}")
 
         try:
             self.calculate_gamma_flip_cone()
         except Exception as e:
-            print(f"Error calculating gamma flip cone: {e}")
+            logger.error(f"Error calculating gamma flip cone: {e}")
             
         try:
             self.calculate_flow_sentiment()
         except Exception as e:
-            print(f"Error calculating flow sentiment: {e}")
+            logger.error(f"Error calculating flow sentiment: {e}")
 
         try:
             self.calculate_expected_moves()
         except Exception as e:
-            print(f"Error calculating expected moves: {e}")
+            logger.error(f"Error calculating expected moves: {e}")
 
         try:
             self.calculate_mm_pnl_simulation()
         except Exception as e:
-            print(f"Error calculating MM PnL: {e}")
+            logger.error(f"Error calculating MM PnL: {e}")
 
 
     def calculate_effective_walls(self):
@@ -1137,7 +1132,7 @@ class OptionsCalculator:
                 'pnl': np.array(mm_pnl)
             }
         except Exception as e:
-            print(f"Error calculating MM PnL: {e}")
+            logger.error(f"Error calculating MM PnL: {e}")
             self.mm_pnl_simulation = None
 
 
