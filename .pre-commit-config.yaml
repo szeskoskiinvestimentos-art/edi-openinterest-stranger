@@ -1,0 +1,17 @@
+---
+# Pre-commit hook para EDI Market Guardian
+# Instalar: pip install pre-commit && pre-commit install
+# Rodar manualmente: pre-commit run --all-files
+#
+# Skip se necessario: git commit --no-verify
+repos:
+  - repo: local
+    hooks:
+      - id: edi-tests
+        name: EDI Test Suite (run_all.py)
+        entry: python tests/run_all.py --quick
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+        # So bloqueia se exit != 0
