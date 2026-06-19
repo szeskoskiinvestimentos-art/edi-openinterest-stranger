@@ -61,14 +61,54 @@ thumbs.db
 !.nojekyll
 !Servico_Unificado.bat
 !Servico_Unificado_FORCE.bat
+!Servico_Unificado_SAFE.bat
 !dashboard_unificado/
 !Cotacoes/
+!scripts/
+!src/
+!tests/
+!docs/
+!.edi_agent/
 
 # Dentro de dashboard_unificado, mantém tudo
 !dashboard_unificado/**/*
 
 # Dentro de Cotacoes, mantém tudo
 !Cotacoes/**/*
+
+# Dentro de scripts, mantém tudo (incluindo hooks/)
+!scripts/**/*
+
+# Dentro de src, mantém tudo
+!src/**/*
+
+# Dentro de tests, mantém tudo
+!tests/**/*
+
+# Dentro de docs, mantém tudo
+!docs/**/*
+
+# Dentro de .edi_agent, mantém TUDO EXCETO snapshots (são binários grandes)
+!.edi_agent/**/*
+!.edi_agent/snapshots/_template/**
+# Snapshots individuais são ignorados na linha abaixo
+
+# ============================================
+# EXCLUSÕES ESPECÍFICAS (após re-inclusão de subárvores)
+# Estas regras têm prioridade e sobrescrevem as anteriores
+# ============================================
+
+# Exclui node_modules dentro de Cotacoes (se existir)
+Cotacoes/node_modules/
+
+# Exclui snapshots pre-run (são backups grandes, não código)
+.edi_agent/snapshots/snap-*/
+
+# Exclui __pycache__ Python em qualquer profundidade
+__pycache__/
+
+# Exclui exports PDF gerados pelo pipeline
+Cotacoes/dashboard/MERCADO/exports/
 
 # ============================================
 # EXCLUSÕES ESPECÍFICAS (após re-inclusão de subárvores)
