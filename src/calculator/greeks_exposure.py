@@ -1,3 +1,9 @@
+"""GreeksExposureMixin — Acumulação de Greeks por strike.
+
+Calcula exposição de Delta, Gamma, Charm, Vanna, Vega e Theta
+para cada strike, acumulando por vencimento e calculando
+versões cumulativas para análise de risco.
+"""
 from __future__ import annotations
 import numpy as np
 import pandas as pd
@@ -6,7 +12,31 @@ from src.greeks import GreeksEngine
 
 
 class GreeksExposureMixin:
+    """Mixin para cálculo de exposição de Greeks por strike.
+
+    Calcula e acumula:
+    - dexp_tot: Delta Exposure total por strike
+    - gex_tot: Gamma Exposure total por strike
+    - charm_tot: Charm Exposure (sensibilidade ao tempo)
+    - vanna_tot: Vanna Exposure (Delta x IV)
+    - vex_tot: Vega Exposure (sensibilidade à volatilidade)
+    - theta_tot: Theta Exposure (decaimento temporal)
+    - gex_flip_base: GEX assinado (para Gamma Flip)
+    - Versões cumulativas (*_cum) de cada grega
+    """
+
     def calculate_greeks_exposure(self):
+        """Calcula exposição de Greeks para todos os strikes.
+
+        Para cada vencimento, agrupa opções por strike e acumula:
+        1. Delta Exposure = Delta × OI × CONTRACT_MULT × Spot × 0.01
+        2. Gamma Exposure = Gamma × OI × CONTRACT_MULT × Spot² × 0.0001
+        3. GEX Assinado = gex_call (+1) - gex_put (-1) × OI
+        4. Charm, Vanna, Vega, Theta (mesma lógica)
+
+        Se IV per-strike disponível, usa para Delta/Gamma/Charm/Vanna.
+        Caso contrário, usa IV flat (self.iv_annual).
+        """
         self.dexp_tot = np.zeros_like(self.strikes_ref, dtype=float)
         self.gex_tot = np.zeros_like(self.strikes_ref, dtype=float)
         self.charm_tot = np.zeros_like(self.strikes_ref, dtype=float)

@@ -1,3 +1,16 @@
+"""FlipsMixin — Cálculos de Gamma Flip e Delta Flip.
+
+Implementa 7 variações de Gamma Flip:
+- Classic: interpolação linear do zero-crossing
+- Spline: interpolação spline (scipy)
+- HVL: ponderado por High Volatility Level
+- HVL Log: HVL em escala logarítmica
+- Sigma Kernel: ponderado por IV local
+- PVOP: ponderado por fluxo direcional
+- HVL Gaussian: suavização Gaussiana
+
+Também inclui Delta Flip Profile e Gamma Flip Cone.
+"""
 from __future__ import annotations
 import numpy as np
 import pandas as pd
@@ -11,7 +24,26 @@ logger = logging.getLogger(__name__)
 
 
 class FlipsMixin:
+    """Mixin para cálculos de Gamma Flip e Delta Flip.
+
+    Fornece métodos para encontrar zero-crossings, calcular flip HVL,
+    e gerar variações de Gamma Flip com diferentes métodos de suavização.
+    """
+
     def _find_zero_cross(self, x_arr, y_arr, target_x=None):
+        """Encontra o zero-crossing mais próximo de target_x.
+
+        Usa interpolação linear quando há cruzamento de zero.
+        Fallback: retorna o ponto com menor |y| dentro de janela ±30% do target.
+
+        Args:
+            x_arr: Array de strikes/preços
+            y_arr: Array de valores (ex: GEX cumulado)
+            target_x: Ponto de referência (spot). Se None, usa primeiro zero-cross.
+
+        Returns:
+            float: Valor de x onde y cruza zero (ou mais próximo).
+        """
         x_arr = np.array(x_arr, dtype=float)
         y_arr = np.array(y_arr, dtype=float)
         if len(x_arr) == 0: return target_x if target_x else 0.0
@@ -52,6 +84,14 @@ class FlipsMixin:
         return float(x_arr[np.argmin(np.abs(y_arr))])
 
     def _calculate_hvl_flip(self):
+        """Calcula Gamma Flip ponderado por HVL (High Volatility Level).
+
+        Usa pesos Gaussianos baseados na volatilidade diária para
+        dar mais importância aos strikes próximos do spot.
+
+        Returns:
+            float ou None: Valor do flip HVL, ou None se desabilitado/erro.
+        """
         try:
             if not getattr(settings, 'USE_HVL_FLIP', True):
                 return None

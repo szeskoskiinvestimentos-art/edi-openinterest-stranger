@@ -1,3 +1,12 @@
+"""Core do Calculator — OptionsCalculator principal.
+
+Contém a classe OptionsCalculator que orquestra todos os cálculos
+de opções financeiras (Greeks, Gamma Flip, Max Pain, Walls, etc.).
+
+Classes:
+    OptionsCalculator: Motor principal de cálculo de opções.
+    SummaryMetrics: TypedDict com métricas resumidas para o dashboard.
+"""
 from __future__ import annotations
 import numpy as np
 import pandas as pd
@@ -43,6 +52,31 @@ class SummaryMetrics(TypedDict):
     expected_moves: Any
 
 class OptionsCalculator(FlipsMixin, GreeksExposureMixin, VolatilityMixin, WallsMixin, FairValueMixin):
+    """Motor principal de cálculo de opções financeiras.
+
+    Processa DataFrame de opções e calcula métricas de risco como:
+    - Gamma Flip (7 variações: Classic, Spline, HVL, HVL Log, Sigma Kernel, PVOP, HVL Gaussian)
+    - Max Pain (preço de máxima dor para compradores)
+    - Greeks Exposure (Delta, Gamma, Charm, Vanna, Vega, Theta)
+    - Effective Walls (Call Wall, Put Wall ponderados por OI)
+    - Fair Value (simulação de cenários)
+    - Expected Moves (variação esperada baseada em IV)
+
+    Attributes:
+        options_df: DataFrame com dados das opções (StrikeK, OptionType, Open Int, etc.)
+        spot: Preço spot do ativo subjacente
+        expiry_date: Data de vencimento das opções
+        risk_free: Taxa livre de risco anual
+        iv_annual: Volatilidade implícita anual (fallback)
+        strikes_ref: Array ordenado de strikes únicos
+        T: Tempo até vencimento em anos (business days / 252)
+
+    Exemplo:
+        >>> calc = OptionsCalculator(df, spot=50000, expiry_date='2026-06-20')
+        >>> calc.calculate_greeks_exposure()
+        >>> calc.calculate_flips_and_walls()
+        >>> metrics = calc.get_summary_metrics()
+    """
     def __init__(self, options_df, spot, expiry_date, risk_free=settings.RISK_FREE, iv_annual=settings.IV_ANNUAL):
         self.options_df = options_df.copy()
         self.spot = float(spot)
@@ -216,6 +250,27 @@ class OptionsCalculator(FlipsMixin, GreeksExposureMixin, VolatilityMixin, WallsM
         self.mm_pnl_simulation = None
 
     def calculate_flips_and_walls(self):
+        """Calcula Gamma Flip, Max Pain, Walls e métricas derivadas.
+
+        Executa a sequência completa de cálculos:
+        1. Gamma Flip (interpolação linear do zero-crossing do GEX cumulado)
+        2. Gamma Flip HVL (High Volatility Level, ponderado por volatilidade)
+        3. Zero Gamma Level (mesmo que Gamma Flip com fallback)
+        4. Max Pain (strike com menor perda para compradores)
+        5. Call Wall / Put Wall (strikes com maior GEX)
+        6. Effective Walls (média ponderada dos top 2 strikes por OI)
+        7. Midwalls (interpolação de OI entre strikes)
+        8. Fibonacci Levels (níveis de suporte/resistência)
+        9. Flip Variations (7 modelos de Gamma Flip)
+        10. Delta Flip Profile (simulação Spot +/- 15%)
+        11. Gamma Flip Cone (incerteza via variação de sigma_factor)
+        12. Flow Sentiment (análise Bull/Bear por volume)
+        13. Expected Moves (variação esperada por horizonte)
+        14. MM PnL Simulation (PnL do Market Maker)
+
+        Raises:
+            Exception: Erros são logados mas não propagados (pipeline continua).
+        """
         try:
             self.gamma_flip = self._find_zero_cross(self.strikes_ref, self.gex_cum_signed, self.spot)
         except Exception as e:
@@ -311,6 +366,20 @@ class OptionsCalculator(FlipsMixin, GreeksExposureMixin, VolatilityMixin, WallsM
             logger.error(f"Error calculating MM PnL: {e}")
 
     def get_summary_metrics(self) -> SummaryMetrics:
+        """Retorna métricas resumidas para o dashboard.
+
+        Consolida todos os cálculos em um dicionário tipado contendo:
+        - Spot, Delta Agregado, Gamma Flip, Max Pain
+        - Call Wall, Put Wall, Effective Walls
+        - Regime (Gamma Positivo/Negativo)
+        - Dealer Pressure Index (peso: delta, gamma, charm, vanna)
+        - Range (baseado em IV diária)
+        - Top Walls (3 maiores OI Call/Put)
+        - Volatility Analysis, Pin Risk, Expected Moves
+
+        Returns:
+            SummaryMetrics: TypedDict com todas as métricas.
+        """
         delta_agregado = float(np.nansum(self.dexp_tot))
         regime = 'Gamma Positivo' if (self.gamma_flip and self.spot >= self.gamma_flip) else 'Gamma Negativo'
 

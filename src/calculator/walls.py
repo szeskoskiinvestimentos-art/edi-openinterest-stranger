@@ -1,9 +1,32 @@
+"""WallsMixin — Max Pain e Effective Walls.
+
+Calcula Max Pain (strike de máxima dor), Effective Walls
+(média ponderada dos top strikes por OI), e perfil de perda.
+"""
 from __future__ import annotations
 import numpy as np
 
 
 class WallsMixin:
+    """Mixin para cálculo de Max Pain e Effective Walls.
+
+    Calcula:
+    - Max Pain: strike onde compradores de opções perdem mais
+    - Effective Walls: média ponderada dos top 2 strikes por OI
+    - Perfil de perda para visualização
+    """
+
     def calculate_max_pain(self):
+        """Calcula o Max Pain (strike de máxima dor).
+
+        Para cada strike candidato, calcula a perda total dos compradores:
+        loss(k) = Σ max(0, k - K) × OI_call + Σ max(0, K - k) × OI_put
+
+        O Max Pain é o strike com menor perda total.
+
+        Returns:
+            float: Strike com menor perda (Max Pain).
+        """
         strikes = np.asarray(self.strikes_ref, dtype=float)
         oi_call = np.asarray(self.oi_call_ref, dtype=float)
         oi_put = np.asarray(self.oi_put_ref, dtype=float)
@@ -34,6 +57,15 @@ class WallsMixin:
         return float(strikes_f[int(np.argmin(loss))])
 
     def calculate_effective_walls(self):
+        """Calcula Effective Walls (média ponderada dos top strikes).
+
+        Para Calls (acima do spot) e Puts (abaixo do spot):
+        1. Filtra strikes dentro de janela ±30% do spot
+        2. Seleciona top 2 strikes por Open Interest
+        3. Calcula média ponderada pelo OI
+
+        Se nenhum strike na janela, usa top 1 global.
+        """
         try:
             strikes = np.asarray(self.strikes_ref, dtype=float)
             oi_put = np.asarray(self.oi_put_ref, dtype=float)

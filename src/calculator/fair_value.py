@@ -1,3 +1,8 @@
+"""FairValueMixin — Simulação de PnL do Market Maker e Fair Value.
+
+Calcula PnL simulado do MM em diferentes cenários de preço
+e gera tabela de Valor Justo para opções-chave.
+"""
 from __future__ import annotations
 import numpy as np
 from src import config as settings
@@ -8,7 +13,21 @@ logger = logging.getLogger(__name__)
 
 
 class FairValueMixin:
+    """Mixin para simulação de PnL do Market Maker e Fair Value.
+
+    Calcula:
+    - MM PnL Simulation: PnL do Market Maker para range de spots
+    - Fair Value Scenario: preço justo de opções em cenários (Call Wall, Put Wall, Gamma Flip)
+    """
+
     def calculate_mm_pnl_simulation(self):
+        """Simula o PnL do Market Maker em função do movimento do Spot.
+
+        Premissa: MM está Short nas opções (clientes Long).
+        PnL = Valor_opções(S_new) + Hedge(S_new) - Valor_opções(S_0) - Hedge(S_0)
+
+        O hedge é mantido fixo (delta-hedging instantâneo sem rebalanceamento).
+        """
         spots_sim = np.linspace(self.spot * settings.SIM_SPOT_RANGE_LOWER, self.spot * settings.SIM_SPOT_RANGE_UPPER, settings.SIM_STEPS)
         pnl_sim = []
 

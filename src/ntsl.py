@@ -1,12 +1,32 @@
+"""NTSL — Geração de scripts para ProfitChart.
+
+Gera scripts em Nelogica Trading System Language (NTSL) para
+importação no ProfitChart, incluindo:
+- Linhas de preço (Spot, Gamma Flip, Max Pain, Walls)
+- Níveis de Fibonacci e Borboleta
+- Grid de OI (Open Interest)
+- Seletor de modelos de Gamma Flip
+"""
 import numpy as np
 from datetime import datetime
 from src import config as settings
 
 def generate_ntsl_script(metrics, calc):
-    """
-    Gera o script NTSL (Nelogica Trading System Language) para importação no ProfitChart.
-    Inclui seletor de modelos de Gamma Flip e Delta Flip.
-    Implementa lógica de intercalação de texto para legibilidade.
+    """Gera script NTSL completo para ProfitChart.
+
+    Cria código NTSL com:
+    - PLOT01-PLOT16: Linhas de preço (Spot, Gamma Flip, Max Pain, Walls, etc.)
+    - PLOT17-PLOT24: Níveis de Fibonacci e Borboleta
+    - GRID: Open Interest por strike (CALL/PUT)
+    - Seletor: Escolha de modelo de Gamma Flip (Classic/Spline/HVL/etc.)
+    - TEXT: Labels de preço em cada linha
+
+    Args:
+        metrics: SummaryMetrics do get_summary_metrics()
+        calc: OptionsCalculator com flip_variations calculado
+
+    Returns:
+        str: Script NTSL completo (~16K linhas).
     """
     # Recupera fator de escala
     sf = getattr(settings, 'DISPLAY_SCALE_FACTOR', 1.0)

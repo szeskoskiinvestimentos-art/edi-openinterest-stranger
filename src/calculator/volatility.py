@@ -1,3 +1,8 @@
+"""VolatilityMixin — Análise de volatilidade e expected moves.
+
+Calcula VRP (Volatility Risk Premium), expected moves,
+pinning risk e classificação de regime de volatilidade.
+"""
 from __future__ import annotations
 import numpy as np
 from src import config as settings
@@ -7,7 +12,24 @@ logger = logging.getLogger(__name__)
 
 
 class VolatilityMixin:
+    """Mixin para análise de volatilidade e expected moves.
+
+    Calcula:
+    - Expected Moves: variação esperada (1σ) por horizonte (intraday, semanal, expiração)
+    - Volatility Analysis: VRP, IV Rank, regime (cara/barata/justa)
+    - Pinning Risk: risco de preço travar em strikes com alto OI
+    """
+
     def calculate_expected_moves(self):
+        """Calcula movimentos esperados baseados na IV ATM.
+
+        Para cada horizonte (1 dia, 1 semana, expiração), calcula:
+        - move = Spot × IV_ATM × √(dias/252)
+        - upper = Spot + move
+        - lower = Spot - move
+
+        Prioriza IV manual (EWZ_ATM_IV_PCT) → IV per-strike → IV flat.
+        """
         try:
             iv_atm = None
             try:

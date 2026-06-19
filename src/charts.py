@@ -1,3 +1,13 @@
+"""Charts — Geração de gráficos Plotly para o dashboard.
+
+Gera figuras interativas com dados de opções, incluindo:
+- Delta/Gamma/Charm/Vanna/Theta/Vega Exposure
+- Open Interest por Strike e Vencimento
+- Max Pain Curve, Expected Move Cone
+- Gamma Flip Cone, Delta Flip Profile
+- Flow Sentiment, Dealer Pressure
+- MM PnL Simulation, Fair Value
+"""
 import plotly.graph_objects as go
 import numpy as np
 from src import config as settings
@@ -5,7 +15,34 @@ from src.layout_config import get_common_layout
 from src.utils_fmt import format_number_br, parse_and_scale_walls
 
 def create_dashboard_figure(calc, metrics):
-    """Gera a figura principal do dashboard com todos os traces do notebook original (CELL 9)."""
+    """Gera a figura principal do dashboard com todos os traces.
+
+    Cria gráfico Plotly com 15 traces (visíveis por botões):
+    0. Delta Agregado (barras)
+    1. Delta Acumulado (linha)
+    2. Gamma Exposure (barras)
+    3. Curvatura do Gamma (linha)
+    4. CALL OI (barras)
+    5. PUT OI (barras)
+    6. Midwalls Call (sombra)
+    7. Midwalls Put (sombra)
+    8. Charm Exposure (barras)
+    9. Vanna Exposure (barras)
+    10. Charm Acumulado (linha)
+    11. Vanna Acumulado (linha)
+    12. Vega Exposure (barras)
+    13. Skew IV (linha pontilhada)
+    14. Dealer Pressure (linha)
+
+    Inclui InfoBox com métricas-chave e botões de seleção de trace.
+
+    Args:
+        calc: OptionsCalculator com cálculos executados
+        metrics: SummaryMetrics do get_summary_metrics()
+
+    Returns:
+        go.Figure: Figura Plotly pronta para renderização.
+    """
     sf = getattr(settings, 'DISPLAY_SCALE_FACTOR', 1.0)
     strikes_raw = calc.strikes_ref
     spot_raw = metrics['spot']
