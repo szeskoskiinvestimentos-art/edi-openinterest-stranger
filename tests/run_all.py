@@ -216,8 +216,96 @@ def test_snapshot_script_exists(golden: dict) -> tuple[bool, str]:
     return True, "Todos os scripts de proteção presentes"
 
 
+# ===========================================================================
+# Wrappers para testes paralelos (Phase 4B: integração de 15 testes órfãos)
+# Cada arquivo paralelo tem suas próprias funções de teste que retornam
+# (ok: bool, msg: str) ou levantam exceções. Wrappers normalizam.
+# ===========================================================================
+
+def _wrap_test(name: str, fn, *args) -> tuple[bool, str]:
+    """Wrapper genérico que padroniza saída."""
+    try:
+        result = fn(*args)
+        if isinstance(result, tuple) and len(result) == 2:
+            return result
+        if result is True:
+            return True, "OK"
+        return False, f"Retorno inesperado: {result}"
+    except AssertionError as e:
+        return False, f"Assertion: {e}"
+    except Exception as e:
+        return False, f"EXC: {type(e).__name__}: {e}"
+
+
+# --- test_iv_smile.py (3 testes) ---
+def test_iv_per_strike_used_in_greeks(golden: dict) -> tuple[bool, str]:
+    from tests.test_iv_smile import test_iv_per_strike_used_in_greeks
+    return _wrap_test("iv_per_strike", test_iv_per_strike_used_in_greeks)
+
+def test_iv_smile_produces_different_greeks(golden: dict) -> tuple[bool, str]:
+    from tests.test_iv_smile import test_iv_smile_produces_different_greeks
+    return _wrap_test("iv_smile", test_iv_smile_produces_different_greeks)
+
+def test_iv_skew_computed(golden: dict) -> tuple[bool, str]:
+    from tests.test_iv_smile import test_iv_skew_computed
+    return _wrap_test("iv_skew", test_iv_skew_computed)
+
+
+# --- test_gamma_flip.py (3 testes) ---
+def test_gex_sign_convention(golden: dict) -> tuple[bool, str]:
+    from tests.test_gamma_flip import test_gex_sign_convention
+    return _wrap_test("gex_sign", test_gex_sign_convention)
+
+def test_gex_flip_base_consistency(golden: dict) -> tuple[bool, str]:
+    from tests.test_gamma_flip import test_gex_flip_base_consistency
+    return _wrap_test("gex_base", test_gex_flip_base_consistency)
+
+def test_gamma_flip_variations_consistency(golden: dict) -> tuple[bool, str]:
+    from tests.test_gamma_flip import test_gamma_flip_variations_consistency
+    return _wrap_test("flip_variations", test_gamma_flip_variations_consistency)
+
+
+# --- test_calculator_core.py (9 testes) ---
+def test_max_pain_basic(golden: dict) -> tuple[bool, str]:
+    from tests.test_calculator_core import test_max_pain_basic
+    return _wrap_test("max_pain_basic", test_max_pain_basic)
+
+def test_max_pain_symmetric(golden: dict) -> tuple[bool, str]:
+    from tests.test_calculator_core import test_max_pain_symmetric
+    return _wrap_test("max_pain_sym", test_max_pain_symmetric)
+
+def test_expected_moves_structure(golden: dict) -> tuple[bool, str]:
+    from tests.test_calculator_core import test_expected_moves_structure
+    return _wrap_test("em_structure", test_expected_moves_structure)
+
+def test_expected_moves_symmetric(golden: dict) -> tuple[bool, str]:
+    from tests.test_calculator_core import test_expected_moves_symmetric
+    return _wrap_test("em_sym", test_expected_moves_symmetric)
+
+def test_effective_walls(golden: dict) -> tuple[bool, str]:
+    from tests.test_calculator_core import test_effective_walls
+    return _wrap_test("walls", test_effective_walls)
+
+def test_flow_sentiment(golden: dict) -> tuple[bool, str]:
+    from tests.test_calculator_core import test_flow_sentiment
+    return _wrap_test("flow", test_flow_sentiment)
+
+def test_pinning_risk(golden: dict) -> tuple[bool, str]:
+    from tests.test_calculator_core import test_pinning_risk
+    return _wrap_test("pinning", test_pinning_risk)
+
+def test_flips_and_walls_integration(golden: dict) -> tuple[bool, str]:
+    from tests.test_calculator_core import test_flips_and_walls_integration
+    return _wrap_test("flips_walls_int", test_flips_and_walls_integration)
+
+def test_find_zero_cross(golden: dict) -> tuple[bool, str]:
+    from tests.test_calculator_core import test_find_zero_cross
+    return _wrap_test("zero_cross", test_find_zero_cross)
+
+
 # Mapeamento de testes
 TESTS = {
+    # --- Originais (9) ---
     "syntax": ("Sintaxe Python (calculator, greeks, ntsl, export_v1_data)", test_syntax_all),
     "greeks_bs": ("Black-Scholes Greeks", test_greeks_black_scholes),
     "greeks_zero_t": ("T=0 Greeks", test_greeks_zero_t),
@@ -227,6 +315,24 @@ TESTS = {
     "gamma_cone": ("Gamma Cone thread-safety (R13)", test_gamma_cone_no_global_mutation),
     "navigation": ("Navigation 6 dashboards", test_navigation_paths),
     "safety_scripts": ("Snapshot/Chrome scripts", test_snapshot_script_exists),
+    # --- IV Smile (3) — validam E10 (IV per-strike) ---
+    "iv_per_strike": ("IV Per-Strike em Greeks (E10)", test_iv_per_strike_used_in_greeks),
+    "iv_smile_diff": ("IV Smile produz GEX diferente (E10)", test_iv_smile_produces_different_greeks),
+    "iv_skew": ("IV Skew Computed (E10)", test_iv_skew_computed),
+    # --- Gamma Flip (3) — validam E7 (GEX Signed doc) ---
+    "gex_sign": ("GEX Sign Convention (E7)", test_gex_sign_convention),
+    "gex_base": ("GEX Flip Base Consistency (E7)", test_gex_flip_base_consistency),
+    "flip_variations": ("Gamma Flip 7 Variations (E7)", test_gamma_flip_variations_consistency),
+    # --- Calculator Core (9) — cobertura de methods ---
+    "max_pain_basic": ("Max Pain basic", test_max_pain_basic),
+    "max_pain_sym": ("Max Pain simétrico", test_max_pain_symmetric),
+    "em_structure": ("Expected Moves estrutura", test_expected_moves_structure),
+    "em_sym": ("Expected Moves simetria", test_expected_moves_symmetric),
+    "walls": ("Effective Walls", test_effective_walls),
+    "flow": ("Flow Sentiment", test_flow_sentiment),
+    "pinning": ("Pinning Risk", test_pinning_risk),
+    "flips_walls_int": ("Flips & Walls integração", test_flips_and_walls_integration),
+    "zero_cross": ("Find Zero Cross", test_find_zero_cross),
 }
 
 
