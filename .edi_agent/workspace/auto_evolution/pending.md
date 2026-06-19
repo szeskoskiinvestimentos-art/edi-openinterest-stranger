@@ -2,7 +2,7 @@
 
 ## Atualizado: 2026-06-19
 
-## ✅ CONCLUÍDOS NESTA SESSÃO (20 evoluções)
+## ✅ CONCLUÍDOS NESTA SESSÃO (21 evoluções)
 - [x] Consolidar orquestração em Python (orquestrador.py criado)
 - [x] Migrar .bat para Python (wrappers simplificados)
 - [x] Adicionar testes para calculator.py (9 testes core)
@@ -19,9 +19,10 @@
 - [x] __pycache__ limpo
 - [x] conftest.py com fixtures compartilhados
 - [x] Testes charts.py (2) e ntsl.py (2) adicionados
+- [x] Paralelizar WDO + EWZ scraping (ThreadPoolExecutor, ~93% mais rápido)
 
 ## Prioridade ALTA
-- [ ] Paralelizar WDO + EWZ scraping
+- [x] ~~Paralelizar WDO + EWZ scraping~~ ✅
 
 ## Prioridade MÉDIA
 - [ ] Documentar APIs internas (docstrings)
