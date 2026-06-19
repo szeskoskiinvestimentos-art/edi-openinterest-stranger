@@ -6,6 +6,7 @@
     { val: 'MERCADO',  label: 'Cotações',            icon: '🧾', path: 'Cotacoes/dashboard/MERCADO/index.html' },
     { val: 'CORR',     label: 'Correlações',         icon: '🧠', path: 'dashboard_unificado/correlation/index.html' },
     { val: 'CONTROLE', label: 'Controle de Dados',   icon: '🛰️', path: 'dashboard_unificado/controle/index.html' },
+    { val: 'CONTROLE_DADOS', label: 'Controle Dados (legado)', icon: '🗂️', path: 'controle_de_dados.html' },
   ];
 
   function getRootBaseHref() {

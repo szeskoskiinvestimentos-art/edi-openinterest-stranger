@@ -32,13 +32,14 @@ CONTROLE : OK
 
 **Status**: ✅ `unified-nav.js` cobre todos os 6 dashboards. O `controle_de_dados.html` da raiz é uma página standalone (não no seletor).
 
-## 3. Dependências (scripts + styles)
+## 3. Dependências (scripts + styles) — REVISADO
 
-### WDO — **INCONSISTENTE** ⚠️
-- ❌ **NÃO inclui** `../shared/unified-nav.js` (mas está no seletor!)
-- ❌ **NÃO inclui** `../shared/js/particles.js`
-- ❌ **NÃO inclui** `../shared/js/chart_data_utils.js`
-- ⚠️ Path frágil: `../../Cotacoes/dashboard/MERCADO/assets/data/fed_watch_rates.js` (acoplamento cruzado)
+### WDO — ✅ Padronizado (audit inicial estava ERRADO)
+- ✅ `../shared/unified-nav.js` (linha 709)
+- ✅ `../shared/js/particles.js` (linha 707)
+- ✅ `../shared/js/chart_data_utils.js` (linha 708)
+- ✅ `../shared/main-shared.js` (linha 712)
+- ⚠️ Path frágil: `../../Cotacoes/dashboard/MERCADO/assets/data/fed_watch_rates.js` (linha 701)
 
 ### WIN — ✅ Padronizado
 - ✅ `../shared/unified-nav.js`
@@ -59,32 +60,37 @@ CONTROLE : OK
 ### MERCADO — ✅ TypeScript
 - Standalone (não usa `shared/unified-nav.js`)
 
-## 4. Problemas Identificados
+## 4. Problemas Identificados (REVISADO)
 
-### 4.1 CRÍTICO: WDO sem navegação
-- `dashboard_unificado/WDO/index.html` **NÃO** inclui `../shared/unified-nav.js`
-- Usuário não consegue trocar de dashboard a partir de WDO via Ctrl+K ou dropdown
-- **Recomendação**: Adicionar `<script src="../shared/unified-nav.js"></script>` antes de `</body>`
+### 4.1 ~~CRÍTICO: WDO sem navegação~~ → **FALSO ALARME** ✅
+- Audit inicial indicou que WDO/index.html não incluía `unified-nav.js`
+- Re-checagem (grep completo): WDO **TEM** todos os scripts compartilhados (linhas 707-712)
+- Problema não existe — WDO está padronizado
 
-### 4.2 MÉDIO: WDO sem particles/chart_data_utils
-- Inconsistente com WIN/CORR/CONTROLE
-- Falta tema visual "Stranger Things"
-- **Recomendação**: Adicionar `<script src="../shared/js/particles.js"></script>` e chart_data_utils
+### 4.2 ~~MÉDIO: WDO sem particles/chart_data_utils~~ → **FALSO ALARME** ✅
+- Mesmo motivo — WDO **TEM** particles.js e chart_data_utils.js
+- Audit estava errado por pegar só os primeiros 6 matches
 
 ### 4.3 MÉDIO: Paths cruzados
-- `../../Cotacoes/dashboard/MERCADO/assets/data/*` em WDO e CORR
+- `../../Cotacoes/dashboard/MERCADO/assets/data/*` em WDO (linha 701) e CORR
 - Acoplamento frágil entre `dashboard_unificado/` e `Cotacoes/`
 - **Recomendação**: Mover para `dashboard_unificado/shared/data/` (cópia ou symlink)
 
-### 4.4 BAIXO: controle_de_dados.html não está no seletor
-- Existe standalone, mas não no `unified-nav.js`
-- **Recomendação**: Adicionar entrada CONTROLE_DADOS ou unificar com `dashboard_unificado/controle/`
+### 4.4 RESOLVIDO: controle_de_dados.html não estava no seletor
+- Adicionado `CONTROLE_DADOS` ao `unified-nav.js` (Phase 4E)
+- Path: `controle_de_dados.html` (na raiz)
+- Ícone: 🗂️
 
-### 4.5 BAIXO: MERCADO é o maior (27MB)
+### 4.5 BAIXO: MERCADO é o maior (27.8 MB)
 - 118 arquivos, 27.8 MB
-- Maioria são blocos JS, data JSON, assets
 - Pipeline TypeScript gera muito output
 - **Não urgente** — funciona
+
+### 4.6 BAIXO: charts.js WDO vs WIN NÃO é duplicação simples
+- SHA256 diferentes, linhas diferentes (WDO: 2222, WIN: 2010)
+- Ambos fazem coisas similares mas com implementações diferentes
+- Consolidação exigiria refatoração profunda (>2h)
+- **Recomendação**: Manter separados. Oportunidade futura: extrair utilitários comuns.
 
 ## 5. Recomendações (NÃO aplicadas)
 

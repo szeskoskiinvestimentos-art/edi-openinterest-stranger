@@ -115,3 +115,13 @@
   - CONTROLE: Adicionados header e nav bar estruturais
   - CONTROLE: Cores status (ok/warn/bad) agora usam glow effects neon
 - **Status**: Implementado
+
+### E16: Hardcoded Paths Fix (CRÍTICO)
+- **Arquivos**: controle_de_dados.html, dashboard_unificado/controle/index.html, servico_unificado.py
+- **Problema**: Caminhos absolutos de localização antiga (C:\Users\ednil\Downloads\Gamma\...) estavam embedded no JSON dos HTMLs
+- **Mudança**:
+  - servico_unificado.py: root_dir agora usa "AUTO_DETECT" em vez de str(cfg.root_dir)
+  - controle/index.html: JavaScript detecta project root via page location
+  - controle_de_dados.html: Mesma detecção dinâmica
+- **Impacto**: Sistema agora é portável - funciona de qualquer localização
+- **Status**: Implementado

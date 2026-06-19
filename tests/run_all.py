@@ -196,13 +196,13 @@ def test_gamma_cone_no_global_mutation(golden: dict) -> tuple[bool, str]:
 
 
 def test_navigation_paths(golden: dict) -> tuple[bool, str]:
-    """6 dashboards registrados no unified-nav.js."""
+    """7 dashboards registrados no unified-nav.js."""
     src = (ROOT / "dashboard_unificado" / "shared" / "unified-nav.js").read_text(encoding="utf-8")
-    expected = ["HUB", "WDO", "WIN", "MERCADO", "CORR", "CONTROLE"]
+    expected = ["HUB", "WDO", "WIN", "MERCADO", "CORR", "CONTROLE", "CONTROLE_DADOS"]
     missing = [d for d in expected if f"val: '{d}'" not in src]
     if missing:
         return False, f"Dashboards faltando em unified-nav.js: {missing}"
-    return True, f"6/6 dashboards registrados: {expected}"
+    return True, f"{len(expected)}/{len(expected)} dashboards registrados: {expected}"
 
 
 def test_snapshot_script_exists(golden: dict) -> tuple[bool, str]:
@@ -381,7 +381,7 @@ TESTS = {
     "vega_doc": ("Vega documentation (R17)", test_vega_convention),
     "odte": ("0DTE any weekday (R12)", test_odte_any_weekday),
     "gamma_cone": ("Gamma Cone thread-safety (R13)", test_gamma_cone_no_global_mutation),
-    "navigation": ("Navigation 6 dashboards", test_navigation_paths),
+    "navigation": ("Navigation 7 dashboards (HUB+WDO+WIN+MERCADO+CORR+CONTROLE+CONTROLE_DADOS)", test_navigation_paths),
     "safety_scripts": ("Snapshot/Chrome scripts", test_snapshot_script_exists),
     # --- IV Smile (3) — validam E10 (IV per-strike) ---
     "iv_per_strike": ("IV Per-Strike em Greeks (E10)", test_iv_per_strike_used_in_greeks),
