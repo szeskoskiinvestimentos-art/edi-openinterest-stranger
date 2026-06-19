@@ -64,16 +64,18 @@ Edi_Market_Guardian_V0/
 - **Painel Ctrl+K**: Auto-inject em todas as telas
 - **Status**: ✅ Robusto (detecta HUB mesmo em URL `/dashboard_unificado/`)
 
-### CRÍTICO: Pipeline de Regeneração
+### Pipeline de Regeneração
 **Arquivos regenerados pelo pipeline (NÃO EDITAR MANUALMENTE):**
 - `dashboard_unificado/WIN/assets/data/market_data.{js,json}` — por `export_v1_data.py` + `update_spot_prices.py`
 - `dashboard_unificado/WDO/assets/data/market_data.{js,json}` — por `update_spot_prices.py`
 - `dashboard_unificado/WIN/assets/data/ntsl_script.txt` — por `export_v1_data.py`
-- `controle_de_dados.html` — por `servico_unificado.py` + `gerar_controle.py`
+- `controle_de_dados.html` — por `scripts/orquestrador.py` + `Cotacoes/tools/market/gerar_controle.py`
 - `Cotacoes/dashboard/MERCADO/assets/data/*.{js,json}` — por `Cotacoes/tools/market/*`
-- `.edi_service_state.json` — por `servico_unificado.py`
+- `.edi_service_state.json` — por `scripts/orquestrador.py`
 
-**Solução implementada**: Use `Servico_Unificado_SAFE.bat` em vez de `Servico_Unificado.bat` para criar snapshot automático pré-execução. Snapshots em `.edi_agent/snapshots/snap-YYYYMMDD-HHMMSS/`.
+**Decisão Phase 4C**: `servico_unificado.py` (100KB, 2141 linhas) era DEAD CODE. BATs sempre chamaram `scripts/orquestrador.py`. Removido do working tree (movido para `archive/servico_unificado_legacy_2141linhas.py.bak`).
+
+**Solução para "voltar para versões antigas"**: Use `Servico_Unificado_SAFE.bat` em vez de `Servico_Unificado.bat` para criar snapshot automático pré-execução. Snapshots em `.edi_agent/snapshots/snap-YYYYMMDD-HHMMSS/`.
 
 ---
 
@@ -107,6 +109,36 @@ Edi_Market_Guardian_V0/
 - ✅ **CP-021**: EVOLUTION.md sincronizado: E1, E2, E3, P1 marcados como RESOLVIDOS
 - ✅ **CP-022**: M4 (Greeks Broadcast) e M5 (IV Per-Strike) documentados em M* (Melhorias Matemáticas)
 - ✅ **CP-023**: 6 dead flags removidas do `config.py` (E14)
+
+### Fase 4B: Integrar testes órfãos (Concluída)
+- ✅ **CP-024**: 15 testes paralelos integrados ao `run_all.py` (24/24 PASS)
+- ✅ **CP-025**: `tests/__init__.py` criado para permitir import como módulo
+
+### Fase 4G: Validação matemática (Concluída)
+- ✅ **CP-026**: MATH_REVIEW.md atualizado com seções E7, E8, E10
+- ✅ **CP-027**: 2 testes de regressão adicionados (E8 broadcast, E10 IV per-strike) — **26/26 PASS**
+
+### Fase 4F: Auditoria de navegação (Concluída)
+- ✅ **CP-028**: REFACTOR_LOG.md criado com mapeamento dos 7 dashboards
+- ✅ **CP-029**: Audit corrigido (WDO estava padronizado, falso alarme)
+
+### Fase 4E: Consolidação de charts.js (Concluída — pivotado)
+- ✅ **CP-030**: `CONTROLE_DADOS` adicionado ao `unified-nav.js` (7 dashboards no seletor)
+- ✅ **CP-031**: `test_navigation_paths` espera 7 dashboards agora
+- ⚠️ **Pivot**: charts.js WDO/WIN não é duplicação simples — manter separados
+
+### Fase 4D: Modularizar calculator.py (Concluída)
+- ✅ **CP-032**: `src/calculator.py` (1178 linhas) → `src/calculator/` package com shim
+- ✅ **CP-033**: `__init__.py` re-exporta `OptionsCalculator` de `core.py`
+- ✅ **CP-034**: 26/26 testes ainda passam (zero regressões)
+
+### Fase 4C: Modularizar servico_unificado.py (Concluída — pivotado)
+- ✅ **CP-035**: **Descoberta**: `servico_unificado.py` (100KB, 2141 linhas) era DEAD CODE
+  - Nunca foi commitado
+  - BATs sempre chamaram `scripts/orquestrador.py` (986 linhas, mais novo)
+- ✅ **CP-036**: Movido para `archive/servico_unificado_legacy_2141linhas.py.bak`
+- ✅ **CP-037**: CHECKPOINT.md e REFACTOR_LOG.md atualizados com a descoberta
+- ⚠️ **Pivot**: ao invés de modularizar (trabalho caro), **removemos 100KB de dead code**
 
 ---
 

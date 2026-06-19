@@ -92,6 +92,37 @@ CONTROLE : OK
 - Consolidação exigiria refatoração profunda (>2h)
 - **Recomendação**: Manter separados. Oportunidade futura: extrair utilitários comuns.
 
+### 4.7 ✅ RESOLVIDO (Phase 4C): servico_unificado.py era DEAD CODE
+- **Arquivo**: `servico_unificado.py` (100KB, 2141 linhas) na raiz
+- **Status**: Dead code — NUNCA foi commitado no git, NÃO é referenciado por nenhum BAT
+- **BATs na verdade chamam**: `scripts/orquestrador.py` (986 linhas)
+- **Ação**: Movido para `archive/servico_unificado_legacy_2141linhas.py.bak`
+- **Decisão de produto**: a sessão paralela já tinha reescrito o daemon em Python limpo
+- **Resultado**: 100KB de código morto removido do working tree
+
+## 5. Recomendações (NÃO aplicadas)
+
+| Prioridade | Recomendação | Esforço | Risco |
+|---|---|---|---|
+| Alta | Adicionar `unified-nav.js` em WDO | ~~5 min~~ | ~~Baixo~~ (FALSO ALARME) |
+| Média | Adicionar particles + chart_data_utils em WDO | ~~5 min~~ | ~~Baixo~~ (FALSO ALARME) |
+| Média | Mover data compartilhada para `shared/data/` | 30 min | Médio |
+| Baixa | Adicionar `controle_de_dados.html` ao seletor | ~~5 min~~ | ~~Baixo~~ (FEITO em 4E) |
+| Baixa | Documentar caminhos esperados em `NAVIGATION.md` | 15 min | Zero |
+
+## 6. Resumo das Fases 4 (até agora)
+
+| Fase | Status | Resultado |
+|---|---|---|
+| 4A | ✅ | 14 evoluções E1-E14 comitadas |
+| 4B | ✅ | 15 testes órfãos integrados (24/24 PASS) |
+| 4C | ✅ | `servico_unificado.py` morto removido (100KB liberados) |
+| 4D | ✅ | `src/calculator.py` → `src/calculator/` package com shim |
+| 4E | ✅ | `CONTROLE_DADOS` adicionado ao seletor; audit corrigido |
+| 4F | ✅ | Mapeamento completo em REFACTOR_LOG.md |
+| 4G | ✅ | MATH_REVIEW.md atualizado com E7/E8/E10 + 2 testes regressão |
+| 4H | ⏳ | CI/Pre-commit (próximo) |
+
 ## 5. Recomendações (NÃO aplicadas)
 
 | Prioridade | Recomendação | Esforço | Risco |
