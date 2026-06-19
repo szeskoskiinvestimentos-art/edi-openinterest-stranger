@@ -77,7 +77,14 @@ class OptionsCalculator(FlipsMixin, GreeksExposureMixin, VolatilityMixin, WallsM
         >>> calc.calculate_flips_and_walls()
         >>> metrics = calc.get_summary_metrics()
     """
-    def __init__(self, options_df, spot, expiry_date, risk_free=settings.RISK_FREE, iv_annual=settings.IV_ANNUAL):
+    def __init__(
+        self,
+        options_df: pd.DataFrame,
+        spot: float,
+        expiry_date: str,
+        risk_free: float = settings.RISK_FREE,
+        iv_annual: float = settings.IV_ANNUAL,
+    ) -> None:
         self.options_df = options_df.copy()
         self.spot = float(spot)
         self.expiry_date = expiry_date
@@ -249,7 +256,7 @@ class OptionsCalculator(FlipsMixin, GreeksExposureMixin, VolatilityMixin, WallsM
         self.expected_moves = None
         self.mm_pnl_simulation = None
 
-    def calculate_flips_and_walls(self):
+    def calculate_flips_and_walls(self) -> None:
         """Calcula Gamma Flip, Max Pain, Walls e métricas derivadas.
 
         Executa a sequência completa de cálculos:

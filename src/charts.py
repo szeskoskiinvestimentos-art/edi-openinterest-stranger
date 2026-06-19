@@ -13,8 +13,9 @@ import numpy as np
 from src import config as settings
 from src.layout_config import get_common_layout
 from src.utils_fmt import format_number_br, parse_and_scale_walls
+from src.calculator.core import OptionsCalculator, SummaryMetrics
 
-def create_dashboard_figure(calc, metrics):
+def create_dashboard_figure(calc: OptionsCalculator, metrics: SummaryMetrics) -> go.Figure:
     """Gera a figura principal do dashboard com todos os traces.
 
     Cria gráfico Plotly com 15 traces (visíveis por botões):

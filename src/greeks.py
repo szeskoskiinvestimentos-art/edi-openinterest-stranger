@@ -1,12 +1,22 @@
+"""GreeksEngine — Motor de cálculo vetorizado para Gregas de Black-Scholes.
+
+Focado apenas em matemática financeira, sem estado de negócio.
+Suporta entrada scalar ou array para todos os parâmetros.
+"""
 import numpy as np
+from numpy.typing import NDArray
 from scipy.stats import norm
+from typing import Union
+
+# Tipo para entrada flexível (scalar ou array)
+Numeric = Union[float, int, np.ndarray, NDArray[np.float64]]
 
 
-def _broadcast_to_k_shape(*args):
+def _broadcast_to_k_shape(*args: Numeric) -> list[NDArray[np.float64]]:
     """Broadcast all arrays to match the shape of the largest array (typically K)."""
     arrays = [np.asarray(a, dtype=float) for a in args]
     target_shape = max((a.shape for a in arrays), key=lambda s: len(s))
-    result = []
+    result: list[NDArray[np.float64]] = []
     for a in arrays:
         if a.shape != target_shape:
             result.append(np.broadcast_to(a, target_shape).copy())
@@ -16,26 +26,33 @@ def _broadcast_to_k_shape(*args):
 
 
 class GreeksEngine:
+    """Motor de cálculo vetorizado para Gregas de Black-Scholes.
+
+    Todos os métodos são estáticos e suportam entrada scalar ou array.
+    Broadcast automático alinha shapes antes do cálculo.
     """
-    Motor de cálculo vetorizado para Gregas de Black-Scholes.
-    Focado apenas em matemática financeira, sem estado de negócio.
-    """
-    
+
     @staticmethod
-    def calculate_greeks(S, K, T, r, sigma, typ):
-        """
-        Cálculo vetorizado de Delta e Gamma.
-        
+    def calculate_greeks(
+        S: Numeric,
+        K: Numeric,
+        T: Numeric,
+        r: Numeric,
+        sigma: Numeric,
+        typ: str,
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """Cálculo vetorizado de Delta e Gamma.
+
         Args:
-            S (float or np.array): Preço do ativo subjacente (Spot).
-            K (float or np.array): Strike price.
-            T (float or np.array): Tempo até o vencimento (em anos).
-            r (float or np.array): Taxa livre de risco (anual).
-            sigma (float or np.array): Volatilidade implícita (anual).
-            typ (str): Tipo da opção ('C' para Call, 'P' para Put).
-            
+            S: Preço do ativo subjacente (Spot)
+            K: Strike price
+            T: Tempo até o vencimento (em anos)
+            r: Taxa livre de risco (anual)
+            sigma: Volatilidade implícita (anual)
+            typ: Tipo da opção ('C' para Call, 'P' para Put)
+
         Returns:
-            tuple: (delta, gamma)
+            Tupla (delta, gamma) como arrays numpy
         """
         S = np.asarray(S, dtype=float)
         K = np.asarray(K, dtype=float)
@@ -85,8 +102,25 @@ class GreeksEngine:
         return delta, gamma
 
     @staticmethod
-    def calculate_vega(S, K, T, r, sigma):
-        """Cálculo vetorizado de Vega."""
+    def calculate_vega(
+        S: Numeric,
+        K: Numeric,
+        T: Numeric,
+        r: Numeric,
+        sigma: Numeric,
+    ) -> NDArray[np.float64]:
+        """Cálculo vetorizado de Vega.
+
+        Args:
+            S: Preço do ativo subjacente (Spot)
+            K: Strike price
+            T: Tempo até o vencimento (em anos)
+            r: Taxa livre de risco (anual)
+            sigma: Volatilidade implícita (anual)
+
+        Returns:
+            Array numpy com valores de Vega
+        """
         S, K, T, r, sigma = _broadcast_to_k_shape(S, K, T, r, sigma)
         
         # Vega é 0 quando T=0 ou sigma=0
@@ -111,8 +145,27 @@ class GreeksEngine:
         return vega
 
     @staticmethod
-    def calculate_theta(S, K, T, r, sigma, typ):
-        """Cálculo vetorizado de Theta."""
+    def calculate_theta(
+        S: Numeric,
+        K: Numeric,
+        T: Numeric,
+        r: Numeric,
+        sigma: Numeric,
+        typ: str,
+    ) -> NDArray[np.float64]:
+        """Cálculo vetorizado de Theta.
+
+        Args:
+            S: Preço do ativo subjacente (Spot)
+            K: Strike price
+            T: Tempo até o vencimento (em anos)
+            r: Taxa livre de risco (anual)
+            sigma: Volatilidade implícita (anual)
+            typ: Tipo da opção ('C' para Call, 'P' para Put)
+
+        Returns:
+            Array numpy com valores de Theta (anual)
+        """
         S, K, T, r, sigma = _broadcast_to_k_shape(S, K, T, r, sigma)
         
         # Theta é 0 quando T=0 ou sigma=0
@@ -140,8 +193,27 @@ class GreeksEngine:
         return theta
 
     @staticmethod
-    def bs_price(S, K, T, r, sigma, typ):
-        """Cálculo do preço teórico (Black-Scholes)."""
+    def bs_price(
+        S: Numeric,
+        K: Numeric,
+        T: Numeric,
+        r: Numeric,
+        sigma: Numeric,
+        typ: str,
+    ) -> NDArray[np.float64]:
+        """Cálculo do preço teórico (Black-Scholes).
+
+        Args:
+            S: Preço do ativo subjacente (Spot)
+            K: Strike price
+            T: Tempo até o vencimento (em anos)
+            r: Taxa livre de risco (anual)
+            sigma: Volatilidade implícita (anual)
+            typ: Tipo da opção ('C' para Call, 'P' para Put)
+
+        Returns:
+            Array numpy com preços teóricos
+        """
         S = np.asarray(S, dtype=float)
         K = np.asarray(K, dtype=float)
         T = np.asarray(T, dtype=float)

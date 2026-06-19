@@ -5,6 +5,8 @@ Calcula Max Pain (strike de máxima dor), Effective Walls
 """
 from __future__ import annotations
 import numpy as np
+from numpy.typing import NDArray
+from typing import Optional
 
 
 class WallsMixin:
@@ -16,7 +18,7 @@ class WallsMixin:
     - Perfil de perda para visualização
     """
 
-    def calculate_max_pain(self):
+    def calculate_max_pain(self) -> float:
         """Calcula o Max Pain (strike de máxima dor).
 
         Para cada strike candidato, calcula a perda total dos compradores:
@@ -56,7 +58,7 @@ class WallsMixin:
         }
         return float(strikes_f[int(np.argmin(loss))])
 
-    def calculate_effective_walls(self):
+    def calculate_effective_walls(self) -> None:
         """Calcula Effective Walls (média ponderada dos top strikes).
 
         Para Calls (acima do spot) e Puts (abaixo do spot):

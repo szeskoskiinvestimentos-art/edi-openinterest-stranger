@@ -10,8 +10,9 @@ importação no ProfitChart, incluindo:
 import numpy as np
 from datetime import datetime
 from src import config as settings
+from src.calculator.core import OptionsCalculator, SummaryMetrics
 
-def generate_ntsl_script(metrics, calc):
+def generate_ntsl_script(metrics: SummaryMetrics, calc: OptionsCalculator) -> str:
     """Gera script NTSL completo para ProfitChart.
 
     Cria código NTSL com:
