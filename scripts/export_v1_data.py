@@ -773,7 +773,7 @@ def main():
             "r_gamma_cum": safe_list(r_gamma_cum)
         },
         "ewz_meta": {
-            "expiration": getattr(settings, 'EWZ_EXPIRATION_LABEL', None),
+            "expiration": _fmt_date_yyyy_mm_dd(expiry_reference_applied) + f" ({(expiry_reference_applied - today).days} DTE)" if expiry_reference_applied else None,
             "atm_iv_pct": getattr(settings, 'EWZ_ATM_IV_PCT', None),
             "hv_pct": getattr(settings, 'EWZ_HV_PCT', None),
             "iv_rank_pct": getattr(settings, 'EWZ_IV_RANK_PCT', None),
