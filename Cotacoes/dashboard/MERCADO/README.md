@@ -1,37 +1,53 @@
-## Dashboard - Cotações de Mercado (MVP)
+# Dashboard MERCADO — Cotações de Mercado
 
-Página estática no mesmo estilo do dashboard, organizada por categorias (commodities, metais, FX/carry e emergentes), com:
-- tabela por categoria (clique no ativo para ver a série)
-- gráfico por categoria (últimos 10 dias)
-- sinal de “fluxo” (heurística)
-- alertas locais (com toggle e notificação do navegador)
+> Dashboard completo de cotações com panomarama de mercado, fluxo estrangeiro, curva de juros e alertas.
 
-### Como abrir
+## Acesso
 
-Abra:
-- `dashboard/MERCADO/index.html`
-Se você abrir direto no navegador (file://), use o botão "↻ Dados" (ou F5) após atualizar o `market_quotes.js`.
+- **Arquivo**: `Cotacoes/dashboard/MERCADO/index.html`
+- **Navegação**: Use o seletor dropdown ou `Ctrl+K` para QuickNav
 
-### Como atualizar os dados (a partir do CSV exportado do Investing)
+## Funcionalidades
 
-Coloque/atualize o CSV (export do Investing) e rode:
+### Visão Geral
+- Ativos monitorados, Maior Alta/Queda, Sinal de Fluxo
+- Ticker global (scroll animation)
+- Qualidade do feed (drivers críticos)
+- Resumo operacional (WIN, WDO, Commodities, Criptos)
+
+### Seções
+- **Operacional EUA**: US30, Nasdaq, S&P 500
+- **Commodities**: Ouro, Petróleo
+- **Petrobras**: Velocímetro híbrido
+- **BTC**: Bitcoin operacional
+- **HK50**: Hang Seng
+- **Top Movers**: Rotação por classe
+
+### Dados
+- `assets/data/market_quotes.js` — cotações em tempo real
+- `assets/data/foreign_flow.js` — fluxo estrangeiro
+- `assets/data/zq_curve.js` — curva de juros EUA
+- `assets/data/economic_calendar.js` — calendário econômico
+
+## Como Atualizar
 
 ```bash
-npx -y tsx tools/market/build-market-history.ts --csv "PréMercado_Watchlist_03102026.csv"
-```
+# Via TypeScript (recomendado)
+npx -y tsx tools/market/build-market-history.ts --csv "watchlist.csv"
 
-Ou via npm:
-
-```bash
+# Via npm
 npm run market:update
 ```
 
-Saídas:
-- `dashboard/MERCADO/assets/data/market_quotes.json`
-- `dashboard/MERCADO/assets/data/market_quotes.js`
-
-Parâmetros úteis:
-
+### Parâmetros
 ```bash
-npx -y tsx tools/market/build-market-history.ts --csv "SEU_ARQUIVO.csv" --interval 30 --retentionDays 10
+npx -y tsx tools/market/build-market-history.ts \
+  --csv "watchlist.csv" \
+  --interval 30 \
+  --retentionDays 10
 ```
+
+## Notas
+
+- Se abrir via `file://`, use o botão "↻ Dados" após atualizar `market_quotes.js`
+- Dados do Investing (portfolio, calendário, DI) ficam em `market_quotes.json`
