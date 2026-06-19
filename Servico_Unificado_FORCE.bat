@@ -11,6 +11,11 @@ if /i "%~1"=="--no-pause" (
   shift
   goto :PARSE_ARGS
 )
+if /i "%~1"=="--git-dry-run" (
+  set "EDI_GIT_DRY_RUN=1"
+  shift
+  goto :PARSE_ARGS
+)
 shift
 goto :PARSE_ARGS
 :PARSE_DONE
@@ -20,6 +25,10 @@ set "MARKET_GIT_SYNC_ENABLED=true"
 set "MARKET_GIT_SYNC_PUSH=true"
 if "%MARKET_GIT_SYNC_BRANCH%"=="" set "MARKET_GIT_SYNC_BRANCH=main"
 if not "%EDI_ARTIFACTS_BRANCH%"=="" (
+  set "MARKET_GIT_SYNC_ENABLED=false"
+  set "MARKET_GIT_SYNC_PUSH=false"
+)
+if "%EDI_GIT_DRY_RUN%"=="1" (
   set "MARKET_GIT_SYNC_ENABLED=false"
   set "MARKET_GIT_SYNC_PUSH=false"
 )
@@ -130,6 +139,7 @@ if errorlevel 1 (
 call :START_EXIT_WATCHER
 
 echo Forcando update (bypass cooldown)...
+for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "(Get-Date).ToUniversalTime().ToString('o')"`) do set "MARKET_FORCE_REQUESTED_AT_UTC=%%i"
 powershell -NoProfile -Command "try { $u='http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/update'; $b=@{ reason='force' } | ConvertTo-Json -Compress; Invoke-RestMethod -Method Post -Uri $u -ContentType 'application/json' -Body $b | Out-String | Write-Host } catch { $m=$_.Exception.Message; if($m -match '409'){ Write-Host 'AVISO: update ja esta em andamento (409).'; exit 0 } Write-Host ('ERRO: ' + $m); exit 1 }"
 
 echo.
@@ -152,7 +162,9 @@ if errorlevel 1 (
 )
 
 call :GIT_PUSH_UNIFIED
+set "UNIFIED_GIT_RC=%errorlevel%"
 call :SHUTDOWN_MARKET_FORCE
+if not "%UNIFIED_GIT_RC%"=="0" exit /b %UNIFIED_GIT_RC%
 
 :END
 if "%EDI_NO_PAUSE%"=="1" exit /b 0
@@ -167,7 +179,7 @@ endlocal & exit /b %errorlevel%
 :WAIT_MARKET_UPDATE
 setlocal
 set "URL=http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/status"
-powershell -NoProfile -Command "try { $u='%URL%'; $needGit=($env:MARKET_GIT_SYNC_ENABLED -eq 'true' -or $env:MARKET_GIT_SYNC_ENABLED -eq '1'); $start=Get-Date; $deadline=$start.AddMinutes(15); while((Get-Date) -lt $deadline){ try { $r=Invoke-RestMethod -Method Get -Uri $u -TimeoutSec 2; if($r -and $r.ok -eq $true -and $r.state){ if($r.state.running -eq $true){ Start-Sleep -Seconds 2; continue } $last=$r.state.last; if($last -and $last.finishedAt){ try { $fin=[DateTime]::Parse([string]$last.finishedAt); if($fin -ge $start){ if(-not $last.reason -or [string]$last.reason -eq 'force'){ if(-not $needGit){ exit 0 } $lp=[string]$last.logPath; if($lp -and (Test-Path -LiteralPath $lp)){ $tail=Get-Content -LiteralPath $lp -Tail 200 -ErrorAction SilentlyContinue; if($tail -match '^GIT_SYNC status='){ exit 0 } } } } } } catch {} } } } catch {} Start-Sleep -Seconds 2 } exit 1 } catch { exit 1 }"
+powershell -NoProfile -Command "try { $u='%URL%'; $needGit=($env:MARKET_GIT_SYNC_ENABLED -eq 'true' -or $env:MARKET_GIT_SYNC_ENABLED -eq '1'); $dry=($env:EDI_GIT_DRY_RUN -eq '1' -or $env:EDI_GIT_DRY_RUN -eq 'true'); $start=Get-Date; $req=$null; try { $req=[DateTime]::Parse([string]$env:MARKET_FORCE_REQUESTED_AT_UTC) } catch { $req=$null }; if(-not $req){ $req=$start }; $reqUtc=$req.ToUniversalTime().AddSeconds(-15); $deadline=$start.AddMinutes(15); while((Get-Date) -lt $deadline){ try { $r=Invoke-RestMethod -Method Get -Uri $u -TimeoutSec 2 } catch { $r=$null }; if($r -and $r.ok -eq $true -and $r.state){ if($r.state.running -eq $true){ Start-Sleep -Seconds 2; continue }; $last=$r.state.last; if($last){ $reason=[string]$last.reason; if(-not $reason -or $reason -eq 'force'){ $ref=$null; if($last.startedAt){ try { $ref=[DateTime]::Parse([string]$last.startedAt) } catch { $ref=$null } }; if((-not $ref) -and $last.finishedAt){ try { $ref=[DateTime]::Parse([string]$last.finishedAt) } catch { $ref=$null } }; if($ref -and $ref.ToUniversalTime() -ge $reqUtc){ if($dry -or -not $needGit){ exit 0 }; $lp=[string]$last.logPath; if($lp -and (Test-Path -LiteralPath $lp)){ $tail=Get-Content -LiteralPath $lp -Tail 250 -ErrorAction SilentlyContinue; if($tail -match '^GIT_SYNC status='){ exit 0 } } } } } }; Start-Sleep -Seconds 2 }; exit 1 } catch { exit 1 }"
 endlocal & exit /b %errorlevel%
 
 :START_EXIT_WATCHER
@@ -192,18 +204,96 @@ endlocal & exit /b 0
 
 :GIT_PUSH_UNIFIED
 setlocal
+if /i not "%EDI_GIT_PUSH_ENABLED%"=="1" (
+  endlocal & exit /b 0
+)
+set "TARGET_BRANCH=%MARKET_GIT_SYNC_BRANCH%"
+if "%TARGET_BRANCH%"=="" set "TARGET_BRANCH=main"
+if not "%EDI_ARTIFACTS_BRANCH%"=="" set "TARGET_BRANCH=%EDI_ARTIFACTS_BRANCH%"
+
+echo.
+echo === GIT PUSH (unificado) ===
+echo Branch alvo: %TARGET_BRANCH%
+
+set "CUR_BRANCH="
+for /f "usebackq delims=" %%i in (`git rev-parse --abbrev-ref HEAD 2^>nul`) do set "CUR_BRANCH=%%i"
+
+if "%EDI_GIT_DRY_RUN%"=="1" (
+  echo.
+  echo === GIT DRY-RUN ===
+  echo Branch atual: %CUR_BRANCH%
+  echo Branch alvo:  %TARGET_BRANCH%
+  echo.
+  git status --porcelain -- dashboard_unificado B3_System\dashboard_unificado controle_de_dados.html Cotacoes\dashboard\index.html Cotacoes\dashboard\MERCADO\index.html Cotacoes\dashboard\MERCADO\assets\js Cotacoes\dashboard\MERCADO\assets\data Cotacoes\dashboard\MERCADO\exports Cotacoes\tools\market Cotacoes\package.json
+  echo.
+  git diff --stat -- dashboard_unificado B3_System\dashboard_unificado controle_de_dados.html Cotacoes\dashboard\index.html Cotacoes\dashboard\MERCADO\index.html Cotacoes\dashboard\MERCADO\assets\js Cotacoes\dashboard\MERCADO\assets\data Cotacoes\dashboard\MERCADO\exports Cotacoes\tools\market Cotacoes\package.json
+  echo.
+  endlocal & exit /b 0
+)
+
+if "%CUR_BRANCH%"=="" (
+  echo AVISO: Git indisponivel (fora de um repo?). Pulando commit/push.
+  endlocal & exit /b 0
+)
+
+if /i not "%CUR_BRANCH%"=="%TARGET_BRANCH%" (
+  echo ERRO: Branch atual (%CUR_BRANCH%) difere do branch alvo (%TARGET_BRANCH%). Nao farei checkout automatico.
+  echo Dica: troque manualmente para %TARGET_BRANCH% e rode novamente.
+  endlocal & exit /b 1
+)
+
+git fetch origin %TARGET_BRANCH% >nul 2>&1
+set "AHEAD=0"
+set "BEHIND=0"
+for /f "tokens=1,2" %%a in ('git rev-list --left-right --count HEAD...origin/%TARGET_BRANCH% 2^>nul') do (
+  set "AHEAD=%%a"
+  set "BEHIND=%%b"
+)
+if not "%BEHIND%"=="0" (
+  echo ERRO: Branch local esta %BEHIND% commit(s) atras de origin/%TARGET_BRANCH%. Abortando push para evitar regressao.
+  endlocal & exit /b 1
+)
+
+if "%EDI_GIT_VALIDATE_STRICT%"=="" set "EDI_GIT_VALIDATE_STRICT=1"
+if "%EDI_GIT_VALIDATE_STRICT%"=="1" (
+  where npm >nul 2>&1
+  if not errorlevel 1 (
+    npm -C "%~dp0Cotacoes" run -s market:validate:strict
+    if errorlevel 1 (
+      echo ERRO: market:validate:strict falhou. Abortando commit/push.
+      if not "%CUR_BRANCH%"=="" if /i not "%CUR_BRANCH%"=="%TARGET_BRANCH%" git checkout %CUR_BRANCH% >nul 2>&1
+      endlocal & exit /b 1
+    )
+  )
+)
+
 git add dashboard_unificado B3_System\dashboard_unificado controle_de_dados.html Cotacoes\dashboard\index.html Cotacoes\dashboard\MERCADO\index.html Cotacoes\dashboard\MERCADO\assets\js Cotacoes\dashboard\MERCADO\assets\data Cotacoes\dashboard\MERCADO\exports Cotacoes\tools\market Cotacoes\package.json >nul 2>&1
+set "GIT_RC=0"
 git diff --cached --quiet >nul 2>&1
 if errorlevel 1 (
   for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "(Get-Date).ToString('yyyy-MM-dd HH:mm')"`) do set "TS=%%i"
   git commit -m "Atualiza dashboard_unificado (auto %TS%)" >nul 2>&1
-  powershell -NoProfile -Command "$env:GIT_TERMINAL_PROMPT='0'; $env:GCM_INTERACTIVE='Never'; $p=Start-Process git -ArgumentList @('push','origin','main') -NoNewWindow -PassThru; if(-not $p.WaitForExit(180000)){ try{$p.Kill()}catch{}; exit 2 }; exit $p.ExitCode" >nul 2>&1
   if errorlevel 1 (
-    powershell -NoProfile -Command "$env:GIT_TERMINAL_PROMPT='0'; $env:GCM_INTERACTIVE='Never'; $p=Start-Process git -ArgumentList @('pull','--no-rebase','--no-edit','-X','ours','origin','main') -NoNewWindow -PassThru; if(-not $p.WaitForExit(180000)){ try{$p.Kill()}catch{}; exit 2 }; exit $p.ExitCode" >nul 2>&1
-    powershell -NoProfile -Command "$env:GIT_TERMINAL_PROMPT='0'; $env:GCM_INTERACTIVE='Never'; $p=Start-Process git -ArgumentList @('push','origin','main') -NoNewWindow -PassThru; if(-not $p.WaitForExit(180000)){ try{$p.Kill()}catch{}; exit 2 }; exit $p.ExitCode" >nul 2>&1
+    echo ERRO: falha ao criar commit (git commit).
+    set "GIT_RC=1"
+  ) else (
+    for /f "usebackq delims=" %%i in (`git rev-parse --short HEAD 2^>nul`) do set "NEW_SHA=%%i"
+    if not "%NEW_SHA%"=="" echo Commit criado: %NEW_SHA%
+    powershell -NoProfile -Command "$env:GIT_TERMINAL_PROMPT='0'; $env:GCM_INTERACTIVE='Never'; $p=Start-Process git -ArgumentList @('push','origin','%TARGET_BRANCH%') -NoNewWindow -PassThru; if(-not $p.WaitForExit(180000)){ try{$p.Kill()}catch{}; exit 2 }; exit $p.ExitCode" >nul 2>&1
+    if errorlevel 1 (
+      echo ERRO: falha no push (git push origin %TARGET_BRANCH%). Nao farei pull automatico.
+    )
+    if errorlevel 1 (
+      echo ERRO: falha no push (git push origin %TARGET_BRANCH%).
+      set "GIT_RC=1"
+    ) else (
+      echo Push OK: origin/%TARGET_BRANCH%
+    )
   )
+ ) else (
+  echo Nada para commitar/push (unificado).
 )
-endlocal & exit /b 0
+endlocal & exit /b %GIT_RC%
 
 :RUN_OPTIONS_JOB_FORCE
 setlocal
@@ -236,7 +326,16 @@ powershell -NoProfile -Command ^
   "  Set-Location '%AUTO_B3_DIR%';" ^
   "  & %PY_CMD% automacao_dados.py;" ^
   "  & %PY_CMD% config.py;" ^
-  "  & %PY_CMD% '%~dp0gerar_controle.py';" ^
+  "  & %PY_CMD% '%~dp0Cotacoes\tools\market\gerar_controle.py';" ^
+  "  $srcDash=Join-Path '%AUTO_B3_DIR%' 'dashboard_unificado';" ^
+  "  $dstDash=Join-Path '%~dp0' 'dashboard_unificado';" ^
+  "  foreach($k in @('WIN','WDO')){" ^
+  "    $sData=Join-Path (Join-Path $srcDash $k) 'assets\\data';" ^
+  "    $dData=Join-Path (Join-Path $dstDash $k) 'assets\\data';" ^
+  "    if(-not (Test-Path -LiteralPath $sData)){ continue };" ^
+  "    try { New-Item -ItemType Directory -Force -Path $dData | Out-Null } catch { };" ^
+  "    try { & robocopy $sData $dData market_data.json market_data.js ntsl_script.txt /FFT /R:2 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null } catch { };" ^
+  "  };" ^
   "  Start-Sleep -Seconds 1;" ^
   "} finally { Remove-Item -LiteralPath $lock -Recurse -Force -ErrorAction SilentlyContinue }"
 endlocal & exit /b %errorlevel%

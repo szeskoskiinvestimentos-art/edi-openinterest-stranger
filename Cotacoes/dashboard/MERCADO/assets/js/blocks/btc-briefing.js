@@ -291,7 +291,7 @@
                 <div style="font-weight:900;letter-spacing:1px;">BTC — Resumo Operacional</div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                     ${badge(p.bias === 'buy' ? 'positive' : p.bias === 'sell' ? 'negative' : 'neutral', `Viés: ${biasLabel(p.bias)}`)}
-                    ${badge('neutral', `Drivers net (${escapeHtml(btcNow.phase.nowLabel || 'AGORA')})`)} ${netBadge}
+                    ${badge('neutral', `Drivers net (${escapeHtml((btcNow && btcNow.phase && btcNow.phase.nowLabel) ? btcNow.phase.nowLabel : 'AGORA')})`)} ${netBadge}
                     ${gaugeHtml}
                 </div>
             </div>

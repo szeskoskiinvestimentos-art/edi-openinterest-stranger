@@ -5,18 +5,25 @@ import { env, envBool, envNumber, parseList } from '../../lib/investing-sync/env
 import { diScheduleIntervalMinutes, shouldRunDiCatchUpAfterClose } from '../../lib/investing-sync/schedule.js'
 import { getLastCalendarAttempt, getLastDiUpdatedAt, getLastPortfolioUpdatedAt } from '../../lib/investing-sync/state.js'
 import type { CsvValidation } from '../../lib/investing-sync/types.js'
-import { defaultAutomationDir, PROJECT_ROOT, resolveFromBase, resolveFromProject } from '../paths.js'
+import { defaultAutomationDir, PROJECT_ROOT, requireInsideWorkspace, resolveFromBase, resolveFromProject } from '../paths.js'
 
 export async function buildRunOnceConfig(modeRaw: string) {
   const mode = String(modeRaw || 'once').toLowerCase()
   const startedAt = new Date().toISOString()
-  const baseDir = resolveFromProject(env('MARKET_AUTOMATION_DIR', defaultAutomationDir()))
-  const userDataDir = resolveFromBase(baseDir, env('INVESTING_USER_DATA_DIR', path.join(baseDir, 'investing-profile')))
-  const downloadDir = resolveFromBase(baseDir, env('INVESTING_DOWNLOAD_DIR', path.join(baseDir, 'downloads')))
+  const baseDir = requireInsideWorkspace('MARKET_AUTOMATION_DIR', resolveFromProject(env('MARKET_AUTOMATION_DIR', defaultAutomationDir())))
+  const userDataDir = requireInsideWorkspace(
+    'INVESTING_USER_DATA_DIR',
+    resolveFromBase(baseDir, env('INVESTING_USER_DATA_DIR', path.join(baseDir, 'investing-profile'))),
+  )
+  const downloadDir = requireInsideWorkspace(
+    'INVESTING_DOWNLOAD_DIR',
+    resolveFromBase(baseDir, env('INVESTING_DOWNLOAD_DIR', path.join(baseDir, 'downloads'))),
+  )
   const debugDir = path.join(baseDir, 'logs')
 
-  const outDir = resolveFromProject(
-    env('MARKET_OUT_DIR', path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'assets', 'data')),
+  const outDir = requireInsideWorkspace(
+    'MARKET_OUT_DIR',
+    resolveFromProject(env('MARKET_OUT_DIR', path.resolve(PROJECT_ROOT, 'dashboard', 'MERCADO', 'assets', 'data'))),
   )
   const intervalMinutes = envNumber('MARKET_INTERVAL_MINUTES', 15)
   const retentionDays = envNumber('MARKET_RETENTION_DAYS', 5)
@@ -76,7 +83,16 @@ export async function buildRunOnceConfig(modeRaw: string) {
   const seedEnabled = envBool('INVESTING_SEED_FROM_LAST_CSV', true)
   const maxAgeHours = Math.max(1, envNumber('INVESTING_SEED_MAX_AGE_HOURS', 72))
   const searchDirs = parseList(env('INVESTING_SEED_SEARCH_DIRS'))
-  const seedDirs = searchDirs.length ? searchDirs : [downloadDir, PROJECT_ROOT]
+  const seedDirs = (searchDirs.length ? searchDirs : [downloadDir, PROJECT_ROOT])
+    .map(d => {
+      try {
+        const candidate = path.isAbsolute(d) ? d : resolveFromProject(d)
+        return requireInsideWorkspace('INVESTING_SEED_DIR', candidate)
+      } catch {
+        return null
+      }
+    })
+    .filter(Boolean) as string[]
 
   return {
     mode,

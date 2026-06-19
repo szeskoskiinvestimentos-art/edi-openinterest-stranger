@@ -3,15 +3,15 @@
     version: '2026-04-28.1',
     freshness: {
       okMaxMin: 15,
-      warnMaxMin: 30,
-      staleMaxMin: 60,
+      warnMaxMin: 15,
+      staleMaxMin: 30,
       factorOk: 1.0,
       factorWarn: 0.86,
       factorStale: 0.72,
       factorVeryStale: 0.58,
     },
     stale: {
-      warnMin: 20,
+      warnMin: 15,
     },
     confidence: {
       baseConvictionFallback: 0.55,

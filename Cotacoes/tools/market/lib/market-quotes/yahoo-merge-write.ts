@@ -102,6 +102,10 @@ export async function writeYahooMergeOutputs(params: {
   const auditText = JSON.stringify(audit, null, 2)
   JSON.parse(auditText)
   await atomicWriteText(path.join(params.outDir, 'market_yahoo_audit.json'), auditText)
+  await atomicWriteText(
+    path.join(params.outDir, 'market_yahoo_audit.js'),
+    `window.MARKET_YAHOO_AUDIT_DATA=${JSON.stringify(audit)};`,
+  )
 
   process.stdout.write(
     `OK • Yahoo quotes: updated=${params.applied.updated} covered=${params.applied.covered}/${params.plan.selectedPlanLength} uniqueYahoo=${params.plan.uniqueYahooLength} dailyFallback=${params.applied.dailyFallbackUsed} quoteFallback=${params.applied.quoteFallbackUsed} skipped=${params.plan.skippedAssets}\n`,

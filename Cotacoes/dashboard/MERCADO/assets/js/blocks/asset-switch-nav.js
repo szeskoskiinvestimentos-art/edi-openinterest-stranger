@@ -13,9 +13,17 @@
         }
         function targetFor(val) {
             if (val === 'MERCADO') return location.href;
+            if (val === 'HUB') {
+                if (isProdHost()) return prodBase;
+                return '../../../dashboard_unificado/index.html';
+            }
             if (val === 'CORR') {
                 if (isProdHost()) return prodBase + 'correlation/';
                 return '../../../dashboard_unificado/correlation/index.html';
+            }
+            if (val === 'CONTROLE') {
+                if (isProdHost()) return prodBase.replace('dashboard_unificado/', '') + 'controle_de_dados.html';
+                return '../../../controle_de_dados.html';
             }
             if (isProdHost()) return prodBase + (val === 'WDO' ? 'WDO/' : 'WIN/');
             return '../../../dashboard_unificado/' + (val === 'WDO' ? 'WDO/index.html' : 'WIN/index.html');

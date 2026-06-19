@@ -55,6 +55,67 @@ export async function applyYahooMergeItem(params: {
     dayFallbackUsed: boolean,
     quoteFallbackUsedNow: boolean,
   ) => {
+    try {
+      const MAX_ABS_CHANGE_PCT = 80
+      const derivedAbsThreshold = (() => {
+        const rb = String((audit as unknown as { resolvedBy?: unknown }).resolvedBy || '')
+        const interval = String((audit as unknown as { dataInterval?: unknown }).dataInterval || '')
+        if (rb === 'tradingview' && interval === '1d') return 25
+        return MAX_ABS_CHANGE_PCT
+      })()
+      const changePctField =
+        typeof (point as unknown as { changePct?: unknown }).changePct === 'number' &&
+        Number.isFinite((point as unknown as { changePct: number }).changePct)
+          ? ((point as unknown as { changePct: number }).changePct as number)
+          : null
+      if (changePctField !== null && Math.abs(changePctField) > MAX_ABS_CHANGE_PCT) {
+        ;(audit as unknown as { changePctSource?: string }).changePctSource = 'missing'
+        ;(audit as unknown as { changePctSuppressed?: boolean }).changePctSuppressed = true
+        ;(audit as unknown as { changePctSuppressedKind?: string }).changePctSuppressedKind = 'field'
+        ;(audit as unknown as { changePctSuppressedValue?: number }).changePctSuppressedValue = changePctField
+        ;(audit as unknown as { changePctSuppressedThreshold?: number }).changePctSuppressedThreshold = MAX_ABS_CHANGE_PCT
+        delete (point as unknown as { changePct?: unknown }).changePct
+      } else if (changePctField !== null) {
+        ;(audit as unknown as { changePctSource?: string }).changePctSource = 'field'
+      }
+
+      const existingPoints = Array.isArray(params.series[p.assetSymbol]) ? params.series[p.assetSymbol] : []
+      const prev = existingPoints.length ? existingPoints[existingPoints.length - 1] : null
+      const prevPrice = prev && typeof prev.price === 'number' && Number.isFinite(prev.price) ? prev.price : null
+      const shouldDeriveChange =
+        prevPrice !== null
+        && prevPrice > 0
+        && typeof point.price === 'number'
+        && Number.isFinite(point.price)
+        && point.price > 0
+        && point.change === undefined
+        && point.changePct === undefined
+      if (shouldDeriveChange) {
+        point.change = point.price - prevPrice
+        const pct = ((point.price - prevPrice) / prevPrice) * 100
+        if (Number.isFinite(pct) && Math.abs(pct) <= derivedAbsThreshold) {
+          point.changePct = pct
+          ;(audit as unknown as { changePctSource?: string }).changePctSource = 'derived'
+          ;(audit as unknown as { changePctDerivedFrom?: string }).changePctDerivedFrom = 'prev_price'
+        } else if (Number.isFinite(pct)) {
+          ;(audit as unknown as { changePctSource?: string }).changePctSource = 'missing'
+          ;(audit as unknown as { changePctSuppressed?: boolean }).changePctSuppressed = true
+          ;(audit as unknown as { changePctSuppressedKind?: string }).changePctSuppressedKind = 'derived'
+          ;(audit as unknown as { changePctSuppressedValue?: number }).changePctSuppressedValue = pct
+          ;(audit as unknown as { changePctSuppressedThreshold?: number }).changePctSuppressedThreshold = derivedAbsThreshold
+        }
+      }
+
+      const src = (audit as unknown as { changePctSource?: unknown }).changePctSource
+      if (src !== 'field' && src !== 'derived' && src !== 'missing') {
+        const hasPct =
+          typeof (point as unknown as { changePct?: unknown }).changePct === 'number' &&
+          Number.isFinite((point as unknown as { changePct: number }).changePct)
+        ;(audit as unknown as { changePctSource?: string }).changePctSource = hasPct ? 'field' : 'missing'
+      }
+    } catch {
+      void 0
+    }
     upsertPointIntoSeries({ series: params.series, assetSymbol: p.assetSymbol, point, cutoffMs: params.cutoffMs })
     updated += 1
     if (dayFallbackUsed) dailyFallbackUsed += 1

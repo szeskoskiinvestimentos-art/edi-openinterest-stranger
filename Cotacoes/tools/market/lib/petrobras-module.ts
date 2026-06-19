@@ -36,6 +36,7 @@ type PetrobrasModuleRow = {
 export type PetrobrasModulePayload = {
   ok: boolean
   provider: 'petrobras_module'
+  warnings: string[]
   generatedAt: string
   phase: { nowLabel: string; cutoffLocal: string }
   score: { value: number; bias: 'COMPRA' | 'VENDA' | 'NEUTRO'; confidence: number }
@@ -139,6 +140,7 @@ export function buildPetrobrasModule(input: {
   return {
     ok: true,
     provider: 'petrobras_module',
+    warnings: [],
     generatedAt,
     phase: { nowLabel: phaseLabel, cutoffLocal: '10:00' },
     score: { value: score, bias, confidence },

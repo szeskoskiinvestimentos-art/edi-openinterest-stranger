@@ -1,4 +1,4 @@
-function opBriefing_computeBrFlowSignal({ data, dc, dcDeps, nowMs, aliasSym, pickBestByMatchers, rcKey, yieldBp10FromSymbol, foreignFlow, macro }) {
+function opBriefing_computeBrFlowSignal({ data, dc, dcDeps, nowMs, aliasSym, pickBestByMatchers, rcKey, yieldBp10FromSymbol, foreignFlow, macro, operationalTuning }) {
     if (!data) return { score: null, label: '—', confidence: null, detail: '', drivers: [] };
 
     const symUsdBrl = aliasSym('USD_BRL') || pickBestByMatchers([/^USD\/BRL\b/i]);
@@ -35,10 +35,12 @@ function opBriefing_computeBrFlowSignal({ data, dc, dcDeps, nowMs, aliasSym, pic
     const tFx = 0.12;
     const tVol = 0.25;
     const tCredit = 0.18;
-    const tRates = typeof operationalTuning.threshold.yields === 'number' && Number.isFinite(operationalTuning.threshold.yields) ? operationalTuning.threshold.yields : 0.12;
-    const tEm = typeof operationalTuning.threshold.em === 'number' && Number.isFinite(operationalTuning.threshold.em) ? operationalTuning.threshold.em : 0.12;
-    const tExport = typeof operationalTuning.threshold.export === 'number' && Number.isFinite(operationalTuning.threshold.export) ? operationalTuning.threshold.export : 0.25;
-    const tFlow = typeof operationalTuning.threshold.foreignFlow === 'number' && Number.isFinite(operationalTuning.threshold.foreignFlow) ? operationalTuning.threshold.foreignFlow : 0.25;
+    const tuning = operationalTuning && typeof operationalTuning === 'object' ? operationalTuning : {};
+    const th = tuning.threshold && typeof tuning.threshold === 'object' ? tuning.threshold : {};
+    const tRates = typeof th.yields === 'number' && Number.isFinite(th.yields) ? th.yields : 0.12;
+    const tEm = typeof th.em === 'number' && Number.isFinite(th.em) ? th.em : 0.12;
+    const tExport = typeof th.export === 'number' && Number.isFinite(th.export) ? th.export : 0.25;
+    const tFlow = typeof th.foreignFlow === 'number' && Number.isFinite(th.foreignFlow) ? th.foreignFlow : 0.25;
 
     const parts = [];
     const push = (label, dir, w) => {
@@ -87,4 +89,3 @@ function opBriefing_computeBrFlowSignal({ data, dc, dcDeps, nowMs, aliasSym, pic
 
     return { score: (typeof score === 'number' && Number.isFinite(score)) ? score : null, label, confidence, detail, drivers };
 }
-

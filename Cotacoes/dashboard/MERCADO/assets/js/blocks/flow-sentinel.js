@@ -44,6 +44,7 @@
         };
         const sess = sessionNow();
         const vhsiWeight = sess === 'asia' ? 1.0 : 0.8;
+        const h = w.FlowSentinelHelpers || {};
 
         const setDot = (id, state, blink) => {
             const el = document.getElementById(id);
@@ -123,87 +124,27 @@
                 const historyKey = 'mercado_fs_history_v1';
                 const maxHistory = 24;
                 const nowMs = Date.now();
-
-                const readHistory = () => {
-                    try {
-                        const raw = localStorage.getItem(historyKey);
-                        const parsed = raw ? JSON.parse(raw) : null;
-                        if (!Array.isArray(parsed)) return [];
-                        return parsed
-                            .filter(x => x && typeof x === 'object')
-                            .map(x => {
-                                const o = x;
-                                const tMs = typeof o.tMs === 'number' && Number.isFinite(o.tMs) ? o.tMs : null;
-                                const s10 = typeof o.s10 === 'number' && Number.isFinite(o.s10) ? o.s10 : null;
-                                const p = typeof o.pct === 'number' && Number.isFinite(o.pct) ? o.pct : null;
-                                const dd = typeof o.delta === 'number' && Number.isFinite(o.delta) ? o.delta : null;
-                                const oa = typeof o.oilAdj === 'number' && Number.isFinite(o.oilAdj) ? o.oilAdj : 0;
-                                const lab = typeof o.label === 'string' ? o.label : '';
-                                if (tMs === null || s10 === null || p === null || dd === null) return null;
-                                return { tMs, s10, pct: p, delta: dd, oilAdj: oa, label: lab };
-                            })
-                            .filter(Boolean);
-                    } catch {
-                        return [];
-                    }
-                };
-
-                const writeHistory = items => {
-                    try {
-                        localStorage.setItem(historyKey, JSON.stringify(items));
-                    } catch {
-                    }
-                };
-
-                const toTime = tMs => {
-                    try {
-                        return new Date(tMs).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                    } catch {
-                        return '';
-                    }
-                };
-
-                const clamp10 = v => Math.max(0, Math.min(10, Math.round(v)));
-                const toneColor = s10 => {
-                    const x = clamp10(s10);
-                    if (x <= 3) return 'rgba(255,60,80,.95)';
-                    if (x >= 7) return 'rgba(0,255,160,.95)';
-                    return 'rgba(255,210,74,.95)';
-                };
-
-                const history = readHistory();
-                const nextItem = { tMs: nowMs, s10: score10, pct: pct, delta: delta === null ? 0 : delta, oilAdj: oilAdj, label: thermoLabel };
-                const last = history.length ? history[history.length - 1] : null;
-                if (last && nowMs - last.tMs < 20000) {
-                    history[history.length - 1] = nextItem;
-                } else {
-                    history.push(nextItem);
-                }
-                const trimmed = history.slice(-maxHistory);
-                writeHistory(trimmed);
-
-                const bars = trimmed
-                    .slice(-12)
-                    .map(h => {
-                        const height = 8 + clamp10(h.s10) * 2.3;
-                        const title = `${toTime(h.tMs)} • ${clamp10(h.s10)}/10 • Δ ${formatNumber(h.delta, 3)}${h.oilAdj ? ` • oil ${h.oilAdj > 0 ? '+' : ''}${formatNumber(h.oilAdj, 2)}` : ''}`;
-                        return `<div title="${escapeHtml(title)}" style="width:10px;height:${height}px;background:${toneColor(h.s10)};border-radius:4px;opacity:.92;"></div>`;
+                const updateThermoHistory = typeof h.updateThermoHistory === 'function' ? h.updateThermoHistory : null;
+                const updated = updateThermoHistory
+                    ? updateThermoHistory({
+                        historyKey,
+                        maxHistory,
+                        nowMs,
+                        s10: score10,
+                        pct,
+                        delta: delta === null ? 0 : delta,
+                        oilAdj,
+                        label: thermoLabel,
+                        formatNumber,
+                        escapeHtml,
                     })
-                    .join('');
+                    : null;
+                setHtml('fs-history', updated && updated.html ? updated.html : '');
 
-                setHtml('fs-history', `
-            <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">
-                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                    <div style="font-weight:900;letter-spacing:1px;opacity:.95;">Histórico (últimas janelas)</div>
-                    <div style="opacity:.80;font-size:12px;">${escapeHtml(trimmed.length ? `${toTime(trimmed[trimmed.length - 1].tMs)}` : '')}</div>
-                </div>
-                <div style="display:flex;align-items:flex-end;gap:6px;margin-top:10px;min-height:38px;">
-                    ${bars || '<div style="opacity:.85;">—</div>'}
-                </div>
-            </div>
-        `);
-
-                const merged = Array.from(new Set((Array.isArray(pre.alerts) ? pre.alerts : []).map(x => String(x || '').trim()).filter(Boolean)));
+                const mergeAlerts = typeof h.mergeAlerts === 'function'
+                    ? h.mergeAlerts
+                    : (alerts) => Array.from(new Set((Array.isArray(alerts) ? alerts : []).map(x => String(x || '').trim()).filter(Boolean)));
+                const merged = mergeAlerts(pre.alerts);
                 setHtml('fs-alerts', merged.length
                     ? `
                 <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);">

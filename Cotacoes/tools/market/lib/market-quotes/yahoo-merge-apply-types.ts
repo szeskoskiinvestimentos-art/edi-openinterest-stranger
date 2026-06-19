@@ -14,6 +14,12 @@ export type YahooMergeAuditItem = {
   tradingViewSymbol?: string
   tradingViewUsedColumn?: string
   tradingViewUpdateMode?: string | null
+  changePctSource?: 'field' | 'derived' | 'missing'
+  changePctDerivedFrom?: 'prev_price'
+  changePctSuppressed?: boolean
+  changePctSuppressedKind?: 'field' | 'derived'
+  changePctSuppressedValue?: number
+  changePctSuppressedThreshold?: number
 }
 
 export type YahooMergeByCategoryCounters = { assets: number; attempted: number; updated: number; missing: number }
@@ -50,4 +56,3 @@ export type YahooMergeApplyResult = {
   missingSymbols: string[]
   auditItems: YahooMergeAuditItem[]
 }
-

@@ -1,21 +1,58 @@
-# Arquivos de ambiente e segredos
+# ============================================
+# EDI Market Guardian - .gitignore
+# ============================================
+
+# --- Arquivos de ambiente e segredos ---
 .env
+.env.*
 .venv
 venv/
-__pycache__/
 *.pyc
+*.pyo
 
-# Arquivos de sistema e IDE
+# --- Arquivos de sistema e IDE ---
 .DS_Store
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
+# --- Dependências Node.js ---
+node_modules/
+package-lock.json
+
+# --- Arquivos de log e debug ---
+Cotacoes/.edi-market-guardin/logs/
+service_logs/
+Auto_B3_System/Debug/
+debug_*.txt
+*.log
+
+# --- Outputs e exports (gerados) ---
+exports/
+controle_de_dados.html
+dashboard_v1/
+*.html.bak
+*.tmp
+
+# --- Dados sensíveis ---
+*.env.auto
+credentials.json
+service-account*.json
+
+# --- Arquivos temporários ---
+*.cache
+*.temp
+thumbs.db
+
+# ============================================
 # PUBLICAÇÃO GITHUB PAGES
+# ============================================
 # Mantém rastreado apenas o que é necessário para o site:
 #   - index.html (redirect)
 #   - .nojekyll
-#   - dashboard_unificado/ (site WDO/WIN)
-#   - dashboard_v1/ (V1 local/publicável, usado por automações)
+#   - dashboard_unificado/ (site principal)
 #   - Cotacoes/ (Market Guardian - Cotações)
 #
 # Todo o restante continua existindo localmente, mas não será enviado ao Git.
@@ -24,22 +61,64 @@ __pycache__/
 !.nojekyll
 !Servico_Unificado.bat
 !Servico_Unificado_FORCE.bat
-!B3_System/
-!B3_System/dashboard_unificado/
-!B3_System/dashboard_unificado/index.html
-!B3_System/dashboard_unificado/WDO/
-!B3_System/dashboard_unificado/WDO/index.html
-!B3_System/dashboard_unificado/WIN/
-!B3_System/dashboard_unificado/WIN/index.html
 !dashboard_unificado/
-!dashboard_v1/
 !Cotacoes/
 
 # Dentro de dashboard_unificado, mantém tudo
 !dashboard_unificado/**/*
 
-# Dentro de dashboard_v1, mantém tudo
-!dashboard_v1/**/*
-
 # Dentro de Cotacoes, mantém tudo
 !Cotacoes/**/*
+
+# ============================================
+# EXCLUSÕES ESPECÍFICAS (após re-inclusão de subárvores)
+# Estas regras têm prioridade e sobrescrevem as anteriores
+# ============================================
+
+# Exclui node_modules dentro de Cotacoes (se existir)
+Cotacoes/node_modules/
+
+# Exclui __pycache__ Python em qualquer profundidade
+__pycache__/
+
+# Exclui exports PDF gerados pelo pipeline
+Cotacoes/dashboard/MERCADO/exports/
+
+# Exclui artefatos de execução do Chrome (Playwright) - Mantém APENAS
+# arquivos de autenticação: Cookies, Login Data, Preferences, Secure Preferences, Bookmarks
+Auto_B3_System/chrome_profile/Default/LOG.old
+Auto_B3_System/chrome_profile/Default/LOG
+Auto_B3_System/chrome_profile/Default/IndexedDB/
+Auto_B3_System/chrome_profile/Default/Cache/
+Auto_B3_System/chrome_profile/Default/Code Cache/
+Auto_B3_System/chrome_profile/Default/GPUCache/
+Auto_B3_System/chrome_profile/Default/File System/
+Auto_B3_System/chrome_profile/Default/Storage/
+Auto_B3_System/chrome_profile/Default/Visited Links
+Auto_B3_System/chrome_profile/Default/WebStorage/
+Auto_B3_System/chrome_profile/Default/Service Worker/
+Auto_B3_System/chrome_profile/Default/Site Characteristics Database/
+Auto_B3_System/chrome_profile/Default/Feature Engagement Tracker/
+Auto_B3_System/chrome_profile/Default/AutofillAiModelCache/
+Auto_B3_System/chrome_profile/Default/AutofillStrikeDatabase/
+Auto_B3_System/chrome_profile/Default/BudgetDatabase/
+Auto_B3_System/chrome_profile/Default/ClientCertificates/
+Auto_B3_System/chrome_profile/Default/commerce_subscription_db/
+Auto_B3_System/chrome_profile/Default/discount_infos_db/
+Auto_B3_System/chrome_profile/Default/discounts_db/
+Auto_B3_System/chrome_profile/Default/Download Service/
+Auto_B3_System/chrome_profile/Default/Extension Rules/
+Auto_B3_System/chrome_profile/Default/Extension Scripts/
+Auto_B3_System/chrome_profile/Default/Extension State/
+Auto_B3_System/chrome_profile/Default/Extensions/
+Auto_B3_System/chrome_profile/Default/GCM Store/
+Auto_B3_System/chrome_profile/Default/optimization_guide_hint_cache_store/
+Auto_B3_System/chrome_profile/Default/parcel_tracking_db/
+Auto_B3_System/chrome_profile/Default/PersistentOriginTrials/
+Auto_B3_System/chrome_profile/Default/Platform Notifications/
+Auto_B3_System/chrome_profile/Default/Segmentation Platform/
+Auto_B3_System/chrome_profile/Default/Session Storage/
+Auto_B3_System/chrome_profile/Default/shared_proto_db/
+Auto_B3_System/chrome_profile/Default/Sync Data/
+Auto_B3_System/chrome_profile/Default/VideoDecodeStats/
+Auto_B3_System/chrome_profile/Default/chrome_cart_db/

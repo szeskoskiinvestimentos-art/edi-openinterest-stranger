@@ -29,19 +29,43 @@ class GreeksEngine:
         r = np.asarray(r, dtype=float)
         sigma = np.asarray(sigma, dtype=float)
         
-        # Evita divisão por zero ou raiz negativa
-        with np.errstate(divide='ignore', invalid='ignore'):
-            d1 = (np.log(S/K) + (r + 0.5*sigma**2)*T) / (sigma*np.sqrt(T))
-            
-        if typ == 'C':
-            delta = norm.cdf(d1)
-        else:
-            delta = norm.cdf(d1) - 1.0
-            
-        gamma = norm.pdf(d1) / (S*sigma*np.sqrt(T))
+        # Inicializa arrays de resultado com zeros
+        delta = np.zeros_like(S, dtype=float)
+        gamma = np.zeros_like(S, dtype=float)
         
-        # Tratamento de NaN gerado por T=0 ou Sigma=0
-        return np.nan_to_num(delta), np.nan_to_num(gamma)
+        # Máscara para valores válidos (T > 0 e sigma > 0)
+        valid_mask = (T > 0) & (sigma > 0)
+        
+        if np.any(valid_mask):
+            # Calcula apenas para valores válidos
+            S_valid = S[valid_mask]
+            K_valid = K[valid_mask]
+            T_valid = T[valid_mask]
+            r_valid = r[valid_mask]
+            sigma_valid = sigma[valid_mask]
+            
+            with np.errstate(divide='ignore', invalid='ignore'):
+                d1 = (np.log(S_valid/K_valid) + (r_valid + 0.5*sigma_valid**2)*T_valid) / (sigma_valid*np.sqrt(T_valid))
+            
+            if typ == 'C':
+                delta[valid_mask] = norm.cdf(d1)
+            else:
+                delta[valid_mask] = norm.cdf(d1) - 1.0
+            
+            gamma[valid_mask] = norm.pdf(d1) / (S_valid*sigma_valid*np.sqrt(T_valid))
+        
+        # Para T=0 ou sigma=0:
+        # Delta é intrinsic value (1 para ITM, 0 para OTM)
+        # Gamma é 0 (sem curvatura no vencimento)
+        invalid_mask = ~valid_mask
+        if np.any(invalid_mask):
+            if typ == 'C':
+                delta[invalid_mask] = np.where(S[invalid_mask] >= K[invalid_mask], 1.0, 0.0)
+            else:
+                delta[invalid_mask] = np.where(S[invalid_mask] <= K[invalid_mask], 1.0, 0.0)
+            # Gamma já é 0 (inicializado)
+        
+        return delta, gamma
 
     @staticmethod
     def calculate_vega(S, K, T, r, sigma):
@@ -52,10 +76,26 @@ class GreeksEngine:
         r = np.asarray(r, dtype=float)
         sigma = np.asarray(sigma, dtype=float)
         
-        with np.errstate(divide='ignore', invalid='ignore'):
-            d1 = (np.log(S/K) + (r + 0.5*sigma**2)*T) / (sigma*np.sqrt(T))
+        # Vega é 0 quando T=0 ou sigma=0
+        vega = np.zeros_like(S, dtype=float)
+        
+        valid_mask = (T > 0) & (sigma > 0)
+        if np.any(valid_mask):
+            S_valid = S[valid_mask]
+            K_valid = K[valid_mask]
+            T_valid = T[valid_mask]
+            r_valid = r[valid_mask]
+            sigma_valid = sigma[valid_mask]
             
-        return np.nan_to_num(S * norm.pdf(d1) * np.sqrt(T))
+            with np.errstate(divide='ignore', invalid='ignore'):
+                d1 = (np.log(S_valid/K_valid) + (r_valid + 0.5*sigma_valid**2)*T_valid) / (sigma_valid*np.sqrt(T_valid))
+            
+            vega[valid_mask] = S_valid * norm.pdf(d1) * np.sqrt(T_valid)
+            # NOTE: Vega is per unit change in sigma (100%). Market convention is per 1%.
+            # To convert to market convention: vega_market = vega / 100
+            # Vega Exposure in calculator.py uses this raw value consistently.
+        
+        return vega
 
     @staticmethod
     def calculate_theta(S, K, T, r, sigma, typ):
@@ -66,18 +106,29 @@ class GreeksEngine:
         r = np.asarray(r, dtype=float)
         sigma = np.asarray(sigma, dtype=float)
         
-        with np.errstate(divide='ignore', invalid='ignore'):
-            d1 = (np.log(S/K) + (r + 0.5*sigma**2)*T) / (sigma*np.sqrt(T))
-            d2 = d1 - sigma*np.sqrt(T)
+        # Theta é 0 quando T=0 ou sigma=0
+        theta = np.zeros_like(S, dtype=float)
         
-        term = -(S * norm.pdf(d1) * sigma) / (2 * np.sqrt(T))
-        
-        if typ == 'C':
-            theta = term - r * K * np.exp(-r*T) * norm.cdf(d2)
-        else:
-            theta = term + r * K * np.exp(-r*T) * norm.cdf(-d2)
+        valid_mask = (T > 0) & (sigma > 0)
+        if np.any(valid_mask):
+            S_valid = S[valid_mask]
+            K_valid = K[valid_mask]
+            T_valid = T[valid_mask]
+            r_valid = r[valid_mask]
+            sigma_valid = sigma[valid_mask]
             
-        return np.nan_to_num(theta)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                d1 = (np.log(S_valid/K_valid) + (r_valid + 0.5*sigma_valid**2)*T_valid) / (sigma_valid*np.sqrt(T_valid))
+                d2 = d1 - sigma_valid*np.sqrt(T_valid)
+            
+            term = -(S_valid * norm.pdf(d1) * sigma_valid) / (2 * np.sqrt(T_valid))
+            
+            if typ == 'C':
+                theta[valid_mask] = term - r_valid * K_valid * np.exp(-r_valid*T_valid) * norm.cdf(d2)
+            else:
+                theta[valid_mask] = term + r_valid * K_valid * np.exp(-r_valid*T_valid) * norm.cdf(-d2)
+        
+        return theta
 
     @staticmethod
     def bs_price(S, K, T, r, sigma, typ):
@@ -88,30 +139,31 @@ class GreeksEngine:
         r = np.asarray(r, dtype=float)
         sigma = np.asarray(sigma, dtype=float)
         
-        # Note: bs_price logic with scalar checks (sigma<=0) is harder to vectorize directly 
-        # without using np.where.
-        # But for now, let's keep it simple or try to vectorize it using np.where.
-        
-        with np.errstate(divide='ignore', invalid='ignore'):
-            d1 = (np.log(S/K) + (r + 0.5*sigma**2)*T) / (sigma*np.sqrt(T))
-            d2 = d1 - sigma*np.sqrt(T)
-            
-            call_price = S*norm.cdf(d1) - K*np.exp(-r*T)*norm.cdf(d2)
-            put_price = K*np.exp(-r*T)*norm.cdf(-d2) - S*norm.cdf(-d1)
-            
-        price = call_price if typ == 'C' else put_price
-        
-        # Handle invalid cases (sigma <= 0 or T <= 0)
-        # Intrinsic value
+        # Preço é intrinsic value quando T=0 ou sigma=0
         intrinsic = np.maximum(0.0, S - K) if typ == 'C' else np.maximum(0.0, K - S)
         
-        # Use intrinsic where sigma<=0 or T<=0
-        mask_valid = (sigma > 0) & (T > 0)
+        price = np.zeros_like(S, dtype=float)
         
-        # If inputs are scalar, result is scalar. If array, result is array.
-        # np.where works for both if we are careful.
+        valid_mask = (T > 0) & (sigma > 0)
+        if np.any(valid_mask):
+            S_valid = S[valid_mask]
+            K_valid = K[valid_mask]
+            T_valid = T[valid_mask]
+            r_valid = r[valid_mask]
+            sigma_valid = sigma[valid_mask]
+            
+            with np.errstate(divide='ignore', invalid='ignore'):
+                d1 = (np.log(S_valid/K_valid) + (r_valid + 0.5*sigma_valid**2)*T_valid) / (sigma_valid*np.sqrt(T_valid))
+                d2 = d1 - sigma_valid*np.sqrt(T_valid)
+                
+                if typ == 'C':
+                    price[valid_mask] = S_valid*norm.cdf(d1) - K_valid*np.exp(-r_valid*T_valid)*norm.cdf(d2)
+                else:
+                    price[valid_mask] = K_valid*np.exp(-r_valid*T_valid)*norm.cdf(-d2) - S_valid*norm.cdf(-d1)
         
-        if np.ndim(mask_valid) == 0:
-             return price if mask_valid else intrinsic
-        else:
-             return np.where(mask_valid, price, intrinsic)
+        # Para T=0 ou sigma=0, usa intrinsic value
+        invalid_mask = ~valid_mask
+        if np.any(invalid_mask):
+            price[invalid_mask] = intrinsic[invalid_mask]
+        
+        return price

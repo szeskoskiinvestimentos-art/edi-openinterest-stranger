@@ -1,30 +1,114 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Dashboard Unificado</title>
-<style>
-body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#0b0d12;color:#e5e7eb}
-header{padding:18px 20px;border-bottom:1px solid #1f2937;background:#0d1117}
-h1{margin:0;font-size:18px;letter-spacing:.5px}
-.wrap{max-width:980px;margin:0 auto;padding:18px 20px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
-a.card{display:block;border:1px solid #1f2937;background:#0d1117;border-radius:12px;padding:14px 14px;text-decoration:none;color:inherit}
-a.card:hover{border-color:#3b82f6}
-.sym{font-weight:800;font-size:16px}
-.meta{margin-top:8px;color:#9ca3af;font-size:12px;line-height:1.35}
-.meta code{color:#93c5fd}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>EDI Market Guardin - Dashboard Unificado (Stranger Things)</title>
+  <link rel="stylesheet" href="shared/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 </head>
 <body>
-<header><h1>Dashboard Unificado</h1></header>
-<div class="wrap">
-<div class="grid">
-<a class="card" href="WDO/index.html"><div class="sym">WDO</div><div class="meta">last_update: <code>2026-05-21 14:23:08</code></div></a>
-<a class="card" href="WIN/index.html"><div class="sym">WIN</div><div class="meta">last_update: <code>2026-05-21 14:23:30</code></div></a>
-<a class="card" href="correlation/index.html"><div class="sym">Correlation Matrix</div><div class="meta">Top 20 • ~1h • fonte: <code>MERCADO/market_quotes.json</code></div></a>
-</div>
-</div>
+  <div id="particles-js"></div>
+
+  <header class="header">
+    <div class="container">
+      <div class="logo">
+        <h1 class="logo-text">EDI MARKET GUARDIN</h1>
+        <div class="logo-subtitle">
+          HUB - DASHBOARD UNIFICADO
+          <span id="last-update-label"></span>
+        </div>
+      </div>
+      <div class="header-glow"></div>
+    </div>
+  </header>
+
+  <nav class="nav">
+    <div class="container" style="display:flex;align-items:center;position:relative;">
+      <div class="nav-center" style="flex:1;display:flex;justify-content:center;">
+        <ul class="nav-list" style="margin:0">
+          <li><a href="#links" class="nav-link active">Atalhos</a></li>
+          <li><a href="#status" class="nav-link">Status</a></li>
+        </ul>
+      </div>
+      <div class="nav-actions" style="position:absolute;right:0;top:50%;transform:translateY(-50%);">
+        <select id="assetSelect" data-current-dashboard="HUB" aria-label="Selecionar dashboard" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;">
+          <optgroup label="Dashboards">
+            <option value="HUB" selected>Dashboard Unificado</option>
+            <option value="WDO">WDO</option>
+            <option value="WIN">WIN</option>
+          </optgroup>
+          <optgroup label="Mercado">
+            <option value="MERCADO">Cotações</option>
+            <option value="CORR">Correlações</option>
+            <option value="CONTROLE">Controle</option>
+          </optgroup>
+        </select>
+      </div>
+    </div>
+  </nav>
+
+  <main class="main">
+    <div class="container">
+      <section id="links" class="section">
+        <div class="section-header">
+          <h2 class="section-title">ATALHOS PRINCIPAIS</h2>
+          <div class="section-glow"></div>
+        </div>
+
+        <div class="metrics-grid">
+          <a class="metric-card" href="WDO/index.html" style="text-decoration:none;color:inherit;">
+            <div class="metric-icon">💱</div>
+            <div class="metric-value">WDO</div>
+            <div class="metric-label">Dólar Futuro</div>
+          </a>
+          <a class="metric-card" href="WIN/index.html" style="text-decoration:none;color:inherit;">
+            <div class="metric-icon">📈</div>
+            <div class="metric-value">WIN</div>
+            <div class="metric-label">Índice Futuro</div>
+          </a>
+          <a class="metric-card" href="../Cotacoes/dashboard/MERCADO/index.html" style="text-decoration:none;color:inherit;">
+            <div class="metric-icon">🧾</div>
+            <div class="metric-value">Cotações</div>
+            <div class="metric-label">MERCADO</div>
+          </a>
+          <a class="metric-card" href="correlation/index.html" style="text-decoration:none;color:inherit;">
+            <div class="metric-icon">🧠</div>
+            <div class="metric-value">Correlação</div>
+            <div class="metric-label">SuperGraphics</div>
+          </a>
+          <a class="metric-card" href="controle/index.html" style="text-decoration:none;color:inherit;">
+            <div class="metric-icon">🛰️</div>
+            <div class="metric-value">Controle</div>
+            <div class="metric-label">Alimentação de dados</div>
+          </a>
+        </div>
+      </section>
+
+      <section id="status" class="section">
+        <div class="section-header">
+          <h2 class="section-title">STATUS</h2>
+          <div class="section-glow"></div>
+        </div>
+        <div class="context-box">
+          <p>Use o seletor no canto superior direito para alternar entre as telas sem “voltar para versões antigas”.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 EDI Market Guardin. Stranger Things Edition.</p>
+    </div>
+  </footer>
+
+  <script src="shared/js/particles.js"></script>
+  <script src="shared/unified-nav.js"></script>
 </body>
 </html>

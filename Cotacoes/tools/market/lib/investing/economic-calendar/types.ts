@@ -30,8 +30,15 @@ export type EconomicCalendarPayload = {
       mapped: number
       total: number
       requestedReports: CalendarMatrixReportRequest[]
+      unmappedTop?: Array<{
+        country: string
+        sampleEvent: string
+        count: number
+        suggestTokens: string[]
+        suggestIncludes: string
+        suggestRegex: string
+      }>
     }
   }
   items: EconomicCalendarItem[]
 }
-

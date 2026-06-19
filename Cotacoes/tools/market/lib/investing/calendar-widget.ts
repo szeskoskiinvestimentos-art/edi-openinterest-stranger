@@ -4,6 +4,7 @@ import { launchPersistentContextWithRetry, type InvestingBrowser, buildChromiumL
 import { dumpDebug } from './debug.js'
 import { tryDismissBanners } from './page-helpers.js'
 import { extractCalendarWidgetRowsFromDom } from './calendar-widget/dom-extract.js'
+import { extractCalendarWidgetRowsFromHtml } from './calendar-widget/html-extract.js'
 
 export type CalendarWidgetRow = {
   time: string
@@ -101,7 +102,20 @@ export async function scrapeCalendarWidget(params: {
       void 0
     }
 
-    const rows = (await page.evaluate(extractCalendarWidgetRowsFromDom)) as CalendarWidgetRow[]
+    let rows: CalendarWidgetRow[] = []
+    try {
+      rows = (await page.evaluate(extractCalendarWidgetRowsFromDom)) as CalendarWidgetRow[]
+    } catch {
+      rows = []
+    }
+    if (!rows.length) {
+      try {
+        const html = await page.content()
+        rows = extractCalendarWidgetRowsFromHtml(html) as CalendarWidgetRow[]
+      } catch {
+        rows = []
+      }
+    }
 
     if (!rows.length) {
       await dumpDebug(page, params.debugDir, 'investing_calendar_empty', log)
@@ -110,6 +124,13 @@ export async function scrapeCalendarWidget(params: {
 
     return { cloudflare: false, rows }
   } catch (e) {
+    try {
+      const html = await page.content()
+      const rows = extractCalendarWidgetRowsFromHtml(html) as CalendarWidgetRow[]
+      if (rows.length) return { cloudflare: false, rows }
+    } catch {
+      void 0
+    }
     try {
       await dumpDebug(page, params.debugDir, 'investing_calendar_error', log)
     } catch {

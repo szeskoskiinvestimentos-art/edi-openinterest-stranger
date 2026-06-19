@@ -73,6 +73,22 @@ export function buildYahooMergePlan(params: {
     plan.push({ assetSymbol, yahooSymbol })
   }
 
+  const pinnedMatchers: RegExp[] = [
+    /^WINc1$/i,
+    /^WDOc1$/i,
+    /^\.BVSP$/i,
+    /^USDX$/i,
+    /^DX-Y\.NYB$/i,
+    /^\.DXY$/i,
+    /^USD\/BRL\b/i,
+    /^\.(VIX|VIX9D)\b/i,
+    /^VIX\b/i,
+    /^\.TNX$/i,
+    /^\^TNX$/i,
+  ]
+  const pinnedRank = (assetSymbol: string) => (pinnedMatchers.some(rx => rx.test(assetSymbol)) ? 0 : 1)
+  plan.sort((a, b) => pinnedRank(a.assetSymbol) - pinnedRank(b.assetSymbol))
+
   const maxSymbols = Math.max(1, Math.min(2000, Math.trunc(params.maxSymbols)))
   const uniqueYahoo = Array.from(new Set(plan.map(p => p.yahooSymbol))).slice(0, maxSymbols)
   const selectedYahooSet = new Set(uniqueYahoo)
@@ -81,4 +97,3 @@ export function buildYahooMergePlan(params: {
 
   return { overrides, assetBySymbol, byCategory, selectedPlan, uniqueYahoo, skippedAssets }
 }
-

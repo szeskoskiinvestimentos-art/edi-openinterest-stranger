@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileExists } from './io.js'
+import { requireInsideWorkspace } from '../update-service/paths.js'
 
 export async function buildOptionsGammaSummary(params: {
   projectRoot: string
@@ -29,27 +30,13 @@ export async function buildOptionsGammaSummary(params: {
 
   const workspaceRoot = path.resolve(params.projectRoot, '..')
 
-  function isPathInside(baseDir: string, targetPath: string) {
-    const base = path.resolve(baseDir)
-    const target = path.resolve(targetPath)
-    const normBase = process.platform === 'win32' ? base.toLowerCase() : base
-    const normTarget = process.platform === 'win32' ? target.toLowerCase() : target
-    const baseWithSep = normBase.endsWith(path.sep) ? normBase : normBase + path.sep
-    return normTarget === normBase || normTarget.startsWith(baseWithSep)
-  }
-
-  function resolveInsideWorkspace(label: string, p: string) {
-    const abs = params.resolveFromProject(p)
-    if (!isPathInside(workspaceRoot, abs)) {
-      throw new Error(`${label}_outside_workspace_root:${abs}`)
-    }
-    return abs
-  }
-
   const envOverride = String(params.env('OPTIONS_UNIFIED_DASHBOARD_DIR', '') || '').trim()
-  const optionsDashboardDir = envOverride
-    ? resolveInsideWorkspace('OPTIONS_UNIFIED_DASHBOARD_DIR', envOverride)
-    : path.resolve(workspaceRoot, 'dashboard_unificado')
+  const optionsDashboardDir = (() => {
+    const fallback = path.resolve(workspaceRoot, 'dashboard_unificado')
+    if (!envOverride) return fallback
+    const candidate = path.isAbsolute(envOverride) ? envOverride : path.resolve(workspaceRoot, envOverride)
+    return requireInsideWorkspace('OPTIONS_UNIFIED_DASHBOARD_DIR', candidate)
+  })()
 
   const mercadoDir = path.resolve(workspaceRoot, 'Cotacoes', 'dashboard', 'MERCADO')
   const unifiedRel = path.relative(mercadoDir, optionsDashboardDir).split(path.sep).join('/')

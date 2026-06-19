@@ -89,9 +89,9 @@ export function sparkStats(chart: SparkLike | null) {
 
   return {
     price: Number.isFinite(last) ? last : null,
-    change: Number.isFinite(change) && change !== 0 ? change : null,
-    changePct: typeof changePct === 'number' && Number.isFinite(changePct) && changePct !== 0 ? changePct : null,
+    change: Number.isFinite(change) ? change : null,
+    changePct: typeof changePct === 'number' && Number.isFinite(changePct) ? changePct : null,
     asOf,
-    rangePct: typeof rangePct === 'number' && Number.isFinite(rangePct) && rangePct !== 0 ? rangePct : null,
+    rangePct: typeof rangePct === 'number' && Number.isFinite(rangePct) ? rangePct : null,
   }
 }

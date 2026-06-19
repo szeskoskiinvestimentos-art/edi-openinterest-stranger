@@ -84,7 +84,7 @@
             getItem({ key: 'oil', label: 'Petróleo', matchers: [/^BZ=F$/i, /^LCOc\d+$/i, /^BRNc\d+$/i, /\bBrent\b/i, /^CL=F$/i, /^CL$/i, /^CLc\d+$/i, /\bWTI\b/i, /\bCrude\b/i, /\bPetróleo\b/i, /\bPetroleo\b/i], weight: 0.18 }),
             getItem({ key: 'lumber', label: 'Madeira serrada', matchers: [/^LBc1$/i, /^LBc\d+$/i, /^LXRc1$/i, /^LXRc\d+$/i, /\bMadeira Serrada\b/i, /\bLumber\b/i], weight: 0.02 }),
             getItem({ key: 'cattle', label: 'Boi', matchers: [/^BGIc1$/i, /^BGIc\d+$/i, /^LC=F$/i, /^LCc\d+$/i, /^LC$/i, /^BBOI11\.SA$/i, /\bBoi Gordo\b/i, /\bLive Cattle\b/i, /^LE=F$/i, /^LE$/i, /^LEc\d+$/i], weight: 0.10 }),
-            getItem({ key: 'chicken', label: 'Frango', matchers: [/\bChicken\b/i, /\bFrango\b/i], weight: 0.02 }),
+            getItem({ key: 'chicken', label: 'Frango', matchers: [/^MBRFY\.PK$/i, /^JBSAY\.PK$/i, /\bBRF\s+SA\b/i, /\bJBS\s+SA\b/i, /\bChicken\b/i, /\bFrango\b/i], weight: 0.02 }),
             getItem({ key: 'hogs', label: 'Porco Magro', matchers: [/^LH=F$/i, /^LH$/i, /^LHc\d+$/i, /\bPorco Magro\b/i, /\bLean Hogs\b/i], weight: 0.03 }),
             getItem({ key: 'coffee', label: 'Café', matchers: [/^KC=F$/i, /^KC$/i, /^KCc\d+$/i, /\bCoffee\b/i, /\bCafé\b/i, /\bCafe\b/i], weight: 0.07 }),
             getItem({ key: 'sugar', label: 'Açúcar', matchers: [/^SB=F$/i, /^SB$/i, /^SBc\d+$/i, /\bSugar\b/i, /\bAçúcar\b/i, /\bAcucar\b/i], weight: 0.05 }),

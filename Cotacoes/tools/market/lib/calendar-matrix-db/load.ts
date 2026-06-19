@@ -6,7 +6,7 @@ import type { CalendarMatrixDb, CalendarMatrixCountry, CalendarMatrixDbs } from 
 
 export async function loadCalendarMatrixDbs(): Promise<CalendarMatrixDbs> {
   const scriptDir = path.dirname(fileURLToPath(import.meta.url))
-  const projectRoot = path.resolve(scriptDir, '..', '..', '..')
+  const projectRoot = path.resolve(scriptDir, '..', '..', '..', '..')
   const baseDir = path.resolve(projectRoot, 'tools', 'market', 'data', 'calendar-matrix')
   const files: Array<{ country: CalendarMatrixCountry; filename: string }> = [
     { country: 'BR', filename: 'br.json' },

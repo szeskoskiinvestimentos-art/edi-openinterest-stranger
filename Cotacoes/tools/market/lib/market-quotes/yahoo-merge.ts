@@ -63,6 +63,8 @@ export async function mergeYahooQuotesIntoMarketQuotes(
   const tradingViewMax = Math.max(0, Math.min(240, Math.trunc(deps.envNumber('MARKET_TRADINGVIEW_FALLBACK_MAX', 40))))
   const tradingViewTimeoutMs = Math.max(1500, deps.envNumber('MARKET_TRADINGVIEW_TIMEOUT_MS', Math.max(6000, opts.timeoutMs)))
   const tradingViewOverrides = parseSymbolOverrides(deps.env('MARKET_TRADINGVIEW_SYMBOL_OVERRIDES'))
+  if (!tradingViewOverrides.has('WINc1')) tradingViewOverrides.set('WINc1', 'BMFBOVESPA:WIN1!')
+  if (!tradingViewOverrides.has('WDOc1')) tradingViewOverrides.set('WDOc1', 'BMFBOVESPA:WDO1!')
   const tradingViewOverrideSuggested = new Set<string>()
 
   const bestChartFetcher = async (symbol: string) =>

@@ -1,4 +1,4 @@
-function opBriefing_computeBrBreadthSectorSignal({ data, aliasSym, pickFreshestCandidate }) {
+function opBriefing_computeBrBreadthSectorSignal({ data, aliasSym, pickFreshestCandidate, operationalTuning }) {
     if (!data) return { ok: false };
 
     const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -117,7 +117,9 @@ function opBriefing_computeBrBreadthSectorSignal({ data, aliasSym, pickFreshestC
         if (!use15 && !use60) return null;
 
         const diff = use15 ? (small15 - large15) : (small60 - large60);
-        const baseTh = typeof operationalTuning.threshold.brRotation === 'number' && Number.isFinite(operationalTuning.threshold.brRotation) ? operationalTuning.threshold.brRotation : 0.12;
+        const tuning = operationalTuning && typeof operationalTuning === 'object' ? operationalTuning : {};
+        const thCfg = tuning.threshold && typeof tuning.threshold === 'object' ? tuning.threshold : {};
+        const baseTh = typeof thCfg.brRotation === 'number' && Number.isFinite(thCfg.brRotation) ? thCfg.brRotation : 0.12;
         const th = baseTh / (ok(amp) ? amp : 1);
         const dir = diff > th ? +1 : diff < -th ? -1 : 0;
         const label = dir > 0 ? 'SMALL> LARGE' : dir < 0 ? 'LARGE> SMALL' : 'MISTO';
@@ -127,17 +129,21 @@ function opBriefing_computeBrBreadthSectorSignal({ data, aliasSym, pickFreshestC
 
     const labelFrom = (score) => {
         if (!ok(score)) return 'MISTO';
-        const t = typeof operationalTuning.threshold.brBreadth === 'number' && Number.isFinite(operationalTuning.threshold.brBreadth) ? operationalTuning.threshold.brBreadth : 0.22;
+        const tuning = operationalTuning && typeof operationalTuning === 'object' ? operationalTuning : {};
+        const thCfg = tuning.threshold && typeof tuning.threshold === 'object' ? tuning.threshold : {};
+        const t = typeof thCfg.brBreadth === 'number' && Number.isFinite(thCfg.brBreadth) ? thCfg.brBreadth : 0.22;
         if (score >= t) return 'RISK-ON';
         if (score <= -t) return 'RISK-OFF';
         return 'MISTO';
     };
 
-    const tBreadth = typeof operationalTuning.threshold.brBreadth === 'number' && Number.isFinite(operationalTuning.threshold.brBreadth) ? operationalTuning.threshold.brBreadth : 0.22;
-    const tSectors = typeof operationalTuning.threshold.brSectors === 'number' && Number.isFinite(operationalTuning.threshold.brSectors) ? operationalTuning.threshold.brSectors : 0.18;
+    const tuning = operationalTuning && typeof operationalTuning === 'object' ? operationalTuning : {};
+    const thCfg = tuning.threshold && typeof tuning.threshold === 'object' ? tuning.threshold : {};
+    const tBreadth = typeof thCfg.brBreadth === 'number' && Number.isFinite(thCfg.brBreadth) ? thCfg.brBreadth : 0.22;
+    const tSectors = typeof thCfg.brSectors === 'number' && Number.isFinite(thCfg.brSectors) ? thCfg.brSectors : 0.18;
     const bScore = breadthScore && ok(breadthScore.score) ? breadthScore.score : null;
     const sScore = sectorsScore && ok(sectorsScore.score) ? sectorsScore.score : null;
-    const tRot = typeof operationalTuning.threshold.brRotation === 'number' && Number.isFinite(operationalTuning.threshold.brRotation) ? operationalTuning.threshold.brRotation : 0.12;
+    const tRot = typeof thCfg.brRotation === 'number' && Number.isFinite(thCfg.brRotation) ? thCfg.brRotation : 0.12;
     const rotScore = rotation && ok(rotation.score) ? rotation.score : null;
     const rotStrongOn = (ok(rotScore) && rotScore >= Math.max(0.18, (tRot * 1.4) / (ok(amp) ? amp : 1)));
     const rotStrongOff = (ok(rotScore) && rotScore <= -Math.max(0.18, (tRot * 1.4) / (ok(amp) ? amp : 1)));

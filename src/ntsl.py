@@ -234,6 +234,7 @@ def generate_ntsl_script(metrics, calc):
         "  ExibirEffectiveWalls(true);",
         "  MostrarPLUS(false);",
         "  MostrarPLUS2(false);",
+        "  MostrarPLUS3(true);",
         "  ExibirMelhoresPontos(true);",
         "  MostrarTodosPontos(false);",
         "  ModeloFlip(7);",
@@ -311,6 +312,20 @@ def generate_ntsl_script(metrics, calc):
             upper = strikes[i+1]
             dist = upper - lower
             for p in [0.236, 0.764]:
+                lvl = float(lower + p * dist)
+                script.append(f"    if (MostrarTodosPontos) then HorizontalLineCustom({lvl:.2f}, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);")
+                if window_low <= lvl <= window_high:
+                    script.append(f"    if (not MostrarTodosPontos) then HorizontalLineCustom({lvl:.2f}, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);")
+    script.append("  end;")
+
+    script.append("")
+    script.append("  if (MostrarPLUS3) then begin")
+    if len(strikes) > 1:
+        for i in range(len(strikes)-1):
+            lower = strikes[i]
+            upper = strikes[i+1]
+            dist = upper - lower
+            for p in [0.1587, 0.5, 0.8413]:
                 lvl = float(lower + p * dist)
                 script.append(f"    if (MostrarTodosPontos) then HorizontalLineCustom({lvl:.2f}, clFib, 1, psDash, \"Edi_Wall\", TamanhoFonte, tpTopLeft, CurrentDate, 0);")
                 if window_low <= lvl <= window_high:

@@ -271,7 +271,13 @@ function opBriefing_computeMacroLine({
         ? `Fluxo→BR ${brFlowSignal.label} (${formatNumber(brFlowSignal.score, 2)}${brFlowSignal.detail ? ` • ${brFlowSignal.detail}` : ''})`
         : 'Fluxo→BR: —';
     const cdsPart = cdsSignal
-        ? ` • CDS ${typeof cdsSignal.drivers.cds === 'number' ? formatPercent(cdsSignal.drivers.cds, 2) : '—'} (${cdsSignal.mode === 'hedge_on_risk_on' ? 'Hedge-on' : cdsSignal.mode === 'risk_off_classic' ? 'Risk-off' : cdsSignal.mode === 'relief_risk_on' ? 'Alívio' : 'Leitura'})`
+        ? (() => {
+            const drv = cdsSignal && cdsSignal.drivers && typeof cdsSignal.drivers === 'object' ? cdsSignal.drivers : null;
+            const cdsPct = drv && typeof drv.cds === 'number' && Number.isFinite(drv.cds) ? drv.cds : null;
+            const mode = cdsSignal && cdsSignal.mode ? String(cdsSignal.mode) : 'neutral';
+            const modeLabel = mode === 'hedge_on_risk_on' ? 'Hedge-on' : mode === 'risk_off_classic' ? 'Risk-off' : mode === 'relief_risk_on' ? 'Alívio' : 'Leitura';
+            return ` • CDS ${cdsPct !== null ? formatPercent(cdsPct, 2) : '—'} (${modeLabel})`;
+        })()
         : '';
 
     return `Flow ${String(macro.flow ? macro.flow.label : '—')} • ${foreignPart} • ${brFlowPart} • DXY ${typeof macro.dxyPct === 'number' ? formatPercent(macro.dxyPct, 2) : '—'} • Export ${typeof macro.exportScore === 'number' ? formatPercent(macro.exportScore, 2) : '—'} • EM ${typeof (macro.em && macro.em.pct) === 'number' ? formatPercent(macro.em.pct, 2) : '—'}${corrPart ? ` • ${corrPart}` : ''}${extras}${cdsPart}`;

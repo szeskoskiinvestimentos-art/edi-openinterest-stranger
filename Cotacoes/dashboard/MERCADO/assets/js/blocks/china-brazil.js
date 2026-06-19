@@ -154,9 +154,11 @@
         const chinaAvg = avg(chinaProxyPcts);
         const usdbbrl = getChangePct(data, sym.usdbbrl);
 
+        const ironProxy = sym.iron || sym.ironDalian;
+        const soyProxy = sym.soy || sym.soyMeal || sym.soyOil;
         const brlImpulse = wAvg([
-            { symbol: sym.iron, w: 0.27 },
-            { symbol: sym.soy, w: 0.20 },
+            { symbol: ironProxy, w: 0.27 },
+            { symbol: soyProxy, w: 0.20 },
             { symbol: sym.corn, w: 0.08 },
             { symbol: sym.coffee, w: 0.05 },
             { symbol: sym.sugar, w: 0.04 },
@@ -165,7 +167,7 @@
         ]);
 
         const ibovImpulse = wAvg([
-            { symbol: sym.iron, w: 0.45 },
+            { symbol: ironProxy, w: 0.45 },
             { symbol: sym.brent || sym.wti, w: 0.55 },
         ]);
 
@@ -235,8 +237,8 @@
             const hasHsi = hasPct(sym.hsi);
             const hasChinaCore = hasFxi || hasCsi;
             const hasUsdCnh = hasPct(sym.usdcnh) || hasPct(sym.usdcny);
-            const hasIron = hasPct(sym.iron);
-            const hasSoy = hasPct(sym.soy);
+            const hasIron = hasPct(sym.iron) || hasPct(sym.ironDalian);
+            const hasSoy = hasPct(sym.soy) || hasPct(sym.soyMeal) || hasPct(sym.soyOil);
             const hasOil = hasPct(sym.brent) || hasPct(sym.wti);
             const hasCopper = hasPct(sym.copper);
             const hasBci = hasPct(sym.bci);
@@ -275,8 +277,8 @@
                     { label: 'FXI ou CSI300 (≥1)', ok: hasChinaCore },
                     { label: 'HSI (fallback)', ok: hasHsi },
                     { label: 'USD/CNH (stress)', ok: hasUsdCnh },
-                    { label: 'Minério (TIO/SM58F)', ok: hasIron },
-                    { label: 'Soja (ZS)', ok: hasSoy },
+                    { label: 'Minério (TIO/SM58F ou DCE_I0)', ok: hasIron },
+                    { label: 'Soja (ZS ou ZM/ZL)', ok: hasSoy },
                     { label: 'Cobre (HG)', ok: hasCopper },
                     { label: 'BCI (ETF commodities)', ok: hasBci },
                     { label: 'Petróleo (Brent/WTI)', ok: hasOil },
@@ -328,9 +330,9 @@
         const divergences = [];
         const fxi = getChangePct(data, sym.fxi);
         const csi = getChangePct(data, sym.csi);
-        const iron = getChangePct(data, sym.iron);
+        const iron = getChangePct(data, ironProxy);
         const ironDalian = getChangePct(data, sym.ironDalian);
-        const soy = getChangePct(data, sym.soy);
+        const soy = getChangePct(data, soyProxy);
         const oil = oilPct;
         const copper = getChangePct(data, sym.copper);
         const usdcnh = getChangePct(data, sym.usdcnh) ?? getChangePct(data, sym.usdcny);

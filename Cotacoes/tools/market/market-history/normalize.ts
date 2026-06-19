@@ -40,6 +40,10 @@ export function normalizeSymbol(rawSymbol: string, rawName: string) {
     return 'USDX'
   }
 
+  if (up === 'RR') {
+    if (/\barroz\b/i.test(name) || /\brice\b/i.test(name)) return 'RR'
+    return 'RR_STOCK'
+  }
+
   return sym
 }
-

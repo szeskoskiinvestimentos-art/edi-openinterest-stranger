@@ -16,10 +16,32 @@ export type PortfolioStats = {
   uniqueSymbols: number
   duplicateSymbols: number
   sampleMissingPriceSymbols: string[]
+  sampleDuplicateSymbols: { symbol: string; rawSymbol?: string; rawName?: string; exchange?: string; csvRowIndex?: number; csvLine?: number }[]
+  sampleMissingPriceRows: { symbol: string; rawSymbol?: string; rawName?: string; exchange?: string; csvRowIndex?: number; csvLine?: number }[]
 }
 
-export type PortfolioRowParseOk = { ok: true; symbol: string; asset: Asset; point: MarketPoint }
-export type PortfolioRowParseNoPoint = { ok: false; symbol: string; asset: Asset; reason: 'missing_price' }
+export type PortfolioRowParseOk = {
+  ok: true
+  symbol: string
+  asset: Asset
+  point: MarketPoint
+  rawSymbol?: string
+  rawName?: string
+  exchange?: string
+  csvRowIndex?: number
+  csvLine?: number
+}
+export type PortfolioRowParseNoPoint = {
+  ok: false
+  symbol: string
+  asset: Asset
+  reason: 'missing_price'
+  rawSymbol?: string
+  rawName?: string
+  exchange?: string
+  csvRowIndex?: number
+  csvLine?: number
+}
 export type PortfolioRowParseSkip =
   | { ok: false; reason: 'missing_symbol_or_name' }
   | { ok: false; reason: 'invalid_symbol' }
@@ -38,6 +60,8 @@ export function createPortfolioStats(rowsTotal: number): PortfolioStats {
     uniqueSymbols: 0,
     duplicateSymbols: 0,
     sampleMissingPriceSymbols: [],
+    sampleDuplicateSymbols: [],
+    sampleMissingPriceRows: [],
   }
 }
 
@@ -54,6 +78,16 @@ export function applyPortfolioParseStats(stats: PortfolioStats, res: PortfolioRo
   if (reason === 'missing_price') {
     stats.rowsMissingPrice += 1
     if (stats.sampleMissingPriceSymbols.length < 20 && 'symbol' in res) stats.sampleMissingPriceSymbols.push(res.symbol)
+    if (stats.sampleMissingPriceRows.length < 20 && 'symbol' in res) {
+      stats.sampleMissingPriceRows.push({
+        symbol: res.symbol,
+        rawSymbol: 'rawSymbol' in res ? (res.rawSymbol as string | undefined) : undefined,
+        rawName: 'rawName' in res ? (res.rawName as string | undefined) : undefined,
+        exchange: 'exchange' in res ? (res.exchange as string | undefined) : undefined,
+        csvRowIndex: 'csvRowIndex' in res ? (res.csvRowIndex as number | undefined) : undefined,
+        csvLine: 'csvLine' in res ? (res.csvLine as number | undefined) : undefined,
+      })
+    }
   }
 }
 
@@ -64,10 +98,12 @@ function resolveUsdxPriority(rawSymbol: string) {
 
 export function parsePortfolioRow(params: {
   row: Record<string, string>
+  rowIndex?: number
   generatedAt: string
   usdxBestPriority: { value: number }
 }): PortfolioRowParseResult {
   const row = params.row
+  const rowIndex = typeof params.rowIndex === 'number' && Number.isFinite(params.rowIndex) && params.rowIndex >= 0 ? Math.floor(params.rowIndex) : null
 
   const rawSymbol = getFirst(row, [
     'Symbol',
@@ -100,7 +136,20 @@ export function parsePortfolioRow(params: {
 
   const priceRaw = getFirst(row, ['Last', 'Último', 'Ultimo', 'Últ. Preço', 'Ult. Preço', 'Preço', 'Preco'])
   const price = parseNumber(priceRaw)
-  if (price === null) return { ok: false, reason: 'missing_price', symbol, asset }
+  if (price === null) {
+    const csvLine = rowIndex !== null ? rowIndex + 2 : undefined
+    return {
+      ok: false,
+      reason: 'missing_price',
+      symbol,
+      asset,
+      rawSymbol,
+      rawName: name,
+      exchange,
+      csvRowIndex: rowIndex !== null ? rowIndex : undefined,
+      csvLine,
+    }
+  }
 
   const preMarketPriceRaw = getFirst(row, ['Pré-mercado', 'Pre-market', 'Pre Market', 'Premarket', 'Pré Mercado', 'PreMarket'])
   const afterHoursPriceRaw = getFirst(row, [
@@ -192,5 +241,16 @@ export function parsePortfolioRow(params: {
   if (extendedPrice !== null) point.extendedPrice = extendedPrice
   if (extendedChangePct !== null) point.extendedChangePct = extendedChangePct
 
-  return { ok: true, symbol, asset, point }
+  const csvLine = rowIndex !== null ? rowIndex + 2 : undefined
+  return {
+    ok: true,
+    symbol,
+    asset,
+    point,
+    rawSymbol,
+    rawName: name,
+    exchange,
+    csvRowIndex: rowIndex !== null ? rowIndex : undefined,
+    csvLine,
+  }
 }

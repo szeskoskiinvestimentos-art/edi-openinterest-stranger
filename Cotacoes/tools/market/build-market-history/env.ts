@@ -1,12 +1,4 @@
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
-
-export const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
-export const PROJECT_ROOT = path.resolve(SCRIPT_DIR, '..', '..', '..')
-
-export function resolveFromProject(p: string) {
-  return path.isAbsolute(p) ? p : path.resolve(PROJECT_ROOT, p)
-}
+export { PROJECT_ROOT, resolveFromProject } from '../update-service/paths.js'
 
 export function env(key: string, fallback = '') {
   const v = process.env[key]
@@ -22,4 +14,3 @@ export function envBool(key: string, fallback: boolean) {
   if (['0', 'false', 'no', 'n', 'off'].includes(s)) return false
   return fallback
 }
-

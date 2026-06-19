@@ -13,6 +13,7 @@ function opBriefing_computePulseCardHtml({ pulseNow, web, data, badge, biasTone,
             const fmt = v => (typeof v === 'number' && Number.isFinite(v) ? formatPercent(v, 2) : '—');
             if (!ok || typeof ok !== 'object') return badge('neutral', `${label}: —`);
             if (ok.reason === 'missing') return badge('neutral', `${label}: —`);
+            if (ok.reason === 'stale') return badge('neutral', `${label}: STALE (${fmt(ok.a)} / ${fmt(ok.b)})`);
             if (ok.reason === 'weak') return badge('neutral', `${label}: FRACO (${fmt(ok.a)} / ${fmt(ok.b)})`);
             if (ok.ok === null) return badge('neutral', `${label}: —`);
             return badge(ok.ok ? 'positive' : 'negative', `${label}: ${ok.ok ? 'OK' : 'DIVERGE'} (${fmt(ok.a)} / ${fmt(ok.b)})`);
@@ -34,6 +35,15 @@ function opBriefing_computePulseCardHtml({ pulseNow, web, data, badge, biasTone,
             const head = list.slice(0, 6).join(', ');
             const tail = list.length > 6 ? `… +${list.length - 6}` : '';
             return badge('neutral', `Faltando: ${head}${tail ? ` ${tail}` : ''}`);
+        })();
+
+        const staleBadge = (() => {
+            const st = pulseNow.stale && pulseNow.stale[side] ? pulseNow.stale[side] : null;
+            if (!st || st.stale !== true) return '';
+            const mins = typeof st.ageMin === 'number' && Number.isFinite(st.ageMin) ? Math.round(st.ageMin) : null;
+            const obs = typeof st.observedPct === 'number' && Number.isFinite(st.observedPct) ? formatPercent(st.observedPct, 2) : '—';
+            const warnMin = pulseNow.stale && typeof pulseNow.stale.warnMin === 'number' ? pulseNow.stale.warnMin : 15;
+            return badge('neutral', `STALE >${warnMin}m (${mins !== null ? `${mins}m` : '—'} • mov ${obs})`);
         })();
 
         const topNews = (() => {
@@ -109,6 +119,7 @@ function opBriefing_computePulseCardHtml({ pulseNow, web, data, badge, biasTone,
                     </div>
                     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                         ${missing}
+                        ${staleBadge}
                     </div>
                     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                         ${a1} ${a2}

@@ -19,49 +19,36 @@
         const loadFavorites = d.loadFavorites;
         const assetIcon = d.assetIcon;
 
-        const safeParse = raw => {
-            try {
-                return raw ? JSON.parse(raw) : null;
-            } catch {
-                return null;
-            }
-        };
+        const h = w.MarketPanoramaHelpers || {};
+        const readJson = typeof h.readJson === 'function'
+            ? h.readJson
+            : (key) => {
+                try {
+                    const raw = localStorage.getItem(String(key || ''));
+                    return raw ? JSON.parse(raw) : null;
+                } catch {
+                    return null;
+                }
+            };
+        const writeJson = typeof h.writeJson === 'function'
+            ? h.writeJson
+            : (key, value) => {
+                try { localStorage.setItem(String(key || ''), JSON.stringify(value || {})); } catch { }
+            };
 
         const frozenKey = 'mercado_panorama_frozen_v2';
-        const frozen = safeParse(localStorage.getItem(frozenKey)) || {};
+        const frozen = readJson(frozenKey) || {};
 
         const expandKey = 'mercado_panorama_expand_v1';
-        const expandedState = safeParse(localStorage.getItem(expandKey)) || {};
+        const expandedState = readJson(expandKey) || {};
 
-        const saveFrozen = next => {
-            try {
-                localStorage.setItem(frozenKey, JSON.stringify(next || {}));
-            } catch {
-            }
-        };
+        const saveFrozen = next => writeJson(frozenKey, next || {});
+        const saveExpanded = next => writeJson(expandKey, next || {});
 
-        const saveExpanded = next => {
-            try {
-                localStorage.setItem(expandKey, JSON.stringify(next || {}));
-            } catch {
-            }
-        };
-
-        const formatPrice = (symbol, price) => {
-            if (price === null || price === undefined || !Number.isFinite(price)) return '—';
-            const s = String(symbol || '');
-            if (/\b(BTC|ETH|XRP|SOL|ADA)\b/i.test(s)) return formatNumber(price, price >= 1000 ? 0 : 2);
-            if (/\/\w{3}\b/i.test(s) || s.includes('/')) return formatNumber(price, 4);
-            if (price >= 1000) return formatNumber(price, 0);
-            if (price >= 100) return formatNumber(price, 2);
-            return formatNumber(price, 4);
-        };
-
-        const formatHm = iso => {
-            const full = iso ? formatDateTime(iso) : '';
-            const parts = full.split(' ');
-            return parts.length > 1 ? parts[1] : full || '';
-        };
+        const formatPrice = (symbol, price) => (typeof h.formatPrice === 'function'
+            ? h.formatPrice(symbol, price, formatNumber)
+            : (price === null || price === undefined || !Number.isFinite(price)) ? '—' : formatNumber(price, 2));
+        const formatHm = iso => (typeof h.formatHm === 'function' ? h.formatHm(iso, formatDateTime) : '');
 
         const assets = data && Array.isArray(data.assets) ? data.assets : [];
         const assetBySymbol = new Map(assets.map(a => [String(a && a.symbol ? a.symbol : ''), a]));
@@ -76,120 +63,31 @@
             return favorites.has(s) || favorites.has(k);
         };
 
-        const pinnedMatchers = groupKey => {
-            const k = String(groupKey || '');
-            if (k === 'fx_g10') return [/^\.(DXY)\b/i, /^EUR\/USD\b/i, /^USD\/JPY\b/i, /^GBP\/USD\b/i, /^AUD\/USD\b/i, /^NZD\/USD\b/i, /^USD\/CHF\b/i, /^USD\/CAD\b/i];
-            if (k === 'fx_em') return [/^USD\/BRL\b/i, /^USD\/MXN\b/i, /^USD\/ZAR\b/i, /^USD\/TRY\b/i, /^USD\/(CNY|CNH)\b/i];
-            if (k === 'rates' || k === 'credit') return [/^US2YT=RR$/i, /^US10YT=RR$/i, /^US30YT=RR$/i, /^BR2YT=RR$/i, /^BR10YT=RR$/i, /^US10BR10=RR$/i];
-            if (k === 'equities') return [/^\.(SPX|NDX)\b/i, /^SPY$/i, /^QQQ$/i, /^IWM$/i, /^DIA$/i, /^EWZ$/i];
-            if (k === 'emerging') return [/^FXI$/i, /^\.(CSI300)\b/i, /^EEM$/i, /^EWW$/i];
-            if (k === 'energy') return [/\bBrent\b/i, /\bWTI\b/i, /^CO1\b/i, /^CL1\b/i];
-            if (k === 'metals') return [/\bGold\b/i, /\bSilver\b/i, /\bCopper\b/i, /^GC1\b/i, /^SI1\b/i, /^HG\b/i];
-            if (k === 'agri') return [/\bSoy\b/i, /\bCorn\b/i, /\bWheat\b/i];
-            if (k === 'crypto') return [/\bBTC\b/i, /\bETH\b/i];
-            if (k === 'vol') return [/\bVIX\b/i, /^\.VIX\b/i];
-            return [];
-        };
-
-        const pinnedIndex = (groupKey, row) => {
-            const matchers = pinnedMatchers(groupKey);
-            if (!matchers.length) return 999;
-            const s = String(row && row.symbol ? row.symbol : '');
-            const n = String(row && row.label ? row.label : '');
-            for (let i = 0; i < matchers.length; i++) {
-                const re = matchers[i];
-                if (re.test(s) || re.test(n)) return i;
-            }
-            return 999;
-        };
-
         const sortRows = (groupKey, rows) => {
-            const key = String(groupKey || '');
-            rows.sort((a, b) => {
-                const af = isFav(a && a.symbol ? a.symbol : '') ? 0 : 1;
-                const bf = isFav(b && b.symbol ? b.symbol : '') ? 0 : 1;
-                if (af !== bf) return af - bf;
-                const ap = pinnedIndex(key, a);
-                const bp = pinnedIndex(key, b);
-                if (ap !== bp) return ap - bp;
-                return String(a && a.label ? a.label : '').localeCompare(String(b && b.label ? b.label : ''), 'pt-BR');
-            });
+            if (typeof h.sortRows === 'function') h.sortRows(groupKey, rows, isFav);
+            else (Array.isArray(rows) ? rows : []).sort((a, b) => String(a && a.label ? a.label : '').localeCompare(String(b && b.label ? b.label : ''), 'pt-BR'));
         };
 
-        const diMonthNum = code => {
-            const c = String(code || '').toUpperCase();
-            if (c === 'F') return 1;
-            if (c === 'G') return 2;
-            if (c === 'H') return 3;
-            if (c === 'J') return 4;
-            if (c === 'K') return 5;
-            if (c === 'M') return 6;
-            if (c === 'N') return 7;
-            if (c === 'Q') return 8;
-            if (c === 'U') return 9;
-            if (c === 'V') return 10;
-            if (c === 'X') return 11;
-            if (c === 'Z') return 12;
-            return null;
-        };
+        const diRows = () => (typeof h.buildDiRows === 'function'
+            ? h.buildDiRows({ data, seriesKeys, diMatcher, getMostRecentPointWithPrice, pointPct, assetIcon })
+            : []);
 
-        const diRows = () => {
-            const symbols = seriesKeys.filter(s => diMatcher.test(s));
-            const parsed = symbols
-                .map(symbol => {
-                    const last = typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null;
-                    const price = last && typeof last.price === 'number' ? last.price : null;
-                    const pct = typeof pointPct === 'function' ? pointPct(last) : null;
-                    const t = last && last.t ? String(last.t) : '';
-                    const yy = Number(String(symbol).slice(-2));
-                    const mm = diMonthNum(String(symbol)[3]);
-                    const tag = Number.isFinite(yy) && Number.isFinite(mm) ? ` ${String(mm).padStart(2, '0')}/${String(yy).padStart(2, '0')}` : '';
-                    const label = `${symbol}${tag ? ` (${tag.trim()})` : ''}`;
-                    const icon = typeof assetIcon === 'function' ? assetIcon({ symbol, name: label, category: 'rates', tags: [] }) : '•';
-                    return { label, symbol, icon, price, pct, t, yy: Number.isFinite(yy) ? yy : null, mm };
-                })
-                .filter(r => typeof r.price === 'number' && Number.isFinite(r.price))
-                .sort((a, b) => ((a.yy || 0) - (b.yy || 0)) || ((a.mm || 0) - (b.mm || 0)));
-            return parsed.map(({ yy, mm, ...rest }) => rest);
-        };
-
-        const rowsFor = (groupKey, categories, { includeDxy = false, excludeSymbols = [], includeMissing = false } = {}) => {
-            const cats = Array.isArray(categories) ? categories : [];
-            const exclude = new Set((excludeSymbols || []).map(s => String(s)));
-            const base = assets.filter(a => cats.includes(a && a.category ? a.category : ''));
-            const rows = base
-                .map(a => {
-                    const symbol = String(a && a.symbol ? a.symbol : '');
-                    const last = includeMissing
-                        ? (typeof getLastPoint === 'function' ? getLastPoint(data, symbol) : null)
-                        : (typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, symbol) : null);
-                    const price = last && typeof last.price === 'number' ? last.price : null;
-                    const pct = typeof pointPct === 'function' ? pointPct(last) : null;
-                    const t = last && last.t ? String(last.t) : '';
-                    const label = String(a && a.name ? a.name : symbol);
-                    const icon = typeof assetIcon === 'function' ? assetIcon({ symbol, name: label, category: a && a.category ? a.category : 'other', tags: a && a.tags ? a.tags : [] }) : '•';
-                    return { label, symbol, icon, price, pct, t };
-                })
-                .filter(r => r.symbol && !exclude.has(r.symbol))
-                .filter(r => includeMissing ? true : (typeof r.price === 'number' && Number.isFinite(r.price)));
-
-            if (includeDxy) {
-                const dxySymbol = typeof findAssetSymbol === 'function' ? findAssetSymbol(data, /(^\.DXY$|\bDXY\b|US Dollar Index)/i) : null;
-                if (dxySymbol && !rows.some(r => r.symbol === dxySymbol)) {
-                    const a = assetBySymbol.get(String(dxySymbol)) || null;
-                    const last = typeof getMostRecentPointWithPrice === 'function' ? getMostRecentPointWithPrice(data, dxySymbol) : null;
-                    const price = last && typeof last.price === 'number' ? last.price : null;
-                    const pct = typeof pointPct === 'function' ? pointPct(last) : null;
-                    const t = last && last.t ? String(last.t) : '';
-                    const label = a && a.name ? String(a.name) : 'DXY';
-                    const icon = typeof assetIcon === 'function' ? assetIcon({ symbol: dxySymbol, name: label, category: a && a.category ? a.category : 'other', tags: a && a.tags ? a.tags : [] }) : '•';
-                    rows.unshift({ label, symbol: dxySymbol, icon, price, pct, t });
-                }
-            }
-
-            sortRows(groupKey, rows);
-            return rows;
-        };
+        const rowsFor = (groupKey, categories, opt = {}) => (typeof h.buildRowsFor === 'function'
+            ? h.buildRowsFor({
+                groupKey,
+                categories,
+                opt,
+                assets,
+                data,
+                assetBySymbol,
+                getLastPoint,
+                getMostRecentPointWithPrice,
+                pointPct,
+                assetIcon,
+                findAssetSymbol,
+                isFav,
+            })
+            : []);
 
         const baseGroups = [
             { key: 'equities', title: 'Ações & ETFs', maxRows: 18, categories: ['equities'], opt: { includeMissing: true } },
@@ -244,67 +142,20 @@
         const rerender = () => render({ data, el, deps });
 
         const renderCard = (group, snap, isFrozen) => {
-            const allRows = (snap && Array.isArray(snap.rows) ? snap.rows : []).slice().filter(r => r && r.symbol);
-            const maxRows = typeof group.maxRows === 'number' && Number.isFinite(group.maxRows) && group.maxRows > 0 ? group.maxRows : 14;
-            const isExpanded = !!(expandedState && expandedState[group.key]);
-            const canExpand = allRows.length > maxRows;
-            const rows = canExpand && !isExpanded ? allRows.slice(0, maxRows) : allRows;
-            const freezeAt = snap && snap.at ? formatDateTime(snap.at) : '';
-            const subtitle = isFrozen && freezeAt ? `Congelado • ${freezeAt}` : '';
-            const countTxt = allRows.length ? `${allRows.length}` : '';
-            const headRight = `
-                <div style="display:flex;gap:10px;align-items:center;">
-                    ${subtitle ? `<div style="opacity:.75;font-weight:800;letter-spacing:.6px;font-size:12px;">${escapeHtml(subtitle)}</div>` : ''}
-                    ${canExpand ? `<button class="panorama-freeze" data-panorama-expand="${escapeHtml(group.key)}" aria-pressed="${isExpanded ? 'true' : 'false'}">${isExpanded ? 'Recolher' : `Ver tudo (${escapeHtml(countTxt)})`}</button>` : ''}
-                    <button class="panorama-freeze" data-panorama-freeze="${escapeHtml(group.key)}" aria-pressed="${isFrozen ? 'true' : 'false'}">Congelar</button>
-                </div>
-            `;
-
-            const body = rows.length
-                ? `<table class="panorama-table">
-                    <thead>
-                        <tr>
-                            <th>Ativo</th>
-                            <th class="panorama-mono" style="text-align:right;">Último</th>
-                            <th class="panorama-mono" style="text-align:right;">Var%</th>
-                            <th class="panorama-mono" style="text-align:right;">Hora</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${rows
-                            .map(r => {
-                                const pct = typeof r.pct === 'number' ? r.pct : null;
-                                const pctTxt = pct === null ? '—' : formatPercent(pct, 2);
-                                const pctHtml = pct === null ? escapeHtml(pctTxt) : toneBadgeHtml(pct, pctTxt, { maxAbs: 3 });
-                                const lastTxt = formatPrice(r.symbol, r.price);
-                                const hm = r.t ? formatHm(r.t) : '';
-                                const fullT = r.t ? formatDateTime(r.t) : '';
-                                return `
-                                    <tr>
-                                        <td>
-                                            <div class="panorama-asset" title="${escapeHtml(r.symbol)}">
-                                                <span class="panorama-asset__icon">${escapeHtml(r.icon || '•')}</span>
-                                                <span class="panorama-asset__name">${escapeHtml(r.label)}</span>
-                                            </div>
-                                        </td>
-                                        <td class="panorama-mono" style="text-align:right;">${escapeHtml(lastTxt)}</td>
-                                        <td class="panorama-mono" style="text-align:right;">${pctHtml}</td>
-                                        <td class="panorama-mono" style="text-align:right;" title="${escapeHtml(fullT)}">${escapeHtml(hm || '—')}</td>
-                                    </tr>
-                                `;
-                            })
-                            .join('')}
-                    </tbody>
-                </table>`
-                : `<div style="opacity:.85;">Sem dados suficientes para este bloco.</div>`;
-
-            return `<div class="panorama-card" data-panorama-card="${escapeHtml(group.key)}">
-                <div class="panorama-card__header">
-                    <div class="panorama-card__title">${escapeHtml(group.title)}${countTxt ? ` <span style="opacity:.7;font-weight:900;">(${escapeHtml(countTxt)})</span>` : ''}</div>
-                    ${headRight}
-                </div>
-                ${body}
-            </div>`;
+            if (typeof h.renderCard === 'function') {
+                return h.renderCard({
+                    group,
+                    snap,
+                    isFrozen,
+                    expandedState,
+                    escapeHtml,
+                    formatDateTime,
+                    formatPercent,
+                    toneBadgeHtml,
+                    formatNumber,
+                });
+            }
+            return '';
         };
 
         const monitoredSymbols = assets.map(a => String(a && a.symbol ? a.symbol : '')).filter(Boolean);
@@ -425,4 +276,3 @@
     root.marketPanorama = { render };
     w.MercadoBlocks = root;
 })();
-

@@ -28,7 +28,6 @@
             }
         }
         details.addEventListener('toggle', tryLoad);
-        tryLoad();
     }
 
     root.investingCalendarWidget = { setup };

@@ -54,14 +54,21 @@ export function validateCoverageOrThrow(assets: Asset[]) {
     'USD/BRL': /^USD\/BRL\b/i,
     WDO: /^WDO/i,
     WIN: /^WIN/i,
+    WDOc1: /^WDOc1$/i,
+    WINc1: /^WINc1$/i,
     IBOV: /(^\.BVSP$|\bIbovespa\b)/i,
     EWZ: /^EWZ$/i,
-    DXY: /(^\.DXY$|\bDXY\b|US Dollar Index)/i,
+    DXY: /(^\.DXY$|\bDXY\b|^USDX$|DX-Y\.NYB|US Dollar Index|\bDollar Index\b)/i,
+    US10Y: /(^US10YT=RR$|^\.TNX$|\^TNX|\b10\s*Year\s*Treasury\b|\bUS\s*10Y\b)/i,
+    VIX: /(^\.(VIX|VIX9D)\b|^VIX\b|\bVolatility Index\b)/i,
+    BRENT: /(\bBrent\b|^BZ(=F)?$|^LCOc1$|^BZc1$)/i,
+    WTI: /(\bWTI\b|^CL(=F)?$|^CLc1$)/i,
+    GOLD: /(\bXAU\/USD\b|\bGold\b|^GC(=F)?$|^GCc1$)/i,
   } as const
 
   const requiredCritical = envList('MARKET_COVERAGE_CRITICAL').length
     ? envList('MARKET_COVERAGE_CRITICAL')
-    : ['USD/BRL', 'WDO', 'WIN', 'IBOV']
+    : ['USD/BRL', 'WDO', 'WIN', 'WDOc1', 'WINc1', 'IBOV', 'DXY', 'US10Y', 'VIX', 'BRENT', 'WTI', 'GOLD']
 
   const missingCritical = requiredCritical.filter(label => {
     const re = (patterns as Record<string, RegExp>)[label]
@@ -80,4 +87,3 @@ export function validateCoverageOrThrow(assets: Asset[]) {
     missingCritical: [],
   }
 }
-

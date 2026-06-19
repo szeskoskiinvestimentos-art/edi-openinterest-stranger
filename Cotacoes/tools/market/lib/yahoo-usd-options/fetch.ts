@@ -131,29 +131,70 @@ export async function fetchYahooOptionsAllExpiries(
     const expYmd = ymdUtc(new Date(expDate * 1000))
     expiries.push(expYmd)
 
-    const map = new Map<number, { call: number; put: number }>()
+    const map = new Map<
+      number,
+      {
+        callOi: number
+        putOi: number
+        callVol: number
+        putVol: number
+        callIvSum: number
+        callIvW: number
+        putIvSum: number
+        putIvW: number
+      }
+    >()
     const addOne = (row: any, kind: 'call' | 'put') => {
       const strike = safeNum(row?.strike)
       if (strike === null) return
+
       const oi = safeNum(row?.openInterest) ?? 0
-      const prev = map.get(strike) || { call: 0, put: 0 }
-      if (kind === 'call') prev.call += oi
-      else prev.put += oi
+      const vol = safeNum(row?.volume) ?? 0
+      const iv = safeNum(row?.impliedVolatility)
+      const w = oi > 0 ? oi : vol > 0 ? vol : 0
+
+      const prev = map.get(strike) || { callOi: 0, putOi: 0, callVol: 0, putVol: 0, callIvSum: 0, callIvW: 0, putIvSum: 0, putIvW: 0 }
+      if (kind === 'call') {
+        prev.callOi += oi
+        prev.callVol += vol
+        if (iv !== null && w > 0) {
+          prev.callIvSum += iv * w
+          prev.callIvW += w
+        }
+      } else {
+        prev.putOi += oi
+        prev.putVol += vol
+        if (iv !== null && w > 0) {
+          prev.putIvSum += iv * w
+          prev.putIvW += w
+        }
+      }
       map.set(strike, prev)
     }
     for (const row of calls) addOne(row, 'call')
     for (const row of puts) addOne(row, 'put')
 
     const strikes = Array.from(map.keys()).sort((a, b) => a - b)
-    const call_oi = strikes.map(k => (map.get(k)?.call ?? 0))
-    const put_oi = strikes.map(k => (map.get(k)?.put ?? 0))
+    const call_oi = strikes.map(k => (map.get(k)?.callOi ?? 0))
+    const put_oi = strikes.map(k => (map.get(k)?.putOi ?? 0))
+    const call_volume = strikes.map(k => (map.get(k)?.callVol ?? 0))
+    const put_volume = strikes.map(k => (map.get(k)?.putVol ?? 0))
+    const call_iv = strikes.map(k => {
+      const it = map.get(k)
+      if (!it || !(it.callIvW > 0)) return null
+      return it.callIvSum / it.callIvW
+    })
+    const put_iv = strikes.map(k => {
+      const it = map.get(k)
+      if (!it || !(it.putIvW > 0)) return null
+      return it.putIvSum / it.putIvW
+    })
     const calls_count = call_oi.filter(x => (Number(x) || 0) > 0).length
     const puts_count = put_oi.filter(x => (Number(x) || 0) > 0).length
 
-    by_expiry[expYmd] = { strikes, call_oi, put_oi, calls_count, puts_count }
+    by_expiry[expYmd] = { strikes, call_oi, put_oi, call_volume, put_volume, call_iv, put_iv, calls_count, puts_count }
   }
 
   const uniqExp = Array.from(new Set(expiries)).sort((a, b) => a.localeCompare(b))
   return { spot, expiries: uniqExp, by_expiry, raw_rows_count: rawRows }
 }
-

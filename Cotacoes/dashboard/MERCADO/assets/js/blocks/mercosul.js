@@ -204,20 +204,29 @@
         pulseEl.innerHTML = pulseHtml || '<div style="opacity:.85;">Sem dados suficientes para montar o bloco.</div>';
 
         const components = ([]).concat(fxPairs, eqProxies, context);
+        const isNum = (v) => (typeof deps.isNum === 'function' ? deps.isNum(v) : (typeof v === 'number' && Number.isFinite(v)));
         const rows = components
             .filter(x => x && x.symbol)
             .map(x => {
                 const a = x.asset || {};
+                const last = x.last || null;
+                const price = last && isNum(last.price) ? last.price : null;
+                const pct = deps.pointPct(last);
+                const t = last && last.t ? String(last.t) : '';
+                const tMs = t ? (Date.parse(t) || 0) : 0;
                 return {
                     symbol: x.symbol,
                     name: x.label,
                     exchange: a && a.exchange ? a.exchange : '',
                     category: a && a.category ? a.category : 'other',
                     tags: a && Array.isArray(a.tags) ? a.tags : [],
-                    last: x.last,
+                    last,
+                    _price: price,
+                    _pct: pct,
+                    _tMs: tMs,
                 };
             })
-            .filter(r => r.last && typeof r.last.price === 'number');
+            .filter(r => r && isNum(r._price));
 
         const preferred = fxPairs.find(x => x && x.symbol && /USD\/BRL/i.test(String(x.symbol))) || null;
         let selected = preferred && preferred.symbol && data.series && data.series[preferred.symbol] ? preferred.symbol : (rows.length ? rows[0].symbol : null);
@@ -237,4 +246,3 @@
     root.mercosul = { render };
     w.MercadoBlocks = root;
 })();
-

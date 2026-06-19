@@ -48,9 +48,26 @@
         setMetric('metric-assets', String((data && data.assets ? data.assets : []).length));
         setMetric('metric-retention', `${retentionDays} dias`);
 
+        const nowMs = Date.now();
+        const isNum = v => (typeof v === 'number' && Number.isFinite(v));
+        const hardMaxAbs = 80;
+        const staleMs = 4 * 60 * 60 * 1000;
+        const ageMs = (pt) => {
+            const t = pt && pt.t ? Date.parse(String(pt.t)) : NaN;
+            if (!Number.isFinite(t)) return null;
+            return nowMs - t;
+        };
         const rowsAll = (data && data.assets ? data.assets : [])
             .map(a => ({ a, last: getLastPoint(data, a.symbol) }))
-            .filter(x => pointPct(x.last) !== null);
+            .filter(x => {
+                const pct = pointPct(x.last);
+                const price = x && x.last && typeof x.last.price === 'number' ? x.last.price : null;
+                const age = ageMs(x.last);
+                if (!isNum(pct) || !isNum(price) || !(price > 0)) return false;
+                if (Math.abs(pct) > hardMaxAbs) return false;
+                if (typeof age === 'number' && Number.isFinite(age) && age > staleMs) return false;
+                return true;
+            });
 
         const sorted = rowsAll.slice().sort((x, y) => (pointPct(y.last) ?? 0) - (pointPct(x.last) ?? 0));
         const topUp = sorted.length ? sorted[0] : null;

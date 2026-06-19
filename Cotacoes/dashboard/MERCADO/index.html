@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EDI Market Guardian - Cotações de Mercado</title>
-    <link rel="stylesheet" href="../WDO/assets/css/style.css">
+    <link rel="stylesheet" href="../../dashboard_unificado/shared/styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
@@ -1035,11 +1035,17 @@
                 <button id="quickSearchBtn" type="button" class="quicksearch-btn" aria-label="Buscar seção" title="Buscar seção (Ctrl+K)">
                     ⌘ Buscar
                 </button>
-                <select id="assetSelect" aria-label="Selecionar dashboard" title="Troca de dashboard: MERCADO, WDO ou WIN. Em produção abre o link publicado; no uso local aponta para a pasta do dashboard_unificado." style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 12px;border-radius:999px;font-weight:900;letter-spacing:1px;">
-                    <option value="WDO">WDO</option>
-                    <option value="WIN">WIN</option>
-                    <option value="CORR">Correlações</option>
-                    <option value="MERCADO" selected>EDI Market Guardian</option>
+                <select id="assetSelect" data-current-dashboard="MERCADO" aria-label="Selecionar dashboard" title="Troca de dashboard: MERCADO, WDO ou WIN. Em produção abre o link publicado; no uso local aponta para a pasta do dashboard_unificado." style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 12px;border-radius:999px;font-weight:900;letter-spacing:1px;">
+                    <optgroup label="Dashboards">
+                        <option value="HUB">Dashboard Unificado</option>
+                        <option value="WDO">WDO</option>
+                        <option value="WIN">WIN</option>
+                        <option value="CORR">Correlações</option>
+                        <option value="CONTROLE">Controle</option>
+                    </optgroup>
+                    <optgroup label="Mercado">
+                        <option value="MERCADO" selected>EDI Market Guardian</option>
+                    </optgroup>
                 </select>
                 <button id="reloadDataBtn" type="button" title="Atualiza os dados. Se o atualizador local estiver rodando, ele tenta capturar (Investing/InfoMoney) e salvar em assets/data. Se estiver offline, apenas recarrega o arquivo atual." style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:8px 12px;border-radius:999px;font-weight:900;letter-spacing:1px;cursor:pointer;white-space:nowrap;">
                     ↻ Dados
@@ -1101,6 +1107,16 @@
                     <div class="market-ticker__label">MUNDO</div>
                     <div class="market-ticker__viewport">
                         <div id="globalTicker" class="market-ticker__track"></div>
+                    </div>
+                </div>
+
+                <div id="global-coverage-audit" class="split-layout split-layout--center-text" style="margin-top: 12px;">
+                    <div class="context-box">
+                        <h3>🧪 Qualidade do Feed (drivers críticos)</h3>
+                        <p>Semáforo global para os principais drivers do MERCADO: mostra <b>idade (asOf)</b>, acusa <b>stale</b> e indica quando um ativo existe mas está <b>sem Δ% calculável</b> (evita módulos “mudos” por falta de variação).</p>
+                    </div>
+                    <div class="table-container">
+                        <div id="globalCoverageAudit"></div>
                     </div>
                 </div>
 
@@ -1374,7 +1390,7 @@
                                     >Abrir Calendário do Investing</a>
                                 </span>
                             </div>
-                            <details id="investingCalendarWidget" open style="margin-top:10px;">
+                            <details id="investingCalendarWidget" style="margin-top:10px;">
                                 <summary style="cursor:pointer;opacity:.9;font-weight:900;">Tentar exibir o widget aqui</summary>
                                 <div style="margin-top:10px;border:1px solid rgba(255,255,255,.10);border-radius:12px;overflow:hidden;">
                                     <iframe
@@ -1814,9 +1830,86 @@
     <script src="assets/js/market-utils.js?v=20260523_1"></script>
     <script src="assets/js/charts.js?v=20260523_1"></script>
     <script src="assets/js/instruments-catalog.js?v=20260523_1"></script>
-    <script src="assets/js/rates-buckets.js?v=20260523_1"></script>
+    <script src="assets/js/rates-buckets-helpers.js?v=20260525_2"></script>
+    <script src="assets/js/rates-buckets.js?v=20260525_2"></script>
     <script src="assets/js/operational-compass.js?v=20260523_1"></script>
-    <script src="assets/js/us-operational-eua.js?v=20260523_1"></script>
-    <script src="assets/js/main.js?v=20260523_1"></script>
+    <script src="assets/js/us-operational-eua-helpers.js?v=20260525_2"></script>
+    <script src="assets/js/us-operational-eua.js?v=20260525_2"></script>
+    <script src="assets/js/blocks/script-loader.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/boot.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/navigation-definition.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/smooth-scroll-nav.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/split-layout-adapter.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/status-ui.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/core-kit.js?v=20260528_1"></script>
+    <script src="assets/js/blocks/table-kit.js?v=20260524_1"></script>
+    <script src="assets/js/blocks/main-actions-helpers.js?v=20260525_2"></script>
+    <script src="assets/js/blocks/main-actions.js?v=20260525_2"></script>
+    <script src="assets/js/blocks/updater.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/updater-summary.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/asset-switch-nav.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/quick-nav-drawer.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/nav-more-panel.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/investing-calendar-widget.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/market-client.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/market-service.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/top-movers.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/sector-heatmap.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/alerts.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/favorites.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/global-coverage-audit.js?v=20260528_1"></script>
+    <script src="assets/js/blocks/overview.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/market-panorama-helpers.js?v=20260525_2"></script>
+    <script src="assets/js/blocks/market-panorama.js?v=20260525_2"></script>
+    <script src="assets/js/blocks/data-audit-helpers.js?v=20260525_2"></script>
+    <script src="assets/js/blocks/data-audit.js?v=20260525_2"></script>
+    <script src="assets/js/blocks/assets-catalog-helpers.js?v=20260525_2"></script>
+    <script src="assets/js/blocks/assets-catalog.js?v=20260525_2"></script>
+    <script src="assets/js/blocks/all-assets-table.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/category-table.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/regime-conviction-helpers-math.js?v=20260525_2"></script>
+    <script src="assets/js/blocks/regime-conviction.js?v=20260525_2"></script>
+    <script src="assets/js/blocks/zq-curve.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/us-treasury-futures.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/global-ticker.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/brazil-export-basket.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/brazil-fixed-income-flow.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/flow-sentinel-helpers.js?v=20260525_2"></script>
+    <script src="assets/js/blocks/flow-sentinel.js?v=20260525_2"></script>
+    <script src="assets/js/blocks/fx-carry.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/carry-intel.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/china-brazil.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/metals-zone.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/mercosul.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/brazil-market.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/petrobras.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/options-gamma-summary.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/financial-juice.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/web-news-module.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/agenda-matrix.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/commodities-briefing.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/btc-briefing.js?v=20260525_1"></script>
+    <script src="assets/js/blocks/hk50-briefing.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/op-briefing-helpers-leads.js?v=20260524_2"></script>
+    <script src="assets/js/blocks/op-briefing-helpers-intel.js?v=20260524_2"></script>
+    <script src="assets/js/blocks/op-briefing-helpers-format.js?v=20260524_2"></script>
+    <script src="assets/js/blocks/op-briefing-helpers-scalp-core.js?v=20260524_3"></script>
+    <script src="assets/js/blocks/op-briefing-helpers-scalp-setups.js?v=20260524_4"></script>
+    <script src="assets/js/blocks/op-briefing-helpers-scalp.js?v=20260524_4"></script>
+    <script src="assets/js/blocks/op-briefing-helpers-win-proj.js?v=20260524_2"></script>
+    <script src="assets/js/blocks/op-briefing-helpers-br.js?v=20260524_3"></script>
+    <script src="assets/js/blocks/op-briefing-helpers-focus-insights.js?v=20260524_4"></script>
+    <script src="assets/js/blocks/op-briefing-helpers-focus.js?v=20260524_3"></script>
+    <script src="assets/js/blocks/op-briefing-helpers-adr-cds.js?v=20260524_3"></script>
+    <script src="assets/js/blocks/op-briefing-helpers-factors.js?v=20260524_3"></script>
+    <script src="assets/js/blocks/op-briefing-helpers-plan.js?v=20260524_3"></script>
+    <script src="assets/js/blocks/op-briefing-br-flow.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/op-briefing-br-breadth.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/op-briefing-corr.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/op-briefing-macro.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/op-briefing-pulse.js?v=20260523_1"></script>
+    <script src="assets/js/blocks/op-briefing-helpers-ui.js?v=20260525_2"></script>
+    <script src="assets/js/blocks/operational-briefing.js?v=20260525_2"></script>
+    <script src="assets/js/main.js?v=20260524_1"></script>
 </body>
 </html>

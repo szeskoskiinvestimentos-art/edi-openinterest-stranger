@@ -18,10 +18,22 @@
         const formatNumber = d.formatNumber;
         const formatDateTime = d.formatDateTime;
         const getChangePct = d.getChangePct;
-        const symbolKey = d.symbolKey;
-        const isBrazilRelated = d.isBrazilRelated;
+        const symbolKey = typeof d.symbolKey === 'function' ? d.symbolKey : (s => String(s || '').trim().toUpperCase());
+        const isBrazilRelated = typeof d.isBrazilRelated === 'function' ? d.isBrazilRelated : (() => false);
         const pointPct = d.pointPct;
         const computeBrazilCdsHedgeSignal = d.computeBrazilCdsHedgeSignal;
+
+        if (typeof escapeHtml !== 'function' || typeof formatNumber !== 'function' || typeof formatDateTime !== 'function'
+            || typeof toneBadgeHtmlFromTone !== 'function' || typeof toneBadgeHtml !== 'function'
+            || typeof findAssetSymbol !== 'function' || typeof getLastPoint !== 'function' || typeof getMostRecentPointWithPrice !== 'function'
+            || typeof getChangePct !== 'function' || typeof pointPct !== 'function'
+        ) {
+            el.innerHTML = `<div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.18);opacity:.9;">
+            <div style="font-weight:900;letter-spacing:1px;margin-bottom:6px;">🇧🇷 Renda Fixa Brasil &amp; Fluxo</div>
+            <div style="opacity:.85;line-height:1.4;">Módulo indisponível (deps ausentes).</div>
+        </div>`;
+            return;
+        }
 
         const mk = (tone, txt) => toneBadgeHtmlFromTone(tone, 0, txt, { maxAbs: 1 });
         const catalog = (typeof window !== 'undefined' && window.InstrumentsCatalog) ? window.InstrumentsCatalog : null;
@@ -64,6 +76,45 @@
             return out.length ? out[0] : null;
         };
         const aliasSym = (k) => findAliasSymbolBest(data, k) || findAliasSymbol(data, k);
+        const rb = (typeof window !== 'undefined' && window.RatesBucketsHelpers) ? window.RatesBucketsHelpers : null;
+        const monthNum = (rb && typeof rb.monthNum === 'function')
+            ? rb.monthNum
+            : (code) => {
+                const c = String(code || '').trim().toUpperCase();
+                if (c === 'F') return 1;
+                if (c === 'G') return 2;
+                if (c === 'H') return 3;
+                if (c === 'J') return 4;
+                if (c === 'K') return 5;
+                if (c === 'M') return 6;
+                if (c === 'N') return 7;
+                if (c === 'Q') return 8;
+                if (c === 'U') return 9;
+                if (c === 'V') return 10;
+                if (c === 'X') return 11;
+                if (c === 'Z') return 12;
+                return null;
+            };
+        const maturityYears = (rb && typeof rb.maturityYears === 'function')
+            ? rb.maturityYears
+            : (y, m) => {
+                if (!Number.isFinite(y) || !Number.isFinite(m)) return null;
+                const now = new Date();
+                const t = new Date(y, m - 1, 1);
+                const months = (t.getFullYear() - now.getFullYear()) * 12 + (t.getMonth() - now.getMonth());
+                if (!Number.isFinite(months)) return null;
+                return months / 12;
+            };
+        const diInfo = (symbol) => {
+            const m = String(symbol || '').trim().toUpperCase().match(/^DI1([FGHJKMNQUVXZ])(\d{2})$/);
+            if (!m) return null;
+            const month = monthNum(m[1]);
+            const year = 2000 + Number(m[2]);
+            if (!Number.isFinite(year) || year < 2000 || year > 2100) return null;
+            if (!Number.isFinite(month) || month < 1 || month > 12) return null;
+            return { year, month };
+        };
+        const isDiSymbol = (sym) => /^DI1[FGHJKMNQUVXZ]\d{2}$/i.test(String(sym || '').trim());
 
         const looksLikeBrazilFixedIncome = a => {
             const name = String(a && a.name ? a.name : '');
@@ -71,10 +122,35 @@
             if (!name && !sym) return false;
             if (isBrazilRelated({ symbol: sym, name, category: 'rates' })) return true;
             if (/\btesouro\b|\btesouro direto\b|\bntn\b|\bntn-?b\b|\bltn\b|\blft\b|\bipca\b|\bselic\b|\bcupom\b|\bdi\b|\bjuros?\s*futuros?\b|\bima[-\s]?b\b|\birf[-\s]?m\b|\bprefixad|\bpre[-\s]?fixad/i.test(name)) return true;
-            if (/^BR\d+(YT|MT)=RR$/i.test(sym) || /^BRNB\d+(YT|MT)=RR$/i.test(sym) || /^US10BR10=RR$/i.test(sym) || /^DAPC\d+$/i.test(sym) || /^DDIC/i.test(sym) || /^DI1\b/i.test(sym) || /^DI[A-Z]\d$/i.test(sym)) return true;
+            if (
+                /^BR\d+(YT|MT)=RR$/i.test(sym)
+                || /^BRNB\d+(YT|MT)=RR$/i.test(sym)
+                || /^US10BR10=RR$/i.test(sym)
+                || /^DAPC\d+$/i.test(sym)
+                || /^DDIC\d+$/i.test(sym)
+                || isDiSymbol(sym)
+            ) return true;
             return false;
         };
-        const rates = assets;
+        const rates = (() => {
+            const base = Array.isArray(assets) ? assets.slice() : [];
+            const byKey = new Map();
+            for (const a of base) {
+                const k = symbolKey(a && a.symbol ? a.symbol : '');
+                if (!k) continue;
+                byKey.set(k, a);
+            }
+            const seriesSyms = Object.keys((data && data.series) || {});
+            const extra = [];
+            for (const sym of seriesSyms) {
+                const k = symbolKey(sym);
+                if (!k || byKey.has(k)) continue;
+                if (!looksLikeBrazilFixedIncome({ symbol: sym, name: '' })) continue;
+                extra.push({ symbol: sym, name: sym });
+                byKey.set(k, { symbol: sym, name: sym });
+            }
+            return base.concat(extra);
+        })();
 
         const fmtRate = v => typeof v === 'number' && Number.isFinite(v) ? `${formatNumber(v, 2)}%` : '—';
         const fmtMoney = v => typeof v === 'number' && Number.isFinite(v) ? `R$ ${formatNumber(v, 2)}` : '—';
@@ -85,6 +161,8 @@
         };
 
         const extractYear = s => {
+            const di = diInfo(s);
+            if (di) return di.year;
             const m = String(s || '').match(/\b(20\d{2})\b/);
             if (!m) return null;
             const y = Number(m[1]);
@@ -94,6 +172,10 @@
 
         const inferTenorYears = (name, symbol) => {
             const src = `${String(symbol || '')} ${String(name || '')}`.toUpperCase();
+            const di = diInfo(symbol);
+            if (di) {
+                return maturityYears(di.year, di.month);
+            }
             const m = src.match(/\b(?:BR|US|BRNB)(\d+)([YM])T=RR\b/);
             if (m) {
                 const n = Number(m[1]);
@@ -144,7 +226,7 @@
             const name = String(asset && asset.name ? asset.name : '');
             const sym = String(symKey || '');
             if (/^BR\d+(YT|MT)=RR$/i.test(sym) || /^US\d+(YT|MT)=RR$/i.test(sym) || /^US10BR10=RR$/i.test(sym)) return true;
-            if (/^DAPC\d+$/i.test(sym) || /^DDIC/i.test(sym) || /^DI\d/i.test(sym) || /^DI1/i.test(sym)) return true;
+            if (/^DAPC\d+$/i.test(sym) || /^DDIC\d+$/i.test(sym) || isDiSymbol(sym)) return true;
             if (/\byield\b|\btaxa\b|\bjuros\b|\bselic\b/i.test(name) && !/\btesouro\b/i.test(name)) return true;
             return false;
         };

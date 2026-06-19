@@ -3,26 +3,54 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Correlation Matrix • Top 20 (~1h)</title>
   <link rel="stylesheet" href="assets/css/style.css" />
+  <link rel="stylesheet" href="../shared/styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="title">Correlation Matrix</div>
-      <div class="subtitle">Top 20 • ~1h • MERCADO/market_quotes.json</div>
-    </div>
-    <div class="actions">
-      <select id="assetSelect" class="navsel" aria-label="Selecionar dashboard">
-        <option value="WDO">WDO</option>
-        <option value="WIN">WIN</option>
-        <option value="MERCADO">Cotações</option>
-        <option value="CORR" selected>Correlações</option>
-      </select>
-      <button id="btn-refresh" class="btn">Atualizar</button>
-      <a class="btn ghost" href="../index.html">Voltar</a>
+  <div id="particles-js"></div>
+  <header class="header">
+    <div class="container">
+      <div class="logo">
+        <h1 class="logo-text">EDI MARKET GUARDIAN</h1>
+        <div class="logo-subtitle">CORRELATION MATRIX • TOP 20 • ~1H</div>
+      </div>
+      <div class="header-glow"></div>
     </div>
   </header>
+
+  <nav class="nav">
+    <div class="container" style="display:flex;align-items:center;position:relative;">
+      <div class="nav-center" style="flex:1;display:flex;justify-content:center;">
+        <ul class="nav-list" style="margin:0">
+          <li><a href="#matrix" class="nav-link active">Matriz</a></li>
+          <li><a href="#supergraphics" class="nav-link">Supergráficos</a></li>
+        </ul>
+      </div>
+      <div class="nav-actions" style="position:absolute;right:0;top:50%;transform:translateY(-50%);display:flex;gap:10px;align-items:center;">
+        <select id="assetSelect" data-current-dashboard="CORR" class="navsel" aria-label="Selecionar dashboard">
+          <optgroup label="Dashboards">
+            <option value="HUB">Dashboard Unificado</option>
+            <option value="WDO">WDO</option>
+            <option value="WIN">WIN</option>
+            <option value="CORR" selected>Correlações</option>
+            <option value="CONTROLE">Controle de Dados</option>
+          </optgroup>
+          <optgroup label="Mercado">
+            <option value="MERCADO">Cotações</option>
+          </optgroup>
+        </select>
+        <button id="btn-refresh" class="btn">Atualizar</button>
+        <a class="btn ghost" href="../index.html">Voltar</a>
+      </div>
+    </div>
+  </nav>
 
   <main class="wrap">
     <section class="panel">
@@ -33,7 +61,7 @@
           <span class="legend-swatch mid"></span><span class="legend-label">0</span>
           <span class="legend-swatch pos"></span><span class="legend-label">+1</span>
         </div>
-        <div class="legend-note">Passe o mouse para ver o par. Clique para fixar no topo.</div>
+        <div class="legend-note">Passe o mouse para ver detalhes. Clique para fixar no topo.</div>
       </div>
       <div class="pin" id="pin" aria-live="polite"></div>
       <div class="matrix-wrap">
@@ -41,9 +69,22 @@
       </div>
       <div class="status" id="status"></div>
     </section>
+
+    <section id="supergraphics" class="panel" style="margin-top:14px;">
+      <div class="meta" style="margin-bottom:10px;">Supergráficos (templates 1:1)</div>
+      <div id="supergraphicsCards" class="sg-grid" aria-label="Lista de supergráficos"></div>
+    </section>
   </main>
 
   <script src="../../Cotacoes/dashboard/MERCADO/assets/data/market_quotes.js"></script>
+  <script src="../shared/js/particles.js"></script>
+  <script src="../shared/unified-nav.js"></script>
+  <script src="assets/js/corr-math.js"></script>
+  <script src="assets/js/corr-catalog.js"></script>
+  <script src="assets/js/corr-ui.js"></script>
+  <script src="assets/data/supergraphics_config.js"></script>
+  <script src="assets/js/supergraphics-cards.js"></script>
   <script src="assets/js/main.js"></script>
 </body>
 </html>
+

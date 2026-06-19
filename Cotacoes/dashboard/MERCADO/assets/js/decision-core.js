@@ -186,15 +186,17 @@
             const k = String(k0 || '');
             const c = String(cur0 || '').toUpperCase();
             if (c === 'USD') {
-                if (k === 'US_CPI' || k === 'US_PCE') return ['DXY', 'US10Y', 'VIX', 'SPX'];
-                if (k === 'US_NFP') return ['DXY', 'US10Y', 'VIX', 'SPX'];
-                if (k === 'US_FOMC') return ['DXY', 'US10Y', 'VIX', 'SPX'];
+                if (k === 'US_CPI' || k === 'US_PCE' || k === 'US_PPI') return ['DXY', 'US10Y', 'VIX', 'SPX'];
+                if (k === 'US_NFP' || k === 'US_ADP' || k === 'US_CLAIMS') return ['DXY', 'US10Y', 'VIX', 'SPX'];
+                if (k === 'US_FOMC' || k === 'US_FED') return ['DXY', 'US10Y', 'VIX', 'SPX'];
+                if (k === 'US_GDP') return ['US10Y', 'SPX', 'DXY', 'VIX'];
                 if (k === 'US_ISM') return ['US10Y', 'SPX', 'HYG', 'DXY'];
                 if (k === 'US_RETAIL') return ['US10Y', 'SPX', 'DXY', 'VIX'];
                 return ['DXY', 'US10Y', 'VIX', 'SPX'];
             }
             if (c === 'BRL') {
                 if (k === 'BR_IPCA' || k === 'BR_IPCA15' || k === 'BR_COPOM') return ['USD_BRL', 'BR10Y', 'IBOV', 'EWZ'];
+                if (k === 'BR_GDP' || k === 'BR_IBCBR' || k === 'BR_RETAIL' || k === 'BR_INDUSTRIAL') return ['USD_BRL', 'IBOV', 'EWZ', 'DXY', 'SPX'];
                 return ['USD_BRL', 'BR10Y', 'IBOV'];
             }
             if (c === 'CNY' || c === 'CNH' || c === 'HKD') {
@@ -210,14 +212,23 @@
                 if (/\bipca-?15\b/.test(nEv)) return 'BR_IPCA15';
                 if (/\bipca\b/.test(nEv)) return 'BR_IPCA';
                 if (/\bcopom\b/.test(nEv) || /\bselic\b/.test(nEv)) return 'BR_COPOM';
+                if (/\bibc-?br\b/.test(nEv)) return 'BR_IBCBR';
+                if (/\bpib\b/.test(nEv) || /\bgdp\b/.test(nEv)) return 'BR_GDP';
+                if (/\bvendas?\s+no\s+varejo\b/.test(nEv) || /\bvarejo\b/.test(nEv)) return 'BR_RETAIL';
+                if (/\bproducao\s+industrial\b/.test(nEv) || /\bindustrial\b/.test(nEv)) return 'BR_INDUSTRIAL';
             }
             if (cur === 'USD') {
                 if (/\bnfp\b/.test(nEv) || /\bpayroll\b/.test(nEv)) return 'US_NFP';
                 if (/\bcpi\b/.test(nEv)) return 'US_CPI';
+                if (/\bppi\b/.test(nEv)) return 'US_PPI';
                 if (/\bpce\b/.test(nEv)) return 'US_PCE';
                 if (/\bism\b/.test(nEv)) return 'US_ISM';
                 if (/\bretail\s+sales\b/.test(nEv) || /\bvendas\s+no\s+varejo\b/.test(nEv)) return 'US_RETAIL';
                 if (/\bfomc\b/.test(nEv) || /\bfed\b/.test(nEv)) return 'US_FOMC';
+                if (/\bgdp\b/.test(nEv) || /\bproduto\s+interno\b/.test(nEv) || /\bpib\b/.test(nEv)) return 'US_GDP';
+                if (/\badp\b/.test(nEv)) return 'US_ADP';
+                if (/\bjobless\s+claims\b/.test(nEv) || /\bpedidos\s+de\s+seguro\s+desemprego\b/.test(nEv) || /\bclaims\b/.test(nEv)) return 'US_CLAIMS';
+                if (/\bminut(es|as)\b/.test(nEv) && /\bfed\b/.test(nEv)) return 'US_FED';
             }
             if (cur === 'CNY' || cur === 'CNH' || cur === 'HKD') {
                 if (/\bpmi\b/.test(nEv)) return 'CN_PMI';
@@ -314,7 +325,90 @@
             return null;
         };
 
-        return fromBr() || fromUs() || fromCn() || { key: k, source: '', lines: [], validators: validatorsFor(k, cur) };
+        const generic = () => {
+            if (!k) return null;
+            const g = { key: k, source: '', lines: [], validators: validatorsFor(k, cur) };
+            if (cur === 'USD') {
+                if (k === 'US_CPI' || k === 'US_PCE' || k === 'US_PPI') {
+                    g.source = 'Matriz EUA (genérica: inflação)';
+                    g.lines = [
+                        'ACIMA do consenso: WDO COMPRA / WIN VENDA',
+                        'NA LINHA: WDO NEUTRO / WIN NEUTRO',
+                        'ABAIXO do consenso: WDO VENDA / WIN COMPRA',
+                    ];
+                    return g;
+                }
+                if (k === 'US_NFP' || k === 'US_ADP' || k === 'US_CLAIMS') {
+                    g.source = 'Matriz EUA (genérica: emprego)';
+                    g.lines = [
+                        'DADO forte (USD forte/yields↑): WDO COMPRA / WIN VENDA',
+                        'NA LINHA: WDO NEUTRO / WIN NEUTRO',
+                        'DADO fraco (USD fraco/yields↓): WDO VENDA / WIN COMPRA',
+                    ];
+                    return g;
+                }
+                if (k === 'US_FOMC' || k === 'US_FED') {
+                    g.source = 'Matriz EUA (genérica: Fed)';
+                    g.lines = [
+                        'Hawkish: WDO COMPRA / WIN VENDA',
+                        'In line: WDO NEUTRO / WIN NEUTRO',
+                        'Dovish: WDO VENDA / WIN COMPRA',
+                    ];
+                    return g;
+                }
+                if (k === 'US_GDP' || k === 'US_ISM' || k === 'US_RETAIL') {
+                    g.source = 'Matriz EUA (genérica: atividade)';
+                    g.lines = [
+                        'FORTE: tende a risk-on se yields controlados (validar US10Y)',
+                        'NA LINHA: WDO NEUTRO / WIN NEUTRO',
+                        'FRACO: tende a risk-off (validar DXY/VIX)',
+                    ];
+                    return g;
+                }
+            }
+            if (cur === 'BRL') {
+                if (k === 'BR_IPCA' || k === 'BR_IPCA15') {
+                    g.source = 'Matriz BR (genérica: inflação)';
+                    g.lines = [
+                        'ACIMA do consenso: WDO COMPRA / WIN VENDA',
+                        'NA LINHA: WDO NEUTRO / WIN NEUTRO',
+                        'ABAIXO do consenso: WDO VENDA / WIN COMPRA',
+                    ];
+                    return g;
+                }
+                if (k === 'BR_COPOM') {
+                    g.source = 'Matriz BR (genérica: Copom/Selic)';
+                    g.lines = [
+                        'Hawkish: WDO COMPRA / WIN VENDA',
+                        'In line: WDO NEUTRO / WIN NEUTRO',
+                        'Dovish: WDO VENDA / WIN COMPRA',
+                    ];
+                    return g;
+                }
+                if (k === 'BR_GDP' || k === 'BR_IBCBR' || k === 'BR_RETAIL' || k === 'BR_INDUSTRIAL') {
+                    g.source = 'Matriz BR (genérica: atividade)';
+                    g.lines = [
+                        'FORTE: WDO VENDA / WIN COMPRA',
+                        'NA LINHA: WDO NEUTRO / WIN NEUTRO',
+                        'FRACO: WDO COMPRA / WIN VENDA',
+                    ];
+                    return g;
+                }
+            }
+            if (cur === 'CNY' || cur === 'CNH' || cur === 'HKD') {
+                if (k === 'CN_PMI' || k === 'CN_TRADE' || k === 'CN_LIQ') {
+                    g.source = 'Matriz China/HK (genérica)';
+                    g.lines = [
+                        'China forte: tende a commodities/EM↑ → WDO VENDA / WIN COMPRA',
+                        'China fraca: tende a commodities/EM↓ → WDO COMPRA / WIN VENDA',
+                    ];
+                    return g;
+                }
+            }
+            return g;
+        };
+
+        return fromBr() || fromUs() || fromCn() || generic() || { key: k, source: '', lines: [], validators: validatorsFor(k, cur) };
     };
 
     window.DecisionCore = {

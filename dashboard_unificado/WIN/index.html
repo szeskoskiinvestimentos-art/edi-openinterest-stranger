@@ -4,12 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EDI Market Guardin V1 - Dashboard Stranger Things</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="../shared/styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
     <div id="particles-js"></div>
@@ -44,11 +43,17 @@
             </ul>
             </div>
             <div class="nav-actions" style="position:absolute;right:0;top:50%;transform:translateY(-50%);">
-                <select id="assetSelect" aria-label="Selecionar ativo" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;">
-                    <option value="WDO">WDO</option>
-                    <option value="WIN" selected>WIN</option>
-                    <option value="MERCADO">Cotações</option>
-                    <option value="CORR">Correlações</option>
+                <select id="assetSelect" data-current-dashboard="WIN" aria-label="Selecionar dashboard" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;">
+                    <optgroup label="Dashboards">
+                        <option value="HUB">Dashboard Unificado</option>
+                        <option value="WDO">WDO</option>
+                        <option value="WIN" selected>WIN</option>
+                    </optgroup>
+                    <optgroup label="Mercado">
+                        <option value="MERCADO">Cotações</option>
+                        <option value="CORR">Correlações</option>
+                        <option value="CONTROLE">Controle</option>
+                    </optgroup>
                 </select>
             </div>
         </div>
@@ -98,18 +103,62 @@
                         <h3>🎯 Resumo Executivo: Simulação de Valor Justo</h3>
                         <p>Projeção de preço das opções principais em cenários de teste de estresse (Call Wall, Put Wall, Gamma Flip).</p>
                     </div>
-                    <div id="fair-value-container" class="table-container">
+                    <div id="fair-value-container-overview" class="table-container">
                         <p>Carregando simulações...</p>
                     </div>
                 </div>
 
                 <div class="split-layout" style="margin-top: 24px;">
                     <div class="context-box">
-                        <h3>🧾 Opções (Yahoo)</h3>
-                        <p>Snapshot local para revisão humana (EWZ). Status considera “stale” quando a captura é antiga.</p>
+                        <h3>🗓️ Open Interest por Vencimento</h3>
+                        <p>Total de contratos em aberto por vencimento, separando Calls e Puts. Ajuda a ver onde está a concentração de risco temporal.</p>
                     </div>
-                    <div id="yahoo-options-container" class="table-container">
-                        <p>Carregando...</p>
+                    <div class="chart-container">
+                        <canvas id="oiExpiryChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 24px;">
+                    <div class="context-box">
+                        <h3>🔥 Most Actives (Open Interest)</h3>
+                        <p>Os strikes com maior atividade e interesse em aberto no momento (Top OI e Top Volume).</p>
+                    </div>
+                    <div class="table-container" id="most-actives-container">
+                        <div class="loading-text">Carregando...</div>
+                    </div>
+                </div>
+
+                <div class="split-layout" style="margin-top: 24px;">
+                    <div class="context-box">
+                        <h3>📈 Volume & Volatilidade</h3>
+                        <p>Correlação entre volume negociado e volatilidade implícita por strike.</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="volumeVolatilityChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tools" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">FERRAMENTAS (YAHOO)</h2>
+                    <div class="section-glow"></div>
+                </div>
+
+                <div class="split-layout" style="margin-bottom: 50px;">
+                    <div class="context-box">
+                        <h3>📌 Open Interest por Strike (Proxy via EWZ)</h3>
+                        <p>Open Interest de Calls e Puts por strike usando um proxy de Índice. Os valores são convertidos para a escala do WIN para facilitar leitura junto do SPOT.</p>
+                    </div>
+                    <div class="chart-container">
+                        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+                            <label style="color:#b3b3b3;font-family:'Share Tech Mono';">Venc:</label>
+                            <select id="ewzOptionsExpirySelect" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;"></select>
+                            <label style="color:#b3b3b3;font-family:'Share Tech Mono';">min OI:</label>
+                            <input id="ewzOptionsMinOi" type="number" value="5" min="0" step="1" style="width:90px;background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;">
+                        </div>
+                        <div id="ewzOptionsMeansAll" style="margin-bottom:10px;color:#b3b3b3;font-family:'Share Tech Mono';"></div>
+                        <canvas id="ewzOptionsOiChart"></canvas>
                     </div>
                 </div>
             </section>
@@ -236,6 +285,14 @@
                     <div class="context-box">
                         <h3>📍 Open Interest por Strike</h3>
                         <p>Distribuição dos contratos em aberto. Grandes concentrações de OI funcionam como ímãs ou barreiras de preço.</p>
+                        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px;">
+                            <label for="oiExpiryMode" style="font-size:12px;color:var(--text-muted);">Vencimentos</label>
+                            <select id="oiExpiryMode" aria-label="Selecionar vencimentos (OI por Strike)" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;min-width:180px;">
+                                <option value="all" selected>Todos os vencimentos</option>
+                                <option value="nearest">Próximo vencimento</option>
+                            </select>
+                            <span id="oiExpiryInfo" style="font-size:12px;color:var(--secondary-neon);"></span>
+                        </div>
                     </div>
                     <div class="chart-container">
                         <canvas id="oiStrikeChart"></canvas>
@@ -458,7 +515,7 @@
                     <div class="context-box" style="width: 100%;">
                         <h3>💎 Simulação de Valor Justo (Fair Value)</h3>
                         <p>Preço estimado das opções em cenários de mercado simulados (Call Wall, Put Wall, Gamma Flip). Identifica oportunidades de assimetria.</p>
-                        <div class="data-table-container" id="fair-value-container-v3">
+                        <div class="data-table-container" id="fair-value-container">
                             <!-- Populated by JS -->
                         </div>
                     </div>
@@ -577,46 +634,12 @@
     <script src="assets/data/yahoo_ewz_options.js"></script>
     
     <!-- Sistema de Partículas Customizado (Stranger Things Theme) -->
-    <script src="assets/js/particles.js"></script>
+    <script src="../shared/js/particles.js"></script>
+    <script src="../shared/js/chart_data_utils.js"></script>
+    <script src="../shared/unified-nav.js"></script>
     
     <!-- Gráficos e Lógica Principal -->
+    <script src="../shared/main-shared.js"></script>
     <script src="assets/js/charts.js"></script>
-    <script src="assets/js/main.js"></script>
-    <script>
-        (function(){
-            const sel = document.getElementById('assetSelect');
-            if(!sel) return;
-            const prodRoot = 'https://szeskoskiinvestimentos-art.github.io/edi-openinterest-stranger/';
-            const prodBase = prodRoot + 'dashboard_unificado/';
-            const prodMercado = prodRoot + 'Cotacoes/dashboard/MERCADO/';
-            function targetFor(val){
-                const host = location.hostname;
-                const href = location.href;
-                const isProd = host.indexOf('github.io') !== -1 || host.indexOf('sites.google.com') !== -1;
-                if(isProd){
-                    if(val === 'WDO') return prodBase + 'WDO/';
-                    if(val === 'WIN') return prodBase + 'WIN/';
-                    if(val === 'CORR') return prodBase + 'correlation/';
-                    if(val === 'MERCADO') return prodMercado;
-                    return href;
-                }
-                const isUnified = href.indexOf('dashboard_unificado') !== -1;
-                if(isUnified){
-                    if(val === 'WDO') return '../WDO/index.html';
-                    if(val === 'WIN') return '../WIN/index.html';
-                    if(val === 'MERCADO') return '../../Cotacoes/dashboard/MERCADO/index.html';
-                    if(val === 'CORR') return '../correlation/index.html';
-                    return href;
-                }
-                if(val === 'WDO'){
-                    return '../../Edi_OpenInterest - PY - Stranger - WDO/dashboard_v1/index.html';
-                }
-                return '../../Edi_OpenInterest - PY - Stranger - Indice/dashboard_v1/index.html';
-            }
-            sel.addEventListener('change', function(e){
-                location.href = targetFor(e.target.value);
-            });
-        })();
-    </script>
 </body>
 </html>

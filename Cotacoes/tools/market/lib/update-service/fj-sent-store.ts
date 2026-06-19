@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { requireInsideWorkspace } from '../../update-service/paths.js'
 
 export function createFinancialJuiceSentStore(params: {
   baseDir: string
@@ -17,10 +18,15 @@ export function createFinancialJuiceSentStore(params: {
   let dirty = false
 
   const storePath = () => {
+    const fallback = path.join(params.baseDir, 'telegram_financialjuice_sent.json')
     const configured = params.env('TELEGRAM_FINANCIALJUICE_SENT_STORE_FILE', '')
-    return configured && String(configured).trim()
-      ? params.resolveFromBase(params.baseDir, String(configured).trim())
-      : path.join(params.baseDir, 'telegram_financialjuice_sent.json')
+    const candidate =
+      configured && String(configured).trim() ? params.resolveFromBase(params.baseDir, String(configured).trim()) : fallback
+    try {
+      return requireInsideWorkspace('TELEGRAM_FINANCIALJUICE_SENT_STORE_FILE', candidate)
+    } catch {
+      return requireInsideWorkspace('TELEGRAM_FINANCIALJUICE_SENT_STORE_FILE', fallback)
+    }
   }
 
   const clampFifo = () => {
@@ -97,4 +103,3 @@ export function createFinancialJuiceSentStore(params: {
 
   return { has, remember, load, flush }
 }
-

@@ -148,6 +148,7 @@ export async function runOnce(modeRaw: string) {
       browser: browserCfg,
       matrixDbs,
       keepLastOnEmpty,
+      fetchTextWithTimeout,
       log: logStdout,
       warn: line => process.stdout.write(`${line}\n`),
     })

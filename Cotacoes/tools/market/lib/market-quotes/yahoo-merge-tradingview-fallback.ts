@@ -23,6 +23,8 @@ export function createTradingViewFallback(params: {
   let used = 0
   const resolvedCache = new Map<string, string>()
 
+  const stripTags = (s: string) => String(s || '').replace(/<[^>]+>/g, '').trim()
+
   async function resolve(asset: Asset | undefined | null, category: string) {
     if (!params.enabled) return null as null | { tradingViewSymbol: string; price: number; usedColumn: string; updateMode: string | null }
     if (!asset || !asset.symbol) return null
@@ -54,7 +56,7 @@ export function createTradingViewFallback(params: {
       const rank = (it: TradingViewSearchItem) => {
         const full = String(it.full_name || '').trim()
         if (!full || !full.includes(':')) return null
-        const sym = String(it.symbol || '').trim()
+        const sym = stripTags(String(it.symbol || '').trim())
         const ex = String(it.exchange || '').trim().toUpperCase()
         const tp = String(it.type || '').trim().toLowerCase()
         const desc = normalizeLooseText(String(it.description || ''))
@@ -64,6 +66,24 @@ export function createTradingViewFallback(params: {
         if (preferredExchanges.length && preferredExchanges.includes(ex)) score += 60
         if (sym && normalizeLooseText(sym) === normalizeLooseText(assetKey)) score += 25
         if (desc && nameNorm && desc.includes(nameNorm.slice(0, 8))) score += 10
+        const contracts = Array.isArray((it as unknown as { contracts?: unknown }).contracts)
+          ? ((it as unknown as { contracts: Array<{ symbol?: string; typespecs?: unknown }> }).contracts)
+          : []
+        const prefix = String(full.split(':')[0] || '').trim()
+        if (prefix && contracts.length) {
+          const continuous = contracts.find(c => {
+            const rawTypes = c && c.typespecs ? c.typespecs : null
+            const types = Array.isArray(rawTypes) ? rawTypes.map(x => String(x)) : []
+            return types.includes('continuous')
+          })
+          const cSym = continuous && continuous.symbol ? stripTags(String(continuous.symbol)) : ''
+          if (cSym) {
+            const tvFull = `${prefix}:${cSym}`
+            score += 45
+            if (/1!$/.test(cSym)) score += 10
+            return { fullName: tvFull, score }
+          }
+        }
         return { fullName: full, score }
       }
 
@@ -112,4 +132,3 @@ export function createTradingViewFallback(params: {
     },
   }
 }
-

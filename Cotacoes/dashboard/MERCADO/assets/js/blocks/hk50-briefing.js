@@ -340,15 +340,35 @@
                 </div>
             </div>`;
             };
+            const mkComputed = (label, spot, chg, hintSym) => {
+                const spotTxt = spot !== null && typeof spot === 'number' && Number.isFinite(spot) ? `${formatNumber(spot, 2)}%` : '—';
+                const chgTxt = typeof chg === 'number' && Number.isFinite(chg) ? toneBadgeHtml(chg, formatNumber(chg, 2), { maxAbs: 0.6 }) : '—';
+                return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px;border:1px solid rgba(255,255,255,.10);border-radius:10px;background:rgba(0,0,0,.16);">
+                <div style="opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%;">${escapeHtml(label)}${hintSym ? ` <span style="opacity:.72;">(${escapeHtml(hintSym)})</span>` : ''}</div>
+                <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap;">
+                    <span style="font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.88;">${escapeHtml(spotTxt)}</span>
+                    ${chgTxt}
+                </div>
+            </div>`;
+            };
             const fmtRate = v => (typeof v === 'number' && Number.isFinite(v) ? `${formatNumber(v, 2)}%` : '—');
             const s = hkNow && hkNow.sym ? hkNow.sym : {};
+            const hk10ySpot = s.hk10y ? spotOf(s.hk10y).spot : null;
+            const cn10ySpot = s.cn10y ? spotOf(s.cn10y).spot : null;
+            const us10ySpot = s.us10y ? spotOf(s.us10y).spot : null;
+            const spreadSpot = (hk10ySpot !== null && us10ySpot !== null) ? (hk10ySpot - us10ySpot) : (cn10ySpot !== null && us10ySpot !== null) ? (cn10ySpot - us10ySpot) : null;
+            const hk10yChg = s.hk10y ? ratesMoveProxy(s.hk10y) : null;
+            const cn10yChg = s.cn10y ? ratesMoveProxy(s.cn10y) : null;
+            const us10yChg = s.us10y ? ratesMoveProxy(s.us10y) : null;
+            const spreadChg = (hk10yChg !== null && us10yChg !== null) ? (hk10yChg - us10yChg) : (cn10yChg !== null && us10yChg !== null) ? (cn10yChg - us10yChg) : null;
+            const spreadHint = (hk10ySpot !== null && us10ySpot !== null) ? 'HK10Y−US10Y' : (cn10ySpot !== null && us10ySpot !== null) ? 'CN10Y−US10Y' : '';
             const items = [
                 mk('HK10Y', s.hk10y, { fmtSpot: fmtRate, maxAbs: 0.6 }),
                 mk('HK 1M', s.hk1m, { fmtSpot: fmtRate, maxAbs: 0.6 }),
                 mk('HK 3M', s.hk3m, { fmtSpot: fmtRate, maxAbs: 0.6 }),
                 mk('CN10Y', s.cn10y, { fmtSpot: fmtRate, maxAbs: 0.6 }),
                 mk('US10Y', s.us10y, { fmtSpot: fmtRate, maxAbs: 0.6 }),
-                mk('Spread 10Y (HK vs US/China)', s.us10hk10, { fmtSpot: fmtRate, maxAbs: 0.6 }),
+                mkComputed('Spread 10Y (HK/China vs US)', spreadSpot, spreadChg, spreadHint),
                 mk('China CDS 5Y (USD)', s.cdsCn5y, { maxAbs: 2.0 }),
             ];
             return `<div style="margin-top:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);">

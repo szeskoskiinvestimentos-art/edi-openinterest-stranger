@@ -21,6 +21,7 @@
 
         const getData = d.getData;
         const loadScriptFresh = d.loadScriptFresh;
+        const refreshDerivedOperationalInputs = d.refreshDerivedOperationalInputs;
         const resetAgendaAutoCache = d.resetAgendaAutoCache;
         const renderAll = d.renderAll;
         const setDataStatus = d.setDataStatus;
@@ -68,6 +69,9 @@
         setupQuickNavDrawer();
         setupNavMorePanel();
         setupInvestingCalendarWidgetLazyLoad();
+        try {
+            if (typeof refreshDerivedOperationalInputs === 'function') refreshDerivedOperationalInputs(getData());
+        } catch { }
         try { renderOperationalBriefing(); } catch { }
         try { renderBtcOperationalBriefing(); } catch { }
         try { renderHk50OperationalBriefing(); } catch { }
@@ -78,15 +82,25 @@
         if (!data) {
             try {
                 await loadScriptFresh('assets/data/market_quotes.js');
+                await loadScriptFresh('assets/data/market_yahoo_audit.js');
                 await loadScriptFresh('assets/data/zq_curve.js');
                 await loadScriptFresh('assets/data/economic_calendar.js');
+                await loadScriptFresh('assets/data/agenda_reports.js');
                 await loadScriptFresh('assets/data/foreign_flow.js');
                 resetAgendaAutoCache();
                 data = getData();
             } catch {
             }
         }
-        if (data) renderAll(data);
+        if (data) {
+            try { if (typeof refreshDerivedOperationalInputs === 'function') refreshDerivedOperationalInputs(data); } catch { }
+            renderAll(data);
+            try { renderOperationalBriefing(); } catch { }
+            try { renderBtcOperationalBriefing(); } catch { }
+            try { renderHk50OperationalBriefing(); } catch { }
+            try { renderUsEquitiesOperationalBriefing(); } catch { }
+            try { renderCommoditiesOperationalBriefing(); } catch { }
+        }
         else setDataStatus('DADOS NÃO CARREGADOS • Verifique assets/data/market_quotes.js', 'negative');
         adaptSplitLayouts();
         void loadOptionsGammaSummary();
@@ -103,8 +117,10 @@
                     const ok = await triggerUpdaterAndReload();
                     if (!ok) {
                         await loadScriptFresh('assets/data/market_quotes.js');
+                        await loadScriptFresh('assets/data/market_yahoo_audit.js');
                         await loadScriptFresh('assets/data/zq_curve.js');
                         await loadScriptFresh('assets/data/economic_calendar.js');
+                        await loadScriptFresh('assets/data/agenda_reports.js');
                         resetAgendaAutoCache();
                         const updated = getData();
                         if (updated) renderAll(updated);
@@ -134,11 +150,21 @@
         const refreshQuotes = async source => {
             try {
                 await loadScriptFresh('assets/data/market_quotes.js');
+                await loadScriptFresh('assets/data/market_yahoo_audit.js');
                 await loadScriptFresh('assets/data/zq_curve.js');
                 await loadScriptFresh('assets/data/economic_calendar.js');
+                await loadScriptFresh('assets/data/agenda_reports.js');
                 resetAgendaAutoCache();
                 const updated = getData();
-                if (updated) renderAll(updated);
+                if (updated) {
+                    try { if (typeof refreshDerivedOperationalInputs === 'function') refreshDerivedOperationalInputs(updated); } catch { }
+                    renderAll(updated);
+                    try { renderOperationalBriefing(); } catch { }
+                    try { renderBtcOperationalBriefing(); } catch { }
+                    try { renderHk50OperationalBriefing(); } catch { }
+                    try { renderUsEquitiesOperationalBriefing(); } catch { }
+                    try { renderCommoditiesOperationalBriefing(); } catch { }
+                }
                 void loadOptionsGammaSummary();
                 void loadFinancialJuice();
                 void loadWebNewsModule();

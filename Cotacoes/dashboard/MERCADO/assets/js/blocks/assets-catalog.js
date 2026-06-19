@@ -21,7 +21,8 @@
         const findAssetSymbol = d.findAssetSymbol;
         const getLastPoint = d.getLastPoint;
 
-        const isNum = v => typeof v === 'number' && Number.isFinite(v);
+        const h = w.AssetsCatalogHelpers || {};
+        const isNum = typeof h.isNum === 'function' ? h.isNum : (v => typeof v === 'number' && Number.isFinite(v));
         const assets = Array.isArray(data && data.assets) ? data.assets : [];
         const series = data && data.series ? data.series : {};
         const generatedAt = data && data.meta && data.meta.generatedAt ? String(data.meta.generatedAt) : '';
@@ -46,70 +47,45 @@
             return xs.length ? xs[xs.length - 1] : null;
         };
 
-        const categories = Array.from(new Set(assets.map(a => String(a && a.category ? a.category : '')).filter(Boolean))).sort((a, b) =>
-            a.localeCompare(b, 'pt-BR'),
-        );
+        const buildCategories = typeof h.buildCategories === 'function' ? h.buildCategories : (() => []);
+        const buildRowsAll = typeof h.buildRowsAll === 'function' ? h.buildRowsAll : (() => []);
+        const buildCounts = typeof h.buildCounts === 'function' ? h.buildCounts : (() => ({ assets: 0, withSeries: 0, withPrice: 0, noSeries: 0, noPrice: 0 }));
+        const buildRatesCreditSummary = typeof h.buildRatesCreditSummary === 'function' ? h.buildRatesCreditSummary : (() => ({ baseResolved: [], extras: [], extrasSymbols: [] }));
 
-        const calcPct = best => {
-            if (typeof pointPct === 'function') return pointPct(best);
-            if (best && isNum(best.extendedChangePct)) return best.extendedChangePct;
-            if (best && isNum(best.changePct)) return best.changePct;
-            return null;
-        };
-
-        const rowsAll = assets
-            .map(a => {
-                const symbol = String(a && a.symbol ? a.symbol : '');
-                const name = String(a && a.name ? a.name : '');
-                const category = String(a && a.category ? a.category : '');
-                const exchange = a && a.exchange ? String(a.exchange) : '';
-                const tags = Array.isArray(a && a.tags) ? a.tags.map(x => String(x)) : [];
-                const xs = Array.isArray(series[symbol]) ? series[symbol] : [];
-                const best = getBestPoint(symbol);
-                const any = getAnyPoint(symbol);
-                const lastT = best && best.t ? best.t : any && any.t ? any.t : null;
-                const lastPrice = best && isNum(best.price) ? best.price : null;
-                const lastChangePct = calcPct(best);
-                const lastExtChangePct = best && isNum(best.extendedChangePct) ? best.extendedChangePct : null;
-                return {
-                    symbol,
-                    name,
-                    category,
-                    exchange,
-                    tags,
-                    points: xs.length,
-                    lastT,
-                    lastPrice,
-                    lastChangePct,
-                    lastExtChangePct,
-                    hasSeries: xs.length > 0,
-                    hasPrice: lastPrice !== null,
-                };
-            })
-            .sort((a, b) => a.symbol.localeCompare(b.symbol, 'en'));
-
-        const counts = {
-            assets: rowsAll.length,
-            withSeries: rowsAll.filter(r => r.hasSeries).length,
-            withPrice: rowsAll.filter(r => r.hasPrice).length,
-            noSeries: rowsAll.filter(r => !r.hasSeries).length,
-            noPrice: rowsAll.filter(r => r.hasSeries && !r.hasPrice).length,
-        };
-
-        const ratesCreditSummary = (() => {
-            if (!catalog) return { baseResolved: [], extras: [], extrasSymbols: [] };
-            const defs = typeof catalog.listRatesCredit === 'function' ? catalog.listRatesCredit() : [];
-            const baseResolved = typeof catalog.buildResolved === 'function'
-                ? defs.map(def => catalog.buildResolved(catDeps, data, def)).filter(Boolean)
-                : [];
-            const baseSymbols = new Set(baseResolved.map(x => String(x && x.symbol ? x.symbol : '')).filter(Boolean));
-            const discovered = typeof catalog.discoverRatesCredit === 'function'
-                ? catalog.discoverRatesCredit(data, { max: 80 })
-                : [];
-            const extras = (discovered || []).filter(x => x && x.symbol && !baseSymbols.has(String(x.symbol)));
-            const extrasSymbols = extras.map(x => String(x.symbol));
-            return { baseResolved, extras, extrasSymbols };
+        const categories = buildCategories(assets);
+        const rowsAllBase = buildRowsAll({ data, assets, series, getBestPoint: (sym) => getBestPoint(sym), getAnyPoint: (sym) => getAnyPoint(sym), pointPct });
+        const yahooAudit = w.MARKET_YAHOO_AUDIT_DATA || null;
+        const yahooMap = (() => {
+            const m = new Map();
+            const items = yahooAudit && Array.isArray(yahooAudit.items) ? yahooAudit.items : [];
+            for (const it of items) {
+                const k = it && it.assetSymbol ? String(it.assetSymbol) : '';
+                const y = it && it.yahooSymbol ? String(it.yahooSymbol) : '';
+                if (k && y && !m.has(k)) m.set(k, y);
+            }
+            return m;
         })();
+        const roleOf = (r) => {
+            const sym = String((r && r.symbol) || '');
+            const cat = String((r && r.category) || '');
+            if (/\b(c\d+|c1|c2)$/i.test(sym)) return 'futuro';
+            if (/=F$/i.test(sym)) return 'futuro';
+            if (sym.includes('/')) return 'fx';
+            if (sym.startsWith('.')) return 'índice';
+            if (/^\^/.test(sym)) return 'índice';
+            if (cat.includes('vol')) return 'vol';
+            if (cat.includes('rates') || cat.includes('credit')) return 'rates';
+            if (cat.includes('crypto')) return 'crypto';
+            if (cat.includes('commod')) return 'commodity';
+            if (cat.includes('equ')) return 'equity';
+            return 'outros';
+        };
+        const rowsAll = rowsAllBase.map(r => {
+            const y = yahooMap.get(String(r.symbol || '')) || yahooMap.get(String(r.name || '')) || '';
+            return { ...r, yahooSymbol: y, role: roleOf(r) };
+        });
+        const counts = buildCounts(rowsAll);
+        const ratesCreditSummary = buildRatesCreditSummary({ catalog, catDeps, data });
 
         const mkCategoryCounts = () => {
             const map = new Map();
@@ -125,31 +101,13 @@
         };
 
         const storageKey = 'edi_market_assets_catalog_v1';
-        const prev = (() => {
-            try {
-                const raw = localStorage.getItem(storageKey);
-                if (!raw) return null;
-                const obj = JSON.parse(raw);
-                if (!obj || typeof obj !== 'object') return null;
-                const syms = Array.isArray(obj.symbols) ? obj.symbols.map(x => String(x)) : [];
-                return { symbols: new Set(syms), at: obj.at ? String(obj.at) : '' };
-            } catch {
-                return null;
-            }
-        })();
+        const readSymbolsSnapshot = typeof h.readSymbolsSnapshot === 'function' ? h.readSymbolsSnapshot : (() => null);
+        const computeDelta = typeof h.computeDelta === 'function' ? h.computeDelta : (() => ({ added: [], removed: [], at: '' }));
+        const writeSymbolsSnapshot = typeof h.writeSymbolsSnapshot === 'function' ? h.writeSymbolsSnapshot : (() => { });
+        const prev = readSymbolsSnapshot(storageKey);
         const curSymbols = new Set(rowsAll.map(r => r.symbol));
-        const delta = (() => {
-            if (!prev) return { added: [], removed: [], at: '' };
-            const added = [];
-            const removed = [];
-            for (const s of curSymbols) if (!prev.symbols.has(s)) added.push(s);
-            for (const s of prev.symbols) if (!curSymbols.has(s)) removed.push(s);
-            return { added: added.sort(), removed: removed.sort(), at: prev.at };
-        })();
-        try {
-            localStorage.setItem(storageKey, JSON.stringify({ at: generatedAt || new Date().toISOString(), symbols: Array.from(curSymbols).sort() }));
-        } catch {
-        }
+        const delta = computeDelta(prev, curSymbols);
+        writeSymbolsSnapshot(storageKey, generatedAt, curSymbols);
 
         const pulseNow = typeof computeOperationalPulseNow === 'function' ? computeOperationalPulseNow(data) : null;
         const hkNow = typeof computeHk50PulseNow === 'function' ? computeHk50PulseNow(data, null) : null;
@@ -231,7 +189,7 @@
             if (only === 'no_series') rows = rows.filter(r => !r.hasSeries);
             if (q) {
                 rows = rows.filter(r => {
-                    const hay = `${r.symbol} ${r.name} ${r.category} ${r.exchange} ${(r.tags || []).join(' ')}`.toLowerCase();
+                    const hay = `${r.symbol} ${r.name} ${r.category} ${r.exchange} ${(r.tags || []).join(' ')} ${(r.role || '')} ${(r.yahooSymbol || '')}`.toLowerCase();
                     return hay.includes(q);
                 });
             }
@@ -255,10 +213,14 @@
                     const seriesTxt = r.hasSeries ? safeEscape(String(r.points)) : '—';
                     const tone = r.hasPrice ? 'neutral' : r.hasSeries ? 'negative' : 'negative';
                     const symCell = safeBadge(tone, r.symbol);
+                    const roleTxt = safeEscape(r.role || '—');
+                    const yahooTxt = safeEscape(r.yahooSymbol || '—');
                     return `<tr>
                     <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);">${symCell}</td>
                     <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);opacity:.92;">${safeEscape(r.name || '')}</td>
                     <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);opacity:.85;white-space:nowrap;">${safeEscape(r.category || '—')}</td>
+                    <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);opacity:.8;white-space:nowrap;">${roleTxt}</td>
+                    <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);opacity:.85;white-space:nowrap;font-family:'Share Tech Mono',monospace;font-weight:900;">${yahooTxt}</td>
                     <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.9;white-space:nowrap;">${safeEscape(pct)}</td>
                     <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.75;white-space:nowrap;">${safeEscape(ext)}</td>
                     <td style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;opacity:.92;white-space:nowrap;">${safeEscape(price)}</td>
@@ -287,7 +249,7 @@
             if (only === 'no_series') rows = rows.filter(r => !r.hasSeries);
             if (q) {
                 rows = rows.filter(r => {
-                    const hay = `${r.symbol} ${r.name} ${r.category} ${r.exchange} ${(r.tags || []).join(' ')}`.toLowerCase();
+                    const hay = `${r.symbol} ${r.name} ${r.category} ${r.exchange} ${(r.tags || []).join(' ')} ${(r.role || '')} ${(r.yahooSymbol || '')}`.toLowerCase();
                     return hay.includes(q);
                 });
             }
@@ -447,6 +409,8 @@
                                 <th style="position:sticky;top:0;background:rgba(10,10,10,.98);backdrop-filter:blur(6px);padding:9px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.6px;opacity:.85;">Símbolo</th>
                                 <th style="position:sticky;top:0;background:rgba(10,10,10,.98);backdrop-filter:blur(6px);padding:9px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.6px;opacity:.85;">Nome</th>
                                 <th style="position:sticky;top:0;background:rgba(10,10,10,.98);backdrop-filter:blur(6px);padding:9px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.6px;opacity:.85;">Cat</th>
+                                <th style="position:sticky;top:0;background:rgba(10,10,10,.98);backdrop-filter:blur(6px);padding:9px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.6px;opacity:.85;">Tipo</th>
+                                <th style="position:sticky;top:0;background:rgba(10,10,10,.98);backdrop-filter:blur(6px);padding:9px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.6px;opacity:.75;">Yahoo</th>
                                 <th style="position:sticky;top:0;background:rgba(10,10,10,.98);backdrop-filter:blur(6px);padding:9px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.6px;opacity:.85;">Δ%</th>
                                 <th style="position:sticky;top:0;background:rgba(10,10,10,.98);backdrop-filter:blur(6px);padding:9px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.6px;opacity:.65;">Ext%</th>
                                 <th style="position:sticky;top:0;background:rgba(10,10,10,.98);backdrop-filter:blur(6px);padding:9px 10px;text-align:right;border-bottom:1px solid rgba(255,255,255,.08);font-weight:900;letter-spacing:.6px;opacity:.85;">Preço</th>

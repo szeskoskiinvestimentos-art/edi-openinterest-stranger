@@ -83,6 +83,31 @@ export type PortfolioStats = {
   uniqueSymbols: number
   duplicateSymbols: number
   sampleMissingPriceSymbols: string[]
+  sampleMissingPriceRows?: MarketAuditRowRef[]
+  sampleDuplicateSymbols?: { symbol: string; rawSymbol?: string; rawName?: string; exchange?: string; csvRowIndex?: number; csvLine?: number }[]
+}
+
+export type MarketAuditOutlier = {
+  symbol: string
+  kind: 'changePct' | 'extendedChangePct' | 'price' | 'priceJump'
+  value: number
+  at: string
+}
+
+export type MarketAuditRowRef = {
+  symbol: string
+  rawSymbol?: string
+  rawName?: string
+  exchange?: string
+  csvRowIndex?: number
+  csvLine?: number
+}
+
+export type MarketAudit = {
+  missingPriceSymbols: string[]
+  missingPriceRows?: MarketAuditRowRef[]
+  duplicateSymbols: MarketAuditRowRef[]
+  outliers: MarketAuditOutlier[]
 }
 
 export type MarketQuotes = {
@@ -96,6 +121,7 @@ export type MarketQuotes = {
     portfolioStats?: PortfolioStats
     diUpdatedAt?: string
     yahooUpdatedAt?: string
+    audit?: MarketAudit
     yahooCoverage?: {
       enabled: boolean
       lastRunAt: string

@@ -156,6 +156,7 @@ export async function buildWebNewsModule(params: {
     ok: true,
     generatedAt: new Date().toISOString(),
     provider: 'web_news_module',
+    warnings: [],
     windowHours,
     sources,
     summary: {

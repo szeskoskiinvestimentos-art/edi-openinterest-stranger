@@ -5,7 +5,7 @@ import { openForLogin, openInfoMoneyForLogin } from '../lib/investing/login.js'
 import { env, envNumber } from '../lib/investing-sync/env.js'
 import { investingBrowserConfig } from './browser.js'
 import { logStdout } from './log.js'
-import { defaultAutomationDir, resolveFromBase, resolveFromProject } from './paths.js'
+import { defaultAutomationDir, requireInsideWorkspace, resolveFromBase, resolveFromProject } from './paths.js'
 import { runOnce } from './run-once.js'
 
 function sleep(ms: number) {
@@ -16,8 +16,11 @@ export async function runInvestingSyncCli(argv: string[]) {
   const args = parseArgs(argv)
   const mode = (args.mode as string) || 'once'
 
-  const baseDir = resolveFromProject(env('MARKET_AUTOMATION_DIR', defaultAutomationDir()))
-  const userDataDir = resolveFromBase(baseDir, env('INVESTING_USER_DATA_DIR', path.join(baseDir, 'investing-profile')))
+  const baseDir = requireInsideWorkspace('MARKET_AUTOMATION_DIR', resolveFromProject(env('MARKET_AUTOMATION_DIR', defaultAutomationDir())))
+  const userDataDir = requireInsideWorkspace(
+    'INVESTING_USER_DATA_DIR',
+    resolveFromBase(baseDir, env('INVESTING_USER_DATA_DIR', path.join(baseDir, 'investing-profile'))),
+  )
   const url =
     env('INVESTING_PORTFOLIO_URL') || 'https://br.investing.com/portfolio/?portfolioID=ZWY2YGY0Mmo3YWFsZjc1NA%3D%3D'
 
@@ -56,4 +59,3 @@ export async function runInvestingSyncCli(argv: string[]) {
 
   await runOnce(mode)
 }
-

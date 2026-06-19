@@ -322,14 +322,14 @@ class OptionsCalculator:
         dT = settings.DT_DAILY
         dsigma = settings.DSIGMA
         
-        # Charm
+        # Charm = -dDelta/dT (rate of change of Delta as time decreases)
         dTp_C, _ = GreeksEngine.calculate_greeks(S, K_ref, max(T + dT, settings.EPSILON), r, sigma, 'C')
         dTm_C, _ = GreeksEngine.calculate_greeks(S, K_ref, max(T - dT, settings.EPSILON), r, sigma, 'C')
-        chC = (np.nan_to_num(dTp_C) - np.nan_to_num(dTm_C)) / (2*dT)
+        chC = (np.nan_to_num(dTm_C) - np.nan_to_num(dTp_C)) / (2*dT)
         
         dTp_P, _ = GreeksEngine.calculate_greeks(S, K_ref, max(T + dT, settings.EPSILON), r, sigma, 'P')
         dTm_P, _ = GreeksEngine.calculate_greeks(S, K_ref, max(T - dT, settings.EPSILON), r, sigma, 'P')
-        chP = (np.nan_to_num(dTp_P) - np.nan_to_num(dTm_P)) / (2*dT)
+        chP = (np.nan_to_num(dTm_P) - np.nan_to_num(dTp_P)) / (2*dT)
         
         # Vanna
         dSp_C, _ = GreeksEngine.calculate_greeks(S, K_ref, T, r, sigma + dsigma, 'C')
@@ -413,7 +413,7 @@ class OptionsCalculator:
             
             order = np.argsort(np.array(self.strikes_ref, dtype=float))
             ks = np.array(self.strikes_ref, dtype=float)[order]
-            gex = np.array(self.gex_tot, dtype=float)[order]
+            gex = np.array(self.gex_flip_base, dtype=float)[order]
             
             w = np.exp(-((ks - float(self.spot))**2) / (2.0 * (sigma_pts**2)))
             gex_cum_hvl = np.cumsum(gex * w)
@@ -725,8 +725,8 @@ class OptionsCalculator:
                 expiry_dt = pd.to_datetime(expiry)
                 dataref_dt = pd.to_datetime(self.dataref)
                 bdays = int(np.busday_count(dataref_dt.date(), expiry_dt.date()))
-                is_0dte_friday = (dataref_dt.date() == expiry_dt.date()) and (expiry_dt.weekday() == 4)
-                T_exp = settings.MIN_T_EXPIRY if is_0dte_friday else ((1.0/252.0) if bdays <= 0 else (bdays/252.0))
+                is_0dte = (dataref_dt.date() == expiry_dt.date())
+                T_exp = settings.MIN_T_EXPIRY if is_0dte else ((1.0/252.0) if bdays <= 0 else (bdays/252.0))
                 
                 df_exp = self.options_df[self.options_df['Expiry'] == expiry]
                 oi_call = df_exp[df_exp['OptionType'] == 'CALL'].groupby('StrikeK')['Open Int'].sum().reindex(self.strikes_ref, fill_value=0.0).values
@@ -769,9 +769,6 @@ class OptionsCalculator:
         alphas = np.linspace(settings.CONE_ALPHA_MIN, settings.CONE_ALPHA_MAX, settings.CONE_ALPHA_STEPS)
         flips: list[float | None] = []
         
-        # Salva estado original
-        original_sigma_factor = float(settings.SIGMA_FACTOR)
-        
         try:
             strikes = np.array(self.strikes_ref, dtype=float)
             if strikes.size == 0:
@@ -783,9 +780,8 @@ class OptionsCalculator:
             step = float(np.median(np.diff(strikes))) if strikes.size > 1 else 25.0
 
             for alpha in alphas:
-                settings.SIGMA_FACTOR = alpha
-                sigma_factor = float(settings.SIGMA_FACTOR)
-                sigma_pts = float(sigma_factor) * max(step * 2.0, spot * hvl_daily)
+                sigma_factor = float(alpha)
+                sigma_pts = sigma_factor * max(step * 2.0, spot * hvl_daily)
                 w = np.exp(-((strikes - spot) ** 2) / (2.0 * (sigma_pts ** 2)))
                 gex_cum = np.cumsum(self.gex_flip_base * w)
                 sg = np.sign(gex_cum)
@@ -807,8 +803,6 @@ class OptionsCalculator:
                     flips.append(x1)
                     continue
                 flips.append(float(x1 - y1 * (x2 - x1) / (y2 - y1)))
-        finally:
-            settings.SIGMA_FACTOR = original_sigma_factor
             
         self.gamma_flip_cone = {
             'alphas': alphas,

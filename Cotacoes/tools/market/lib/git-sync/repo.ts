@@ -1,14 +1,5 @@
-import path from 'node:path'
 import type { GitSyncDeps } from './types.js'
-
-function isPathInside(baseDir: string, targetPath: string) {
-  const base = path.resolve(baseDir)
-  const target = path.resolve(targetPath)
-  const normBase = process.platform === 'win32' ? base.toLowerCase() : base
-  const normTarget = process.platform === 'win32' ? target.toLowerCase() : target
-  const baseWithSep = normBase.endsWith(path.sep) ? normBase : normBase + path.sep
-  return normTarget === normBase || normTarget.startsWith(baseWithSep)
-}
+import { isPathInside } from '../../update-service/paths.js'
 
 export async function resolveGitRepoDir(deps: GitSyncDeps) {
   const candidates = [
@@ -32,4 +23,3 @@ export async function resolveGitRepoDir(deps: GitSyncDeps) {
 export function ensureTargetInsideRepo(repoAbs: string, targetAbs: string) {
   return isPathInside(repoAbs, targetAbs)
 }
-

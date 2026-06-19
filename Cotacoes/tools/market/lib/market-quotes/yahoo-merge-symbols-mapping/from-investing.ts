@@ -19,6 +19,7 @@ const DIRECT_MAP: Record<string, string> = {
   '.VXN': '^VXN',
   '.VVIX': '^VVIX',
   USDIDX: 'DX-Y.NYB',
+  USDX: 'DX-Y.NYB',
   VIX: '^VIX',
   LCO: 'BZ=F',
 }

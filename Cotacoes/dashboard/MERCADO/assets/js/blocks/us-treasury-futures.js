@@ -108,24 +108,25 @@
         const extrasHtml = extras.length ? `
         <div style="margin-top:10px;border-top:1px solid rgba(255,255,255,.10);padding-top:10px;">
             <div style="opacity:.92;font-weight:900;letter-spacing:.6px;">Extras (ETFs/Crédito)</div>
-            <div style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;">
+            <div style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;">
                 ${extras.map(x => {
                     const label = x && x.label ? String(x.label) : '—';
-                    const symbol = x && x.symbol ? String(x.symbol) : '';
-                    const px = x && typeof x.lastPrice === 'number' ? formatNumber(x.lastPrice, 2) : '—';
+                    const symbol = x && (x.yahooSymbol || x.symbol) ? String(x.yahooSymbol || x.symbol) : '';
+                    const rawPrice = x && typeof x.lastPrice === 'number' ? x.lastPrice : (x && typeof x.price === 'number' ? x.price : null);
+                    const px = typeof rawPrice === 'number' && Number.isFinite(rawPrice) ? formatNumber(rawPrice, 2) : '—';
                     const dayPct = x && typeof x.dayChangePct === 'number' && Number.isFinite(x.dayChangePct) ? formatPercent(x.dayChangePct, 2) : '—';
                     const tone = typeof x.dayChangePct === 'number' && Number.isFinite(x.dayChangePct) ? (x.dayChangePct > 0.12 ? 'risk_on' : x.dayChangePct < -0.12 ? 'risk_off' : 'neutral') : 'neutral';
                     const strength = typeof x.dayChangePct === 'number' && Number.isFinite(x.dayChangePct) ? Math.max(0.40, Math.min(1, Math.abs(x.dayChangePct) / 0.6)) : 0.55;
-                    const right = `${escapeHtml(px)} • ${escapeHtml(dayPct)}`;
                     return `
-                    <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px;background:rgba(0,0,0,.14);">
-                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+                    <div style="border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;background:rgba(0,0,0,.14);">
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;">
                             <div style="min-width:0;">
-                                <div style="font-weight:900;letter-spacing:.5px;opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(label)}</div>
-                                <div style="opacity:.75;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(symbol)}</div>
+                                <div style="font-weight:900;letter-spacing:.5px;opacity:.92;line-height:1.2;font-size:13px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(label)}</div>
+                                <div style="opacity:.78;font-size:12px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(symbol)}</div>
                             </div>
-                            <div style="text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;white-space:nowrap;">
-                                ${badge(tone, right, strength)}
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center;text-align:right;font-family:'Share Tech Mono',monospace;font-weight:900;max-width:100%;">
+                                ${badge('neutral', px, 0.55)}
+                                ${badge(tone, dayPct, strength)}
                             </div>
                         </div>
                     </div>
@@ -137,7 +138,8 @@
 
         const futuresHtml = items.length ? `
         <div style="margin-top:10px;border-top:1px solid rgba(255,255,255,.10);padding-top:10px;">
-            <table style="width:100%;border-collapse:collapse;">
+            <div style="overflow-x:auto;">
+                <table style="width:100%;min-width:640px;border-collapse:collapse;font-size:13px;">
                 <thead>
                     <tr>
                         <th style="text-align:left;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12);opacity:.85;">Tenor</th>
@@ -148,7 +150,8 @@
                     </tr>
                 </thead>
                 <tbody>${rowsHtml}</tbody>
-            </table>
+                </table>
+            </div>
         </div>
     ` : '';
 
@@ -167,7 +170,7 @@
                         ${badge(tone, `Modo: ${mode}`, strength)}
                     </div>
                 </div>
-                <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+                <div style="margin-top:8px;opacity:.90;font-size:13px;line-height:1.35;">
                     ${escapeHtml(line)}
                 </div>
                 ${pills ? `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">${pills}</div>` : ''}
@@ -179,7 +182,7 @@
         })() : '';
 
         el.innerHTML = `
-        <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);">
+        <div style="padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.18);font-size:13px;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
                 <div style="font-weight:900;letter-spacing:1px;">Treasuries (futuros)</div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
@@ -188,7 +191,7 @@
                     ${extras.length ? badge('neutral', `Extras: ${String(extras.length)}`, 0.55) : ''}
                 </div>
             </div>
-            <div style="margin-top:8px;opacity:.86;font-size:12px;line-height:1.35;">
+            <div style="margin-top:8px;opacity:.92;font-size:13px;line-height:1.35;">
                 ${escapeHtml(headLine)}
             </div>
             ${futuresHtml}
