@@ -32,4 +32,4 @@
 
 ## Prioridade BAIXA
 - [x] ~~Otimizar performance do calculator~~ ✅ (96ms → 72ms, ~25% mais rápido)
-- [ ] Adicionar type hints completos
+- [x] ~~Adicionar type hints completos~~ ✅
