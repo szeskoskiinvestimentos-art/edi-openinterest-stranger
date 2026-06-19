@@ -31,9 +31,5 @@
 - [x] ~~Atualizar READMEs~~ ✅
 
 ## Prioridade BAIXA
-- [ ] Otimizar performance do calculator
-- [ ] Adicionar type hints completos
-
-## Prioridade BAIXA
-- [ ] Otimizar performance do calculator
+- [x] ~~Otimizar performance do calculator~~ ✅ (96ms → 72ms, ~25% mais rápido)
 - [ ] Adicionar type hints completos
