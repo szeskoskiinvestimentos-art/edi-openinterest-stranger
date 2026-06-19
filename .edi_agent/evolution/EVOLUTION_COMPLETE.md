@@ -243,9 +243,53 @@ B3 CSVs → src/data_loader.py → src/calculator.py → export_v1_data.py
 
 ---
 
+## 2026-06-19 - Análise Profunda dos .bat e Pipeline
+
+### Análise dos Scripts de Automação
+- **Servico_Unificado.bat** (471 linhas): Daemon loop com agendamento de opções
+- **Servico_Unificado_FORCE.bat** (357 linhas): One-shot force execution
+- **servico_unificado.py** (2381 linhas): Orquestrador Python alternativo
+
+### Pontos Críticos Identificados (12 recomendações)
+
+| # | Severidade | Componente | Problema |
+|---|-----------|------------|----------|
+| 1 | ALTA | automacao_dados.py:1649 | .env.auto write não-atômico (corrupção se crash) |
+| 2 | ALTA | config.py:218 | subprocess.check=True impede WIN se WDO falhar |
+| 3 | ALTA | automacao_dados.py:1474 | Spot price=0.0 silencioso quando scraping falha |
+| 4 | ALTA | servico_unificado.py:2360 | Tight loop sem sleep quando Barchart não atualiza |
+| 5 | MEDIA | automacao_dados.py:228 | Temp profiles nunca limpas (~100MB cada) |
+| 6 | MEDIA | .bat + .py | Dois sistemas de orquestração sobrepostos |
+| 7 | MEDIA | config.py:256 | shutil.copytree falha se destino existe |
+| 8 | MEDIA | automacao_dados.py:1371 | Option type inference fallback incorreto |
+| 9 | BAIXA | automacao_dados.py:418 | import math no final do arquivo |
+| 10 | BAIXA | servico_unificado.py:1802 | cmd.exe /k abre janela visível |
+| 11 | BAIXA | .bat:349 | Git push async sem retry |
+| 12 | BAIXA | .bat:161 | Legacy fallback sem error checking |
+
+### Correções Implementadas
+1. **Atomic .env.auto write** - Write to .tmp then os.replace()
+2. **Spot price validation** - WDO: 3000-10000, IND1!: 50000-300000
+3. **Decouple WDO/WIN** - Ambos rodam independentemente
+4. **Tight loop fix** - time.sleep(30) antes de continue
+5. **math import** - Movido para topo do arquivo
+
+### Riscos de Integridade de Dados
+- Dois paths de cópia de dashboard (config.py vs .bat robocopy)
+- Git commit pode pegar dados parciais durante cópia
+- .env.auto com spot=0.0 gera cálculos Black-Scholes inválidos
+- Barchart indisponível → CSVs desatualizados mas timestamp parece recente
+
+### Oportunidades de Otimização
+- Paralelizar WDO + EWZ scraping
+- Cache de Barchart CSRF tokens
+- Migrar completamente para orquestrador Python
+- Adicionar checksums após file copy
+
 ## Decisões de Arquitetura Pendentes
 
 - Os paths `../../` devem ser substituídos por cópia em shared/?
 - Deve haver um build system que gere os .js a partir dos .json?
 - Verificar segurança do `Cotacoes/.env` (credenciais)
 - Atualizar `.edi_service_state.json` (caminho antigo)
+- Migrar .bat para Python (recomendado a longo prazo)

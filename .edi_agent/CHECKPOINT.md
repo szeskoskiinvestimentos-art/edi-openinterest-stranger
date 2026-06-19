@@ -94,6 +94,14 @@ Edi_Market_Guardian_V0/
 - ✅ **CP-012**: 3 skills aprendidas criadas (impact-analyzer, priority-sorter, regression-detector)
 - ✅ **CP-013**: Templates criados (`checkpoint.md`, `skill.md`, `evolution.md`)
 
+### Fase: Auto-purge + Testes (Concluída 09:30)
+- ✅ **CP-014**: Auto-purge integrado ao `pre_run_snapshot.py` (max 7 dias, mantém 10)
+- ✅ **CP-015**: Test runner criado (`tests/run_all.py` com 9 testes)
+- ✅ **CP-016**: Golden values em `.edi_agent/tests/golden_values.json`
+- ✅ **CP-017**: **BUG CRÍTICO ENCONTRADO**: SyntaxError em `src/calculator.py:807` — `try:` sem `except`. **CORRIGIDO** com `except Exception as e`.
+- ✅ **CP-018**: **BUG R12 REAPARECIDO**: `weekday() == 4` voltou em `calculator.py:964` — **CORRIGIDO** (removido)
+- ✅ **CP-019**: 9/9 testes passando (sintaxe, BS Greeks, T=0, charm sign, vega doc, 0DTE, gamma cone, navigation, safety scripts)
+
 ---
 
 ## Arquivos Críticos (NÃO MODIFICAR SEM TESTE)
@@ -116,10 +124,10 @@ Edi_Market_Guardian_V0/
 Ver [`workspace/PLAN.md`](workspace/PLAN.md) para o plano ativo detalhado.
 
 Imediato:
-1. **Implementar IV Smile** (F4 do plano unificado) — melhorar precisão de gregas
-2. **Validar Gamma Flip Signed** (P1 do MATH_REVIEW)
-3. **Adicionar testes de regressão** (skill regression-detector)
-4. **Limpar snapshots > 7 dias** automaticamente
+1. **IV Smile** (E3/P3 do MATH_REVIEW) — melhorar precisão de gregas
+2. **Validar Gamma Flip Signed** (P1) — não padrão de mercado
+3. **Expandir `tests/run_all.py`** com mais casos (charm, HVL flip, smile)
+4. **Auto-purge já implementado** em `pre_run_snapshot.py`
 
 Backlog:
 - F1: Limpar snapshots Auto_B3_System

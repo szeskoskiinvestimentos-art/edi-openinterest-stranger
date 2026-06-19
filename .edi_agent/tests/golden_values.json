@@ -1,0 +1,60 @@
+{
+  "version": "1.1.0",
+  "last_updated": "2026-06-19",
+  "description": "Golden values para testes de regressao. Valores calculados manualmente. NAO alterar sem documentar em SESSION_LOG.md.",
+  "greeks_black_scholes": {
+    "description": "Black-Scholes: S=100, K=100, T=0.25 anos, r=0.05, sigma=0.20, CALL",
+    "convention": "Per-unit (sigma 100%), per-year (theta em anos). Documentado em R17.",
+    "inputs": {"S": 100, "K": 100, "T": 0.25, "r": 0.05, "sigma": 0.20, "type": "C"},
+    "delta_expected": 0.5694,
+    "gamma_expected": 0.0393,
+    "vega_expected_per_unit": 19.64,
+    "vega_market_per_1pct": 0.1964,
+    "theta_expected_per_year": -10.47,
+    "theta_per_day": -0.0287,
+    "tolerance": 0.01
+  },
+  "greeks_zero_t": {
+    "description": "T=0 (vencimento): Gamma=0, Delta=intrinseco, Vega=0, Theta=0",
+    "convention": "valid_mask em greeks.py:37 deve filtrar T>0",
+    "inputs": {"S": 105, "K": 100, "T": 0.0, "r": 0.05, "sigma": 0.20, "type": "C"},
+    "delta_expected": 1.0,
+    "gamma_expected": 0.0,
+    "vega_expected": 0.0,
+    "theta_expected": 0.0,
+    "tolerance": 0.01
+  },
+  "charm_sign": {
+    "description": "Charm = -dDelta/dT. Para call ATM, delta diminui com T, entao -dDelta/dT deve ser POSITIVO (com sinal invertido). R10 corrige sinal.",
+    "inputs": {"S": 100, "K": 100, "T": 0.25, "r": 0.05, "sigma": 0.20, "type": "C"},
+    "charm_sign_expected": "positive",
+    "rationale": "R10: charm era (dTp - dTm) = +dDelta/dT (ERRADO). Corrigido para (dTm - dTp) = -dDelta/dT. Para call ATM, delta diminui quando T aumenta, entao -dDelta/dT > 0.",
+    "calculation": "delta_T_minus - delta_T_plus, com T_minus=0.24, T_plus=0.26"
+  },
+  "hvl_flip_base": {
+    "description": "HVL Flip deve usar gex_flip_base (assinado), NAO gex_tot. R11.",
+    "inputs": {"method": "hvl", "use_base": "gex_flip_base"},
+    "expected_consistency": "calculate_gamma_flip_variations e _calculate_hvl_flip devem usar mesma base"
+  },
+  "odte_detection": {
+    "description": "0DTE deve ser detectado em QUALQUER dia da semana. R12 removeu weekday==4.",
+    "inputs": {"dataref": "2026-06-19", "expiry": "2026-06-19", "weekday": "friday"},
+    "expected_is_0dte": true,
+    "bug_indicator": "linha com 'expiry_date.weekday() == 4' indica que R12 NAO foi aplicado"
+  },
+  "gamma_cone_thread_safety": {
+    "description": "Gamma Cone nao deve mutar settings.SIGMA_FACTOR globalmente. R13.",
+    "expected": "try/except/finally pattern; nao deve haver 'settings.SIGMA_FACTOR =' no metodo calculate_gamma_flip_cone"
+  },
+  "vega_convention": {
+    "description": "Vega retornada por UNIDADE (100%). Documentado em R17 (comentario em greeks.py:94-96).",
+    "convention": "per_unit_100pct",
+    "to_market": "vega_market = vega / 100",
+    "rationale": "Mantido por compatibilidade com calculo de Vega Exposure em calculator.py"
+  },
+  "syntax_check": {
+    "description": "Arquivos .py do projeto devem ser sintaticamente validos",
+    "files": ["src/calculator.py", "src/greeks.py", "src/ntsl.py", "scripts/export_v1_data.py"],
+    "method": "ast.parse()"
+  }
+}

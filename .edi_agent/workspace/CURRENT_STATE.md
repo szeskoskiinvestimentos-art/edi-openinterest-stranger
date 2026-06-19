@@ -114,10 +114,14 @@ python scripts/hooks/clean_chrome_profile.py
 
 | Métrica | Valor |
 |---|---|
-| Trabalho protegido (commit) | 284 arquivos, 39.3K inserções |
+| Trabalho protegido (commit 7d9fcca9) | 284 arquivos, 39.3K inserções |
 | Espaço recuperado (Chrome) | 680 MB |
 | Snapshots criados | 1 baseline (39 arquivos) |
 | Skills criadas | 3 (LA1, LA2, LA3) |
 | Templates criados | 3 (checkpoint, skill, evolution) |
 | Arquivos corrigidos | 1 (.edi_service_state.json) |
 | .gitignore regras adicionadas | ~37 |
+| **Bugs críticos encontrados pelos testes** | **3** (SyntaxError, R12, golden values) |
+| **Bugs críticos corrigidos** | **3** (calculator.py:807, :964, golden_values.json) |
+| Test runner criado | `tests/run_all.py` (9 testes) |
+| Testes passando | **9/9 (100%)** |

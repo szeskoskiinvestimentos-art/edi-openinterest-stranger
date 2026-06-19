@@ -803,12 +803,16 @@ class OptionsCalculator:
                     flips.append(x1)
                     continue
                 flips.append(float(x1 - y1 * (x2 - x1) / (y2 - y1)))
-            
+
+        except Exception as e:
+            # logger.error(f"Error calculating gamma flip cone: {e}")
+            flips = [None] * len(alphas)
+
         self.gamma_flip_cone = {
-            'alphas': alphas,
+            'alphas': list(alphas),
             'flips': flips
         }
-        
+
     def calculate_flow_sentiment(self):
         """Analisa variação de preço e volume para determinar fluxo Bull/Bear."""
         def _to_float(v):
@@ -957,7 +961,7 @@ class OptionsCalculator:
 
             # Movimentos para hoje (1 dia/0DTE), 1 semana, e Expiração
             # Se for 0DTE, o movimento "1 Dia" é na verdade "Intraday Restante"
-            is_0dte = bool(self.expiry_date) and (self.dataref == self.expiry_date) and (self.expiry_date.weekday() == 4)
+            is_0dte = bool(self.expiry_date) and (self.dataref == self.expiry_date)
             expiry_days = int(max(round(float(self.T) * 252.0), 1))
 
             horizons_days: list[int] = []

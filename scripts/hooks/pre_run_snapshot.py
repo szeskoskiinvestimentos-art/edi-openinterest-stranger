@@ -62,6 +62,10 @@ def _now_stamp() -> str:
 def create_snapshot(label: str | None = None) -> Path:
     """Cria um snapshot e retorna o diretório criado."""
     SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Auto-purge ANTES de criar novo (evita duplicação)
+    auto_purge()
+
     stamp = _now_stamp()
     name = f"snap-{stamp}" + (f"-{label}" if label else "")
     dest = SNAPSHOTS_DIR / name
@@ -83,12 +87,57 @@ def create_snapshot(label: str | None = None) -> Path:
         "files_copied": len(copied),
         "files": copied,
         "root": str(ROOT),
+        "auto_purge": {
+            "max_age_days": MAX_AGE_DAYS,
+            "keep_min": KEEP_MIN,
+        },
     }
     (dest / "_META.json").write_text(
         json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8"
     )
     print(f"[SNAPSHOT] Criado {dest.name} com {len(copied)} arquivo(s).")
     return dest
+
+
+# Configuração do auto-purge
+MAX_AGE_DAYS = 7       # Remover snapshots mais antigos que N dias
+KEEP_MIN = 10          # Sempre manter pelo menos N snapshots mais recentes
+
+
+def auto_purge() -> int:
+    """
+    Auto-purge executado antes de cada create.
+    Política: manter os KEEP_MIN mais recentes, ou tudo dentro de MAX_AGE_DAYS.
+    Retorna o número de snapshots removidos.
+    """
+    SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+    snaps = sorted(
+        [p for p in SNAPSHOTS_DIR.iterdir() if p.is_dir() and p.name != "_template"],
+        key=lambda p: p.name,
+        reverse=True,
+    )
+    if len(snaps) <= KEEP_MIN:
+        return 0
+
+    cutoff = datetime.now() - timedelta(days=MAX_AGE_DAYS)
+    removed = 0
+    # Itera do mais antigo para o mais novo
+    for snap_dir in reversed(snaps):
+        # Sempre manter os KEEP_MIN mais recentes
+        if len(snaps) - removed <= KEEP_MIN:
+            break
+        try:
+            parts = snap_dir.name.split("-")
+            if len(parts) >= 3:
+                stamp_str = parts[1] + "-" + parts[2]
+                snap_dt = datetime.strptime(stamp_str, "%Y%m%d-%H%M%S")
+                if snap_dt < cutoff:
+                    shutil.rmtree(snap_dir)
+                    removed += 1
+                    print(f"  [PURGE] Removido (antigo): {snap_dir.name}")
+        except (ValueError, IndexError):
+            continue
+    return removed
 
 
 def list_snapshots() -> list[Path]:
@@ -183,14 +232,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Snapshot de arquivos regeneraveis.")
     sub = parser.add_subparsers(dest="cmd", required=False)
 
-    sub.add_parser("create", help="Cria novo snapshot (padrao)")
-    sub.add_parser("list", help="Lista snapshots")
-    sub.add_parser("restore", help="Restaura o snapshot mais recente")
-    sub.add_parser("purge", help="Remove snapshots antigos")
+    p_create = sub.add_parser("create", help="Cria novo snapshot (padrao)")
+    p_create.add_argument("--label", help="Rotulo do snapshot")
 
-    parser.add_argument("--label", help="Rotulo do snapshot")
-    parser.add_argument("--days", type=int, default=7, help="Dias para purge")
-    parser.add_argument("--snap", help="Nome do snapshot para restore")
+    sub.add_parser("list", help="Lista snapshots")
+
+    p_restore = sub.add_parser("restore", help="Restaura o snapshot mais recente")
+    p_restore.add_argument("--snap", help="Nome do snapshot para restore")
+
+    p_purge = sub.add_parser("purge", help="Remove snapshots antigos")
+    p_purge.add_argument("--days", type=int, default=7, help="Dias para purge")
 
     args = parser.parse_args()
     cmd = args.cmd or "create"
