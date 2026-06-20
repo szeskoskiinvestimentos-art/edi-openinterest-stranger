@@ -84,3 +84,36 @@ Edi_Market_Guardian_V0/
 - **Working tree**: 1 modified (last_run.json auto-gerado)
 - **Total evolucoes**: 65 (20 feitas + 45 planejadas)
 - **Testes**: 31/31 PASS
+
+---
+
+## Fase 6: Q1 Quick Wins Completo (2026-06-19 14:00)
+
+### CP-042: Q1 - 6 Evoluções Implementadas
+- **E22** Volga (∂Vega/∂σ) - src/calculator/volatility.py + 6 testes
+  - Formula fechada: S · φ(d1) · √T · (d1·d2) / σ
+  - Cross-check com diferencas finitas: 1.10% diff
+  - Usa IV per-strike (E10)
+- **E25** IV Bisect robusto - src/greeks.py + 6 testes
+  - implied_vol_bs() estatico com confidence
+  - Trata edge cases: T<1d, price<intrinsic, NaN, etc
+- **E31** HUB Health - dashboard_unificado/index.html + 5 testes
+  - 4 cards: ultima atualizacao, testes, snapshots, proximo slot
+  - Auto-refresh 60s
+- **E37** Stale Banner - dashboard_unificado/shared/stale-banner.js + 7 testes
+  - Detecta dados > 30min
+  - Banner Neon Terminal com botao restaurar
+- **E42** Snapshot Agendado - scripts/scheduled_snapshots.py + 7 testes
+  - 4 slots BRT: 04:00, 07:00, 12:00, 18:00
+  - Janela tolerancia: [slot-4min, slot+1min]
+  - CLI: check, run-now, status, next
+- **E44** Auto-Discovery - dashboard_unificado/shared/unified-nav.js + 7 testes
+  - Aceita window.EDI_EXTRA_DASHBOARDS
+  - Backward compat preservada (6 dashboards base)
+
+### Metricas Q1
+- **Commits**: 6 (E22, E25, E31, E37, E42, E44)
+- **Testes adicionados**: 38 (de 31 para 69)
+- **Taxa de sucesso**: 100% (69/69)
+- **Tempo**: ~3 horas
+- **Linhas de codigo**: ~1100 (incluindo testes)

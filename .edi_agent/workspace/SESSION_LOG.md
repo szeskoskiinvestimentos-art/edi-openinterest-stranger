@@ -246,3 +246,35 @@ Edi_Market_Guardian_V0/
 - Escolher Q1 (quick wins) ou Q2 (foundation) ou comecar E45
 - E45 (migrar v3) ja tem plano detalhado - ~8h
 - Q1 soma 8-13h em 6 evolucoes pequenas
+
+---
+
+## 2026-06-19 14:00 - Q1 Quick Wins COMPLETO
+
+### Resumo
+Implementadas 6 evolucoes do Q1 conforme planejado em IMPLEMENTACOES_FUTURAS.md.
+
+### Evolucoes implementadas (commits individuais)
+- d4d09c28: E22 Volga (∂V/∂σ²) completa
+- 9f629397: E25 IV Bisect robusto
+- e9018f98: E31 HUB Health dashboard
+- def3ea0c: E37 Stale Banner com auto-deteccao
+- 9873a032: E42 Snapshot agendado 4x/dia
+- f7355286: E44 Auto-discovery de telas
+
+### Metricas finais Q1
+- 31/31 → 69/69 testes PASS (+38)
+- 0 regressoes
+- 6 commits semanticos
+- ~3 horas de execucao
+
+### Trabalho paralelo detectado
+- unified-nav.js foi reescrito em paralelo (v3.1) usando map em vez de array
+  - Atualizei test_navigation_paths para aceitar novo formato
+  - Backward compat preservada
+- main-shared.js foi removido em paralelo
+  - Criei shared/stale-banner.js como substituto parcial (E37)
+
+### Pendencias para proxima sessao
+- Escolher entre Q2 (E21 SABR, E23 Stress, E26 MERCADO tests, E35 API REST, E36 E2E, E38 JSON log, E45 v3->v1) e Backlog
+- IMPLEMENTACOES_FUTURAS.md ja tem roadmap completo
