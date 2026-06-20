@@ -1105,6 +1105,67 @@ def test_rbergomi_call_positive(golden: dict) -> tuple[bool, str]:
     from tests.test_rough_bergomi import test_rbergomi_call_positive
     return _wrap_test("rberg_call_pos", test_rbergomi_call_positive)
 
+def test_discovery_fibonacci_basic(golden: dict) -> tuple[bool, str]:
+    from tests.test_discovery import test_fibonacci_basic
+    return _wrap_test("disc_fib_basic", test_fibonacci_basic)
+
+def test_discovery_fibonacci_default_percentages(golden: dict) -> tuple[bool, str]:
+    from tests.test_discovery import test_fibonacci_default_percentages
+    return _wrap_test("disc_fib_default", test_fibonacci_default_percentages)
+
+def test_discovery_fibonacci_multiple_strikes(golden: dict) -> tuple[bool, str]:
+    from tests.test_discovery import test_fibonacci_multiple_strikes
+    return _wrap_test("disc_fib_multi", test_fibonacci_multiple_strikes)
+
+def test_discovery_fibonacci_empty(golden: dict) -> tuple[bool, str]:
+    from tests.test_discovery import test_fibonacci_empty_strikes
+    return _wrap_test("disc_fib_empty", test_fibonacci_empty_strikes)
+
+def test_discovery_fibonacci_unsorted(golden: dict) -> tuple[bool, str]:
+    from tests.test_discovery import test_fibonacci_unsorted
+    return _wrap_test("disc_fib_unsorted", test_fibonacci_unsorted)
+
+def test_discovery_fibonacci_invalid_pct(golden: dict) -> tuple[bool, str]:
+    from tests.test_discovery import test_fibonacci_invalid_percentages
+    return _wrap_test("disc_fib_invalid", test_fibonacci_invalid_percentages)
+
+def test_discovery_midwalls_basic(golden: dict) -> tuple[bool, str]:
+    from tests.test_discovery import test_midwalls_basic
+    return _wrap_test("disc_mw_basic", test_midwalls_basic)
+
+def test_discovery_midwalls_single(golden: dict) -> tuple[bool, str]:
+    from tests.test_discovery import test_midwalls_single_strike
+    return _wrap_test("disc_mw_single", test_midwalls_single_strike)
+
+def test_discovery_midwalls_mismatch(golden: dict) -> tuple[bool, str]:
+    from tests.test_discovery import test_midwalls_size_mismatch
+    return _wrap_test("disc_mw_mismatch", test_midwalls_size_mismatch)
+
+def test_discovery_range_basic(golden: dict) -> tuple[bool, str]:
+    from tests.test_discovery import test_range_basic
+    return _wrap_test("disc_range_basic", test_range_basic)
+
+def test_discovery_range_empty(golden: dict) -> tuple[bool, str]:
+    from tests.test_discovery import test_range_empty
+    return _wrap_test("disc_range_empty", test_range_empty)
+
+def test_discovery_range_n_large(golden: dict) -> tuple[bool, str]:
+    from tests.test_discovery import test_range_n_larger_than_data
+    return _wrap_test("disc_range_n", test_range_n_larger_than_data)
+
+def test_discovery_integration(golden: dict) -> tuple[bool, str]:
+    from tests.test_discovery import test_discover_levels_integration
+    return _wrap_test("disc_integration", test_discover_levels_integration)
+
+def test_discovery_result_dataclass(golden: dict) -> tuple[bool, str]:
+    from tests.test_discovery import test_discovery_result_dataclass
+    return _wrap_test("disc_dataclass", test_discovery_result_dataclass)
+
+def test_discovery_custom_fib(golden: dict) -> tuple[bool, str]:
+    from tests.test_discovery import test_discovery_custom_fib_percentages
+    return _wrap_test("disc_custom", test_discovery_custom_fib_percentages)
+
+
 def test_rbergomi_class_invalid_params_raise(golden: dict) -> tuple[bool, str]:
     from tests.test_rough_bergomi import test_rbergomi_class_invalid_params_raise
     return _wrap_test("rberg_class_invalid", test_rbergomi_class_invalid_params_raise)
@@ -1396,6 +1457,22 @@ TESTS = {
     "rberg_rough_check": ("rBerg is_rough e is_classical_bergomi", test_rbergomi_is_rough_property),
     "rberg_call_pos": ("rBerg call sempre >= 0", test_rbergomi_call_positive),
     "rberg_class_invalid": ("rBerg construtor valida 4 params", test_rbergomi_class_invalid_params_raise),
+    # --- Discovery Levels E45d (14 testes) ---
+    "disc_fib_basic": ("Disc fibonacci basico", test_discovery_fibonacci_basic),
+    "disc_fib_default": ("Disc fibonacci default 5 levels", test_discovery_fibonacci_default_percentages),
+    "disc_fib_multi": ("Disc fibonacci 3 strikes -> 2*N", test_discovery_fibonacci_multiple_strikes),
+    "disc_fib_empty": ("Disc fibonacci strikes vazios", test_discovery_fibonacci_empty),
+    "disc_fib_unsorted": ("Disc fibonacci auto-sort", test_discovery_fibonacci_unsorted),
+    "disc_fib_invalid": ("Disc fibonacci percentages invalidos", test_discovery_fibonacci_invalid_pct),
+    "disc_mw_basic": ("Disc midwalls interpola OI", test_discovery_midwalls_basic),
+    "disc_mw_single": ("Disc midwalls 1 strike -> []", test_discovery_midwalls_single),
+    "disc_mw_mismatch": ("Disc midwalls ValueError", test_discovery_midwalls_mismatch),
+    "disc_range_basic": ("Disc range top N clusters", test_discovery_range_basic),
+    "disc_range_empty": ("Disc range strikes vazios", test_discovery_range_empty),
+    "disc_range_n": ("Disc range n > len", test_discovery_range_n_large),
+    "disc_integration": ("Disc integration E45d", test_discovery_integration),
+    "disc_dataclass": ("Disc dataclass metodos", test_discovery_result_dataclass),
+    "disc_custom": ("Disc custom percentages", test_discovery_custom_fib),
 }
 
 
