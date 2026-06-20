@@ -452,6 +452,27 @@ def test_iv_bisect_confidence_high_for_converged(golden: dict) -> tuple[bool, st
     from tests.test_iv_bisect import test_iv_bisect_confidence_high_for_converged
     return _wrap_test("iv_conf", test_iv_bisect_confidence_high_for_converged)
 
+# --- test_hub_health.py (5 testes E31) ---
+def test_hub_has_health_section(golden: dict) -> tuple[bool, str]:
+    from tests.test_hub_health import test_hub_has_health_section
+    return _wrap_test("hub_section", test_hub_has_health_section)
+
+def test_hub_has_four_health_cards(golden: dict) -> tuple[bool, str]:
+    from tests.test_hub_health import test_hub_has_four_health_cards
+    return _wrap_test("hub_cards", test_hub_has_four_health_cards)
+
+def test_hub_has_auto_refresh(golden: dict) -> tuple[bool, str]:
+    from tests.test_hub_health import test_hub_has_auto_refresh
+    return _wrap_test("hub_refresh", test_hub_has_auto_refresh)
+
+def test_hub_has_next_slot_logic(golden: dict) -> tuple[bool, str]:
+    from tests.test_hub_health import test_hub_has_next_slot_logic
+    return _wrap_test("hub_slot", test_hub_has_next_slot_logic)
+
+def test_hub_has_legacy_status_link(golden: dict) -> tuple[bool, str]:
+    from tests.test_hub_health import test_hub_has_legacy_status_link
+    return _wrap_test("hub_link", test_hub_has_legacy_status_link)
+
 def test_find_zero_cross(golden: dict) -> tuple[bool, str]:
     from tests.test_calculator_core import test_find_zero_cross
     return _wrap_test("zero_cross", test_find_zero_cross)
@@ -507,6 +528,12 @@ TESTS = {
     "iv_0dte": ("IV Bisect 0DTE T=1d", test_iv_bisect_handles_zero_dte),
     "iv_invalid": ("IV Bisect rejeita invalidos", test_iv_bisect_rejects_invalid_inputs),
     "iv_conf": ("IV Bisect confidence alta", test_iv_bisect_confidence_high_for_converged),
+    # --- HUB Health E31 (5 testes) ---
+    "hub_section": ("HUB secao SAUDE", test_hub_has_health_section),
+    "hub_cards": ("HUB 4 cards", test_hub_has_four_health_cards),
+    "hub_refresh": ("HUB auto-refresh 60s", test_hub_has_auto_refresh),
+    "hub_slot": ("HUB calcula proximo slot", test_hub_has_next_slot_logic),
+    "hub_link": ("HUB link #status", test_hub_has_legacy_status_link),
     "zero_cross": ("Find Zero Cross", test_find_zero_cross),
     # --- Regressão Phase 4G (E8, E10) ---
     "e8_broadcast": ("E8: Greeks Broadcast (S scalar + K array)", test_e8_greeks_broadcast_scalar_s),
