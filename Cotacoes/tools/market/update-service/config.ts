@@ -90,7 +90,7 @@ function buildBaseConfig(deps: {
   envNumber: (name: string, fallback: number) => number
 }) {
   const host = deps.env('MARKET_SERVICE_HOST', '127.0.0.1') || '127.0.0.1'
-  const port = deps.envNumber('MARKET_SERVICE_PORT', 3033)
+  const port = deps.envNumber('MARKET_SERVICE_PORT', 3433)
 
   const intervalMinutes = deps.envNumber('MARKET_INTERVAL_MINUTES', 15)
   const intervalMs = clampMin(5, intervalMinutes) * 60 * 1000

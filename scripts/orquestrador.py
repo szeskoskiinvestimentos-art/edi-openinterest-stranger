@@ -60,7 +60,7 @@ class Config:
     root_dir: Path = field(default_factory=Path.cwd)
     py_cmd: str = "python"
     market_host: str = "127.0.0.1"
-    market_port: int = 3033
+    market_port: int = 3433
     market_interval_minutes: int = 5
     investing_portfolio_interval_minutes: int = 15
     market_update_mode: str = "once"
@@ -143,7 +143,7 @@ class Config:
         cfg = cls(
             root_dir=root_dir,
             market_host=_env("MARKET_SERVICE_HOST", "127.0.0.1"),
-            market_port=_env_int("MARKET_SERVICE_PORT", 3033),
+            market_port=_env_int("MARKET_SERVICE_PORT", 3433),
             market_interval_minutes=_env_int("MARKET_INTERVAL_MINUTES", 5),
             investing_portfolio_interval_minutes=_env_int("INVESTING_PORTFOLIO_INTERVAL_MINUTES", 15),
             market_update_mode=_env("MARKET_UPDATE_MODE", "once"),
@@ -295,6 +295,14 @@ class MarketService:
         return False
 
     def start(self) -> None:
+        if not self.cfg.market_scheduler_enabled:
+            logger.info(
+                "market:service DESATIVADO (MARKET_SCHEDULER_ENABLED=false). "
+                "Coleta via pipeline Python apenas, sem subir servidor (porta %d livre).",
+                self.cfg.market_port,
+            )
+            return
+
         if self.is_running() and self.health_check():
             logger.info("Market service ja esta rodando.")
             self._check_modules_active()
@@ -917,12 +925,15 @@ class Orquestrador:
         logger.info("===============================")
         logger.info("Host: %s", self.cfg.market_host)
         logger.info("Porta: %d", self.cfg.market_port)
+        if not self.cfg.market_scheduler_enabled:
+            logger.info("Modo: COLLECT-ONLY (sem market:service)")
         logger.info("")
 
-        if not self.market.wait_ready():
-            logger.warning("market:service nao respondeu em %s/api/market/health", self.market._base_url)
-        else:
-            logger.info("Market service online.")
+        if self.cfg.market_scheduler_enabled:
+            if not self.market.wait_ready():
+                logger.warning("market:service nao respondeu em %s/api/market/health", self.market._base_url)
+            else:
+                logger.info("Market service online.")
 
         self._start_exit_watcher()
 

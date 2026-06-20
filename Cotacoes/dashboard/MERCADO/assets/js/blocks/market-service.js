@@ -6,9 +6,9 @@
     function getMarketServiceBaseUrl() {
         const client = (w.MercadoBlocks && w.MercadoBlocks.marketClient) ? w.MercadoBlocks.marketClient : null;
         if (client && typeof client.getBaseUrl === 'function') {
-            try { return client.getBaseUrl(); } catch { return 'http://127.0.0.1:3033'; }
+            try { return client.getBaseUrl(); } catch { return 'http://127.0.0.1:3433'; }
         }
-        return 'http://127.0.0.1:3033';
+        return 'http://127.0.0.1:3433';
     }
 
     async function ensureMarketServiceOnline(force = false) {

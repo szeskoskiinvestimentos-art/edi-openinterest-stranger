@@ -16,9 +16,12 @@ cd /d "%EDI_ROOT%"
 
 title EDI Servico Unificado (SAFE - com snapshot)
 
-echo.
 echo ============================================================
-echo  [SAFE MODE] Pre-run snapshot iniciando...
+echo.
+echo  [SAFE MODE + COLLECT-ONLY] Pre-run snapshot + Servico_Unificado
+echo  Sem subir market:service — apenas pipeline Python de opcoes.
+echo  Para reativar o servico, exporte MARKET_SCHEDULER_ENABLED=true
+echo  ou remova o set abaixo.
 echo ============================================================
 echo.
 
@@ -28,6 +31,9 @@ if errorlevel 1 (
     echo [ERRO] Python nao encontrado no PATH.
     exit /b 1
 )
+
+REM Coletar CSVs/JSONs sem subir servidor (regra do projeto: HTML estatico)
+set "MARKET_SCHEDULER_ENABLED=false"
 
 REM Criar snapshot
 python scripts\hooks\pre_run_snapshot.py --label pre-run

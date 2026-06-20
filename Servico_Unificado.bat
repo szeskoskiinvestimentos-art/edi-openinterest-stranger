@@ -7,7 +7,7 @@ title EDI Servico Unificado
 rem Detect Python command
 set "PY_CMD="
 py -3 -c "import sys" >nul 2>&1
-if not errorlevel 1 set "PY_CMD=py -3"
+if not errorlevel 1 set "PY_CMD=py -3.13"
 if "%PY_CMD%"=="" (
   python -c "import sys" >nul 2>&1
   if not errorlevel 1 set "PY_CMD=python"
@@ -32,11 +32,16 @@ if /i "%~3"=="--no-pause" set "ARGS=%ARGS% --no-pause"
 if /i "%~3"=="--git-dry-run" set "ARGS=%ARGS% --git-dry-run"
 
 echo.
-echo ===============================
+echo =====================================
 echo  EDI - Servico Unificado
 echo  (Python Orquestrador)
-echo ===============================
+echo  Modo: COLLECT-ONLY (sem market:service)
+echo  Para reativar: set MARKET_SCHEDULER_ENABLED=true
+echo =====================================
 echo.
+
+REM Coletar dados sem subir servidor (regra do projeto: HTML estatico)
+set "MARKET_SCHEDULER_ENABLED=false"
 
 %PY_CMD% scripts/orquestrador.py%ARGS%
 

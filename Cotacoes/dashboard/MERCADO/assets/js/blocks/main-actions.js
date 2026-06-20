@@ -11,7 +11,7 @@
         const buildDeps = typeof c.buildDeps === 'function' ? c.buildDeps : () => ({});
         const getData = typeof c.getData === 'function' ? c.getData : () => null;
         const fallbackCard = typeof c.fallbackCard === 'function' ? c.fallbackCard : () => '';
-        const getMarketServiceBaseUrl = typeof c.getMarketServiceBaseUrl === 'function' ? c.getMarketServiceBaseUrl : () => 'http://127.0.0.1:3033';
+        const getMarketServiceBaseUrl = typeof c.getMarketServiceBaseUrl === 'function' ? c.getMarketServiceBaseUrl : () => 'http://127.0.0.1:3433';
         const loadScriptFresh = typeof c.loadScriptFresh === 'function' ? c.loadScriptFresh : () => Promise.reject(new Error('script_loader_unavailable'));
         const operationalInputs = c.operationalInputs && typeof c.operationalInputs === 'object' ? c.operationalInputs : {};
         const requestAutoRefreshPage = typeof c.requestAutoRefreshPage === 'function' ? c.requestAutoRefreshPage : () => { try { window.location.reload(); } catch { } };

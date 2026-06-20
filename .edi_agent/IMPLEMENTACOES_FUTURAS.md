@@ -220,7 +220,7 @@ dashboard_unificado/   # 6 dashboards (HUB, WDO, WIN, MERCADO, CORR, CONTROLE, C
 ### E35: API REST no Orquestrador
 - **Embasamento**: Hoje, dashboards acessam dados via `window.marketData` (carregado de .js). API REST permite acesso programatico.
 - **Como fazer**:
-  1. Adicionar Flask/FastAPI no `orquestrador.py` (porta 3033)
+  1. Adicionar Flask/FastAPI no `orquestrador.py` (porta 3433)
   2. Endpoints: `/api/health`, `/api/options/{symbol}`, `/api/snapshots`
   3. Auth basica (API key)
   4. Documentar em OpenAPI

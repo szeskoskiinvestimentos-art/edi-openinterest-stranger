@@ -21,7 +21,7 @@ set "MARKET_VALIDATE_BEFORE_GIT_SYNC=true"
 set "MARKET_VALIDATE_STRICT=false"
 
 set "MARKET_PORT=%MARKET_SERVICE_PORT%"
-if "!MARKET_PORT!"=="" set "MARKET_PORT=3033"
+if "!MARKET_PORT!"=="" set "MARKET_PORT=3433"
 
 set "NPM_CMD=%ProgramFiles%\nodejs\npm.cmd"
 if exist "!NPM_CMD!" goto NPM_OK

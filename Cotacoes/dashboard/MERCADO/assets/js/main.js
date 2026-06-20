@@ -125,7 +125,7 @@
     const getMarketServiceBaseUrl = () => {
         const ms = (w.MercadoBlocks && w.MercadoBlocks.marketService) ? w.MercadoBlocks.marketService : null;
         if (ms && typeof ms.getMarketServiceBaseUrl === 'function') return ms.getMarketServiceBaseUrl();
-        return 'http://127.0.0.1:3033';
+        return 'http://127.0.0.1:3433';
     };
 
     const loadScriptFresh = (src) => {

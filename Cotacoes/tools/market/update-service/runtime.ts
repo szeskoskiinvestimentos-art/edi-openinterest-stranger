@@ -87,7 +87,7 @@ export function startMarketServiceRuntime(deps: {
       process.stderr.write(
         `ERRO • Porta em uso: http://${deps.host}:${deps.port}\n` +
           `- Encerre a outra janela/serviço que já está rodando o market:service\n` +
-          `- Ou altere a porta via MARKET_SERVICE_PORT (ex.: set MARKET_SERVICE_PORT=3034)\n`,
+          `- Ou altere a porta via MARKET_SERVICE_PORT (ex.: set MARKET_SERVICE_PORT=3434)\n`,
       )
       process.exitCode = 1
       return

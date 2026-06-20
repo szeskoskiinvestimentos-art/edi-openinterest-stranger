@@ -58,20 +58,21 @@ dashboard_v1/
 
 ## 🚀 Como Executar
 
-### Opção 1: Servidor Python (Recomendado)
+### Opção 1: Servidor Python (Recomendado para CORS)
 ```bash
 # Navegue até o diretório do dashboard
 cd dashboard_v1
 
-# Inicie o servidor web
-python -m http.server 8080
+# Inicie o servidor web (porta 8480 - isolada deste projeto)
+py -3.13 -m http.server 8480
 
 # Acesse no navegador
-# http://localhost:8080
+# http://localhost:8480
 ```
 
-### Opção 2: Abrir Diretamente
-Simplesmente abra o arquivo `index.html` no seu navegador, mas algumas funcionalidades podem ser limitadas devido a restrições de CORS.
+### Opção 2: Abrir Diretamente (sem servidor)
+Basta abrir o arquivo `index.html` no seu navegador via `file://` ou usar
+`START_DASHBOARD_V1.bat` deste projeto (que abre direto, sem subir servidor).
 
 ## 🎮 Atalhos de Teclado
 

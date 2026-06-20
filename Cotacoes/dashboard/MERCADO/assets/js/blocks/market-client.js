@@ -3,7 +3,8 @@
     if (!w) return;
     const root = (w.MercadoBlocks && typeof w.MercadoBlocks === 'object') ? w.MercadoBlocks : {};
 
-    const DEFAULT_BASE_URL = 'http://127.0.0.1:3033';
+    const DEFAULT_BASE_URL = 'http://127.0.0.1:3433';
+    const FALLBACK_BASE_URL = 'http://127.0.0.1:3434';
     const DEFAULT_TIMEOUT_HEALTH_MS = 900;
     const DEFAULT_TIMEOUT_JSON_MS = 3500;
     const ONLINE_CACHE_MS = 30000;
@@ -27,8 +28,8 @@
     }
 
     function swapLocalPortIfLocalhost(u) {
-        if (u.indexOf('http://127.0.0.1:3033') === 0) return u.replace('http://127.0.0.1:3033', 'http://127.0.0.1:3034');
-        if (u.indexOf('http://127.0.0.1:3034') === 0) return u.replace('http://127.0.0.1:3034', 'http://127.0.0.1:3033');
+        if (u.indexOf('http://127.0.0.1:3433') === 0) return u.replace('http://127.0.0.1:3433', 'http://127.0.0.1:3434');
+        if (u.indexOf('http://127.0.0.1:3434') === 0) return u.replace('http://127.0.0.1:3434', 'http://127.0.0.1:3433');
         return null;
     }
 
