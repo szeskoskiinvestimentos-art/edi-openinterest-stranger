@@ -502,6 +502,35 @@ def test_banner_handles_missing_data(golden: dict) -> tuple[bool, str]:
     from tests.test_stale_banner import test_banner_handles_missing_data
     return _wrap_test("banner_robust", test_banner_handles_missing_data)
 
+# --- test_scheduled_snapshots.py (7 testes E42) ---
+def test_slots_correct(golden: dict) -> tuple[bool, str]:
+    from tests.test_scheduled_snapshots import test_slots_correct
+    return _wrap_test("sched_slots", test_slots_correct)
+
+def test_parse_slot(golden: dict) -> tuple[bool, str]:
+    from tests.test_scheduled_snapshots import test_parse_slot
+    return _wrap_test("sched_parse", test_parse_slot)
+
+def test_slot_datetime_uses_today(golden: dict) -> tuple[bool, str]:
+    from tests.test_scheduled_snapshots import test_slot_datetime_uses_today
+    return _wrap_test("sched_today", test_slot_datetime_uses_today)
+
+def test_should_snapshot_now_in_window(golden: dict) -> tuple[bool, str]:
+    from tests.test_scheduled_snapshots import test_should_snapshot_now_in_window
+    return _wrap_test("sched_window", test_should_snapshot_now_in_window)
+
+def test_next_snapshot_slot_returns_future(golden: dict) -> tuple[bool, str]:
+    from tests.test_scheduled_snapshots import test_next_snapshot_slot_returns_future
+    return _wrap_test("sched_next", test_next_snapshot_slot_returns_future)
+
+def test_tolerance_constants(golden: dict) -> tuple[bool, str]:
+    from tests.test_scheduled_snapshots import test_tolerance_constants
+    return _wrap_test("sched_tol", test_tolerance_constants)
+
+def test_label_prefix_correct(golden: dict) -> tuple[bool, str]:
+    from tests.test_scheduled_snapshots import test_label_prefix_correct
+    return _wrap_test("sched_label", test_label_prefix_correct)
+
 def test_find_zero_cross(golden: dict) -> tuple[bool, str]:
     from tests.test_calculator_core import test_find_zero_cross
     return _wrap_test("zero_cross", test_find_zero_cross)
@@ -571,6 +600,14 @@ TESTS = {
     "banner_priority": ("stale-banner prioriza marketData", test_banner_checks_marketdata_first),
     "banner_interval": ("stale-banner interval 5min", test_banner_has_interval_check),
     "banner_robust": ("stale-banner robusto a dados faltantes", test_banner_handles_missing_data),
+    # --- Snapshot Agendado E42 (7 testes) ---
+    "sched_slots": ("Snap slots BRT", test_slots_correct),
+    "sched_parse": ("Snap _parse_slot", test_parse_slot),
+    "sched_today": ("Snap _slot_datetime hoje", test_slot_datetime_uses_today),
+    "sched_window": ("Snap should_snapshot_now janela", test_should_snapshot_now_in_window),
+    "sched_next": ("Snap next_snapshot_slot futuro", test_next_snapshot_slot_returns_future),
+    "sched_tol": ("Snap tolerancia", test_tolerance_constants),
+    "sched_label": ("Snap label 'scheduled'", test_label_prefix_correct),
     "zero_cross": ("Find Zero Cross", test_find_zero_cross),
     # --- Regressão Phase 4G (E8, E10) ---
     "e8_broadcast": ("E8: Greeks Broadcast (S scalar + K array)", test_e8_greeks_broadcast_scalar_s),
