@@ -854,6 +854,36 @@ def test_kelly_invalid_params_raises(golden: dict) -> tuple[bool, str]:
     return _wrap_test("kelly_validation", test_kelly_invalid_params_raises)
 
 
+# --- test_veta.py (7 testes E22/E51) ---
+def test_veta_call_atm_basic(golden: dict) -> tuple[bool, str]:
+    from tests.test_veta import test_veta_call_atm_basic
+    return _wrap_test("veta_atm", test_veta_call_atm_basic)
+
+def test_veta_put_equals_call(golden: dict) -> tuple[bool, str]:
+    from tests.test_veta import test_veta_put_equals_call
+    return _wrap_test("veta_put_eq_call", test_veta_put_equals_call)
+
+def test_veta_finite_diff_matches_closed_form(golden: dict) -> tuple[bool, str]:
+    from tests.test_veta import test_veta_finite_diff_matches_closed_form
+    return _wrap_test("veta_fd_check", test_veta_finite_diff_matches_closed_form)
+
+def test_veta_at_T_zero(golden: dict) -> tuple[bool, str]:
+    from tests.test_veta import test_veta_at_T_zero
+    return _wrap_test("veta_t0", test_veta_at_T_zero)
+
+def test_veta_class_consistency(golden: dict) -> tuple[bool, str]:
+    from tests.test_veta import test_veta_class_consistency
+    return _wrap_test("veta_oo", test_veta_class_consistency)
+
+def test_veta_invalid_params_raises(golden: dict) -> tuple[bool, str]:
+    from tests.test_veta import test_veta_invalid_params_raises
+    return _wrap_test("veta_validation", test_veta_invalid_params_raises)
+
+def test_veta_larger_T_smaller_magnitude(golden: dict) -> tuple[bool, str]:
+    from tests.test_veta import test_veta_larger_T_smaller_magnitude
+    return _wrap_test("veta_T_effect", test_veta_larger_T_smaller_magnitude)
+
+
 # Mapeamento de testes
 TESTS = {
     # --- Originais (9) ---
@@ -1015,6 +1045,14 @@ TESTS = {
     "kelly_pos_size": ("Kelly position size = capital * fraction", test_kelly_position_size),
     "kelly_max_losses": ("Kelly max consecutive losses", test_kelly_max_consecutive_losses),
     "kelly_validation": ("Kelly valida parametros", test_kelly_invalid_params_raises),
+    # --- Veta E22/E51 (7 testes) ---
+    "veta_atm": ("Veta Call ATM basico", test_veta_call_atm_basic),
+    "veta_put_eq_call": ("Veta put = Veta call (BS sem div)", test_veta_put_equals_call),
+    "veta_fd_check": ("Veta FD primária = FD dt=1e-4 (consistente)", test_veta_finite_diff_matches_closed_form),
+    "veta_t0": ("Veta T=0 = 0", test_veta_at_T_zero),
+    "veta_oo": ("VetaCalculator.veta_call = veta_call()", test_veta_class_consistency),
+    "veta_validation": ("Veta valida parametros", test_veta_invalid_params_raises),
+    "veta_T_effect": ("|Veta| diminui com T (Vega mais estavel)", test_veta_larger_T_smaller_magnitude),
 }
 
 
