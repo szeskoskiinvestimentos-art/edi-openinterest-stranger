@@ -123,6 +123,7 @@ class StrangerThingsCharts {
             this.createMMPnLChart(data);
             this.createDealerPressureChart(data); // Added
             this.createDeltaAgregadoChart(data); // Added
+            this.createSkewChart(data); // E45e: Skew IV dedicado
 
             this.updateMetrics(data);
             this.updateKeyLevels(data);
@@ -2162,3 +2163,55 @@ class StrangerThingsCharts {
 document.addEventListener('DOMContentLoaded', () => {
     window.strangerThingsCharts = new StrangerThingsCharts();
 });
+
+// E45e: Skew IV chart dedicado
+strangerThingsCharts.prototype.createSkewChart = function(data) {
+    const ctx = document.getElementById('skewChart');
+    if (!ctx) return;
+    if (!data.volatility_data || !data.volatility_data.skew) {
+        console.warn('[E45e] Skew data not available');
+        return;
+    }
+
+    const strikes = data.strikes || [];
+    const skew = data.volatility_data.skew;
+    if (strikes.length === 0 || skew.length === 0) return;
+
+    const colors = skew.map(v => v >= 0 ? 'rgba(76, 175, 80, 0.6)' : 'rgba(244, 67, 54, 0.6)');
+    const pointColors = skew.map(v => v >= 0 ? '#4caf50' : '#f44336');
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: strikes.map(s => s.toFixed(0)),
+            datasets: [{
+                label: 'Skew IV',
+                data: skew.map(v => v * 100),
+                backgroundColor: colors,
+                borderColor: pointColors,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: 'Edi - Skew IV por Strike (%)', color: '#e0e0e0', font: { size: 14 } },
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => `Strike ${ctx.label}: ${ctx.parsed.y.toFixed(4)}%`
+                    }
+                }
+            },
+            scales: {
+                x: { title: { display: true, text: 'Strike', color: '#e0e0e0' }, ticks: { color: '#e0e0e0' } },
+                y: {
+                    title: { display: true, text: 'Skew IV (%)', color: '#e0e0e0' },
+                    ticks: { color: '#e0e0e0', callback: (v) => v.toFixed(3) + '%' },
+                    grid: { color: 'rgba(255,255,255,0.05)' }
+                }
+            }
+        }
+    });
+};

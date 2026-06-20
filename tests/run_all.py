@@ -1192,6 +1192,26 @@ def test_win_external_assets_exist(golden: dict) -> tuple[bool, str]:
 
 
 # --- test_dashboards.py (8 testes E26) ---
+def test_wdo_has_skew_canvas(golden: dict) -> tuple[bool, str]:
+    """E45e: WDO tem canvas skewChart dedicado."""
+    src = (ROOT / "dashboard_unificado" / "WDO" / "index.html").read_text(encoding="utf-8")
+    if 'id="skewChart"' not in src:
+        return False, "E45e: skewChart canvas ausente em WDO/index.html"
+    if 'createSkewChart' not in (ROOT / "dashboard_unificado" / "WDO" / "assets" / "js" / "charts.js").read_text(encoding="utf-8"):
+        return False, "E45e: createSkewChart ausente em WDO/charts.js"
+    return True, "E45e: WDO skewChart canvas + createSkewChart presentes"
+
+
+def test_win_has_skew_canvas(golden: dict) -> tuple[bool, str]:
+    """E45e: WIN tem canvas skewChart dedicado."""
+    src = (ROOT / "dashboard_unificado" / "WIN" / "index.html").read_text(encoding="utf-8")
+    if 'id="skewChart"' not in src:
+        return False, "E45e: skewChart canvas ausente em WIN/index.html"
+    if 'createSkewChart' not in (ROOT / "dashboard_unificado" / "WIN" / "assets" / "js" / "charts.js").read_text(encoding="utf-8"):
+        return False, "E45e: createSkewChart ausente em WIN/charts.js"
+    return True, "E45e: WIN skewChart canvas + createSkewChart presentes"
+
+
 def test_wdo_has_ntsl_code_block(golden: dict) -> tuple[bool, str]:
     from tests.test_dashboards import test_wdo_has_ntsl_code_block
     return _wrap_test("dash_wdo_ntsl_block", test_wdo_has_ntsl_code_block)
@@ -1394,6 +1414,8 @@ TESTS = {
     "dash_wdo_sync": ("WDO HTML/JS sincronizado (sem dead handlers)", test_wdo_html_js_sync),
     "dash_win_sync": ("WIN HTML/JS sincronizado (sem dead handlers)", test_win_html_js_sync),
     "dash_wdo_assets": ("WDO assets externos existem", test_wdo_external_assets_exist),
+    "dash_e45e_wdo_skew": ("E45e WDO skewChart canvas", test_wdo_has_skew_canvas),
+    "dash_e45e_win_skew": ("E45e WIN skewChart canvas", test_win_has_skew_canvas),
     "dash_win_assets": ("WIN assets externos existem", test_win_external_assets_exist),
     # --- VWAP E68 (16 testes) ---
     "vwap_basic": ("VWAP = Σ(P×V) / Σ(V)", test_vwap_basic),
