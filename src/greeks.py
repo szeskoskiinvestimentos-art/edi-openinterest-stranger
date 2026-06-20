@@ -193,6 +193,92 @@ class GreeksEngine:
         return theta
 
     @staticmethod
+    def implied_vol_bs(
+        price: Numeric,
+        S: Numeric,
+        K: Numeric,
+        T: Numeric,
+        r: Numeric,
+        typ: str,
+        max_iter: int = 60,
+        tol: float = 1e-5,
+    ) -> tuple[float, float] | None:
+        """Calcula volatilidade implicita via bisseccao (Black-Scholes).
+
+        Versao robusta com tratamento de edge cases e retorno de confidence.
+
+        Args:
+            price: preco de mercado da opcao
+            S: spot do ativo
+            K: strike
+            T: tempo em anos
+            r: taxa livre de risco
+            typ: 'C' para call, 'P' para put
+            max_iter: maximo de iteracoes (default 60)
+            tol: tolerancia de convergencia (default 1e-5)
+
+        Returns:
+            Tupla (iv, confidence) onde:
+                - iv: volatilidade implicita (annualizada)
+                - confidence: 0.0 a 1.0 (1.0 = convergiu perfeitamente, <0.5 = aproximacao)
+            Ou None se nao foi possivel calcular.
+        """
+        if not (np.isfinite(price) and np.isfinite(S) and np.isfinite(K)
+                and np.isfinite(T) and np.isfinite(r)):
+            return None
+        if price <= 0 or S <= 0 or K <= 0 or T <= 0:
+            return None
+
+        # Edge case: preco menor que intrinsic value
+        intrinsic = max(0.0, S - K) if typ == "C" else max(0.0, K - S)
+        if price < intrinsic - 0.01:  # tolerancia de 1 centavo
+            return None
+
+        # Edge case: preco igual ao intrinsic (ITM deep, vol = 0)
+        if abs(price - intrinsic) < 0.01:
+            return 0.0, 0.5  # confidence baixa pois e arbitrario
+
+        lo = 1e-6
+        hi = 5.0
+        p_hi = float(GreeksEngine.bs_price(S, K, T, r, hi, typ))
+        if not np.isfinite(p_hi) or p_hi < price:
+            # Tenta com range expandido (pode ser opcao com vol muito alta)
+            hi = 20.0
+            p_hi = float(GreeksEngine.bs_price(S, K, T, r, hi, typ))
+            if not np.isfinite(p_hi) or p_hi < price:
+                return None
+
+        # Edge case: T muito pequeno (0DTE)
+        # BS quebra quando T < ~1/365 anos, entao usamos T_min
+        T_eff = max(T, 1.0/365.0)  # min 1 dia
+
+        iterations_used = 0
+        last_error = float('inf')
+        for i in range(max_iter):
+            mid = 0.5 * (lo + hi)
+            p_mid = float(GreeksEngine.bs_price(S, K, T_eff, r, mid, typ))
+            iterations_used = i + 1
+            if not np.isfinite(p_mid):
+                hi = mid
+                continue
+            err = abs(p_mid - price)
+            last_error = err
+            if err < tol * max(price, 1.0):
+                # Convergiu
+                confidence = 1.0
+                return mid, confidence
+            if p_mid > price:
+                hi = mid
+            else:
+                lo = mid
+
+        # Nao convergiu perfeitamente: confidence baseada no erro relativo
+        rel_err = last_error / max(price, 1.0)
+        confidence = max(0.1, min(0.9, 1.0 - rel_err * 10))
+        iv_approx = 0.5 * (lo + hi)
+        return iv_approx, confidence
+
+    @staticmethod
     def bs_price(
         S: Numeric,
         K: Numeric,

@@ -427,6 +427,31 @@ def test_volga_uses_iv_per_strike(golden: dict) -> tuple[bool, str]:
     from tests.test_volga import test_volga_uses_iv_per_strike
     return _wrap_test("volga_iv", test_volga_uses_iv_per_strike)
 
+# --- test_iv_bisect.py (6 testes E25) ---
+def test_iv_bisect_atm_call(golden: dict) -> tuple[bool, str]:
+    from tests.test_iv_bisect import test_iv_bisect_atm_call
+    return _wrap_test("iv_atm", test_iv_bisect_atm_call)
+
+def test_iv_bisect_otm_higher_iv(golden: dict) -> tuple[bool, str]:
+    from tests.test_iv_bisect import test_iv_bisect_otm_higher_iv
+    return _wrap_test("iv_otm", test_iv_bisect_otm_higher_iv)
+
+def test_iv_bisect_returns_none_for_below_intrinsic(golden: dict) -> tuple[bool, str]:
+    from tests.test_iv_bisect import test_iv_bisect_returns_none_for_below_intrinsic
+    return _wrap_test("iv_intrinsic", test_iv_bisect_returns_none_for_below_intrinsic)
+
+def test_iv_bisect_handles_zero_dte(golden: dict) -> tuple[bool, str]:
+    from tests.test_iv_bisect import test_iv_bisect_handles_zero_dte
+    return _wrap_test("iv_0dte", test_iv_bisect_handles_zero_dte)
+
+def test_iv_bisect_rejects_invalid_inputs(golden: dict) -> tuple[bool, str]:
+    from tests.test_iv_bisect import test_iv_bisect_rejects_invalid_inputs
+    return _wrap_test("iv_invalid", test_iv_bisect_rejects_invalid_inputs)
+
+def test_iv_bisect_confidence_high_for_converged(golden: dict) -> tuple[bool, str]:
+    from tests.test_iv_bisect import test_iv_bisect_confidence_high_for_converged
+    return _wrap_test("iv_conf", test_iv_bisect_confidence_high_for_converged)
+
 def test_find_zero_cross(golden: dict) -> tuple[bool, str]:
     from tests.test_calculator_core import test_find_zero_cross
     return _wrap_test("zero_cross", test_find_zero_cross)
@@ -475,6 +500,13 @@ TESTS = {
     "volga_otm": ("Volga OTM >= 0", test_volga_otm_positive),
     "volga_t0": ("Volga T~0 finita", test_volga_zero_t),
     "volga_iv": ("Volga usa IV per-strike", test_volga_uses_iv_per_strike),
+    # --- IV Bisect E25 (6 testes) ---
+    "iv_atm": ("IV Bisect ATM call", test_iv_bisect_atm_call),
+    "iv_otm": ("IV Bisect OTM (vol maior)", test_iv_bisect_otm_higher_iv),
+    "iv_intrinsic": ("IV Bisect recusa below intrinsic", test_iv_bisect_returns_none_for_below_intrinsic),
+    "iv_0dte": ("IV Bisect 0DTE T=1d", test_iv_bisect_handles_zero_dte),
+    "iv_invalid": ("IV Bisect rejeita invalidos", test_iv_bisect_rejects_invalid_inputs),
+    "iv_conf": ("IV Bisect confidence alta", test_iv_bisect_confidence_high_for_converged),
     "zero_cross": ("Find Zero Cross", test_find_zero_cross),
     # --- Regressão Phase 4G (E8, E10) ---
     "e8_broadcast": ("E8: Greeks Broadcast (S scalar + K array)", test_e8_greeks_broadcast_scalar_s),
