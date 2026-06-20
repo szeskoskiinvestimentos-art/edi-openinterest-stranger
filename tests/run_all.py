@@ -700,6 +700,48 @@ def test_stress_scenario_metrics_keys(golden: dict) -> tuple[bool, str]:
     return _wrap_test("stress_metrics", test_stress_scenario_metrics_keys)
 
 
+# --- test_heston.py (10 testes E52) ---
+def test_heston_call_atm_basic(golden: dict) -> tuple[bool, str]:
+    from tests.test_heston import test_heston_call_atm_basic
+    return _wrap_test("heston_atm", test_heston_call_atm_basic)
+
+def test_heston_call_itm_otm(golden: dict) -> tuple[bool, str]:
+    from tests.test_heston import test_heston_call_itm_otm
+    return _wrap_test("heston_itm_otm", test_heston_call_itm_otm)
+
+def test_heston_put_call_parity(golden: dict) -> tuple[bool, str]:
+    from tests.test_heston import test_heston_put_call_parity
+    return _wrap_test("heston_parity", test_heston_put_call_parity)
+
+def test_heston_higher_vol_higher_call(golden: dict) -> tuple[bool, str]:
+    from tests.test_heston import test_heston_higher_vol_higher_call
+    return _wrap_test("heston_vol_of_vol", test_heston_higher_vol_higher_call)
+
+def test_heston_higher_rho_higher_call(golden: dict) -> tuple[bool, str]:
+    from tests.test_heston import test_heston_higher_rho_higher_call
+    return _wrap_test("heston_rho_skew", test_heston_higher_rho_higher_call)
+
+def test_heston_feller_condition(golden: dict) -> tuple[bool, str]:
+    from tests.test_heston import test_heston_feller_condition
+    return _wrap_test("heston_feller", test_heston_feller_condition)
+
+def test_heston_model_class_call(golden: dict) -> tuple[bool, str]:
+    from tests.test_heston import test_heston_model_class_call
+    return _wrap_test("heston_oo_call", test_heston_model_class_call)
+
+def test_heston_zero_T_returns_intrinsic(golden: dict) -> tuple[bool, str]:
+    from tests.test_heston import test_heston_zero_T_returns_intrinsic
+    return _wrap_test("heston_t0", test_heston_zero_T_returns_intrinsic)
+
+def test_heston_invalid_params_raises(golden: dict) -> tuple[bool, str]:
+    from tests.test_heston import test_heston_invalid_params_raises
+    return _wrap_test("heston_validation", test_heston_invalid_params_raises)
+
+def test_heston_calibrate_returns_valid_model(golden: dict) -> tuple[bool, str]:
+    from tests.test_heston import test_heston_calibrate_returns_valid_model
+    return _wrap_test("heston_calibrate", test_heston_calibrate_returns_valid_model)
+
+
 # Mapeamento de testes
 TESTS = {
     # --- Originais (9) ---
@@ -820,6 +862,17 @@ TESTS = {
     # --- Regressão Phase 4G (E8, E10) ---
     "e8_broadcast": ("E8: Greeks Broadcast (S scalar + K array)", test_e8_greeks_broadcast_scalar_s),
     "e10_iv_per_strike": ("E10: IV per-strike extraído do DataFrame", test_e10_iv_per_strike_used_in_greeks),
+    # --- Heston E52 (10 testes) ---
+    "heston_atm": ("Heston Call ATM basico", test_heston_call_atm_basic),
+    "heston_itm_otm": ("Heston Call ITM > OTM", test_heston_call_itm_otm),
+    "heston_parity": ("Heston paridade put-call", test_heston_put_call_parity),
+    "heston_vol_of_vol": ("Heston sigma_v afeta call (efeito de vol of vol)", test_heston_higher_vol_higher_call),
+    "heston_rho_skew": ("Heston rho positivo -> OTM call mais cara", test_heston_higher_rho_higher_call),
+    "heston_feller": ("Heston Feller condition", test_heston_feller_condition),
+    "heston_oo_call": ("HestonModel.call_price = heston_call_price", test_heston_model_class_call),
+    "heston_t0": ("Heston T=0 -> intrinsic", test_heston_zero_T_returns_intrinsic),
+    "heston_validation": ("Heston valida parametros", test_heston_invalid_params_raises),
+    "heston_calibrate": ("Heston calibrate retorna modelo valido", test_heston_calibrate_returns_valid_model),
 }
 
 
