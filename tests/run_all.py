@@ -473,6 +473,35 @@ def test_hub_has_legacy_status_link(golden: dict) -> tuple[bool, str]:
     from tests.test_hub_health import test_hub_has_legacy_status_link
     return _wrap_test("hub_link", test_hub_has_legacy_status_link)
 
+# --- test_stale_banner.py (7 testes E37) ---
+def test_banner_file_exists(golden: dict) -> tuple[bool, str]:
+    from tests.test_stale_banner import test_banner_file_exists
+    return _wrap_test("banner_exists", test_banner_file_exists)
+
+def test_banner_uses_iife(golden: dict) -> tuple[bool, str]:
+    from tests.test_stale_banner import test_banner_uses_iife
+    return _wrap_test("banner_iife", test_banner_uses_iife)
+
+def test_banner_has_config(golden: dict) -> tuple[bool, str]:
+    from tests.test_stale_banner import test_banner_has_config
+    return _wrap_test("banner_config", test_banner_has_config)
+
+def test_banner_uses_neon_terminal_styles(golden: dict) -> tuple[bool, str]:
+    from tests.test_stale_banner import test_banner_uses_neon_terminal_styles
+    return _wrap_test("banner_neon", test_banner_uses_neon_terminal_styles)
+
+def test_banner_checks_marketdata_first(golden: dict) -> tuple[bool, str]:
+    from tests.test_stale_banner import test_banner_checks_marketdata_first
+    return _wrap_test("banner_priority", test_banner_checks_marketdata_first)
+
+def test_banner_has_interval_check(golden: dict) -> tuple[bool, str]:
+    from tests.test_stale_banner import test_banner_has_interval_check
+    return _wrap_test("banner_interval", test_banner_has_interval_check)
+
+def test_banner_handles_missing_data(golden: dict) -> tuple[bool, str]:
+    from tests.test_stale_banner import test_banner_handles_missing_data
+    return _wrap_test("banner_robust", test_banner_handles_missing_data)
+
 def test_find_zero_cross(golden: dict) -> tuple[bool, str]:
     from tests.test_calculator_core import test_find_zero_cross
     return _wrap_test("zero_cross", test_find_zero_cross)
@@ -534,6 +563,14 @@ TESTS = {
     "hub_refresh": ("HUB auto-refresh 60s", test_hub_has_auto_refresh),
     "hub_slot": ("HUB calcula proximo slot", test_hub_has_next_slot_logic),
     "hub_link": ("HUB link #status", test_hub_has_legacy_status_link),
+    # --- Stale Banner E37 (7 testes) ---
+    "banner_exists": ("stale-banner.js existe", test_banner_file_exists),
+    "banner_iife": ("stale-banner IIFE", test_banner_uses_iife),
+    "banner_config": ("stale-banner config", test_banner_has_config),
+    "banner_neon": ("stale-banner Neon Terminal", test_banner_uses_neon_terminal_styles),
+    "banner_priority": ("stale-banner prioriza marketData", test_banner_checks_marketdata_first),
+    "banner_interval": ("stale-banner interval 5min", test_banner_has_interval_check),
+    "banner_robust": ("stale-banner robusto a dados faltantes", test_banner_handles_missing_data),
     "zero_cross": ("Find Zero Cross", test_find_zero_cross),
     # --- Regressão Phase 4G (E8, E10) ---
     "e8_broadcast": ("E8: Greeks Broadcast (S scalar + K array)", test_e8_greeks_broadcast_scalar_s),
