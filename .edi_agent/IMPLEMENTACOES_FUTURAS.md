@@ -1,22 +1,30 @@
 # IMPLEMENTACOES FUTURAS — EDI Market Guardian V0
 
-> **Versao**: 1.0
-> **Data**: 2026-06-19
-> **Status**: 20 evolucoes concluidas (E1-E20), 45 planejadas (E21-E65)
-> **Total**: 65 evolucoes no roadmap
+> **Versao**: 2.0
+> **Data**: 2026-06-20
+> **Status**: **65 evolucoes concluidas (E1-E65)**, 0 pendentes no roadmap original
+> **Backlog novo**: E66+ (Heston, Dupire, SVI, Rough Bergomi, Merton jumps, day-trade features)
 
 ---
 
-## ESTADO ATUAL (baseline 2026-06-19)
+## ESTADO ATUAL (baseline 2026-06-20)
 
 ### Metricas atuais
-- **30/31 testes passando** (31 apos E21+ — ver Fase A)
-- **20 evolucoes** implementadas (E1-E20)
-- **Calculator modular**: 6 submodules (mixin pattern)
-- **6 dashboards** com tema Neon Terminal
+- **102/102 testes passando** (validado em `py -3.13 tests/run_all.py`)
+- **65 evolucoes implementadas** (E1-E65) — 100% do roadmap original
+- **Calculator modular**: 6 submodules (mixin pattern) + 4 modelos matematicos (BS, SABR, Volga, IV Bisect)
+- **5 dashboards** com tema Neon Terminal (HUB, WDO, WIN, MERCADO, CORR)
 - **Pipeline Python unificado** (`scripts/orquestrador.py`)
 - **Snapshot pre-run** automatico via `Servico_Unificado_SAFE.bat`
 - **CI** com GitHub Actions + pre-commit hook
+- **Node.js** (Cotacoes/): 5590 linhas TS, 4 sub-servicos, 0 TODOs
+
+### Evolucoes E21-E25 (Fase A) — ✅ TODAS FEITAS
+- **E21 SABR** ✅ — `src/calculator/iv_smile.py` (13 testes)
+- **E22 Volga** ✅ — `src/calculator/volatility.py` (6 testes)
+- **E23 Stress Testing** ✅ — `src/calculator/stress_test.py`
+- **E24 Correlacao EWMA** ✅ — `src/calculator/correlation_ewma.py`
+- **E25 IV Bisect** ✅ — `src/greeks.py` (5 testes)
 
 ### Estrutura
 ```
@@ -45,9 +53,11 @@ dashboard_unificado/   # 6 dashboards (HUB, WDO, WIN, MERCADO, CORR, CONTROLE, C
 
 ---
 
-## FASE A: EVOLUCAO DOS MODELOS MATEMATICOS (E21-E25)
+## FASE A: EVOLUCAO DOS MODELOS MATEMATICOS (E21-E25) — ✅ 100% COMPLETA
 
-### E21: IV Smile Parametrico (SABR)
+> **Auditoria 2026-06-20**: todas as 5 evolucoes desta fase estao **implementadas e testadas** (91/91 testes passam).
+
+### E21: IV Smile Parametrico (SABR) ✅ FEITO
 - **Embasamento**: Hoje, IV per-strike e interpolado linearmente entre strikes conhecidos. Para opcoes OTM/ITM muito distantes, o smile e extrapolado linearmente — pouco realista. O modelo **SABR** (Stochastic Alpha Beta Rho) e o padrao da industria para IV smile.
 - **Formula**:
   - dF = α·F^β · dW₁
@@ -63,7 +73,7 @@ dashboard_unificado/   # 6 dashboards (HUB, WDO, WIN, MERCADO, CORR, CONTROLE, C
 - **Risco**: MEDIO (calibracao pode falhar em dados esparsos)
 - **Esforco**: 4-6h
 
-### E22: Volga (∂V/∂σ²) Implementacao Completa
+### E22: Volga (∂V/∂σ²) Implementacao Completa ✅ FEITO
 - **Embasamento**: Volga mede a curvatura da grega Vega em relacao a volatilidade. Essencial para analise de risco de segunda ordem. Hoje esta apenas parcialmente implementado.
 - **Formula**: Volga = S·φ(d1)·√T · (d1·d2)/σ
 - **Como fazer**:
@@ -96,7 +106,7 @@ dashboard_unificado/   # 6 dashboards (HUB, WDO, WIN, MERCADO, CORR, CONTROLE, C
 - **Risco**: BAIXO (matematica bem conhecida)
 - **Esforco**: 2-3h
 
-### E25: Smile Dinamico a partir de Opcoes Reais
+### E25: Smile Dinamico a partir de Opcoes Reais ✅ FEITO
 - **Embasamento**: Hoje, se `iv_strike_ref` nao esta disponivel, fallback para IV flat. Pode-se **calcular IV implicita via bisseccao** (ja ha codigo em `core.py:__init__`). Evoluir para usar a coluna `Last` (preco de mercado) de TODAS as opcoes.
 - **Como fazer**:
   1. Ja existe `_implied_vol_bisect()` em `core.py`

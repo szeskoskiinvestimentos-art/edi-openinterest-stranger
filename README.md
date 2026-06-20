@@ -11,8 +11,7 @@
 | **WIN** | [dashboard_unificado/WIN/index.html](dashboard_unificado/WIN/index.html) | Opções do índice (Ibovespa) |
 | **MERCADO** | [Cotacoes/dashboard/MERCADO/index.html](Cotacoes/dashboard/MERCADO/index.html) | Cotações de mercado |
 | **CORR** | [dashboard_unificado/correlation/index.html](dashboard_unificado/correlation/index.html) | Matriz de correlação |
-| **CONTROLE** | [dashboard_unificado/controle/index.html](dashboard_unificado/controle/index.html) | Painel de controle |
-| **CONTROLE_DADOS** | [controle_de_dados.html](controle_de_dados.html) | Versão legado |
+| **CONTROLE_DADOS** | [controle_de_dados.html](controle_de_dados.html) | Versão legado (snapshot) |
 
 ## Como rodar
 
@@ -41,7 +40,7 @@ python scripts/hooks/pre_run_snapshot.py restore
 
 - **GitHub Actions**: `.github/workflows/tests.yml` roda `tests/run_all.py` em push/PR
 - **Pre-commit**: `.pre-commit-config.yaml` roda antes de cada commit
-- **Total de testes**: 30/30 passando
+- **Total de testes**: 102/102 passando
   - 9 originais (sintaxe, BS Greeks, T=0, charm, vega, 0DTE, gamma cone, navigation, safety)
   - 3 Gamma Flip (GEX sign, base consistency, 7 variações)
   - 3 IV Smile (per-strike, GEX diff, skew)
@@ -101,7 +100,7 @@ Edi_Market_Guardian_V0/
 ├── docs/                         # Documentação
 ├── .edi_agent/                   # Sistema de auto-aprendizado
 │   ├── workspace/                # Registro persistente
-│   │   ├── auto_evolution/       # Log de evoluções (E1-E22)
+│   │   ├── auto_evolution/       # Log de evoluções (E1-E65)
 │   │   └── auto_learning/        # Aprendizados
 │   └── skills/                   # Skills do agente
 ├── Servico_Unificado.bat         # Wrapper Python
@@ -111,18 +110,35 @@ Edi_Market_Guardian_V0/
 └── requirements.txt              # Dependências Python
 ```
 
-## Evoluções (E1-E22)
+## Evoluções (E1-E65 — 100% completo)
 
-| ID | Categoria | Descrição |
-|----|-----------|-----------|
+| Faixa | Categoria | Descrição |
+|-------|-----------|-----------|
 | E1-E5 | Pipeline & Dados | Atomic write, spot validation, decouple WDO/WIN, tight loop fix |
 | E6-E8, E17 | Código & Bug Fixes | Greeks broadcast fix, BS price broadcast fix |
 | E9-E12, E20 | Testes | Gamma flip, IV smile, calculator core, charts, NTSL |
 | E10 | Matemática IV | IV per-strike integration (Delta/Gamma usam IV real) |
 | E13-E14, E18-E19 | Limpeza | Print→Logger, dead flags, calculator split, orphan cleanup |
 | E15-E16 | UI & Navegação | Dashboard normalization, AUTO_DETECT paths |
-| E21 | Performance | Scraping paralelo (ThreadPoolExecutor, ~93% mais rápido) |
-| E22 | Documentação | Docstrings para APIs internas |
+| E21 | Performance/Modelo | Scraping paralelo + SABR (Hagan approximation) |
+| E22 | Modelo Matemático | Volga (∂V/∂σ²) + cross-check por diferenças finitas |
+| E23 | Análise | Stress Testing (heatmap 5×5 spot×vol) |
+| E24 | Análise | Correlação EWMA (dinâmica com λ) |
+| E25 | Matemática IV | IV Bisect robusto (encontrar IV de preço de mercado) |
+| E26-E30 | Cotacoes/ | MERCADO tests, code splitting, schema validator, Service Worker |
+| E31 | Dashboard | HUB health dashboard |
+| E32-E33 | Dashboard | Charts unificados WDO/WIN + CORR finalizar |
+| E35-E36 | Infra | API REST no orquestrador + Playwright E2E |
+| E37-E38 | Infra | Auto-pull snapshots + Logging JSON estruturado |
+| E39-E40 | Qualidade | OpenAPI/Swagger + Type hints completos |
+| E41-E42 | DevOps | Dependabot + Snapshot agendado (4x/dia) |
+| E44 | Auto-aprendizado | Skill auto-discovery de telas |
+| E45 | Migração BIG | v3→v1 (10.4 MB → Chart.js) |
+| E46-E49 | Dashboard | HUB gráfico semanal, tooltips, split-view WDO/WIN, top 10 pares |
+| E51 | Modelo | Veta (∂V/∂t) |
+| E55-E58 | Performance | Cache CSVs mtime-based, Data warehouse SQLite |
+| E59-E62 | UX | Code splitting HUB, Service Worker, dark/light toggle, mobile-first |
+| E63-E65 | DevOps | Docker Compose, CI matrix expandido, Release automation |
 
 ## Documentação
 
