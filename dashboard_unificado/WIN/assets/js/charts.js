@@ -124,6 +124,7 @@ class StrangerThingsCharts {
             this.createDealerPressureChart(data); // Added
             this.createDeltaAgregadoChart(data); // Added
             this.createSkewChart(data); // E45e: Skew IV dedicado
+            this.createDiscoveryChart(data); // E45b: Strikes + Midwalls + Fibo
 
             this.updateMetrics(data);
             this.updateKeyLevels(data);
@@ -2158,6 +2159,150 @@ class StrangerThingsCharts {
         this.charts = {};
     }
 }
+
+// E45b: Strikes + Midwalls + Fibonacci chart combinado
+// Logica espelhada de src/discovery_levels.py (E45d) - computa no cliente para nao depender de backend Python
+strangerThingsCharts.prototype.createDiscoveryChart = function(data) {
+    const ctx = document.getElementById('discoveryChart');
+    if (!ctx) return;
+
+    // E45b: Usar oi_data.strikes (grade completa pareada com call_oi/put_oi)
+    // data.strikes raiz pode ter subset diferente
+    const oiData = data.oi_data || {};
+    const strikes = oiData.strikes || data.strikes || [];
+    if (strikes.length === 0) {
+        console.warn('[E45b] Strikes data not available');
+        return;
+    }
+
+    const oiCall = oiData.call_oi || data.oi_call || data.open_interest_call || [];
+    const oiPut = oiData.put_oi || data.oi_put || data.open_interest_put || [];
+
+    if (oiCall.length !== strikes.length || oiPut.length !== strikes.length) {
+        console.warn('[E45b] OI arrays length mismatch with strikes');
+        return;
+    }
+
+    // --- 1. Midwalls Shadow: OI total por strike (Call + Put) ---
+    const oiTotal = strikes.map((_, i) => oiCall[i] + oiPut[i]);
+
+    // --- 2. Midwalls: zona onde |Call - Put| e' minimo (equilibrio) ---
+    const diff = strikes.map((_, i) => Math.abs(oiCall[i] - oiPut[i]));
+    const minDiffIdx = diff.indexOf(Math.min(...diff));
+    const midwallStrike = strikes[minDiffIdx];
+    const midwallOI = oiTotal[minDiffIdx];
+
+    // --- 3. Fibonacci levels: 23.6%, 38.2%, 50%, 61.8%, 78.6% entre min e max strike ---
+    const minStrike = Math.min(...strikes);
+    const maxStrike = Math.max(...strikes);
+    const fibRatios = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+    const fibLevels = fibRatios.map(r => ({
+        ratio: r,
+        strike: minStrike + (maxStrike - minStrike) * r,
+        label: (r * 100).toFixed(1) + '%'
+    }));
+
+    // Construir datasets
+    const datasets = [];
+
+    // (a) Strikes (linha base - OI total)
+    datasets.push({
+        label: 'Strikes (OI Total)',
+        data: strikes.map((s, i) => ({ x: s, y: oiTotal[i] })),
+        borderColor: 'rgba(33, 150, 243, 0.9)',
+        backgroundColor: 'rgba(33, 150, 243, 0.15)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: 'rgba(33, 150, 243, 1)',
+        type: 'line',
+        yAxisID: 'yOI'
+    });
+
+    // (b) Midwalls Shadow - area sombreada em volta do midwall
+    const shadowWidth = (maxStrike - minStrike) * 0.04; // 4% do range
+    datasets.push({
+        label: `Midwall @ ${midwallStrike.toFixed(0)} (OI=${midwallOI})`,
+        data: [
+            { x: midwallStrike - shadowWidth, y: midwallOI * 1.1 },
+            { x: midwallStrike + shadowWidth, y: midwallOI * 1.1 },
+            { x: midwallStrike + shadowWidth, y: 0 },
+            { x: midwallStrike - shadowWidth, y: 0 }
+        ],
+        backgroundColor: 'rgba(255, 193, 7, 0.25)',
+        borderColor: 'rgba(255, 193, 7, 0.8)',
+        borderWidth: 1,
+        fill: true,
+        type: 'scatter',
+        showLine: false,
+        yAxisID: 'yOI'
+    });
+
+    // (c) Fibonacci levels (linhas horizontais em y=0 com annotation)
+    fibLevels.forEach(fib => {
+        datasets.push({
+            label: `Fib ${fib.label} (${fib.strike.toFixed(0)})`,
+            data: [
+                { x: minStrike, y: 0 },
+                { x: maxStrike, y: 0 }
+            ],
+            borderColor: `rgba(156, 39, 176, ${0.3 + fib.ratio * 0.4})`,
+            borderWidth: 1,
+            borderDash: [4, 4],
+            type: 'line',
+            pointRadius: 0,
+            fill: false,
+            yAxisID: 'yOI',
+            fibStrike: fib.strike
+        });
+    });
+
+    new Chart(ctx, {
+        type: 'scatter',
+        data: { datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Edi - Discovery: Strikes (OI) + Midwalls Shadow + Fibonacci',
+                    color: '#e0e0e0',
+                    font: { size: 14 }
+                },
+                legend: {
+                    display: true,
+                    labels: { color: '#e0e0e0', filter: (item) => !item.text.includes('Fib ') }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+                            if (ctx.dataset.fibStrike !== undefined) {
+                                return `Fib @ ${ctx.dataset.fibStrike.toFixed(0)}`;
+                            }
+                            return `${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('pt-BR')}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'linear',
+                    title: { display: true, text: 'Strike', color: '#e0e0e0' },
+                    ticks: { color: '#e0e0e0', callback: (v) => v.toFixed(0) },
+                    grid: { color: 'rgba(255,255,255,0.05)' }
+                },
+                yOI: {
+                    title: { display: true, text: 'Open Interest', color: '#e0e0e0' },
+                    ticks: { color: '#e0e0e0', callback: (v) => v.toLocaleString('pt-BR') },
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+};
 
 // Initialize charts when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {

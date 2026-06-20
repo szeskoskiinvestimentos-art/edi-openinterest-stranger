@@ -1212,6 +1212,27 @@ def test_win_has_skew_canvas(golden: dict) -> tuple[bool, str]:
     return True, "E45e: WIN skewChart canvas + createSkewChart presentes"
 
 
+# --- E45b: Strikes + Midwalls + Fibonacci chart combinado ---
+def test_wdo_has_discovery_canvas(golden: dict) -> tuple[bool, str]:
+    """E45b: WDO tem canvas discoveryChart + createDiscoveryChart."""
+    src = (ROOT / "dashboard_unificado" / "WDO" / "index.html").read_text(encoding="utf-8")
+    if 'id="discoveryChart"' not in src:
+        return False, "E45b: discoveryChart canvas ausente em WDO/index.html"
+    if 'createDiscoveryChart' not in (ROOT / "dashboard_unificado" / "WDO" / "assets" / "js" / "charts.js").read_text(encoding="utf-8"):
+        return False, "E45b: createDiscoveryChart ausente em WDO/charts.js"
+    return True, "E45b: WDO discoveryChart canvas + createDiscoveryChart presentes"
+
+
+def test_win_has_discovery_canvas(golden: dict) -> tuple[bool, str]:
+    """E45b: WIN tem canvas discoveryChart + createDiscoveryChart."""
+    src = (ROOT / "dashboard_unificado" / "WIN" / "index.html").read_text(encoding="utf-8")
+    if 'id="discoveryChart"' not in src:
+        return False, "E45b: discoveryChart canvas ausente em WIN/index.html"
+    if 'createDiscoveryChart' not in (ROOT / "dashboard_unificado" / "WIN" / "assets" / "js" / "charts.js").read_text(encoding="utf-8"):
+        return False, "E45b: createDiscoveryChart ausente em WIN/charts.js"
+    return True, "E45b: WIN discoveryChart canvas + createDiscoveryChart presentes"
+
+
 def test_wdo_has_ntsl_code_block(golden: dict) -> tuple[bool, str]:
     from tests.test_dashboards import test_wdo_has_ntsl_code_block
     return _wrap_test("dash_wdo_ntsl_block", test_wdo_has_ntsl_code_block)
@@ -1416,6 +1437,8 @@ TESTS = {
     "dash_wdo_assets": ("WDO assets externos existem", test_wdo_external_assets_exist),
     "dash_e45e_wdo_skew": ("E45e WDO skewChart canvas", test_wdo_has_skew_canvas),
     "dash_e45e_win_skew": ("E45e WIN skewChart canvas", test_win_has_skew_canvas),
+    "dash_e45b_wdo_discovery": ("E45b WDO discoveryChart canvas", test_wdo_has_discovery_canvas),
+    "dash_e45b_win_discovery": ("E45b WIN discoveryChart canvas", test_win_has_discovery_canvas),
     "dash_win_assets": ("WIN assets externos existem", test_win_external_assets_exist),
     # --- VWAP E68 (16 testes) ---
     "vwap_basic": ("VWAP = Σ(P×V) / Σ(V)", test_vwap_basic),

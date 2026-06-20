@@ -184,3 +184,75 @@ def test_ntsl_handler_is_called() -> tuple[bool, str]:
     if "this.updateNtslCode" not in content and "updateNtslCode(" not in content:
         return False, "updateNtslCode() nao e chamado em charts.js"
     return True, "updateNtslCode() e chamado (handler ativo)"
+
+
+# ============================================================================
+# E45e: Skew IV chart dedicado (v3->v1)
+# ============================================================================
+
+def test_wdo_has_skew_canvas() -> tuple[bool, str]:
+    """E45e: WDO tem <canvas id='skewChart'>."""
+    ids = _html_ids("dashboard_unificado/WDO/index.html")
+    if "skewChart" not in ids:
+        return False, "Faltando <canvas id='skewChart'> no WDO"
+    return True, "WDO tem skewChart canvas"
+
+
+def test_win_has_skew_canvas() -> tuple[bool, str]:
+    """E45e: WIN tem <canvas id='skewChart'>."""
+    ids = _html_ids("dashboard_unificado/WIN/index.html")
+    if "skewChart" not in ids:
+        return False, "Faltando <canvas id='skewChart'> no WIN"
+    return True, "WIN tem skewChart canvas"
+
+
+def test_wdo_create_skew_chart_present() -> tuple[bool, str]:
+    """E45e: charts.js WDO tem funcao createSkewChart."""
+    content = _read("dashboard_unificado/WDO/assets/js/charts.js")
+    if "createSkewChart" not in content:
+        return False, "createSkewChart nao definido em WDO/charts.js"
+    return True, "WDO charts.js tem createSkewChart"
+
+
+def test_win_create_skew_chart_present() -> tuple[bool, str]:
+    """E45e: charts.js WIN tem funcao createSkewChart."""
+    content = _read("dashboard_unificado/WIN/assets/js/charts.js")
+    if "createSkewChart" not in content:
+        return False, "createSkewChart nao definido em WIN/charts.js"
+    return True, "WIN charts.js tem createSkewChart"
+
+
+# ============================================================================
+# E45b: Strikes + Midwalls + Fibonacci chart combinado
+# ============================================================================
+
+def test_wdo_has_discovery_canvas() -> tuple[bool, str]:
+    """E45b: WDO tem <canvas id='discoveryChart'>."""
+    ids = _html_ids("dashboard_unificado/WDO/index.html")
+    if "discoveryChart" not in ids:
+        return False, "Faltando <canvas id='discoveryChart'> no WDO"
+    return True, "WDO tem discoveryChart canvas"
+
+
+def test_win_has_discovery_canvas() -> tuple[bool, str]:
+    """E45b: WIN tem <canvas id='discoveryChart'>."""
+    ids = _html_ids("dashboard_unificado/WIN/index.html")
+    if "discoveryChart" not in ids:
+        return False, "Faltando <canvas id='discoveryChart'> no WIN"
+    return True, "WIN tem discoveryChart canvas"
+
+
+def test_wdo_create_discovery_chart_present() -> tuple[bool, str]:
+    """E45b: charts.js WDO tem funcao createDiscoveryChart."""
+    content = _read("dashboard_unificado/WDO/assets/js/charts.js")
+    if "createDiscoveryChart" not in content:
+        return False, "createDiscoveryChart nao definido em WDO/charts.js"
+    return True, "WDO charts.js tem createDiscoveryChart"
+
+
+def test_win_create_discovery_chart_present() -> tuple[bool, str]:
+    """E45b: charts.js WIN tem funcao createDiscoveryChart."""
+    content = _read("dashboard_unificado/WIN/assets/js/charts.js")
+    if "createDiscoveryChart" not in content:
+        return False, "createDiscoveryChart nao definido em WIN/charts.js"
+    return True, "WIN charts.js tem createDiscoveryChart"
