@@ -768,6 +768,32 @@ def test_dupire_too_few_points_raises(golden: dict) -> tuple[bool, str]:
     return _wrap_test("dupire_validation", test_dupire_too_few_points_raises)
 
 
+# --- test_svi.py (6 testes E54) ---
+def test_svi_smoke_basic(golden: dict) -> tuple[bool, str]:
+    from tests.test_svi import test_svi_smoke_basic
+    return _wrap_test("svi_smoke", test_svi_smoke_basic)
+
+def test_svi_implied_vol_atm(golden: dict) -> tuple[bool, str]:
+    from tests.test_svi import test_svi_implied_vol_atm
+    return _wrap_test("svi_atm", test_svi_implied_vol_atm)
+
+def test_svi_skew_with_negative_rho(golden: dict) -> tuple[bool, str]:
+    from tests.test_svi import test_svi_skew_with_negative_rho
+    return _wrap_test("svi_skew", test_svi_skew_with_negative_rho)
+
+def test_svi_function_matches_class(golden: dict) -> tuple[bool, str]:
+    from tests.test_svi import test_svi_function_matches_class
+    return _wrap_test("svi_func_class", test_svi_function_matches_class)
+
+def test_svi_invalid_params_raises(golden: dict) -> tuple[bool, str]:
+    from tests.test_svi import test_svi_invalid_params_raises
+    return _wrap_test("svi_validation", test_svi_invalid_params_raises)
+
+def test_svi_fit_recovers_params(golden: dict) -> tuple[bool, str]:
+    from tests.test_svi import test_svi_fit_recovers_params
+    return _wrap_test("svi_fit", test_svi_fit_recovers_params)
+
+
 # Mapeamento de testes
 TESTS = {
     # --- Originais (9) ---
@@ -906,6 +932,13 @@ TESTS = {
     "dupire_oo": ("LocalVolModel.local_vol = dupire_local_vol_from_surface", test_dupire_local_vol_model_class),
     "dupire_grid": ("Dupire grade completa", test_dupire_grid_returns_full_surface),
     "dupire_validation": ("Dupire valida tamanho da grade", test_dupire_too_few_points_raises),
+    # --- SVI E54 (6 testes) ---
+    "svi_smoke": ("SVI construtor basico", test_svi_smoke_basic),
+    "svi_atm": ("SVI vol ATM razoavel", test_svi_implied_vol_atm),
+    "svi_skew": ("SVI skew negativo", test_svi_skew_with_negative_rho),
+    "svi_func_class": ("svi_implied_vol == SVIModel.implied_vol", test_svi_function_matches_class),
+    "svi_validation": ("SVI valida parametros", test_svi_invalid_params_raises),
+    "svi_fit": ("SVI fit recupera params", test_svi_fit_recovers_params),
 }
 
 
