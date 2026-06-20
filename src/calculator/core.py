@@ -154,7 +154,8 @@ class OptionsCalculator(FlipsMixin, GreeksExposureMixin, VolatilityMixin, WallsM
                 expiry_min = None
                 try:
                     expiry_min = pd.to_datetime(df_iv["Expiry"], errors="coerce").dropna().min()
-                except Exception:
+                except Exception as e:
+                    logger.debug("Falha ao parsear coluna Expiry (dataframe sem col Expiry ou formato invalido): %s", e)
                     expiry_min = None
                 if expiry_min is not None and pd.notnull(expiry_min):
                     df_iv = df_iv[pd.to_datetime(df_iv["Expiry"], errors="coerce") == expiry_min]
@@ -307,7 +308,8 @@ class OptionsCalculator(FlipsMixin, GreeksExposureMixin, VolatilityMixin, WallsM
                     self.zero_gamma_level = float(x1 - y1 * (x2 - x1) / (y2 - y1))
                 else:
                     self.zero_gamma_level = float(x1)
-        except Exception:
+        except Exception as e:
+            logger.debug("Falha ao calcular zero_gamma_level via interpolacao, usando gamma_flip como fallback: %s", e)
             self.zero_gamma_level = self.gamma_flip
 
         self.max_pain = self.calculate_max_pain()
