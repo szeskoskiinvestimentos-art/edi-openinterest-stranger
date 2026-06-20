@@ -1057,6 +1057,59 @@ def test_kou_calibrate_requires_min_points(golden: dict) -> tuple[bool, str]:
     from tests.test_kou import test_kou_calibrate_requires_min_points
     return _wrap_test("kou_calib_min", test_kou_calibrate_requires_min_points)
 
+def test_rbergomi_eta_zero_recovers_bs(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_bergomi import test_rbergomi_eta_zero_recovers_bs
+    return _wrap_test("rberg_eta0", test_rbergomi_eta_zero_recovers_bs)
+
+def test_rbergomi_t_zero_returns_intrinsic(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_bergomi import test_rbergomi_t_zero_returns_intrinsic
+    return _wrap_test("rberg_t0", test_rbergomi_t_zero_returns_intrinsic)
+
+def test_rbergomi_invalid_params_raise(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_bergomi import test_rbergomi_invalid_params_raise
+    return _wrap_test("rberg_invalid", test_rbergomi_invalid_params_raise)
+
+def test_rbergomi_char_func_at_zero(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_bergomi import test_rbergomi_char_func_at_zero
+    return _wrap_test("rberg_phi0", test_rbergomi_char_func_at_zero)
+
+def test_rbergomi_char_func_is_finite(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_bergomi import test_rbergomi_char_func_is_finite
+    return _wrap_test("rberg_phi_finite", test_rbergomi_char_func_is_finite)
+
+def test_rbergomi_higher_eta_higher_call(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_bergomi import test_rbergomi_higher_eta_higher_call
+    return _wrap_test("rberg_eta_up", test_rbergomi_higher_eta_higher_call)
+
+def test_rbergomi_lower_h_heavier_tail(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_bergomi import test_rbergomi_lower_h_heavier_tail
+    return _wrap_test("rberg_rough_tail", test_rbergomi_lower_h_heavier_tail)
+
+def test_rbergomi_negative_rho_increases_otm_put(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_bergomi import test_rbergomi_negative_rho_increases_otm_put
+    return _wrap_test("rberg_rho_skew", test_rbergomi_negative_rho_increases_otm_put)
+
+def test_rbergomi_put_call_parity(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_bergomi import test_rbergomi_put_call_parity
+    return _wrap_test("rberg_parity", test_rbergomi_put_call_parity)
+
+def test_rbergomi_class_call_equals_function(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_bergomi import test_rbergomi_class_call_equals_function
+    return _wrap_test("rberg_oo_func", test_rbergomi_class_call_equals_function)
+
+def test_rbergomi_is_rough_property(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_bergomi import test_rbergomi_is_rough_property
+    return _wrap_test("rberg_rough_check", test_rbergomi_is_rough_property)
+
+def test_rbergomi_call_positive(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_bergomi import test_rbergomi_call_positive
+    return _wrap_test("rberg_call_pos", test_rbergomi_call_positive)
+
+def test_rbergomi_class_invalid_params_raise(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_bergomi import test_rbergomi_class_invalid_params_raise
+    return _wrap_test("rberg_class_invalid", test_rbergomi_class_invalid_params_raise)
+
+
 def test_kou_invalid_class_params_raise(golden: dict) -> tuple[bool, str]:
     from tests.test_kou import test_kou_invalid_class_params_raise
     return _wrap_test("kou_class_invalid", test_kou_invalid_class_params_raise)
@@ -1329,6 +1382,20 @@ TESTS = {
     "kou_calibrate": ("Kou calibrate recupera σ e λ", test_kou_calibrate_recovers_lambda),
     "kou_calib_min": ("Kou calibrate >= 3 pontos", test_kou_calibrate_requires_min_points),
     "kou_class_invalid": ("Kou construtor valida 5 params", test_kou_invalid_class_params_raise),
+    # --- Rough Bergomi E73 (13 testes) ---
+    "rberg_eta0": ("rBerg η=0 degenera em BS", test_rbergomi_eta_zero_recovers_bs),
+    "rberg_t0": ("rBerg T=0 -> intrinseco", test_rbergomi_t_zero_returns_intrinsic),
+    "rberg_invalid": ("rBerg valida 8 parametros", test_rbergomi_invalid_params_raise),
+    "rberg_phi0": ("rBerg φ(0)=1 normalizacao", test_rbergomi_char_func_at_zero),
+    "rberg_phi_finite": ("rBerg φ finita para u=0.1..10", test_rbergomi_char_func_is_finite),
+    "rberg_eta_up": ("rBerg ↑η -> OTM call mais cara", test_rbergomi_higher_eta_higher_call),
+    "rberg_rough_tail": ("rBerg H menor -> cauda mais pesada", test_rbergomi_lower_h_heavier_tail),
+    "rberg_rho_skew": ("rBerg ρ<0 -> OTM put mais cara (skew)", test_rbergomi_negative_rho_increases_otm_put),
+    "rberg_parity": ("rBerg paridade put-call", test_rbergomi_put_call_parity),
+    "rberg_oo_func": ("RoughBergomiModel == funcao", test_rbergomi_class_call_equals_function),
+    "rberg_rough_check": ("rBerg is_rough e is_classical_bergomi", test_rbergomi_is_rough_property),
+    "rberg_call_pos": ("rBerg call sempre >= 0", test_rbergomi_call_positive),
+    "rberg_class_invalid": ("rBerg construtor valida 4 params", test_rbergomi_class_invalid_params_raise),
 }
 
 
