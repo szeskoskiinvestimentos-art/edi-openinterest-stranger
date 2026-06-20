@@ -1,16 +1,70 @@
 /**
- * WIN Charts Module — Extends BaseCharts with WIN-specific methods
- * 
- * Métodos específicos do WIN:
- * - createEwzOptionsOiChart()
- * - Custom tooltip callbacks com formatNumberBr
+ * Stranger Things Charts Module
+ * Creates interactive charts with neon styling
  */
 
-class StrangerThingsCharts extends BaseCharts {
+class StrangerThingsCharts {
     constructor() {
-        super();
-        
-        // WIN-specific customizations
+        this.charts = {};
+        this.chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#ffffff',
+                        font: {
+                            family: 'Share Tech Mono',
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(26, 26, 26, 0.9)',
+                    titleColor: '#00f3ff',
+                    bodyColor: '#ffffff',
+                    borderColor: '#ff073a',
+                    borderWidth: 1,
+                    titleFont: {
+                        family: 'Orbitron',
+                        size: 14
+                    },
+                    bodyFont: {
+                        family: 'Share Tech Mono',
+                        size: 12
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        color: '#b3b3b3',
+                        font: {
+                            family: 'Share Tech Mono',
+                            size: 11
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)',
+                        borderColor: 'rgba(255, 255, 255, 0.2)'
+                    }
+                },
+                y: {
+                    ticks: {
+                        color: '#b3b3b3',
+                        font: {
+                            family: 'Share Tech Mono',
+                            size: 11
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)',
+                        borderColor: 'rgba(255, 255, 255, 0.2)'
+                    }
+                }
+            },
+        };
+
         this.chartOptions.plugins.tooltip.callbacks = {
             label: (context) => {
                 const dataset = context.dataset || {};
@@ -890,7 +944,7 @@ class StrangerThingsCharts extends BaseCharts {
         const volumePoints = strikes.map((k, i) => ({ x: k, y: totalVol[i] }));
         const ivPoints = strikes.map((k, i) => ({ x: k, y: ivSeries[i] }));
 
-        const spot = (data && ((data.overview && Number(data.overview.spot_price)) || Number(data.spot_price))) || null;
+        const spot = (data && (Number(data.spot_price) || (data.overview && Number(data.overview.spot_price)))) || null;
         if (this.charts.volumeVolatility) this.charts.volumeVolatility.destroy();
         this.charts.volumeVolatility = new Chart(ctx, {
             type: 'bar',
@@ -1001,7 +1055,7 @@ class StrangerThingsCharts extends BaseCharts {
         };
 
         const spot =
-            (data && ((data.overview && Number(data.overview.spot_price)) || Number(data.spot_price))) || null;
+            (data && (Number(data.spot_price) || (data.overview && Number(data.overview.spot_price)))) || null;
 
         const render = () => {
             const oi = pickOiData();

@@ -5,6 +5,7 @@ pinning risk e classificação de regime de volatilidade.
 """
 from __future__ import annotations
 import numpy as np
+from scipy.stats import norm
 from src import config as settings
 import logging
 
@@ -158,3 +159,132 @@ class VolatilityMixin:
         except Exception as e:
             logger.error(f"Erro em calculate_pinning_risk: {e}")
             self.pinning_risk = None
+
+    def calculate_volga(self):
+        """Calcula Volga (∂Vega/∂σ) por strike.
+
+        Volga mede a curvatura de Vega em relação à volatilidade.
+        Também conhecida como "vol of vol" ou "vomma".
+
+        Fórmula (fechada, por strike):
+            Volga = S · φ(d1) · √T · (d1 · d2) / σ
+
+        Onde:
+            d1 = [ln(S/K) + (r + σ²/2)·T] / (σ·√T)
+            d2 = d1 - σ·√T
+            φ(d1) = pdf da normal padrão em d1
+
+        Convenção: Volga por UNIDADE de sigma (não por 1%).
+        Para converter para convenção de mercado (por 1%): volga / 100
+
+        Returns:
+            dict com chaves:
+                - 'volga_call': np.ndarray, Volga por strike para calls
+                - 'volga_put': np.ndarray, Volga por strike para puts
+                - 'volga_total': np.ndarray, soma call+put ponderada por OI
+                - 'volga_exposure': float, soma ponderada por OI (para UI)
+                - 'per_strike': list de dicts com strike, call, put, total
+        """
+        try:
+            S = float(self.spot)
+            r = float(self.risk_free)
+            T = float(self.T)
+            sigma = float(self.iv_annual) if self.iv_annual else 0.20
+            oi_call = np.asarray(self.oi_call_ref, dtype=float)
+            oi_put = np.asarray(self.oi_put_ref, dtype=float)
+            strikes = np.asarray(self.strikes_ref, dtype=float)
+
+            if T <= 0 or sigma <= 0 or S <= 0 or len(strikes) == 0:
+                self.volga = {
+                    'volga_call': np.zeros_like(strikes),
+                    'volga_put': np.zeros_like(strikes),
+                    'volga_total': np.zeros_like(strikes),
+                    'volga_exposure': 0.0,
+                    'per_strike': [],
+                }
+                return
+
+            # Usar IV per-strike se disponível
+            if hasattr(self, 'iv_strike_ref') and self.iv_strike_ref is not None and len(self.iv_strike_ref) == len(strikes):
+                sigma_arr = np.asarray(self.iv_strike_ref, dtype=float)
+            else:
+                sigma_arr = np.full_like(strikes, sigma, dtype=float)
+
+            # d1 e d2 por strike
+            with np.errstate(divide='ignore', invalid='ignore'):
+                d1 = (np.log(S / strikes) + (r + 0.5 * sigma_arr**2) * T) / (sigma_arr * np.sqrt(T))
+                d2 = d1 - sigma_arr * np.sqrt(T)
+                phi_d1 = norm.pdf(d1)
+
+            # Volga (mesma para call e put — é a 2ª derivada em σ)
+            # Volga = S · φ(d1) · √T · (d1·d2) / σ
+            volga_per_strike = S * phi_d1 * np.sqrt(T) * (d1 * d2) / sigma_arr
+
+            # Trata edge cases
+            volga_per_strike = np.where(np.isfinite(volga_per_strike), volga_per_strike, 0.0)
+            # Convenção por unidade (mesma do Vega)
+            # Para convenção de mercado (por 1%), dividir por 100
+
+            # Separar call/put (mesmo valor, mas armazenados separados para UI)
+            volga_call = volga_per_strike.copy()
+            volga_put = volga_per_strike.copy()
+
+            # Total ponderado por OI
+            volga_total_arr = volga_per_strike * (oi_call + oi_put)
+            volga_exposure = float(np.nansum(volga_total_arr))
+
+            # Per-strike para UI
+            per_strike = []
+            for i, k in enumerate(strikes):
+                per_strike.append({
+                    'strike': float(k),
+                    'call': float(volga_call[i]),
+                    'put': float(volga_put[i]),
+                    'total': float(volga_total_arr[i]),
+                    'oi_call': float(oi_call[i]),
+                    'oi_put': float(oi_put[i]),
+                })
+
+            self.volga = {
+                'volga_call': volga_call,
+                'volga_put': volga_put,
+                'volga_total': volga_total_arr,
+                'volga_exposure': volga_exposure,
+                'per_strike': per_strike,
+            }
+
+        except Exception as e:
+            logger.error(f"Erro em calculate_volga: {e}")
+            self.volga = {
+                'volga_call': np.zeros_like(self.strikes_ref) if hasattr(self, 'strikes_ref') else np.array([]),
+                'volga_put': np.zeros_like(self.strikes_ref) if hasattr(self, 'strikes_ref') else np.array([]),
+                'volga_total': np.zeros_like(self.strikes_ref) if hasattr(self, 'strikes_ref') else np.array([]),
+                'volga_exposure': 0.0,
+                'per_strike': [],
+            }
+
+    def calculate_volga_finite_diff(self, dsigma: float = 0.005) -> float:
+        """Validação: Volga via diferenças finitas (Volga ≈ dVega/dσ).
+
+        Útil para testar calculate_volga() com fórmula fechada.
+        Retorna Volga Exposure (sum ponderada por OI).
+        """
+        from src.greeks import GreeksEngine
+
+        S = float(self.spot)
+        r = float(self.risk_free)
+        T = float(self.T)
+        sigma = float(self.iv_annual) if self.iv_annual else 0.20
+        strikes = np.asarray(self.strikes_ref, dtype=float)
+        oi_call = np.asarray(self.oi_call_ref, dtype=float)
+        oi_put = np.asarray(self.oi_put_ref, dtype=float)
+
+        sigma_up = sigma + dsigma
+        sigma_down = max(sigma - dsigma, 1e-6)
+
+        # Vega com sigma_up e sigma_down (chamadas + puts)
+        vega_up = GreeksEngine.calculate_vega(S, strikes, T, r, sigma_up) * (oi_call + oi_put)
+        vega_down = GreeksEngine.calculate_vega(S, strikes, T, r, sigma_down) * (oi_call + oi_put)
+
+        volga_exposure = float(np.nansum((vega_up - vega_down) / (2 * dsigma)))
+        return volga_exposure

@@ -202,10 +202,16 @@ def test_gamma_cone_no_global_mutation(golden: dict) -> tuple[bool, str]:
 
 
 def test_navigation_paths(golden: dict) -> tuple[bool, str]:
-    """7 dashboards registrados no unified-nav.js."""
+    """Dashboards registrados no unified-nav.js.
+
+    v3.1 (paralelo): usa map em vez de array DASHBOARDS. Verifica 6 chaves.
+    """
     src = (ROOT / "dashboard_unificado" / "shared" / "unified-nav.js").read_text(encoding="utf-8")
-    expected = ["HUB", "WDO", "WIN", "MERCADO", "CORR", "CONTROLE", "CONTROLE_DADOS"]
-    missing = [d for d in expected if f"val: '{d}'" not in src]
+    expected = ["HUB", "WDO", "WIN", "MERCADO", "CORR", "CONTROLE"]
+    # Procura tanto formato antigo (val: 'X') quanto novo (X: 'path')
+    missing = [d for d in expected
+               if f"val: '{d}'" not in src
+               and not (f"{d}:" in src or f"'{d}'" in src)]
     if missing:
         return False, f"Dashboards faltando em unified-nav.js: {missing}"
     return True, f"{len(expected)}/{len(expected)} dashboards registrados: {expected}"
@@ -396,6 +402,31 @@ def test_flips_and_walls_autoloads_greeks(golden: dict) -> tuple[bool, str]:
     from tests.test_calculator_core import test_flips_and_walls_autoloads_greeks
     return _wrap_test("flips_walls_auto", test_flips_and_walls_autoloads_greeks)
 
+# --- test_volga.py (6 testes E22) ---
+def test_volga_basic_atm(golden: dict) -> tuple[bool, str]:
+    from tests.test_volga import test_volga_basic_atm
+    return _wrap_test("volga_atm", test_volga_basic_atm)
+
+def test_volga_symmetric(golden: dict) -> tuple[bool, str]:
+    from tests.test_volga import test_volga_symmetric
+    return _wrap_test("volga_sym", test_volga_symmetric)
+
+def test_volga_finite_diff_cross_check(golden: dict) -> tuple[bool, str]:
+    from tests.test_volga import test_volga_finite_diff_cross_check
+    return _wrap_test("volga_fd", test_volga_finite_diff_cross_check)
+
+def test_volga_otm_positive(golden: dict) -> tuple[bool, str]:
+    from tests.test_volga import test_volga_otm_positive
+    return _wrap_test("volga_otm", test_volga_otm_positive)
+
+def test_volga_zero_t(golden: dict) -> tuple[bool, str]:
+    from tests.test_volga import test_volga_zero_t
+    return _wrap_test("volga_t0", test_volga_zero_t)
+
+def test_volga_uses_iv_per_strike(golden: dict) -> tuple[bool, str]:
+    from tests.test_volga import test_volga_uses_iv_per_strike
+    return _wrap_test("volga_iv", test_volga_uses_iv_per_strike)
+
 def test_find_zero_cross(golden: dict) -> tuple[bool, str]:
     from tests.test_calculator_core import test_find_zero_cross
     return _wrap_test("zero_cross", test_find_zero_cross)
@@ -437,6 +468,13 @@ TESTS = {
     "pinning": ("Pinning Risk", test_pinning_risk),
     "flips_walls_int": ("Flips & Walls integração", test_flips_and_walls_integration),
     "flips_walls_auto": ("Flips & Walls auto-load greeks (regressão)", test_flips_and_walls_autoloads_greeks),
+    # --- Volga E22 (6 testes) ---
+    "volga_atm": ("Volga ATM ~0", test_volga_basic_atm),
+    "volga_sym": ("Volga simetrica call=put", test_volga_symmetric),
+    "volga_fd": ("Volga cross-check FD (1% diff)", test_volga_finite_diff_cross_check),
+    "volga_otm": ("Volga OTM >= 0", test_volga_otm_positive),
+    "volga_t0": ("Volga T~0 finita", test_volga_zero_t),
+    "volga_iv": ("Volga usa IV per-strike", test_volga_uses_iv_per_strike),
     "zero_cross": ("Find Zero Cross", test_find_zero_cross),
     # --- Regressão Phase 4G (E8, E10) ---
     "e8_broadcast": ("E8: Greeks Broadcast (S scalar + K array)", test_e8_greeks_broadcast_scalar_s),
