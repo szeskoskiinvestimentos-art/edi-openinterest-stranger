@@ -560,6 +560,55 @@ def test_nav_has_comment_doc(golden: dict) -> tuple[bool, str]:
     from tests.test_auto_discovery import test_nav_has_comment_doc
     return _wrap_test("nav_doc", test_nav_has_comment_doc)
 
+# --- test_sabr.py (12 testes E21) ---
+def test_hagan_atm(golden: dict) -> tuple[bool, str]:
+    from tests.test_sabr import test_hagan_atm
+    return _wrap_test("sabr_atm", test_hagan_atm)
+
+def test_hagan_otm_call(golden: dict) -> tuple[bool, str]:
+    from tests.test_sabr import test_hagan_otm_call
+    return _wrap_test("sabr_otm_call", test_hagan_otm_call)
+
+def test_hagan_otm_put_higher_iv(golden: dict) -> tuple[bool, str]:
+    from tests.test_sabr import test_hagan_otm_put_higher_iv
+    return _wrap_test("sabr_otm_put", test_hagan_otm_put_higher_iv)
+
+def test_hagan_edge_cases(golden: dict) -> tuple[bool, str]:
+    from tests.test_sabr import test_hagan_edge_cases
+    return _wrap_test("sabr_edge", test_hagan_edge_cases)
+
+def test_sabr_model_implied_vol(golden: dict) -> tuple[bool, str]:
+    from tests.test_sabr import test_sabr_model_implied_vol
+    return _wrap_test("sabr_scalar", test_sabr_model_implied_vol)
+
+def test_sabr_model_array(golden: dict) -> tuple[bool, str]:
+    from tests.test_sabr import test_sabr_model_array
+    return _wrap_test("sabr_array", test_sabr_model_array)
+
+def test_sabr_calibrate_perfect_fit(golden: dict) -> tuple[bool, str]:
+    from tests.test_sabr import test_sabr_calibrate_perfect_fit
+    return _wrap_test("sabr_perfect", test_sabr_calibrate_perfect_fit)
+
+def test_sabr_calibrate_with_noise(golden: dict) -> tuple[bool, str]:
+    from tests.test_sabr import test_sabr_calibrate_with_noise
+    return _wrap_test("sabr_noise", test_sabr_calibrate_with_noise)
+
+def test_sabr_calibrate_requires_min_points(golden: dict) -> tuple[bool, str]:
+    from tests.test_sabr import test_sabr_calibrate_requires_min_points
+    return _wrap_test("sabr_min_points", test_sabr_calibrate_requires_min_points)
+
+def test_sabr_smile_metrics(golden: dict) -> tuple[bool, str]:
+    from tests.test_sabr import test_sabr_smile_metrics
+    return _wrap_test("sabr_metrics", test_sabr_smile_metrics)
+
+def test_sabr_calibrate_from_iv_strike_ref(golden: dict) -> tuple[bool, str]:
+    from tests.test_sabr import test_sabr_calibrate_from_iv_strike_ref
+    return _wrap_test("sabr_helper", test_sabr_calibrate_from_iv_strike_ref)
+
+def test_sabr_parameter_limits(golden: dict) -> tuple[bool, str]:
+    from tests.test_sabr import test_sabr_parameter_limits
+    return _wrap_test("sabr_limits", test_sabr_parameter_limits)
+
 def test_find_zero_cross(golden: dict) -> tuple[bool, str]:
     from tests.test_calculator_core import test_find_zero_cross
     return _wrap_test("zero_cross", test_find_zero_cross)
@@ -645,6 +694,19 @@ TESTS = {
     "nav_no_override": ("Nav nao sobrescreve existentes", test_nav_does_not_override_existing),
     "nav_iife": ("Nav IIFE pattern", test_nav_iife_pattern),
     "nav_doc": ("Nav comentario E44", test_nav_has_comment_doc),
+    # --- SABR E21 (12 testes) ---
+    "sabr_atm": ("SABR Hagan ATM", test_hagan_atm),
+    "sabr_otm_call": ("SABR Hagan OTM call", test_hagan_otm_call),
+    "sabr_otm_put": ("SABR Hagan OTM put > call", test_hagan_otm_put_higher_iv),
+    "sabr_edge": ("SABR Hagan edge cases", test_hagan_edge_cases),
+    "sabr_scalar": ("SABRModel.implied_vol", test_sabr_model_implied_vol),
+    "sabr_array": ("SABRModel array", test_sabr_model_array),
+    "sabr_perfect": ("SABR calibrate perfect fit", test_sabr_calibrate_perfect_fit),
+    "sabr_noise": ("SABR calibrate com ruido", test_sabr_calibrate_with_noise),
+    "sabr_min_points": ("SABR calibrate requer >=3 pontos", test_sabr_calibrate_requires_min_points),
+    "sabr_metrics": ("SABR smile metrics", test_sabr_smile_metrics),
+    "sabr_helper": ("SABR helper from iv_strike_ref", test_sabr_calibrate_from_iv_strike_ref),
+    "sabr_limits": ("SABR parameter limits", test_sabr_parameter_limits),
     "zero_cross": ("Find Zero Cross", test_find_zero_cross),
     # --- Regressão Phase 4G (E8, E10) ---
     "e8_broadcast": ("E8: Greeks Broadcast (S scalar + K array)", test_e8_greeks_broadcast_scalar_s),
