@@ -884,6 +884,71 @@ def test_veta_larger_T_smaller_magnitude(golden: dict) -> tuple[bool, str]:
     return _wrap_test("veta_T_effect", test_veta_larger_T_smaller_magnitude)
 
 
+def test_vwap_basic(golden: dict) -> tuple[bool, str]:
+    from tests.test_vwap import test_vwap_basic
+    return _wrap_test("vwap_basic", test_vwap_basic)
+
+def test_vwap_equal_volume_is_simple_average(golden: dict) -> tuple[bool, str]:
+    from tests.test_vwap import test_vwap_equal_volume_is_simple_average
+    return _wrap_test("vwap_equal_vol", test_vwap_equal_volume_is_simple_average)
+
+def test_vwap_volume_emphasizes_high_volume(golden: dict) -> tuple[bool, str]:
+    from tests.test_vwap import test_vwap_volume_emphasizes_high_volume
+    return _wrap_test("vwap_high_vol", test_vwap_volume_emphasizes_high_volume)
+
+def test_vwap_empty_raises(golden: dict) -> tuple[bool, str]:
+    from tests.test_vwap import test_vwap_empty_raises
+    return _wrap_test("vwap_empty", test_vwap_empty_raises)
+
+def test_vwap_zero_volume_raises(golden: dict) -> tuple[bool, str]:
+    from tests.test_vwap import test_vwap_zero_volume_raises
+    return _wrap_test("vwap_zero_vol", test_vwap_zero_volume_raises)
+
+def test_vwap_single_sample(golden: dict) -> tuple[bool, str]:
+    from tests.test_vwap import test_vwap_single_sample
+    return _wrap_test("vwap_single", test_vwap_single_sample)
+
+def test_vwap_bands(golden: dict) -> tuple[bool, str]:
+    from tests.test_vwap import test_vwap_bands
+    return _wrap_test("vwap_bands", test_vwap_bands)
+
+def test_vwap_position_in_band(golden: dict) -> tuple[bool, str]:
+    from tests.test_vwap import test_vwap_position_in_band
+    return _wrap_test("vwap_position", test_vwap_position_in_band)
+
+def test_vwap_signal(golden: dict) -> tuple[bool, str]:
+    from tests.test_vwap import test_vwap_signal
+    return _wrap_test("vwap_signal", test_vwap_signal)
+
+def test_anchored_vwap(golden: dict) -> tuple[bool, str]:
+    from tests.test_vwap import test_anchored_vwap
+    return _wrap_test("vwap_anchored", test_anchored_vwap)
+
+def test_anchored_vwap_invalid_index(golden: dict) -> tuple[bool, str]:
+    from tests.test_vwap import test_anchored_vwap_invalid_index
+    return _wrap_test("vwap_anchor_bad", test_anchored_vwap_invalid_index)
+
+def test_vwap_cross_above_real(golden: dict) -> tuple[bool, str]:
+    from tests.test_vwap import test_vwap_cross_above_real
+    return _wrap_test("vwap_cross_above", test_vwap_cross_above_real)
+
+def test_vwap_cross_below(golden: dict) -> tuple[bool, str]:
+    from tests.test_vwap import test_vwap_cross_below
+    return _wrap_test("vwap_cross_below", test_vwap_cross_below)
+
+def test_vwap_no_cross_insufficient_samples(golden: dict) -> tuple[bool, str]:
+    from tests.test_vwap import test_vwap_no_cross_insufficient_samples
+    return _wrap_test("vwap_no_cross", test_vwap_no_cross_insufficient_samples)
+
+def test_vwap_max_min_price(golden: dict) -> tuple[bool, str]:
+    from tests.test_vwap import test_vwap_max_min_price
+    return _wrap_test("vwap_max_min", test_vwap_max_min_price)
+
+def test_vwap_negative_price_raises(golden: dict) -> tuple[bool, str]:
+    from tests.test_vwap import test_vwap_negative_price_raises
+    return _wrap_test("vwap_neg_price", test_vwap_negative_price_raises)
+
+
 def test_wdo_external_assets_exist(golden: dict) -> tuple[bool, str]:
     from tests.test_dashboards import test_wdo_external_assets_exist
     return _wrap_test("dash_wdo_assets", test_wdo_external_assets_exist)
@@ -1098,6 +1163,23 @@ TESTS = {
     "dash_win_sync": ("WIN HTML/JS sincronizado (sem dead handlers)", test_win_html_js_sync),
     "dash_wdo_assets": ("WDO assets externos existem", test_wdo_external_assets_exist),
     "dash_win_assets": ("WIN assets externos existem", test_win_external_assets_exist),
+    # --- VWAP E68 (16 testes) ---
+    "vwap_basic": ("VWAP = Σ(P×V) / Σ(V)", test_vwap_basic),
+    "vwap_equal_vol": ("VWAP volume igual = média simples", test_vwap_equal_volume_is_simple_average),
+    "vwap_high_vol": ("VWAP puxado pelo volume alto", test_vwap_volume_emphasizes_high_volume),
+    "vwap_empty": ("VWAP lista vazia -> ValueError", test_vwap_empty_raises),
+    "vwap_zero_vol": ("VWAP volume=0 -> ValueError", test_vwap_zero_volume_raises),
+    "vwap_single": ("VWAP 1 sample -> σ=0, bandas colapsam", test_vwap_single_sample),
+    "vwap_bands": ("VWAP bandas ±1σ e ±2σ", test_vwap_bands),
+    "vwap_position": ("VWAP position_in_band classifica", test_vwap_position_in_band),
+    "vwap_signal": ("VWAP signal: buy/hold/sell", test_vwap_signal),
+    "vwap_anchored": ("Anchored VWAP a partir de index", test_anchored_vwap),
+    "vwap_anchor_bad": ("Anchored VWAP rejeita index inválido", test_anchored_vwap_invalid_index),
+    "vwap_cross_above": ("VWAP cross above signal", test_vwap_cross_above_real),
+    "vwap_cross_below": ("VWAP cross below signal", test_vwap_cross_below),
+    "vwap_no_cross": ("VWAP sem cruzamento com <2 samples", test_vwap_no_cross_insufficient_samples),
+    "vwap_max_min": ("VWAP max_price e min_price", test_vwap_max_min_price),
+    "vwap_neg_price": ("VWAP rejeita price <= 0", test_vwap_negative_price_raises),
 }
 
 
