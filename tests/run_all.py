@@ -654,6 +654,51 @@ def test_find_zero_cross(golden: dict) -> tuple[bool, str]:
     from tests.test_calculator_core import test_find_zero_cross
     return _wrap_test("zero_cross", test_find_zero_cross)
 
+# --- test_stress_test.py (11 testes E23) ---
+def test_stress_scenario_dataclass(golden: dict) -> tuple[bool, str]:
+    from tests.test_stress_test import test_stress_scenario_dataclass
+    return _wrap_test("stress_dataclass", test_stress_scenario_dataclass)
+
+def test_default_scenarios_count(golden: dict) -> tuple[bool, str]:
+    from tests.test_stress_test import test_default_scenarios_count
+    return _wrap_test("stress_default_count", test_default_scenarios_count)
+
+def test_stress_scenario_apply_restores_state(golden: dict) -> tuple[bool, str]:
+    from tests.test_stress_test import test_stress_scenario_apply_restores_state
+    return _wrap_test("stress_restore", test_stress_scenario_apply_restores_state)
+
+def test_stress_scenario_spot_shift(golden: dict) -> tuple[bool, str]:
+    from tests.test_stress_test import test_stress_scenario_spot_shift
+    return _wrap_test("stress_spot", test_stress_scenario_spot_shift)
+
+def test_stress_scenario_vol_shift(golden: dict) -> tuple[bool, str]:
+    from tests.test_stress_test import test_stress_scenario_vol_shift
+    return _wrap_test("stress_vol", test_stress_scenario_vol_shift)
+
+def test_stress_scenario_time_decay(golden: dict) -> tuple[bool, str]:
+    from tests.test_stress_test import test_stress_scenario_time_decay
+    return _wrap_test("stress_decay", test_stress_scenario_time_decay)
+
+def test_stress_test_run_all(golden: dict) -> tuple[bool, str]:
+    from tests.test_stress_test import test_stress_test_run_all
+    return _wrap_test("stress_run_all", test_stress_test_run_all)
+
+def test_stress_test_run_single(golden: dict) -> tuple[bool, str]:
+    from tests.test_stress_test import test_stress_test_run_single
+    return _wrap_test("stress_run_single", test_stress_test_run_single)
+
+def test_stress_test_custom_scenarios(golden: dict) -> tuple[bool, str]:
+    from tests.test_stress_test import test_stress_test_custom_scenarios
+    return _wrap_test("stress_custom", test_stress_test_custom_scenarios)
+
+def test_stress_test_format_summary(golden: dict) -> tuple[bool, str]:
+    from tests.test_stress_test import test_stress_test_format_summary
+    return _wrap_test("stress_format", test_stress_test_format_summary)
+
+def test_stress_scenario_metrics_keys(golden: dict) -> tuple[bool, str]:
+    from tests.test_stress_test import test_stress_scenario_metrics_keys
+    return _wrap_test("stress_metrics", test_stress_scenario_metrics_keys)
+
 
 # Mapeamento de testes
 TESTS = {
@@ -760,6 +805,18 @@ TESTS = {
     "log_dispatch_text": ("Log dispatch text", test_setup_logging_text_dispatches_to_text),
     "log_json_complex": ("Log JSON objetos complexos", test_json_formatter_safely_serializes_complex),
     "zero_cross": ("Find Zero Cross", test_find_zero_cross),
+    # --- Stress Test E23 (11 testes) ---
+    "stress_dataclass": ("StressScenario dataclass", test_stress_scenario_dataclass),
+    "stress_default_count": ("DEFAULT_SCENARIOS 8 itens", test_default_scenarios_count),
+    "stress_restore": ("Stress estado restaurado", test_stress_scenario_apply_restores_state),
+    "stress_spot": ("Stress spot shift", test_stress_scenario_spot_shift),
+    "stress_vol": ("Stress vol shift", test_stress_scenario_vol_shift),
+    "stress_decay": ("Stress time decay", test_stress_scenario_time_decay),
+    "stress_run_all": ("Stress run_all_scenarios", test_stress_test_run_all),
+    "stress_run_single": ("Stress run_single", test_stress_test_run_single),
+    "stress_custom": ("Stress custom scenarios", test_stress_test_custom_scenarios),
+    "stress_format": ("Stress format_summary_table", test_stress_test_format_summary),
+    "stress_metrics": ("Stress metricas keys", test_stress_scenario_metrics_keys),
     # --- Regressão Phase 4G (E8, E10) ---
     "e8_broadcast": ("E8: Greeks Broadcast (S scalar + K array)", test_e8_greeks_broadcast_scalar_s),
     "e10_iv_per_strike": ("E10: IV per-strike extraído do DataFrame", test_e10_iv_per_strike_used_in_greeks),
