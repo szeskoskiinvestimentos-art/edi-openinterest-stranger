@@ -794,6 +794,66 @@ def test_svi_fit_recovers_params(golden: dict) -> tuple[bool, str]:
     return _wrap_test("svi_fit", test_svi_fit_recovers_params)
 
 
+# --- test_position.py (7 testes E66) ---
+def test_position_long_profit(golden: dict) -> tuple[bool, str]:
+    from tests.test_position import test_position_long_profit
+    return _wrap_test("pos_long_profit", test_position_long_profit)
+
+def test_position_long_loss(golden: dict) -> tuple[bool, str]:
+    from tests.test_position import test_position_long_loss
+    return _wrap_test("pos_long_loss", test_position_long_loss)
+
+def test_position_short_profit(golden: dict) -> tuple[bool, str]:
+    from tests.test_position import test_position_short_profit
+    return _wrap_test("pos_short_profit", test_position_short_profit)
+
+def test_position_with_multiplier_wdo(golden: dict) -> tuple[bool, str]:
+    from tests.test_position import test_position_with_multiplier_wdo
+    return _wrap_test("pos_wdo_mult", test_position_with_multiplier_wdo)
+
+def test_position_with_fees(golden: dict) -> tuple[bool, str]:
+    from tests.test_position import test_position_with_fees
+    return _wrap_test("pos_fees", test_position_with_fees)
+
+def test_position_validation(golden: dict) -> tuple[bool, str]:
+    from tests.test_position import test_position_validation
+    return _wrap_test("pos_validation", test_position_validation)
+
+def test_position_risk_reward(golden: dict) -> tuple[bool, str]:
+    from tests.test_position import test_position_risk_reward
+    return _wrap_test("pos_rr", test_position_risk_reward)
+
+
+# --- test_kelly.py (7 testes E67) ---
+def test_kelly_positive_edge(golden: dict) -> tuple[bool, str]:
+    from tests.test_kelly import test_kelly_positive_edge
+    return _wrap_test("kelly_pos", test_kelly_positive_edge)
+
+def test_kelly_zero_edge(golden: dict) -> tuple[bool, str]:
+    from tests.test_kelly import test_kelly_zero_edge
+    return _wrap_test("kelly_zero", test_kelly_zero_edge)
+
+def test_kelly_negative_edge_clamped(golden: dict) -> tuple[bool, str]:
+    from tests.test_kelly import test_kelly_negative_edge_clamped
+    return _wrap_test("kelly_neg", test_kelly_negative_edge_clamped)
+
+def test_kelly_variants(golden: dict) -> tuple[bool, str]:
+    from tests.test_kelly import test_kelly_variants
+    return _wrap_test("kelly_variants", test_kelly_variants)
+
+def test_kelly_position_size(golden: dict) -> tuple[bool, str]:
+    from tests.test_kelly import test_kelly_position_size
+    return _wrap_test("kelly_pos_size", test_kelly_position_size)
+
+def test_kelly_max_consecutive_losses(golden: dict) -> tuple[bool, str]:
+    from tests.test_kelly import test_kelly_max_consecutive_losses
+    return _wrap_test("kelly_max_losses", test_kelly_max_consecutive_losses)
+
+def test_kelly_invalid_params_raises(golden: dict) -> tuple[bool, str]:
+    from tests.test_kelly import test_kelly_invalid_params_raises
+    return _wrap_test("kelly_validation", test_kelly_invalid_params_raises)
+
+
 # Mapeamento de testes
 TESTS = {
     # --- Originais (9) ---
@@ -939,6 +999,22 @@ TESTS = {
     "svi_func_class": ("svi_implied_vol == SVIModel.implied_vol", test_svi_function_matches_class),
     "svi_validation": ("SVI valida parametros", test_svi_invalid_params_raises),
     "svi_fit": ("SVI fit recupera params", test_svi_fit_recovers_params),
+    # --- Position P&L E66 (7 testes) ---
+    "pos_long_profit": ("Position long: P&L positivo", test_position_long_profit),
+    "pos_long_loss": ("Position long: P&L negativo", test_position_long_loss),
+    "pos_short_profit": ("Position short: preco cai -> lucro", test_position_short_profit),
+    "pos_wdo_mult": ("Position WDO com multiplier 0.50", test_position_with_multiplier_wdo),
+    "pos_fees": ("Position desconta fees e calcula breakeven", test_position_with_fees),
+    "pos_validation": ("Position valida parametros", test_position_validation),
+    "pos_rr": ("Position risk/reward ratio", test_position_risk_reward),
+    # --- Kelly Criterion E67 (7 testes) ---
+    "kelly_pos": ("Kelly edge positivo (60%W R/R=2 -> 40%)", test_kelly_positive_edge),
+    "kelly_zero": ("Kelly edge zero -> 0", test_kelly_zero_edge),
+    "kelly_neg": ("Kelly edge negativo -> clamp 0", test_kelly_negative_edge_clamped),
+    "kelly_variants": ("Kelly variancias FULL/HALF/QUARTER", test_kelly_variants),
+    "kelly_pos_size": ("Kelly position size = capital * fraction", test_kelly_position_size),
+    "kelly_max_losses": ("Kelly max consecutive losses", test_kelly_max_consecutive_losses),
+    "kelly_validation": ("Kelly valida parametros", test_kelly_invalid_params_raises),
 }
 
 
