@@ -1,7 +1,10 @@
 import datetime as dt
+import logging
 import os
 from typing import Any, Callable, Optional, TypeVar
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 # Carrega variáveis do arquivo .env se existir (Fallback)
 load_dotenv()
@@ -162,8 +165,8 @@ if __name__ == "__main__":
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(current_dir)
     
-    print(f"=== Iniciando Sistema via Config ===")
-    print(f"Raiz do Projeto: {project_root}")
+    logger.info("=== Iniciando Sistema via Config ===")
+    logger.info("Raiz do Projeto: %s", project_root)
     
     # Define o script main.py
     main_script = os.path.join(project_root, "main.py")
@@ -173,8 +176,8 @@ if __name__ == "__main__":
         try:
             subprocess.run([sys.executable, "main.py"], cwd=project_root, check=True)
         except subprocess.CalledProcessError as e:
-            print(f"Erro na execução: {e}")
+            logger.error("Erro na execução: %s", e)
         except KeyboardInterrupt:
-            print("\nExecução interrompida pelo usuário.")
+            logger.warning("Execução interrompida pelo usuário.")
     else:
-        print(f"ERRO: main.py não encontrado em {project_root}")
+        logger.error("main.py não encontrado em %s", project_root)

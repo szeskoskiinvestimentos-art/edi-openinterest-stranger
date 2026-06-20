@@ -3,7 +3,10 @@ from pathlib import Path
 import os
 import re
 import datetime as dt
+import logging
 from src.utils import _num
+
+logger = logging.getLogger(__name__)
 
 def collect_csv_files(directory='.'):
     """Coleta arquivos CSV no diretório especificado."""
@@ -63,9 +66,8 @@ def read_options_table(path: Path):
                 if not valid_spots.empty:
                     # Usa a mediana para robustez
                     spot_val = float(valid_spots.median())
-                    # print(f"DEBUG: Spot recuperado via Moneyness: {spot_val}")
         except Exception:
-            pass
+            logger.debug("Falha ao recuperar spot via moneyness (silencioso).")
 
     rename_map = {
         'Open Int':'Open Int', 'Open Interest':'Open Int', 'OI':'Open Int',
@@ -125,7 +127,7 @@ def load_data(directory='.', use_csv_spot=False, spot_override=None):
     expiries_found = []
     
     if not csv_files:
-        print("Nenhum arquivo CSV encontrado.")
+        logger.warning("Nenhum arquivo CSV encontrado.")
         return pd.DataFrame(), spot_override, None
 
     # Agrupa arquivos por vencimento e seleciona o mais recente (snapshot)
@@ -153,7 +155,8 @@ def load_data(directory='.', use_csv_spot=False, spot_override=None):
                 files_by_expiry[key] = (f, snap)
     
     selected_files = [v[0] for v in files_by_expiry.values()]
-    print(f"Arquivos selecionados para carregamento: {len(selected_files)} de {len(csv_files)} encontrados.")
+    logger.info("Arquivos selecionados para carregamento: %d de %d encontrados.",
+                len(selected_files), len(csv_files))
 
     for f in selected_files:
         current_expiry = get_expiry_from_filename(f)
