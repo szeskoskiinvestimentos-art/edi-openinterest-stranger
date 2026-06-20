@@ -742,6 +742,32 @@ def test_heston_calibrate_returns_valid_model(golden: dict) -> tuple[bool, str]:
     return _wrap_test("heston_calibrate", test_heston_calibrate_returns_valid_model)
 
 
+# --- test_dupire.py (6 testes E53) ---
+def test_dupire_flat_vol_recovers_bs_vol(golden: dict) -> tuple[bool, str]:
+    from tests.test_dupire import test_dupire_flat_vol_recovers_bs_vol
+    return _wrap_test("dupire_flat", test_dupire_flat_vol_recovers_bs_vol)
+
+def test_dupire_smile_shape(golden: dict) -> tuple[bool, str]:
+    from tests.test_dupire import test_dupire_smile_shape
+    return _wrap_test("dupire_smile", test_dupire_smile_shape)
+
+def test_dupire_term_structure(golden: dict) -> tuple[bool, str]:
+    from tests.test_dupire import test_dupire_term_structure
+    return _wrap_test("dupire_term", test_dupire_term_structure)
+
+def test_dupire_local_vol_model_class(golden: dict) -> tuple[bool, str]:
+    from tests.test_dupire import test_dupire_local_vol_model_class
+    return _wrap_test("dupire_oo", test_dupire_local_vol_model_class)
+
+def test_dupire_grid_returns_full_surface(golden: dict) -> tuple[bool, str]:
+    from tests.test_dupire import test_dupire_grid_returns_full_surface
+    return _wrap_test("dupire_grid", test_dupire_grid_returns_full_surface)
+
+def test_dupire_too_few_points_raises(golden: dict) -> tuple[bool, str]:
+    from tests.test_dupire import test_dupire_too_few_points_raises
+    return _wrap_test("dupire_validation", test_dupire_too_few_points_raises)
+
+
 # Mapeamento de testes
 TESTS = {
     # --- Originais (9) ---
@@ -873,6 +899,13 @@ TESTS = {
     "heston_t0": ("Heston T=0 -> intrinsic", test_heston_zero_T_returns_intrinsic),
     "heston_validation": ("Heston valida parametros", test_heston_invalid_params_raises),
     "heston_calibrate": ("Heston calibrate retorna modelo valido", test_heston_calibrate_returns_valid_model),
+    # --- Dupire E53 (6 testes) ---
+    "dupire_flat": ("Dupire flat vol recupera BS", test_dupire_flat_vol_recovers_bs_vol),
+    "dupire_smile": ("Dupire detecta smile", test_dupire_smile_shape),
+    "dupire_term": ("Dupire detecta term structure", test_dupire_term_structure),
+    "dupire_oo": ("LocalVolModel.local_vol = dupire_local_vol_from_surface", test_dupire_local_vol_model_class),
+    "dupire_grid": ("Dupire grade completa", test_dupire_grid_returns_full_surface),
+    "dupire_validation": ("Dupire valida tamanho da grade", test_dupire_too_few_points_raises),
 }
 
 
