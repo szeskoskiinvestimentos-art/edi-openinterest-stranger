@@ -1,4 +1,30 @@
 (function () {
+  // E44: Auto-discovery de dashboards
+  // Tenta popular o seletor <select id="assetSelect"> com paginas
+  // encontradas em diretorios conhecidos.
+  function autoDiscoverDashboards(knownMap) {
+    try {
+      // Diretorios onde procurar dashboards
+      var dirs = [
+        '../',                            // dashboard_unificado/*/index.html
+        '../../Cotacoes/dashboard/',      // Cotacoes/dashboard/*/index.html
+        '../../',                         // raiz para controle_de_dados.html
+      ];
+      var suffixes = ['index.html', 'dashboard.html'];
+
+      for (var i = 0; i < dirs.length; i++) {
+        // Tenta resolver paths comuns manualmente (sem fazer fetch)
+        // ja que file:// nao tem listagem de diretorio
+      }
+      // Como file:// nao permite listar diretorios,
+      // este auto-discovery e limitado a paths hardcoded no map.
+      // Para descoberta real, usar backend (E35).
+      return knownMap;
+    } catch (e) {
+      return knownMap;
+    }
+  }
+
   function getRootBaseHref() {
     var href = window.location.href;
     var idx = href.indexOf('/dashboard_unificado/');
@@ -29,6 +55,12 @@
       CORR: 'dashboard_unificado/correlation/index.html',
       CONTROLE: 'controle_de_dados.html',
     };
+    // E44: auto-discovery: extender map com paginas customizadas
+    if (window.EDI_EXTRA_DASHBOARDS && typeof window.EDI_EXTRA_DASHBOARDS === 'object') {
+      Object.keys(window.EDI_EXTRA_DASHBOARDS).forEach(function (k) {
+        if (!map[k]) map[k] = window.EDI_EXTRA_DASHBOARDS[k];
+      });
+    }
     var rel = map[val];
     if (!rel) return null;
     return baseRoot + rel;

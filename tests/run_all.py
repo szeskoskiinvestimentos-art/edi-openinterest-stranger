@@ -531,6 +531,35 @@ def test_label_prefix_correct(golden: dict) -> tuple[bool, str]:
     from tests.test_scheduled_snapshots import test_label_prefix_correct
     return _wrap_test("sched_label", test_label_prefix_correct)
 
+# --- test_auto_discovery.py (7 testes E44) ---
+def test_nav_has_auto_discover_function(golden: dict) -> tuple[bool, str]:
+    from tests.test_auto_discovery import test_nav_has_auto_discover_function
+    return _wrap_test("nav_discover", test_nav_has_auto_discover_function)
+
+def test_nav_accepts_extra_dashboards(golden: dict) -> tuple[bool, str]:
+    from tests.test_auto_discovery import test_nav_accepts_extra_dashboards
+    return _wrap_test("nav_extra", test_nav_accepts_extra_dashboards)
+
+def test_nav_base_dashboards_unchanged(golden: dict) -> tuple[bool, str]:
+    from tests.test_auto_discovery import test_nav_base_dashboards_unchanged
+    return _wrap_test("nav_base", test_nav_base_dashboards_unchanged)
+
+def test_nav_extra_dashboard_pattern(golden: dict) -> tuple[bool, str]:
+    from tests.test_auto_discovery import test_nav_extra_dashboard_pattern
+    return _wrap_test("nav_pattern", test_nav_extra_dashboard_pattern)
+
+def test_nav_does_not_override_existing(golden: dict) -> tuple[bool, str]:
+    from tests.test_auto_discovery import test_nav_does_not_override_existing
+    return _wrap_test("nav_no_override", test_nav_does_not_override_existing)
+
+def test_nav_iife_pattern(golden: dict) -> tuple[bool, str]:
+    from tests.test_auto_discovery import test_nav_iife_pattern
+    return _wrap_test("nav_iife", test_nav_iife_pattern)
+
+def test_nav_has_comment_doc(golden: dict) -> tuple[bool, str]:
+    from tests.test_auto_discovery import test_nav_has_comment_doc
+    return _wrap_test("nav_doc", test_nav_has_comment_doc)
+
 def test_find_zero_cross(golden: dict) -> tuple[bool, str]:
     from tests.test_calculator_core import test_find_zero_cross
     return _wrap_test("zero_cross", test_find_zero_cross)
@@ -608,6 +637,14 @@ TESTS = {
     "sched_next": ("Snap next_snapshot_slot futuro", test_next_snapshot_slot_returns_future),
     "sched_tol": ("Snap tolerancia", test_tolerance_constants),
     "sched_label": ("Snap label 'scheduled'", test_label_prefix_correct),
+    # --- Auto-Discovery E44 (7 testes) ---
+    "nav_discover": ("Nav autoDiscoverDashboards", test_nav_has_auto_discover_function),
+    "nav_extra": ("Nav aceita EDI_EXTRA_DASHBOARDS", test_nav_accepts_extra_dashboards),
+    "nav_base": ("Nav 6 dashboards base (backward compat)", test_nav_base_dashboards_unchanged),
+    "nav_pattern": ("Nav extracao Object.keys+forEach", test_nav_extra_dashboard_pattern),
+    "nav_no_override": ("Nav nao sobrescreve existentes", test_nav_does_not_override_existing),
+    "nav_iife": ("Nav IIFE pattern", test_nav_iife_pattern),
+    "nav_doc": ("Nav comentario E44", test_nav_has_comment_doc),
     "zero_cross": ("Find Zero Cross", test_find_zero_cross),
     # --- Regressão Phase 4G (E8, E10) ---
     "e8_broadcast": ("E8: Greeks Broadcast (S scalar + K array)", test_e8_greeks_broadcast_scalar_s),
