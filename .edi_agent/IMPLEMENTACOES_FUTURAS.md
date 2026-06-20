@@ -4,6 +4,7 @@
 > **Data**: 2026-06-20
 > **Status**: **65 evolucoes concluidas (E1-E65)**, 0 pendentes no roadmap original
 > **Backlog novo**: E66+ (Heston, Dupire, SVI, Rough Bergomi, Merton jumps, day-trade features)
+> **E13 (Print→Logger)**: ✅ COMPLETO 2026-06-20 (commit `eba5f14f`) — 3 arquivos migrados
 
 ---
 
