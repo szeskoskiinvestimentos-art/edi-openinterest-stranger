@@ -20,7 +20,8 @@ def read_options_table(path: Path):
     """Lê um arquivo CSV de opções e tenta identificar colunas e Spot."""
     try:
         df = pd.read_csv(path)
-    except Exception:
+    except Exception as e:
+        logger.debug("[E95] read_options_table failed: %s", e)
         return None, None
     if df.empty:
         return None, None
@@ -38,7 +39,8 @@ def read_options_table(path: Path):
                     if not valid_vals.empty:
                         spot_val = float(valid_vals.iloc[0])
                         break
-            except Exception:
+            except Exception as e:
+                logger.debug("[E95] read_options_table failed: %s", e)
                 pass
 
     # Tentativa 2: Extração implícita via Moneyness (se disponível)
@@ -66,7 +68,7 @@ def read_options_table(path: Path):
                 if not valid_spots.empty:
                     # Usa a mediana para robustez
                     spot_val = float(valid_spots.median())
-        except Exception:
+        except Exception as e:
             logger.debug("Falha ao recuperar spot via moneyness (silencioso).")
 
     rename_map = {

@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def format_number_br(value, decimals=2, prefix="", suffix=""):
     """
@@ -55,5 +59,6 @@ def parse_and_scale_walls(txt, scale):
                 except ValueError:
                     scaled_parts.append(p) # Mantém texto original se não for número
         return values, ' | '.join(scaled_parts)
-    except Exception:
+    except Exception as e:
+        logger.warning("[E95] parse_and_scale_walls failed: %s", e)
         return [], txt

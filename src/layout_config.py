@@ -1,4 +1,8 @@
+import logging
 import plotly.graph_objects as go
+
+logger = logging.getLogger(__name__)
+
 
 def get_common_layout(metrics, spot, min_k, max_k):
     """
@@ -8,7 +12,8 @@ def get_common_layout(metrics, spot, min_k, max_k):
     try:
         from src import config as settings
         sf = getattr(settings, 'DISPLAY_SCALE_FACTOR', 1.0)
-    except Exception:
+    except Exception as e:
+        logger.warning("[E95] get_common_layout failed: %s", e)
         sf = 1.0
     regime_color = 'lime' if 'Positivo' in metrics['regime'] else 'red'
     

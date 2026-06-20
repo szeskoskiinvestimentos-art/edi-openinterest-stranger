@@ -9,6 +9,10 @@ from plotly.subplots import make_subplots
 from src import config as settings
 from src.utils_fmt import format_number_br, parse_and_scale_walls
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 def create_detailed_table(calc, metrics):
     """
     Recria a Tabela Detalhada (Figura 3) com métricas de GEX, Walls, Range e Midwalls.
@@ -118,7 +122,8 @@ def create_model_comparison_table(calc):
     sf = getattr(settings, "DISPLAY_SCALE_FACTOR", 1.0)
     try:
         spot = float(getattr(calc, "spot", 0.0)) * float(sf)
-    except Exception:
+    except Exception as e:
+        logger.debug("[E95] create_model_comparison_table failed: %s", e)
         spot = 0.0
 
     flip_map = getattr(calc, "flip_variations", {}) or {}
@@ -129,7 +134,8 @@ def create_model_comparison_table(calc):
     def add_row(modelo, val):
         try:
             v = float(val) * float(sf)
-        except Exception:
+        except Exception as e:
+            logger.debug("[E95] add_row failed: %s", e)
             return
         if not np.isfinite(v):
             return
@@ -205,7 +211,8 @@ def create_fed_rates_table(options_df=None, spot=None, expiry=None):
             with open(p, "r", encoding="utf-8") as f:
                 data = json.load(f) or {}
             break
-        except Exception:
+        except Exception as e:
+            logger.debug("[E95] create_fed_rates_table failed: %s", e)
             data = {}
 
     if isinstance(data, dict):
@@ -335,7 +342,8 @@ def create_most_actives_table(options_df):
             return '-'
         try:
             return f"{format_number_br(float(iv_val), 1)}%"
-        except Exception:
+        except Exception as e:
+            logger.debug("[E95] fmt_iv failed: %s", e)
             return '-'
     
     top_oi = options_df.sort_values('Open Int', ascending=False).head(10)

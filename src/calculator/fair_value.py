@@ -79,7 +79,8 @@ class FairValueMixin:
             iv_arr = np.asarray(self.iv_strike_ref, dtype=float)
             if iv_arr.size == strikes_arr.size:
                 iv_sorted = iv_arr[order]
-        except Exception:
+        except Exception as e:
+            logger.debug("[E95] calculate_fair_value_scenario failed: %s", e)
             iv_sorted = None
 
         refs = [self.call_wall, self.put_wall, self.gamma_flip, self.spot]

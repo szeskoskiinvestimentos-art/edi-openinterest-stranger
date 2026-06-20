@@ -30,6 +30,10 @@ import numpy as np
 from scipy.optimize import minimize
 from typing import Optional
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 # Limites razoaveis para os parametros
 ALPHA_MIN, ALPHA_MAX = 0.001, 5.0   # vol inicial
@@ -218,7 +222,8 @@ class SABRModel:
                     return 1e10
                 residuals = model_ivs - market_ivs
                 return float(np.sum(residuals**2))
-            except Exception:
+            except Exception as e:
+                logger.debug("[E95] objective failed: %s", e)
                 return 1e10
 
         result = minimize(
@@ -266,7 +271,8 @@ class SABRModel:
             iv_otm = float(self.implied_vol(self.F * 0.9))
             iv_far = float(self.implied_vol(self.F * 1.1))
             curvature = iv_otm - 2 * atm_vol + iv_far
-        except Exception:
+        except Exception as e:
+            logger.debug("[E95] smile_metrics failed: %s", e)
             pass
 
         return {

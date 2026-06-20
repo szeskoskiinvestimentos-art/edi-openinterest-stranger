@@ -71,7 +71,8 @@ class JSONFormatter(logging.Formatter):
         # Mensagem
         try:
             message = record.getMessage()
-        except Exception:
+        except Exception as e:
+            logger.warning("[E95] format failed: %s", e)
             message = str(record.msg)
 
         log_obj = {

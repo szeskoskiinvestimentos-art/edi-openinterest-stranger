@@ -117,7 +117,8 @@ class FlipsMixin:
                 return float(x1 if y2==y1 else x1 - y1*(x2 - x1)/(y2 - y1))
             else:
                 return float(ks[int(np.argmin(np.abs(gex_cum_hvl)))])
-        except Exception:
+        except Exception as e:
+            logger.debug("[E95] operation failed: %s", e)
             return None
 
     def calculate_gamma_flip_variations(self):
@@ -137,7 +138,8 @@ class FlipsMixin:
                 flips['Spline'] = float(roots_arr[np.argmin(np.abs(roots_arr - spot))])
             else:
                 flips['Spline'] = flips['Classic']
-        except Exception:
+        except Exception as e:
+            logger.debug("[E95] calculate_gamma_flip_variations failed: %s", e)
             flips['Spline'] = flips['Classic']
 
         step = float(np.median(np.diff(strikes))) if len(strikes) > 1 else 25.0
@@ -167,6 +169,7 @@ class FlipsMixin:
             gex_cum_gauss = np.cumsum(gex_smooth)
             flips['HVL Gaussian'] = self._find_zero_cross(strikes, gex_cum_gauss, spot)
         except Exception as e:
+            logger.debug("[E95] operation failed: %s", e)
             flips['HVL Gaussian'] = flips['Classic']
 
         self.flip_variations = flips
@@ -270,6 +273,7 @@ class FlipsMixin:
                 flips.append(float(x1 - y1 * (x2 - x1) / (y2 - y1)))
 
         except Exception as e:
+            logger.debug("[E95] operation failed: %s", e)
             flips = [None] * len(alphas)
 
         self.gamma_flip_cone = {
@@ -286,7 +290,8 @@ class FlipsMixin:
                     v = v.strip().replace('%', '').replace('.', '').replace(',', '.')
                 x = float(v)
                 return x if np.isfinite(x) else None
-            except Exception:
+            except Exception as e:
+                logger.debug("[E95] _to_float failed: %s", e)
                 return None
 
         bull_vols: list[float] = []

@@ -159,7 +159,8 @@ def dupire_local_vol_grid(
                 sigma_grid[i, j] = dupire_local_vol_from_surface(
                     k, t, K_grid, T_grid, C_grid, r, q,
                 )
-            except Exception:
+            except Exception as e:
+                logger.debug("[E95] dupire_local_vol_grid failed: %s", e)
                 sigma_grid[i, j] = np.nan
 
     return K_out, T_out, sigma_grid

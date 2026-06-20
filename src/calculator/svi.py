@@ -188,7 +188,8 @@ class SVIModel:
                 # MSE em vols (normalizado pela vol media)
                 mse = np.mean((model_vars - market_vars) ** 2) / (np.mean(market_vars) ** 2)
                 return mse
-            except Exception:
+            except Exception as e:
+                logger.debug("[E95] _objective failed: %s", e)
                 return 1e10
 
         # Initial guess

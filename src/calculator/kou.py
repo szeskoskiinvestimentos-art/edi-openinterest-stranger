@@ -395,7 +395,8 @@ class KouJumpModel:
                     model_price = model.call_price(S0, K, T, r)
                     sq_err += (model_price - mkt_price) ** 2
                 return sq_err
-            except Exception:
+            except Exception as e:
+                logger.debug("[E95] _objective failed: %s", e)
                 return 1e10
 
         # Initial guess

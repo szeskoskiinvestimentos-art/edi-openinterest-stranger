@@ -12,6 +12,10 @@ from datetime import datetime
 from src import config as settings
 from src.calculator.core import OptionsCalculator, SummaryMetrics
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 def generate_ntsl_script(metrics: SummaryMetrics, calc: OptionsCalculator) -> str:
     """Gera script NTSL completo para ProfitChart.
 
@@ -87,7 +91,8 @@ def generate_ntsl_script(metrics: SummaryMetrics, calc: OptionsCalculator) -> st
                 "sup3": sup3,
                 "sup4": sup4,
             }
-    except Exception:
+    except Exception as e:
+        logger.warning("[E95] operation failed: %s", e)
         borboleta_levels = None
 
     # Recuperando Strikes para Grid

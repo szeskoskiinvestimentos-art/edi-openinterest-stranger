@@ -39,6 +39,10 @@ import numpy as np
 
 from src import config as settings
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class StressScenario:
@@ -99,6 +103,7 @@ class StressScenario:
             # Tenta recalcular GEX com novos parametros
             calc.calculate_greeks_exposure()
         except Exception as e:
+            logger.debug("[E95] _compute_metrics failed: %s", e)
             metrics['error'] = f"greeks_exposure failed: {e}"
             return metrics
 
@@ -109,7 +114,8 @@ class StressScenario:
                     calc.strikes_ref, calc.gex_cum_signed, current_spot
                 )
                 metrics['gamma_flip'] = float(gamma_flip) if gamma_flip is not None else None
-        except Exception:
+        except Exception as e:
+            logger.debug("[E95] _compute_metrics failed: %s", e)
             metrics['gamma_flip'] = None
 
         try:
@@ -118,14 +124,16 @@ class StressScenario:
                 if len(calc.gex_call_tot) > 0 and len(calc.gex_put_tot) > 0:
                     metrics['call_wall'] = float(calc.strikes_ref[np.argmax(calc.gex_call_tot)])
                     metrics['put_wall'] = float(calc.strikes_ref[np.argmax(calc.gex_put_tot)])
-        except Exception:
+        except Exception as e:
+            logger.debug("[E95] _compute_metrics failed: %s", e)
             pass
 
         try:
             # Delta agregado
             if hasattr(calc, 'dexp_tot'):
                 metrics['delta_agregado'] = float(np.nansum(calc.dexp_tot))
-        except Exception:
+        except Exception as e:
+            logger.debug("[E95] operation failed: %s", e)
             pass
 
         # Regime
@@ -138,7 +146,8 @@ class StressScenario:
                     metrics['regime'] = 'Gamma Negativo (curva abaixo)'
             else:
                 metrics['regime'] = 'indefinido'
-        except Exception:
+        except Exception as e:
+            logger.debug("[E95] operation failed: %s", e)
             metrics['regime'] = 'indefinido'
 
         # IV (atual)
@@ -228,6 +237,7 @@ class StressTest:
                 metrics = scenario.apply(self.calc)
                 results[scenario.name] = metrics
             except Exception as e:
+                logger.debug("[E95] run_all_scenarios failed: %s", e)
                 results[scenario.name] = {
                     'error': f"{type(e).__name__}: {e}",
                     'scenario': scenario.name,

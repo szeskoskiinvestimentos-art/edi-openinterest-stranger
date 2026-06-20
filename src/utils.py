@@ -1,6 +1,10 @@
 import pandas as pd
 import re
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 def _num(s):
     def _parse_one(v) -> float:
         if v is None:
@@ -8,7 +12,8 @@ def _num(s):
         if isinstance(v, (int, float)):
             try:
                 return float(v)
-            except Exception:
+            except Exception as e:
+                logger.debug("[E95] _parse_one failed: %s", e)
                 return float("nan")
         x = str(v).strip()
         if x in {"", "-", "—", "N/A", "n/a", "null", "None"}:
@@ -32,7 +37,8 @@ def _num(s):
             return float("nan")
         try:
             return float(x)
-        except Exception:
+        except Exception as e:
+            logger.debug("[E95] operation failed: %s", e)
             return float("nan")
 
     if isinstance(s, pd.Series):
