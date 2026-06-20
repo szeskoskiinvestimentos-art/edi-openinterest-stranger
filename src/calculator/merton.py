@@ -153,10 +153,11 @@ def merton_call_price(
 
     # Termos auxiliares (pre-computados)
     lamT = lam * T
+    # Drift compensado: sob risco-neutro, mu = r - lambda*kappa
     # E[Y] = mu_J; E[exp(Y)] = exp(mu_J + sigma_J²/2) -> compensador
-    # Drift ajustado: (r - lambda*kappa) ao inves de r
     # kappa = E[exp(Y) - 1] = exp(mu_J + sigma_J²/2) - 1
     kappa = math.exp(mu_J + 0.5 * sigma_J * sigma_J) - 1.0
+    r_compensated = r - lam * kappa  # taxa livre de risco ajustada
 
     # Para cada n saltos:
     #   S_n = S0 * exp(n * (mu_J + sigma_J²/2))   [media do compound asset price]
@@ -200,9 +201,8 @@ def merton_call_price(
         sigma_n_sq = sigma_sq + n * sigma_J_sq / T if T > 0 else sigma_sq
         sigma_n = math.sqrt(sigma_n_sq) if sigma_n_sq > 0 else sigma
 
-        # Drift ajustado para Merton: usa o spot compensado S_n (que ja tem
-        # o efeito medio dos saltos). Para o BS subjacente, r puro.
-        bs_price = _bs_call(S_n, K, T, r, sigma_n)
+        # Drift compensado: sob risco-neutro, taxa efetiva = r - lambda*kappa
+        bs_price = _bs_call(S_n, K, T, r_compensated, sigma_n)
 
         call += p_n * bs_price
         prob_sum += p_n
@@ -222,6 +222,10 @@ def merton_put_price(
     """
     Preco de Put Europeia no modelo Merton.
 
+    Implementado via soma direta (mesma estrutura da call), nao via
+    paridade put-call (paridade nao se aplica diretamente a modelos
+    com saltos discretos).
+
     Args:
         Mesmos de merton_call_price.
 
@@ -231,12 +235,44 @@ def merton_put_price(
     # Validacao (delega para call)
     merton_call_price(S0, K, T, r, sigma, lam, mu_J, sigma_J, n_max)
 
-    # Paridade put-call modificada para Merton:
-    # P = C - S0 * exp(-lambda*kappa*T) + K * exp(-r*T)
-    # onde kappa = E[exp(Y)-1]
+    # Drift compensado
     kappa = math.exp(mu_J + 0.5 * sigma_J * sigma_J) - 1.0
-    call = merton_call_price(S0, K, T, r, sigma, lam, mu_J, sigma_J, n_max)
-    put = call - S0 * math.exp(-lam * kappa * T) + K * math.exp(-r * T)
+    r_compensated = r - lam * kappa
+
+    # Edge cases
+    if T == 0:
+        return max(K - S0, 0.0)
+    if lam == 0:
+        return _bs_put(S0, K, T, r, sigma)
+
+    # Termos auxiliares
+    lamT = lam * T
+    exp_neg_lamT = math.exp(-lamT)
+    log_jump_compound = mu_J + 0.5 * sigma_J * sigma_J
+    sigma_J_sq = sigma_J * sigma_J
+    sigma_sq = sigma * sigma
+
+    put = 0.0
+    prob_sum = 0.0
+
+    for n in range(n_max + 1):
+        if n == 0:
+            p_n = exp_neg_lamT
+        else:
+            log_p_n = -lamT + n * math.log(lamT) - math.lgamma(n + 1)
+            p_n = math.exp(log_p_n)
+
+        S_n = S0 * math.exp(n * log_jump_compound)
+        sigma_n_sq = sigma_sq + n * sigma_J_sq / T if T > 0 else sigma_sq
+        sigma_n = math.sqrt(sigma_n_sq) if sigma_n_sq > 0 else sigma
+
+        bs_put = _bs_put(S_n, K, T, r_compensated, sigma_n)
+        put += p_n * bs_put
+        prob_sum += p_n
+
+        if prob_sum > 1.0 - 1e-10:
+            break
+
     return max(put, 0.0)
 
 

@@ -1001,6 +1001,67 @@ def test_merton_zero_jumps_higher_than_bs_for_otm(golden: dict) -> tuple[bool, s
     from tests.test_merton import test_merton_zero_jumps_higher_than_bs_for_otm
     return _wrap_test("merton_otm_vs_bs", test_merton_zero_jumps_higher_than_bs_for_otm)
 
+def test_kou_lambda_zero_recovers_bs(golden: dict) -> tuple[bool, str]:
+    from tests.test_kou import test_kou_lambda_zero_recovers_bs
+    return _wrap_test("kou_lambda0", test_kou_lambda_zero_recovers_bs)
+
+def test_kou_t_zero_returns_intrinsic(golden: dict) -> tuple[bool, str]:
+    from tests.test_kou import test_kou_t_zero_returns_intrinsic
+    return _wrap_test("kou_t0", test_kou_t_zero_returns_intrinsic)
+
+def test_kou_invalid_params_raise(golden: dict) -> tuple[bool, str]:
+    from tests.test_kou import test_kou_invalid_params_raise
+    return _wrap_test("kou_invalid", test_kou_invalid_params_raise)
+
+def test_kou_jump_moments_known_case(golden: dict) -> tuple[bool, str]:
+    from tests.test_kou import test_kou_jump_moments_known_case
+    return _wrap_test("kou_moments", test_kou_jump_moments_known_case)
+
+def test_kou_asymmetric_p_moments(golden: dict) -> tuple[bool, str]:
+    from tests.test_kou import test_kou_asymmetric_p_moments
+    return _wrap_test("kou_asym_p", test_kou_asymmetric_p_moments)
+
+def test_kou_asymmetric_eta_moments(golden: dict) -> tuple[bool, str]:
+    from tests.test_kou import test_kou_asymmetric_eta_moments
+    return _wrap_test("kou_asym_eta", test_kou_asymmetric_eta_moments)
+
+def test_kou_higher_lambda_higher_call(golden: dict) -> tuple[bool, str]:
+    from tests.test_kou import test_kou_higher_lambda_higher_call
+    return _wrap_test("kou_lambda_up", test_kou_higher_lambda_higher_call)
+
+def test_kou_asymmetric_put_protection(golden: dict) -> tuple[bool, str]:
+    from tests.test_kou import test_kou_asymmetric_put_protection
+    return _wrap_test("kou_put_asym", test_kou_asymmetric_put_protection)
+
+def test_kou_put_call_parity_modified(golden: dict) -> tuple[bool, str]:
+    from tests.test_kou import test_kou_put_call_parity_modified
+    return _wrap_test("kou_parity", test_kou_put_call_parity_modified)
+
+def test_kou_class_call_equals_function(golden: dict) -> tuple[bool, str]:
+    from tests.test_kou import test_kou_class_call_equals_function
+    return _wrap_test("kou_oo_func", test_kou_class_call_equals_function)
+
+def test_kou_class_is_asymmetric(golden: dict) -> tuple[bool, str]:
+    from tests.test_kou import test_kou_class_is_asymmetric
+    return _wrap_test("kou_asym_check", test_kou_class_is_asymmetric)
+
+def test_kou_kappa_compensator(golden: dict) -> tuple[bool, str]:
+    from tests.test_kou import test_kou_kappa_compensator
+    return _wrap_test("kou_kappa", test_kou_kappa_compensator)
+
+def test_kou_calibrate_recovers_lambda(golden: dict) -> tuple[bool, str]:
+    from tests.test_kou import test_kou_calibrate_recovers_lambda
+    return _wrap_test("kou_calibrate", test_kou_calibrate_recovers_lambda)
+
+def test_kou_calibrate_requires_min_points(golden: dict) -> tuple[bool, str]:
+    from tests.test_kou import test_kou_calibrate_requires_min_points
+    return _wrap_test("kou_calib_min", test_kou_calibrate_requires_min_points)
+
+def test_kou_invalid_class_params_raise(golden: dict) -> tuple[bool, str]:
+    from tests.test_kou import test_kou_invalid_class_params_raise
+    return _wrap_test("kou_class_invalid", test_kou_invalid_class_params_raise)
+
+
 def test_merton_call_positive_for_itm(golden: dict) -> tuple[bool, str]:
     from tests.test_merton import test_merton_call_positive_for_itm
     return _wrap_test("merton_itm", test_merton_call_positive_for_itm)
@@ -1252,6 +1313,22 @@ TESTS = {
     "merton_class_invalid": ("Merton construtor valida", test_merton_invalid_class_params_raise),
     "merton_otm_vs_bs": ("Merton OTM > BS (saltos cobrem)", test_merton_zero_jumps_higher_than_bs_for_otm),
     "merton_itm": ("Merton ITM call >= intrinseco", test_merton_call_positive_for_itm),
+    # --- Kou E72 (15 testes) ---
+    "kou_lambda0": ("Kou λ=0 degenera em BS", test_kou_lambda_zero_recovers_bs),
+    "kou_t0": ("Kou T=0 -> intrinseco", test_kou_t_zero_returns_intrinsic),
+    "kou_invalid": ("Kou valida 9 parametros", test_kou_invalid_params_raise),
+    "kou_moments": ("Kou momentos (simetrico p=0.5)", test_kou_jump_moments_known_case),
+    "kou_asym_p": ("Kou p<0.5 -> E[Y] negativo", test_kou_asymmetric_p_moments),
+    "kou_asym_eta": ("Kou η₂<η₁ -> Var[Y] aumenta", test_kou_asymmetric_eta_moments),
+    "kou_lambda_up": ("Kou ↑λ -> call OTM mais cara", test_kou_higher_lambda_higher_call),
+    "kou_put_asym": ("Kou assimetrico protege deep OTM put", test_kou_asymmetric_put_protection),
+    "kou_parity": ("Kou paridade put-call modificada", test_kou_put_call_parity_modified),
+    "kou_oo_func": ("KouJumpModel == funcao", test_kou_class_call_equals_function),
+    "kou_asym_check": ("Kou is_asymmetric detecta quebra", test_kou_class_is_asymmetric),
+    "kou_kappa": ("Kou κ=E[exp(Y)-1] compensador", test_kou_kappa_compensator),
+    "kou_calibrate": ("Kou calibrate recupera σ e λ", test_kou_calibrate_recovers_lambda),
+    "kou_calib_min": ("Kou calibrate >= 3 pontos", test_kou_calibrate_requires_min_points),
+    "kou_class_invalid": ("Kou construtor valida 5 params", test_kou_invalid_class_params_raise),
 }
 
 
