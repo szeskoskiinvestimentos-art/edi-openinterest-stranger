@@ -884,6 +884,42 @@ def test_veta_larger_T_smaller_magnitude(golden: dict) -> tuple[bool, str]:
     return _wrap_test("veta_T_effect", test_veta_larger_T_smaller_magnitude)
 
 
+def test_wdo_external_assets_exist(golden: dict) -> tuple[bool, str]:
+    from tests.test_dashboards import test_wdo_external_assets_exist
+    return _wrap_test("dash_wdo_assets", test_wdo_external_assets_exist)
+
+
+def test_win_external_assets_exist(golden: dict) -> tuple[bool, str]:
+    from tests.test_dashboards import test_win_external_assets_exist
+    return _wrap_test("dash_win_assets", test_win_external_assets_exist)
+
+
+# --- test_dashboards.py (8 testes E26) ---
+def test_wdo_has_ntsl_code_block(golden: dict) -> tuple[bool, str]:
+    from tests.test_dashboards import test_wdo_has_ntsl_code_block
+    return _wrap_test("dash_wdo_ntsl_block", test_wdo_has_ntsl_code_block)
+
+def test_wdo_has_copy_ntsl_button(golden: dict) -> tuple[bool, str]:
+    from tests.test_dashboards import test_wdo_has_copy_ntsl_button
+    return _wrap_test("dash_wdo_ntsl_copy", test_wdo_has_copy_ntsl_button)
+
+def test_win_has_ntsl_code_block(golden: dict) -> tuple[bool, str]:
+    from tests.test_dashboards import test_win_has_ntsl_code_block
+    return _wrap_test("dash_win_ntsl_block", test_win_has_ntsl_code_block)
+
+def test_win_has_copy_ntsl_button(golden: dict) -> tuple[bool, str]:
+    from tests.test_dashboards import test_win_has_copy_ntsl_button
+    return _wrap_test("dash_win_ntsl_copy", test_win_has_copy_ntsl_button)
+
+def test_wdo_html_js_sync(golden: dict) -> tuple[bool, str]:
+    from tests.test_dashboards import test_wdo_html_js_sync
+    return _wrap_test("dash_wdo_sync", test_wdo_html_js_sync)
+
+def test_win_html_js_sync(golden: dict) -> tuple[bool, str]:
+    from tests.test_dashboards import test_win_html_js_sync
+    return _wrap_test("dash_win_sync", test_win_html_js_sync)
+
+
 # Mapeamento de testes
 TESTS = {
     # --- Originais (9) ---
@@ -1053,6 +1089,15 @@ TESTS = {
     "veta_oo": ("VetaCalculator.veta_call = veta_call()", test_veta_class_consistency),
     "veta_validation": ("Veta valida parametros", test_veta_invalid_params_raises),
     "veta_T_effect": ("|Veta| diminui com T (Vega mais estavel)", test_veta_larger_T_smaller_magnitude),
+    # --- Dashboards E26 (8 testes) ---
+    "dash_wdo_ntsl_block": ("WDO tem ntsl-code-block", test_wdo_has_ntsl_code_block),
+    "dash_wdo_ntsl_copy": ("WDO tem copy-ntsl", test_wdo_has_copy_ntsl_button),
+    "dash_win_ntsl_block": ("WIN tem ntsl-code-block", test_win_has_ntsl_code_block),
+    "dash_win_ntsl_copy": ("WIN tem copy-ntsl", test_win_has_copy_ntsl_button),
+    "dash_wdo_sync": ("WDO HTML/JS sincronizado (sem dead handlers)", test_wdo_html_js_sync),
+    "dash_win_sync": ("WIN HTML/JS sincronizado (sem dead handlers)", test_win_html_js_sync),
+    "dash_wdo_assets": ("WDO assets externos existem", test_wdo_external_assets_exist),
+    "dash_win_assets": ("WIN assets externos existem", test_win_external_assets_exist),
 }
 
 

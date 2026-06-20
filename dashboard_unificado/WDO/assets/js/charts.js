@@ -121,6 +121,7 @@ class StrangerThingsCharts {
             this.createYahooUupOiChart();
             this.createYahooUsduOiChart();
             this.createYahooUsdbrlBetaMappingBlock();
+            this.updateYahooOptionsPanel(); // Added: painel consolidado de opcoes Yahoo (USDU/UUP/EWZ)
         } catch (error) {
             console.error('Error initializing charts:', error);
         }

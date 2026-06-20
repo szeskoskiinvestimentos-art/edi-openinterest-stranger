@@ -131,6 +131,7 @@ class StrangerThingsCharts {
             this.createFairValueTable(data); // Added
             this.updateLastUpdate(data);
             this.createEwzOptionsOiChart();
+            this.updateYahooOptionsPanel(); // Added: painel consolidado de opcoes Yahoo (USDU/UUP/EWZ)
         } catch (error) {
             console.error('Error initializing charts:', error);
         }
