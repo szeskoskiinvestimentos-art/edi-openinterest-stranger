@@ -609,6 +609,47 @@ def test_sabr_parameter_limits(golden: dict) -> tuple[bool, str]:
     from tests.test_sabr import test_sabr_parameter_limits
     return _wrap_test("sabr_limits", test_sabr_parameter_limits)
 
+# --- test_structured_logging.py (10 testes E38) ---
+def test_json_formatter_basic(golden: dict) -> tuple[bool, str]:
+    from tests.test_structured_logging import test_json_formatter_basic
+    return _wrap_test("log_json_basic", test_json_formatter_basic)
+
+def test_json_formatter_extras(golden: dict) -> tuple[bool, str]:
+    from tests.test_structured_logging import test_json_formatter_extras
+    return _wrap_test("log_json_extras", test_json_formatter_extras)
+
+def test_json_formatter_correlation_id(golden: dict) -> tuple[bool, str]:
+    from tests.test_structured_logging import test_json_formatter_correlation_id
+    return _wrap_test("log_json_corr", test_json_formatter_correlation_id)
+
+def test_json_formatter_exception(golden: dict) -> tuple[bool, str]:
+    from tests.test_structured_logging import test_json_formatter_exception
+    return _wrap_test("log_json_exc", test_json_formatter_exception)
+
+def test_setup_json_logging_capture(golden: dict) -> tuple[bool, str]:
+    from tests.test_structured_logging import test_setup_json_logging_capture
+    return _wrap_test("log_json_setup", test_setup_json_logging_capture)
+
+def test_setup_json_logging_with_file(golden: dict) -> tuple[bool, str]:
+    from tests.test_structured_logging import test_setup_json_logging_with_file
+    return _wrap_test("log_json_file", test_setup_json_logging_with_file)
+
+def test_setup_text_logging_fallback(golden: dict) -> tuple[bool, str]:
+    from tests.test_structured_logging import test_setup_text_logging_fallback
+    return _wrap_test("log_text_fallback", test_setup_text_logging_fallback)
+
+def test_setup_logging_json_dispatches_to_json(golden: dict) -> tuple[bool, str]:
+    from tests.test_structured_logging import test_setup_logging_json_dispatches_to_json
+    return _wrap_test("log_dispatch_json", test_setup_logging_json_dispatches_to_json)
+
+def test_setup_logging_text_dispatches_to_text(golden: dict) -> tuple[bool, str]:
+    from tests.test_structured_logging import test_setup_logging_text_dispatches_to_text
+    return _wrap_test("log_dispatch_text", test_setup_logging_text_dispatches_to_text)
+
+def test_json_formatter_safely_serializes_complex(golden: dict) -> tuple[bool, str]:
+    from tests.test_structured_logging import test_json_formatter_safely_serializes_complex
+    return _wrap_test("log_json_complex", test_json_formatter_safely_serializes_complex)
+
 def test_find_zero_cross(golden: dict) -> tuple[bool, str]:
     from tests.test_calculator_core import test_find_zero_cross
     return _wrap_test("zero_cross", test_find_zero_cross)
@@ -707,6 +748,17 @@ TESTS = {
     "sabr_metrics": ("SABR smile metrics", test_sabr_smile_metrics),
     "sabr_helper": ("SABR helper from iv_strike_ref", test_sabr_calibrate_from_iv_strike_ref),
     "sabr_limits": ("SABR parameter limits", test_sabr_parameter_limits),
+    # --- Structured Logging E38 (10 testes) ---
+    "log_json_basic": ("Log JSON basico", test_json_formatter_basic),
+    "log_json_extras": ("Log JSON extras", test_json_formatter_extras),
+    "log_json_corr": ("Log JSON correlation_id", test_json_formatter_correlation_id),
+    "log_json_exc": ("Log JSON exception", test_json_formatter_exception),
+    "log_json_setup": ("Log setup captura", test_setup_json_logging_capture),
+    "log_json_file": ("Log setup arquivo", test_setup_json_logging_with_file),
+    "log_text_fallback": ("Log text fallback", test_setup_text_logging_fallback),
+    "log_dispatch_json": ("Log dispatch json", test_setup_logging_json_dispatches_to_json),
+    "log_dispatch_text": ("Log dispatch text", test_setup_logging_text_dispatches_to_text),
+    "log_json_complex": ("Log JSON objetos complexos", test_json_formatter_safely_serializes_complex),
     "zero_cross": ("Find Zero Cross", test_find_zero_cross),
     # --- Regressão Phase 4G (E8, E10) ---
     "e8_broadcast": ("E8: Greeks Broadcast (S scalar + K array)", test_e8_greeks_broadcast_scalar_s),
