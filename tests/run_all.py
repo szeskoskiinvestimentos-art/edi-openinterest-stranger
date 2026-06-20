@@ -949,6 +949,63 @@ def test_vwap_negative_price_raises(golden: dict) -> tuple[bool, str]:
     return _wrap_test("vwap_neg_price", test_vwap_negative_price_raises)
 
 
+def test_merton_lambda_zero_recovers_bs(golden: dict) -> tuple[bool, str]:
+    from tests.test_merton import test_merton_lambda_zero_recovers_bs
+    return _wrap_test("merton_lambda0", test_merton_lambda_zero_recovers_bs)
+
+def test_merton_t_zero_returns_intrinsic(golden: dict) -> tuple[bool, str]:
+    from tests.test_merton import test_merton_t_zero_returns_intrinsic
+    return _wrap_test("merton_t0", test_merton_t_zero_returns_intrinsic)
+
+def test_merton_invalid_params_raise(golden: dict) -> tuple[bool, str]:
+    from tests.test_merton import test_merton_invalid_params_raise
+    return _wrap_test("merton_invalid", test_merton_invalid_params_raise)
+
+def test_merton_higher_lambda_higher_call(golden: dict) -> tuple[bool, str]:
+    from tests.test_merton import test_merton_higher_lambda_higher_call
+    return _wrap_test("merton_lambda_up", test_merton_higher_lambda_higher_call)
+
+def test_merton_positive_mu_j_increases_call(golden: dict) -> tuple[bool, str]:
+    from tests.test_merton import test_merton_positive_mu_j_increases_call
+    return _wrap_test("merton_mu_j_pos", test_merton_positive_mu_j_increases_call)
+
+def test_merton_higher_sigma_j_higher_otm_call(golden: dict) -> tuple[bool, str]:
+    from tests.test_merton import test_merton_higher_sigma_j_higher_otm_call
+    return _wrap_test("merton_sigma_j", test_merton_higher_sigma_j_higher_otm_call)
+
+def test_merton_put_call_parity_modified(golden: dict) -> tuple[bool, str]:
+    from tests.test_merton import test_merton_put_call_parity_modified
+    return _wrap_test("merton_parity", test_merton_put_call_parity_modified)
+
+def test_merton_class_call_equals_function(golden: dict) -> tuple[bool, str]:
+    from tests.test_merton import test_merton_class_call_equals_function
+    return _wrap_test("merton_oo_func", test_merton_class_call_equals_function)
+
+def test_merton_class_kappa_compensator(golden: dict) -> tuple[bool, str]:
+    from tests.test_merton import test_merton_class_kappa_compensator
+    return _wrap_test("merton_kappa", test_merton_class_kappa_compensator)
+
+def test_merton_calibrate_recovers_lambda(golden: dict) -> tuple[bool, str]:
+    from tests.test_merton import test_merton_calibrate_recovers_lambda
+    return _wrap_test("merton_calibrate", test_merton_calibrate_recovers_lambda)
+
+def test_merton_calibrate_requires_min_points(golden: dict) -> tuple[bool, str]:
+    from tests.test_merton import test_merton_calibrate_requires_min_points
+    return _wrap_test("merton_calib_min", test_merton_calibrate_requires_min_points)
+
+def test_merton_invalid_class_params_raise(golden: dict) -> tuple[bool, str]:
+    from tests.test_merton import test_merton_invalid_class_params_raise
+    return _wrap_test("merton_class_invalid", test_merton_invalid_class_params_raise)
+
+def test_merton_zero_jumps_higher_than_bs_for_otm(golden: dict) -> tuple[bool, str]:
+    from tests.test_merton import test_merton_zero_jumps_higher_than_bs_for_otm
+    return _wrap_test("merton_otm_vs_bs", test_merton_zero_jumps_higher_than_bs_for_otm)
+
+def test_merton_call_positive_for_itm(golden: dict) -> tuple[bool, str]:
+    from tests.test_merton import test_merton_call_positive_for_itm
+    return _wrap_test("merton_itm", test_merton_call_positive_for_itm)
+
+
 def test_wdo_external_assets_exist(golden: dict) -> tuple[bool, str]:
     from tests.test_dashboards import test_wdo_external_assets_exist
     return _wrap_test("dash_wdo_assets", test_wdo_external_assets_exist)
@@ -1180,6 +1237,21 @@ TESTS = {
     "vwap_no_cross": ("VWAP sem cruzamento com <2 samples", test_vwap_no_cross_insufficient_samples),
     "vwap_max_min": ("VWAP max_price e min_price", test_vwap_max_min_price),
     "vwap_neg_price": ("VWAP rejeita price <= 0", test_vwap_negative_price_raises),
+    # --- Merton E71 (14 testes) ---
+    "merton_lambda0": ("Merton λ=0 degenere em BS", test_merton_lambda_zero_recovers_bs),
+    "merton_t0": ("Merton T=0 -> intrinseco", test_merton_t_zero_returns_intrinsic),
+    "merton_invalid": ("Merton valida parametros", test_merton_invalid_params_raise),
+    "merton_lambda_up": ("Merton ↑λ -> call OTM mais cara", test_merton_higher_lambda_higher_call),
+    "merton_mu_j_pos": ("Merton μ_J>0 -> call mais cara (saltos bullish)", test_merton_positive_mu_j_increases_call),
+    "merton_sigma_j": ("Merton ↑σ_J -> deep OTM call protegida", test_merton_higher_sigma_j_higher_otm_call),
+    "merton_parity": ("Merton paridade put-call modificada", test_merton_put_call_parity_modified),
+    "merton_oo_func": ("MertonJumpModel == funcao", test_merton_class_call_equals_function),
+    "merton_kappa": ("Merton κ=E[exp(Y)-1] compensador", test_merton_class_kappa_compensator),
+    "merton_calibrate": ("Merton calibrate recupera σ e λ", test_merton_calibrate_recovers_lambda),
+    "merton_calib_min": ("Merton calibrate >= 3 pontos", test_merton_calibrate_requires_min_points),
+    "merton_class_invalid": ("Merton construtor valida", test_merton_invalid_class_params_raise),
+    "merton_otm_vs_bs": ("Merton OTM > BS (saltos cobrem)", test_merton_zero_jumps_higher_than_bs_for_otm),
+    "merton_itm": ("Merton ITM call >= intrinseco", test_merton_call_positive_for_itm),
 }
 
 
