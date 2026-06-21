@@ -1171,6 +1171,60 @@ def test_rbergomi_class_invalid_params_raise(golden: dict) -> tuple[bool, str]:
     return _wrap_test("rberg_class_invalid", test_rbergomi_class_invalid_params_raise)
 
 
+# --- test_bates.py (13 testes E76) ---
+def test_bates_call_atm_basic(golden: dict) -> tuple[bool, str]:
+    from tests.test_bates import test_bates_call_atm_basic
+    return _wrap_test("bates_atm", test_bates_call_atm_basic)
+
+def test_bates_call_itm_otm(golden: dict) -> tuple[bool, str]:
+    from tests.test_bates import test_bates_call_itm_otm
+    return _wrap_test("bates_itm_otm", test_bates_call_itm_otm)
+
+def test_bates_lambda_zero_equals_heston(golden: dict) -> tuple[bool, str]:
+    from tests.test_bates import test_bates_lambda_zero_equals_heston
+    return _wrap_test("bates_lambda0", test_bates_lambda_zero_equals_heston)
+
+def test_bates_no_stoch_vol_equals_merton(golden: dict) -> tuple[bool, str]:
+    from tests.test_bates import test_bates_no_stoch_vol_equals_merton
+    return _wrap_test("bates_sv0_merton", test_bates_no_stoch_vol_equals_merton)
+
+def test_bates_zero_T_returns_intrinsic(golden: dict) -> tuple[bool, str]:
+    from tests.test_bates import test_bates_zero_T_returns_intrinsic
+    return _wrap_test("bates_t0", test_bates_zero_T_returns_intrinsic)
+
+def test_bates_invalid_params_raises(golden: dict) -> tuple[bool, str]:
+    from tests.test_bates import test_bates_invalid_params_raises
+    return _wrap_test("bates_invalid", test_bates_invalid_params_raises)
+
+def test_bates_model_class_call(golden: dict) -> tuple[bool, str]:
+    from tests.test_bates import test_bates_model_class_call
+    return _wrap_test("bates_oo_func", test_bates_model_class_call)
+
+def test_bates_feller_ratio(golden: dict) -> tuple[bool, str]:
+    from tests.test_bates import test_bates_feller_ratio
+    return _wrap_test("bates_feller", test_bates_feller_ratio)
+
+def test_bates_jump_compensator(golden: dict) -> tuple[bool, str]:
+    from tests.test_bates import test_bates_jump_compensator
+    return _wrap_test("bates_kappa", test_bates_jump_compensator)
+
+def test_bates_put_basic(golden: dict) -> tuple[bool, str]:
+    from tests.test_bates import test_bates_put_basic
+    return _wrap_test("bates_put_atm", test_bates_put_basic)
+
+def test_bates_put_lambda_zero_equals_heston(golden: dict) -> tuple[bool, str]:
+    from tests.test_bates import test_bates_put_lambda_zero_equals_heston
+    return _wrap_test("bates_put_lambda0", test_bates_put_lambda_zero_equals_heston)
+
+def test_bates_jumps_increase_call_price(golden: dict) -> tuple[bool, str]:
+    from tests.test_bates import test_bates_jumps_increase_call_price
+    return _wrap_test("bates_jumps_up", test_bates_jumps_increase_call_price)
+
+def test_bates_repr(golden: dict) -> tuple[bool, str]:
+    from tests.test_bates import test_bates_repr
+    return _wrap_test("bates_repr", test_bates_repr)
+
+
 def test_kou_invalid_class_params_raise(golden: dict) -> tuple[bool, str]:
     from tests.test_kou import test_kou_invalid_class_params_raise
     return _wrap_test("kou_class_invalid", test_kou_invalid_class_params_raise)
@@ -1594,6 +1648,20 @@ TESTS = {
     "rberg_rough_check": ("rBerg is_rough e is_classical_bergomi", test_rbergomi_is_rough_property),
     "rberg_call_pos": ("rBerg call sempre >= 0", test_rbergomi_call_positive),
     "rberg_class_invalid": ("rBerg construtor valida 4 params", test_rbergomi_class_invalid_params_raise),
+    # --- Bates E76 (13 testes) ---
+    "bates_atm": ("Bates call ATM basico", test_bates_call_atm_basic),
+    "bates_itm_otm": ("Bates ITM > OTM", test_bates_call_itm_otm),
+    "bates_lambda0": ("Bates λ=0 degenera em Heston", test_bates_lambda_zero_equals_heston),
+    "bates_sv0_merton": ("Bates σ_v=0,κ=0 degenera em Merton", test_bates_no_stoch_vol_equals_merton),
+    "bates_t0": ("Bates T=0 -> intrinseco", test_bates_zero_T_returns_intrinsic),
+    "bates_invalid": ("Bates valida 8 parametros", test_bates_invalid_params_raises),
+    "bates_oo_func": ("BatesModel == funcao", test_bates_model_class_call),
+    "bates_feller": ("Bates Feller ratio (2κθ/σ_v²)", test_bates_feller_ratio),
+    "bates_kappa": ("Bates compensador κ=E[exp(J)-1]", test_bates_jump_compensator),
+    "bates_put_atm": ("Bates put ATM basico", test_bates_put_basic),
+    "bates_put_lambda0": ("Bates put λ=0 == Heston put", test_bates_put_lambda_zero_equals_heston),
+    "bates_jumps_up": ("Bates saltos neutros -> call mais cara", test_bates_jumps_increase_call_price),
+    "bates_repr": ("BatesModel repr tem 8 campos", test_bates_repr),
     # --- Discovery Levels E45d (14 testes) ---
     "disc_fib_basic": ("Disc fibonacci basico", test_discovery_fibonacci_basic),
     "disc_fib_default": ("Disc fibonacci default 5 levels", test_discovery_fibonacci_default_percentages),

@@ -1,24 +1,25 @@
 # IMPLEMENTACOES FUTURAS — EDI Market Guardian V0
 
-> **Versao**: 4.0
-> **Data**: 2026-06-20
-> **Status**: **73 evolucoes concluidas (E1-E73)**, 0 pendentes no roadmap original
-> **Backlog novo**: E74+ (Markovian Bergomi, MC rBergomi, Bates, migracao v3)
+> **Versao**: 5.0
+> **Data**: 2026-06-21
+> **Status**: **75 evolucoes concluidas (E1-E76)**, E80 em progresso
+> **Backlog novo**: E74, E75 (Markovian/MC rBergomi), E80+ (day-trade features)
 
 ---
 
 ## ESTADO ATUAL (atualizado 2026-06-20)
 
 ### Metricas atuais
-- **211/211 testes passando** (validado em `py -3.13 tests/run_all.py`)
-- **73 evolucoes implementadas** (E1-E73) — arsenal matematico de nivel institucional
-- **10 modelos matematicos** em `src/calculator/`:
+- **251/251 testes passando** (validado em `py -3.13 tests/run_all.py`)
+- **75 evolucoes implementadas** (E1-E76) — arsenal matematico de nivel institucional
+- **11 modelos matematicos** em `src/calculator/`:
   - Difusivos: BS, SABR, Volga, Veta
-  - Stoch vol: Heston, Dupire (local vol), SVI
+  - Stoch vol: Heston, Dupire (local vol), SVI, **Bates (Heston+Merton)** [E76]
   - Jump-diffusion: Merton (1976), Kou (2002)
   - Rough vol: Rough Bergomi (Bayer-Friz-Gatheral 2016)
   - Operacional: VWAP, Position, Kelly
 - **5 dashboards** com tema Neon Terminal (HUB, WDO, WIN, MERCADO, CORR)
+- **Day-trade tools (E80)** — P&L ticker + alerts panel em WDO/WIN
 - **Pipeline Python unificado** (`scripts/orquestrador.py`)
 - **Snapshot pre-run** automatico via `Servico_Unificado_SAFE.bat`
 - **CI** com GitHub Actions + pre-commit hook
@@ -35,6 +36,14 @@
 - **E71 Merton jumps** ✅ — `src/calculator/merton.py` (14 testes) — bugfix drift compensation
 - **E72 Kou double-exponential** ✅ — `src/calculator/kou.py` (15 testes)
 - **E73 Rough Bergomi** ✅ — `src/calculator/rough_bergomi.py` (13 testes) — **FRONTIER MODEL**
+- **E76 Bates (Heston+Merton)** ✅ — `src/calculator/bates.py` (13 testes) — combinado
+
+### Evolucoes recentes (Fase C: Day-Trade) — 🚧 EM PROGRESSO
+- **E80 Day-Trade Tools** 🚧 — `dashboard_unificado/shared/js/daytrade-tools.js` (289 linhas) + `css/daytrade-tools.css` (218 linhas)
+  - P&L Ticker: widget fixo canto inferior direito, gerencia posicoes (long/short) via localStorage, computa P&L em tempo real
+  - Alerts Panel: monitor de thresholds (spot_above, spot_below) com persistencia
+  - Auto-inject CSS, auto-init em DOMContentLoaded, failsafe (erros silenciosos)
+  - Integrado em WDO/WIN dashboards (testado, sem regressoes)
 
 ### Bugs corrigidos nesta fase
 - **Merton drift compensation** (commit `083b2198`): paridade put-call NÃO se aplica a modelos com saltos discretos; fix usa `r_compensated = r − λ·κ` no BS subjacente
@@ -58,13 +67,20 @@ src/calculator/            # 19 submodules
 ├── merton.py              # Merton 1976 jumps (E71) - NEW
 ├── kou.py                 # Kou 2002 asym jumps (E72) - NEW
 ├── rough_bergomi.py       # rBergomi 2016 (E73) - NEW
+├── bates.py               # Bates 1996 (E76) Heston+Merton - NEW
 ├── vwap.py                # VWAP intraday (E68) - NEW
 ├── position.py            # Position P&L (E66) - NEW
 └── kelly.py               # Kelly Criterion (E67) - NEW
+dashboard_unificado/shared/
+├── js/
+│   ├── chart_data_utils.js
+│   └── daytrade-tools.js  # E80: P&L ticker + alerts
+└── css/
+    └── daytrade-tools.css # E80: neon theme
 src/greeks.py              # Black-Scholes engine
 src/config.py              # Configuracoes
 src/tradingview_fetcher.py # Spot prices TradingView
-tests/                     # 211 testes em 30+ arquivos
+tests/                     # 251 testes em 30+ arquivos
 dashboard_unificado/       # 5 dashboards
 .edi_agent/                # Sistema de auto-aprendizado
 ```
@@ -223,9 +239,10 @@ for name, price in models.items():
 | 27 | `695b3f4b` | E71 Merton |
 | 28 | `083b2198` | E72 Kou + Merton bugfix |
 | 29 | `017a1ea` | E73 Rough Bergomi |
+| 30 | `pending` | **E76 Bates (Heston+Merton)** + E80 Day-Trade Tools |
 | 30+ | ... | Atualizacoes deste documento |
 
-Total: 30+ commits na sessão, +109 testes (102→211), 10 novos modelos matemáticos.
+|Total: 31+ commits na sessão, +141 testes (102→251), 11 modelos matemáticos, 2 features UI (P&L ticker + alerts).|
 
 ---
 
