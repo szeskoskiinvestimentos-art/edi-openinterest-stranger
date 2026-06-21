@@ -1279,6 +1279,64 @@ def test_bates_repr(golden: dict) -> tuple[bool, str]:
     return _wrap_test("bates_repr", test_bates_repr)
 
 
+# --- test_kaniadakis.py (13 testes E78) ---
+def test_exp_kappa_at_zero_is_exp(golden: dict) -> tuple[bool, str]:
+    from tests.test_kaniadakis import test_exp_kappa_at_zero_is_exp
+    return _wrap_test("kan_exp_zero", test_exp_kappa_at_zero_is_exp)
+
+def test_exp_kappa_positive_and_negative(golden: dict) -> tuple[bool, str]:
+    from tests.test_kaniadakis import test_exp_kappa_positive_and_negative
+    return _wrap_test("kan_exp_sym", test_exp_kappa_positive_and_negative)
+
+def test_kaniadakis_call_atm_basic(golden: dict) -> tuple[bool, str]:
+    from tests.test_kaniadakis import test_kaniadakis_call_atm_basic
+    return _wrap_test("kan_atm", test_kaniadakis_call_atm_basic)
+
+def test_kaniadakis_kappa_zero_is_merton(golden: dict) -> tuple[bool, str]:
+    from tests.test_kaniadakis import test_kaniadakis_kappa_zero_is_merton
+    return _wrap_test("kan_kappa0_merton", test_kaniadakis_kappa_zero_is_merton)
+
+def test_kaniadakis_lambda_zero_is_bs(golden: dict) -> tuple[bool, str]:
+    from tests.test_kaniadakis import test_kaniadakis_lambda_zero_is_bs
+    return _wrap_test("kan_lambda0_bs", test_kaniadakis_lambda_zero_is_bs)
+
+def test_kaniadakis_heavy_vs_light_tails(golden: dict) -> tuple[bool, str]:
+    from tests.test_kaniadakis import test_kaniadakis_heavy_vs_light_tails
+    return _wrap_test("kan_heavy_vs_light", test_kaniadakis_heavy_vs_light_tails)
+
+def test_kaniadakis_call_itm_otm(golden: dict) -> tuple[bool, str]:
+    from tests.test_kaniadakis import test_kaniadakis_call_itm_otm
+    return _wrap_test("kan_itm_otm", test_kaniadakis_call_itm_otm)
+
+def test_kaniadakis_zero_T_returns_intrinsic(golden: dict) -> tuple[bool, str]:
+    from tests.test_kaniadakis import test_kaniadakis_zero_T_returns_intrinsic
+    return _wrap_test("kan_t0", test_kaniadakis_zero_T_returns_intrinsic)
+
+def test_kaniadakis_invalid_params_raises(golden: dict) -> tuple[bool, str]:
+    from tests.test_kaniadakis import test_kaniadakis_invalid_params_raises
+    return _wrap_test("kan_invalid", test_kaniadakis_invalid_params_raises)
+
+def test_kaniadakis_model_class_call(golden: dict) -> tuple[bool, str]:
+    from tests.test_kaniadakis import test_kaniadakis_model_class_call
+    return _wrap_test("kan_oo_func", test_kaniadakis_model_class_call)
+
+def test_kaniadakis_is_gaussian_heavy_light(golden: dict) -> tuple[bool, str]:
+    from tests.test_kaniadakis import test_kaniadakis_is_gaussian_heavy_light
+    return _wrap_test("kan_regimes", test_kaniadakis_is_gaussian_heavy_light)
+
+def test_kaniadakis_tail_factor(golden: dict) -> tuple[bool, str]:
+    from tests.test_kaniadakis import test_kaniadakis_tail_factor
+    return _wrap_test("kan_tail_factor", test_kaniadakis_tail_factor)
+
+def test_kaniadakis_put_basic(golden: dict) -> tuple[bool, str]:
+    from tests.test_kaniadakis import test_kaniadakis_put_basic
+    return _wrap_test("kan_put_atm", test_kaniadakis_put_basic)
+
+def test_kaniadakis_repr(golden: dict) -> tuple[bool, str]:
+    from tests.test_kaniadakis import test_kaniadakis_repr
+    return _wrap_test("kan_repr", test_kaniadakis_repr)
+
+
 def test_kou_invalid_class_params_raise(golden: dict) -> tuple[bool, str]:
     from tests.test_kou import test_kou_invalid_class_params_raise
     return _wrap_test("kou_class_invalid", test_kou_invalid_class_params_raise)
@@ -1730,6 +1788,21 @@ TESTS = {
     "bates_put_lambda0": ("Bates put λ=0 == Heston put", test_bates_put_lambda_zero_equals_heston),
     "bates_jumps_up": ("Bates saltos neutros -> call mais cara", test_bates_jumps_increase_call_price),
     "bates_repr": ("BatesModel repr tem 8 campos", test_bates_repr),
+    # --- Kaniadakis E78 (14 testes) ---
+    "kan_exp_zero": ("Kan exp_κ(x,0) == exp(x)", test_exp_kappa_at_zero_is_exp),
+    "kan_exp_sym": ("Kan exp_κ(1,+κ) == exp_κ(1,-κ)", test_exp_kappa_positive_and_negative),
+    "kan_atm": ("Kaniadakis call ATM basico", test_kaniadakis_call_atm_basic),
+    "kan_kappa0_merton": ("Kaniadakis κ=0 degenera em Merton", test_kaniadakis_kappa_zero_is_merton),
+    "kan_lambda0_bs": ("Kaniadakis λ=0 degenera em BS", test_kaniadakis_lambda_zero_is_bs),
+    "kan_heavy_vs_light": ("Kan heavy > gauss > light (caudas)", test_kaniadakis_heavy_vs_light_tails),
+    "kan_itm_otm": ("Kaniadakis ITM > OTM", test_kaniadakis_call_itm_otm),
+    "kan_t0": ("Kaniadakis T=0 -> intrinseco", test_kaniadakis_zero_T_returns_intrinsic),
+    "kan_invalid": ("Kaniadakis valida 5 parametros", test_kaniadakis_invalid_params_raises),
+    "kan_oo_func": ("KaniadakisJumpModel == funcao", test_kaniadakis_model_class_call),
+    "kan_regimes": ("Kan is_gaussian/heavy/light", test_kaniadakis_is_gaussian_heavy_light),
+    "kan_tail_factor": ("Kan tail_factor (1+κ*0.5)", test_kaniadakis_tail_factor),
+    "kan_put_atm": ("Kaniadakis put ATM basico", test_kaniadakis_put_basic),
+    "kan_repr": ("KaniadakisJumpModel repr tem 5 campos", test_kaniadakis_repr),
     # --- Discovery Levels E45d (14 testes) ---
     "disc_fib_basic": ("Disc fibonacci basico", test_discovery_fibonacci_basic),
     "disc_fib_default": ("Disc fibonacci default 5 levels", test_discovery_fibonacci_default_percentages),
