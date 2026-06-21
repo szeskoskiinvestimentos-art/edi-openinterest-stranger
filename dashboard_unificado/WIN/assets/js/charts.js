@@ -126,6 +126,7 @@ class StrangerThingsCharts {
             this.createSkewChart(data); // E45e: Skew IV dedicado
             this.createDiscoveryChart(data); // E45b: Strikes + Midwalls + Fibo
             this.createRangeWallsChart(data); // E45c: Range + Walls (top N clusters)
+            this.createFairValueTable(data); // E45h: Fair Value Table (3 cenarios)
 
             this.updateMetrics(data);
             this.updateKeyLevels(data);
@@ -2468,6 +2469,107 @@ strangerThingsCharts.prototype.createRangeWallsChart = function(data) {
             }
         }
     });
+};
+
+// E45h: Fair Value Table (3 cenarios: Base / Otimista / Pessimista)
+// Implementa Black-Scholes + Greeks + Prob ITM em JS puro
+// Logica espelhada de src/bs_model.py e src/position.py
+strangerThingsCharts.prototype.createFairValueTable = function(data) {
+    const tbody = document.getElementById('fairValueTableBody');
+    if (!tbody) return;
+
+    const spot = data.spot_price;
+    if (!spot) {
+        tbody.innerHTML = '<tr><td colspan="9" style="padding:12px; text-align:center; color:#999;">Spot price indisponivel</td></tr>';
+        return;
+    }
+
+    const volData = data.volatility_data || {};
+    const ivArray = volData.iv_values || volData.iv || [];
+    const strikes = volData.strikes || [];
+    if (ivArray.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="padding:12px; text-align:center; color:#999;">IV data indisponivel</td></tr>';
+        return;
+    }
+
+    let minDiff = Infinity;
+    let ivBase = ivArray[0];
+    for (let i = 0; i < strikes.length; i++) {
+        const d = Math.abs(strikes[i] - spot);
+        if (d < minDiff) {
+            minDiff = d;
+            ivBase = ivArray[i];
+        }
+    }
+    if (ivBase > 1) ivBase = ivBase / 100;
+
+    const r = 0.10;
+    const T = 30 / 365;
+    const K = Math.round(spot);
+
+    const cenarios = [
+        { name: 'Otimista', ivMult: 0.8, color: '#4caf50', icon: '🟢' },
+        { name: 'Base',     ivMult: 1.0, color: '#2196f3', icon: '🔵' },
+        { name: 'Pessimista', ivMult: 1.2, color: '#f44336', icon: '🔴' }
+    ];
+
+    const normCdf = (x) => {
+        const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
+        const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+        const sign = x < 0 ? -1 : 1;
+        x = Math.abs(x) / Math.sqrt(2);
+        const t = 1.0 / (1.0 + p * x);
+        const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+        return 0.5 * (1.0 + sign * y);
+    };
+    const normPdf = (x) => Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+
+    const bsCall = (S, K, T, r, sigma) => {
+        if (T <= 0 || sigma <= 0) return Math.max(S - K, 0);
+        const d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+        const d2 = d1 - sigma * Math.sqrt(T);
+        return S * normCdf(d1) - K * Math.exp(-r * T) * normCdf(d2);
+    };
+
+    const bsGreeks = (S, K, T, r, sigma) => {
+        if (T <= 0 || sigma <= 0) return { delta: 0, gamma: 0, vega: 0, theta: 0, prob_itm: 0 };
+        const sqrtT = Math.sqrt(T);
+        const d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrtT);
+        const d2 = d1 - sigma * sqrtT;
+        const delta = normCdf(d1);
+        const gamma = normPdf(d1) / (S * sigma * sqrtT);
+        const vega = S * normPdf(d1) * sqrtT / 100;
+        const theta = (-S * normPdf(d1) * sigma / (2 * sqrtT) - r * K * Math.exp(-r * T) * normCdf(d2)) / 365;
+        const prob_itm = normCdf(d2);
+        return { delta, gamma, vega, theta, prob_itm };
+    };
+
+    let rowsHtml = '';
+    for (const cen of cenarios) {
+        const iv = ivBase * cen.ivMult;
+        const price = bsCall(spot, K, T, r, iv);
+        const greeks = bsGreeks(spot, K, T, r, iv);
+        const S_medio = spot * (1 + (cen.ivMult - 1) * 0.5);
+        const pnlEsperado = (greeks.prob_itm * Math.max(S_medio - K, 0) - price).toFixed(2);
+
+        const fmt = (v, d=2) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+        const pnlColor = parseFloat(pnlEsperado) >= 0 ? '#4caf50' : '#f44336';
+
+        rowsHtml += `
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); transition: background 0.2s;" onmouseover="this.style.background='rgba(33,150,243,0.08)'" onmouseout="this.style.background='transparent'">
+            <td style="padding: 12px;"><span style="color: ${cen.color}; font-weight: bold;">${cen.icon} ${cen.name}</span></td>
+            <td style="padding: 12px; text-align: right;">${fmt(iv * 100)}%</td>
+            <td style="padding: 12px; text-align: right; font-weight: bold;">R$ ${fmt(price)}</td>
+            <td style="padding: 12px; text-align: right;">${fmt(greeks.delta, 4)}</td>
+            <td style="padding: 12px; text-align: right;">${fmt(greeks.gamma, 6)}</td>
+            <td style="padding: 12px; text-align: right;">${fmt(greeks.vega, 4)}</td>
+            <td style="padding: 12px; text-align: right; color: #ff9800;">${fmt(greeks.theta, 4)}</td>
+            <td style="padding: 12px; text-align: right;">${fmt(greeks.prob_itm * 100, 1)}%</td>
+            <td style="padding: 12px; text-align: right; color: ${pnlColor}; font-weight: bold;">R$ ${pnlEsperado}</td>
+        </tr>`;
+    }
+
+    tbody.innerHTML = rowsHtml;
 };
 
 // Initialize charts when DOM is loaded
