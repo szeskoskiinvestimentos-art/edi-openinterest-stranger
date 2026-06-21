@@ -724,6 +724,37 @@ def main() -> int:
     sys.stdout.write(json.dumps(summary, ensure_ascii=False))
     return 2
 
+  # EDI safety check (E95b-prevention 2026-06-21): fonte stale?
+  try:
+    src_mtime = datetime.fromtimestamp(os.path.getmtime(src))
+    age_days = (datetime.now() - src_mtime).days
+    if age_days > 30:
+      summary["error"] = "source_stale"
+      summary["source_age_days"] = age_days
+      sys.stderr.write(f"ERRO: fonte stale ({age_days} dias, modified={src_mtime.isoformat()}). Abortando para nao sobrescrever dashboard_unificado/.\n")
+      sys.stderr.write("Dica: fonte foi renomeada/movida. Verifique antes de continuar.\n")
+      sys.stdout.write(json.dumps(summary, ensure_ascii=False))
+      return 4
+  except OSError as e:
+    sys.stderr.write(f"WARN: nao foi possivel checar idade da fonte: {e}\n")
+
+  # EDI safety check (E95b-prevention 2026-06-21): working tree dirty em dashboard_unificado/?
+  try:
+    r = subprocess.run(
+      ["git", "status", "--porcelain", "dashboard_unificado/"],
+      cwd=workspace_root, capture_output=True, text=True, timeout=5,
+    )
+    if r.stdout.strip():
+      summary["error"] = "working_tree_dirty"
+      summary["dirty_files"] = r.stdout.strip().splitlines()[:10]
+      sys.stderr.write("ERRO: working tree dirty em dashboard_unificado/. Committar antes de gerar.\n")
+      for line in r.stdout.strip().splitlines()[:10]:
+        sys.stderr.write(f"  {line}\n")
+      sys.stdout.write(json.dumps(summary, ensure_ascii=False))
+      return 5
+  except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+    sys.stderr.write(f"WARN: nao foi possivel checar git status: {e}\n")
+
   _safe_rmtree(staging)
   _ensure_dir(staging)
 

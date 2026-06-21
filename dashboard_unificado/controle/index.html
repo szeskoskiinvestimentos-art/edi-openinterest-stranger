@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" "no-cache">
+  <meta http-equiv="Expires" "0">
+  <title>EDI Market Guardin - Controle de Dados</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    .redirect-box { text-align: center; padding: 40px 20px; }
+    .redirect-box .countdown-num { font-size: 4rem; color: var(--primary-neon); text-shadow: var(--glow-red); font-family: 'Orbitron', sans-serif; font-weight: 900; }
+    .redirect-box p { margin: 12px 0; line-height: 1.7; color: var(--text-secondary); }
+    .redirect-box code { background: var(--dark-secondary); padding: 2px 8px; border-radius: 4px; color: var(--secondary-neon); font-family: 'Share Tech Mono', monospace; }
+  </style>
+</head>
+<body>
+  <div id="particles-js"></div>
+
+  <header class="header">
+    <div class="container">
+      <div class="logo">
+        <h1 class="logo-text">EDI MARKET GUARDIN</h1>
+        <div class="logo-subtitle">CONTROLE DE DADOS — WRAPPER CANÔNICO</div>
+      </div>
+      <div class="header-glow"></div>
+    </div>
+  </header>
+
+  <nav class="nav">
+    <div class="container" style="display:flex;align-items:center;position:relative;">
+      <div class="nav-center" style="flex:1;display:flex;justify-content:center;">
+        <ul class="nav-list" style="margin:0">
+          <li><a href="../index.html" class="nav-link">← Voltar ao HUB</a></li>
+        </ul>
+      </div>
+      <div class="nav-actions" style="position:absolute;right:0;top:50%;transform:translateY(-50%);">
+        <select id="assetSelect" data-current-dashboard="CONTROLE" aria-label="Selecionar dashboard" style="background:#141414;color:#e0e0e0;border:1px solid #333;padding:6px 10px;border-radius:4px;font-weight:700;">
+          <optgroup label="Dashboards">
+            <option value="HUB">Dashboard Unificado</option>
+            <option value="WDO">WDO</option>
+            <option value="WIN">WIN</option>
+          </optgroup>
+          <optgroup label="Mercado">
+            <option value="MERCADO">Cotações</option>
+            <option value="CORR">Correlações</option>
+            <option value="CONTROLE" selected>Controle</option>
+          </optgroup>
+        </select>
+      </div>
+    </div>
+  </nav>
+
+  <main class="main">
+    <div class="container">
+      <section class="section">
+        <div class="section-header">
+          <h2 class="section-title">CONTROLE DE DADOS</h2>
+          <div class="section-glow"></div>
+        </div>
+
+        <div class="context-box">
+          <h3>Wrapper canônico</h3>
+          <p>Este arquivo é o <strong>wrapper canônico</strong> do dashboard "Controle" no caminho <code>dashboard_unificado/controle/index.html</code>.</p>
+          <p>Resolve o <strong>phantom</strong> detectado na auditoria F1 (2026-06-21): o caminho era referenciado em docs, nav e supergráficos, mas o arquivo não existia.</p>
+          <p>O conteúdo vivo está em <code>controle_de_dados.html</code> (legado, raiz do projeto) — 14 cards dinâmicos sobre saúde de feeds, cobertura Yahoo, aderência Investing × Yahoo, curva Fed Funds, fluxo estrangeiro, TradingView, Sina, auditoria de faltantes, logs recentes.</p>
+          <p style="margin-top:20px;"><strong>Status do legado:</strong> 🔴 <em>paleta indigo divergente</em> — refatoração prevista em F3.5.</p>
+        </div>
+
+        <div class="redirect-box">
+          <p style="color:var(--text-primary);font-size:1.1rem;">Redirecionando automaticamente em</p>
+          <div class="countdown-num" id="countdown">2</div>
+          <p style="color:var(--text-muted);">segundos</p>
+          <p style="margin-top:30px;">
+            <a class="action-btn" href="../../controle_de_dados.html">ABRIR CONTROLE LEGADO AGORA →</a>
+          </p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 EDI Market Guardin. Wrapper canônico do Controle (legado em <code>controle_de_dados.html</code>).</p>
+      <p style="margin-top:8px;font-size:0.7rem;color:var(--text-muted);">Criado em F2 (2026-06-21) — auditoria inicial paralela + hygiene semântica.</p>
+    </div>
+  </footer>
+
+  <script src="../WDO/assets/js/particles.js"></script>
+  <script src="../shared/unified-nav.js"></script>
+  <script>
+    (function () {
+      var n = 2;
+      var span = document.getElementById('countdown');
+      var iv = setInterval(function () {
+        n--;
+        if (span) span.textContent = n;
+        if (n <= 0) {
+          clearInterval(iv);
+          window.location.replace('../../controle_de_dados.html');
+        }
+      }, 1000);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+# ============================================================
+# .edi_agent/.protected — MARKER FILE
+# ============================================================
+# Data de criação: 2026-06-21
+# Criado por: Hermes (F3.1 — investigar e mitigar perda da evolução)
+# Investigação: .edi_agent/workspace/auditoria_inicial_2026-06-21/F3_investigation_bat_cleanup.md
+#
+# PROPÓSITO
+# ----------------------------------------------------------
+# Este arquivo MARCA o diretório `.edi_agent/` como contendo
+# estado NÃO-REDUNDANTE que NÃO DEVE ser apagado por nenhuma
+# rotina de limpeza:
+#
+#   - `.edi_agent/workspace/` contém:
+#     - SESSION_LOG.md (histórico cronológico de sessões)
+#     - CURRENT_STATE.md (estado atual do projeto)
+#     - auto_evolution/evolution_log.md (log de todas evoluções E1-En)
+#     - auto_evolution/pending.md (próximas pendências)
+#     - auto_learning/{discoveries,patterns,lessons,metrics}.md (aprendizado)
+#     - checkpoints/ (checkpoints consolidados)
+#     - auditoria_*/ (relatórios de auditoria)
+#
+#   - `.edi_agent/snapshots/` contém snapshots versionados do projeto
+#     (regra: snapshots > 7 dias são purgados automaticamente — OK)
+#
+# REGRAS OBRIGATÓRIAS
+# ----------------------------------------------------------
+# 1. NUNCA execute `git clean -fd` neste projeto sem antes:
+#    a) Rodar `git status --porcelain --untracked-files=all`
+#    b) Commitar ou stash do trabalho valioso
+#    c) Confirmar que apenas arquivos `.tmp`, `.bak`, ou gerados podem sair
+#
+# 2. Qualquer novo script de cleanup (em scripts/hooks/ ou similar)
+#    DEVE verificar a existência deste arquivo antes de deletar
+#    qualquer coisa sob `.edi_agent/`:
+#
+#       if os.path.exists('.edi_agent/.protected') and target.startswith('.edi_agent/'):
+#           logger.warning(f"Refusing to delete {target} (.edi_agent is protected)")
+#           continue
+#
+# 3. Os .bat da raiz (Servico_Unificado*.bat, Publicar_Artefatos.bat)
+#    foram investigados em 2026-06-21 e o código ATUAL NÃO toca
+#    `.edi_agent/`. Mas se for detectado comportamento deletivo
+#    novamente, atualizar F3_investigation_bat_cleanup.md.
+#
+# HISTÓRICO
+# ----------------------------------------------------------
+# 2026-06-21 — F3.1 — Criado por Hermes após F1+F2+F3
+#                 Anomalia: arquivos F1 desapareceram entre 18:10
+#                 e 19:53. Causa exata não determinada; suspeita
+#                 principal: `git clean -fd` acidental em IDE.
+# ============================================================
