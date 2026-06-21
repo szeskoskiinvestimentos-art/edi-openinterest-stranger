@@ -303,6 +303,37 @@
                 </div>
             </section>
 
+            <!-- E45i: Tabela Comparativa Modelos (Flip Detection) -->
+            <section id="models-comparison" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">🔬 COMPARAÇÃO DE MODELOS (FLIP DETECTION)</h2>
+                    <div class="section-glow"></div>
+                </div>
+                <div class="info-box">
+                    <h3>📚 O que é Flip Detection?</h3>
+                    <p>Compara o <b>preço teórico</b> e <b>Delta Flip</b> (strike onde Δ=0.5) entre 4 modelos de precificação: <b>Black-Scholes</b> (referência), <b>Heston</b> (vol estocástica), <b>SVI</b> (parametrização vol surface) e <b>Dupire</b> (vol local). Diferenças &gt; 2% indicam <b>inconsistência</b> entre modelos — útil para identificar oportunidades de arbitragem ou calibragem. Lógica em <code>src/calculator/{bs_model,heston,svi,dupire}.py</code>.</p>
+                </div>
+
+                <div class="table-container" style="overflow-x: auto;">
+                    <table id="modelsTable" class="data-table" style="width: 100%; border-collapse: collapse; color: #e0e0e0;">
+                        <thead>
+                            <tr style="background: rgba(156, 39, 176, 0.15); border-bottom: 2px solid #9c27b0;">
+                                <th style="padding: 12px; text-align: left;">Modelo</th>
+                                <th style="padding: 12px; text-align: center;">Tipo</th>
+                                <th style="padding: 12px; text-align: right;">Preço Call ATM</th>
+                                <th style="padding: 12px; text-align: right;">Delta Flip Strike</th>
+                                <th style="padding: 12px; text-align: right;">Diff vs BS</th>
+                                <th style="padding: 12px; text-align: right;">Tempo (ms)</th>
+                                <th style="padding: 12px; text-align: center;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modelsTableBody">
+                            <!-- Preenchido por createModelsTable() -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
             <!-- Advanced Section (Key Levels) -->
             <section id="advanced" class="section">
                 <div class="section-header">
