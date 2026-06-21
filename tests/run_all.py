@@ -1296,6 +1296,27 @@ def test_win_has_models_table(golden: dict) -> tuple[bool, str]:
     return True, "E45i: WIN modelsTable + createModelsTable presentes"
 
 
+# --- E45j: Tabela Detalhada por Strike (Fig 3) ---
+def test_wdo_has_detailed_table(golden: dict) -> tuple[bool, str]:
+    """E45j: WDO tem tabela detailedTable + createDetailedTable."""
+    src = (ROOT / "dashboard_unificado" / "WDO" / "index.html").read_text(encoding="utf-8")
+    if 'id="detailedTable"' not in src:
+        return False, "E45j: detailedTable ausente em WDO/index.html"
+    if 'createDetailedTable' not in (ROOT / "dashboard_unificado" / "WDO" / "assets" / "js" / "charts.js").read_text(encoding="utf-8"):
+        return False, "E45j: createDetailedTable ausente em WDO/charts.js"
+    return True, "E45j: WDO detailedTable + createDetailedTable presentes"
+
+
+def test_win_has_detailed_table(golden: dict) -> tuple[bool, str]:
+    """E45j: WIN tem tabela detailedTable + createDetailedTable."""
+    src = (ROOT / "dashboard_unificado" / "WIN" / "index.html").read_text(encoding="utf-8")
+    if 'id="detailedTable"' not in src:
+        return False, "E45j: detailedTable ausente em WIN/index.html"
+    if 'createDetailedTable' not in (ROOT / "dashboard_unificado" / "WIN" / "assets" / "js" / "charts.js").read_text(encoding="utf-8"):
+        return False, "E45j: createDetailedTable ausente em WIN/charts.js"
+    return True, "E45j: WIN detailedTable + createDetailedTable presentes"
+
+
 def test_wdo_has_ntsl_code_block(golden: dict) -> tuple[bool, str]:
     from tests.test_dashboards import test_wdo_has_ntsl_code_block
     return _wrap_test("dash_wdo_ntsl_block", test_wdo_has_ntsl_code_block)
@@ -1508,6 +1529,8 @@ TESTS = {
     "dash_e45h_win_fair_value": ("E45h WIN fairValueTable", test_win_has_fair_value_table),
     "dash_e45i_wdo_models": ("E45i WDO modelsTable", test_wdo_has_models_table),
     "dash_e45i_win_models": ("E45i WIN modelsTable", test_win_has_models_table),
+    "dash_e45j_wdo_detailed": ("E45j WDO detailedTable", test_wdo_has_detailed_table),
+    "dash_e45j_win_detailed": ("E45j WIN detailedTable", test_win_has_detailed_table),
     "dash_win_assets": ("WIN assets externos existem", test_win_external_assets_exist),
     # --- VWAP E68 (16 testes) ---
     "vwap_basic": ("VWAP = Σ(P×V) / Σ(V)", test_vwap_basic),

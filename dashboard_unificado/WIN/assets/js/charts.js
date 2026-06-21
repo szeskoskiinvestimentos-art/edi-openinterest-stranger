@@ -128,6 +128,7 @@ class StrangerThingsCharts {
             this.createRangeWallsChart(data); // E45c: Range + Walls (top N clusters)
             this.createFairValueTable(data); // E45h: Fair Value Table (3 cenarios)
             this.createModelsTable(data); // E45i: Tabela comparativa modelos (Flip)
+            this.createDetailedTable(data); // E45j: Tabela detalhada por strike (Fig 3)
 
             this.updateMetrics(data);
             this.updateKeyLevels(data);
@@ -2711,6 +2712,157 @@ strangerThingsCharts.prototype.createModelsTable = function(data) {
             <td style="padding: 12px; text-align: right;">${diffCell}</td>
             <td style="padding: 12px; text-align: right; color: #999;">${fmt(r.elapsed, 2)}</td>
             <td style="padding: 12px; text-align: center; color: ${statusColor};">${status}</td>
+        </tr>`;
+    }
+
+    tbody.innerHTML = rowsHtml;
+};
+
+// E45j: Tabela Detalhada por Strike (Fig 3)
+strangerThingsCharts.prototype.createDetailedTable = function(data) {
+    const tbody = document.getElementById('detailedTableBody');
+    if (!tbody) return;
+
+    const spot = data.spot_price;
+    if (!spot) {
+        tbody.innerHTML = '<tr><td colspan="13" style="padding:12px; text-align:center; color:#999;">Spot indisponivel</td></tr>';
+        return;
+    }
+
+    const oiData = data.oi_data || {};
+    const strikes = oiData.strikes || [];
+    const callOI = oiData.call_oi || [];
+    const putOI = oiData.put_oi || [];
+    if (strikes.length === 0 || callOI.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="13" style="padding:12px; text-align:center; color:#999;">OI data indisponivel</td></tr>';
+        return;
+    }
+
+    const volData = data.volatility_data || {};
+    const ivArray = volData.iv_values || volData.iv || [];
+    const volSurfaceStrikes = volData.strikes || [];
+
+    const volDataObj = data.volume_data || {};
+    const volStrikesArr = volDataObj.strikes || [];
+    const callVol = volDataObj.call_volume || [];
+    const putVol = volDataObj.put_volume || [];
+
+    const r = 0.10;
+    const T = 30 / 365;
+
+    const normCdf = (x) => {
+        const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
+        const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+        const sign = x < 0 ? -1 : 1;
+        x = Math.abs(x) / Math.sqrt(2);
+        const t = 1.0 / (1.0 + p * x);
+        const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+        return 0.5 * (1.0 + sign * y);
+    };
+    const normPdf = (x) => Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+
+    const getIV = (K) => {
+        if (ivArray.length === 0 || volSurfaceStrikes.length === 0) return 0.15;
+        let minDiff = Infinity;
+        let iv = ivArray[0];
+        for (let i = 0; i < volSurfaceStrikes.length; i++) {
+            const d = Math.abs(volSurfaceStrikes[i] - K);
+            if (d < minDiff) {
+                minDiff = d;
+                iv = ivArray[i];
+            }
+        }
+        return (iv > 1 ? iv / 100 : iv);
+    };
+
+    const getCallVol = (K) => {
+        if (callVol.length === 0) return 0;
+        let minDiff = Infinity, v = 0;
+        for (let i = 0; i < volStrikesArr.length; i++) {
+            const d = Math.abs(volStrikesArr[i] - K);
+            if (d < minDiff) { minDiff = d; v = callVol[i]; }
+        }
+        return v || 0;
+    };
+    const getPutVol = (K) => {
+        if (putVol.length === 0) return 0;
+        let minDiff = Infinity, v = 0;
+        for (let i = 0; i < volStrikesArr.length; i++) {
+            const d = Math.abs(volStrikesArr[i] - K);
+            if (d < minDiff) { minDiff = d; v = putVol[i]; }
+        }
+        return v || 0;
+    };
+
+    const bsGreeksCall = (S, K, T, r, sigma) => {
+        if (T <= 0 || sigma <= 0) return { delta: 0, gamma: 0 };
+        const sqrtT = Math.sqrt(T);
+        const d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrtT);
+        return { delta: normCdf(d1), gamma: normPdf(d1) / (S * sigma * sqrtT) };
+    };
+    const bsGreeksPut = (S, K, T, r, sigma) => {
+        if (T <= 0 || sigma <= 0) return { delta: 0, gamma: 0 };
+        const sqrtT = Math.sqrt(T);
+        const d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrtT);
+        return { delta: normCdf(d1) - 1, gamma: normPdf(d1) / (S * sigma * sqrtT) };
+    };
+
+    const ranking = strikes.map((K, i) => ({
+        idx: i, K, totalOI: (callOI[i] || 0) + (putOI[i] || 0)
+    })).sort((a, b) => b.totalOI - a.totalOI).slice(0, 30);
+    const sortedIndices = ranking.map(r => r.idx).sort((a, b) => a - b);
+
+    let minDiff = Infinity;
+    let atmIdx = sortedIndices[0];
+    for (const i of sortedIndices) {
+        const d = Math.abs(strikes[i] - spot);
+        if (d < minDiff) { minDiff = d; atmIdx = i; }
+    }
+
+    const fmt = (v, d=0) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+    const fmtOI = (v) => v >= 1000 ? `${(v/1000).toFixed(1)}k` : v.toFixed(0);
+
+    let rowsHtml = '';
+    for (const i of sortedIndices) {
+        const K = strikes[i];
+        const iv = getIV(K);
+        const callOi = callOI[i] || 0;
+        const putOi = putOI[i] || 0;
+        const callVolVal = getCallVol(K);
+        const putVolVal = getPutVol(K);
+        const callGreeks = bsGreeksCall(spot, K, T, r, iv);
+        const putGreeks = bsGreeksPut(spot, K, T, r, iv);
+
+        const netOI = callOi - putOi;
+        const isATM = i === atmIdx;
+        const isITM_C = K < spot;
+        const isITM_P = K > spot;
+
+        const rowBg = isATM ? 'background: rgba(255, 235, 59, 0.15);' :
+                      (Math.abs(netOI) > 5000 ? 'background: rgba(244, 67, 54, 0.08);' : '');
+
+        const callDeltaColor = isITM_C ? '#4caf50' : '#888';
+        const putDeltaColor = isITM_P ? '#f44336' : '#888';
+        const netColor = netOI > 0 ? '#4caf50' : (netOI < 0 ? '#f44336' : '#999');
+        const netSign = netOI > 0 ? '🟢' : (netOI < 0 ? '🔴' : '⚪');
+        const sentiment = netOI > 1000 ? '🟢 Bullish' : (netOI < -1000 ? '🔴 Bearish' : '⚖️ Neutro');
+        const strikeStyle = isATM ? 'background: rgba(255, 235, 59, 0.25); font-weight: bold; color: #ffeb3b;' : 'background: rgba(255,255,255,0.05); font-weight: bold;';
+
+        rowsHtml += `
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); ${rowBg} transition: background 0.2s;" onmouseover="this.style.background='rgba(33,150,243,0.12)'" onmouseout="this.style.background='${rowBg}'">
+            <td style="padding: 8px; text-align: right; color: #4caf50;">${fmtOI(callOi)}</td>
+            <td style="padding: 8px; text-align: right; color: #66bb6a;">${fmtOI(callVolVal)}</td>
+            <td style="padding: 8px; text-align: right;">${fmt(iv * 100, 1)}%</td>
+            <td style="padding: 8px; text-align: right; color: ${callDeltaColor};">${fmt(callGreeks.delta, 3)}</td>
+            <td style="padding: 8px; text-align: right; border-right: 2px solid #555;">${fmt(callGreeks.gamma * 100, 4)}</td>
+            <td style="padding: 8px; text-align: center; ${strikeStyle}">${fmt(K, 0)}</td>
+            <td style="padding: 8px; text-align: right; color: #f44336; border-left: 2px solid #555;">${fmtOI(putOi)}</td>
+            <td style="padding: 8px; text-align: right; color: #ef5350;">${fmtOI(putVolVal)}</td>
+            <td style="padding: 8px; text-align: right;">${fmt(iv * 100, 1)}%</td>
+            <td style="padding: 8px; text-align: right; color: ${putDeltaColor};">${fmt(putGreeks.delta, 3)}</td>
+            <td style="padding: 8px; text-align: right;">${fmt(putGreeks.gamma * 100, 4)}</td>
+            <td style="padding: 8px; text-align: right; color: ${netColor}; font-weight: bold;">${netSign} ${fmt(netOI, 0)}</td>
+            <td style="padding: 8px; text-align: right;">${sentiment}</td>
         </tr>`;
     }
 

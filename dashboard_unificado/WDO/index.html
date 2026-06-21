@@ -401,6 +401,49 @@
                 </div>
             </section>
 
+            <!-- E45j: Tabela Detalhada Fig 3 (metricas por strike) -->
+            <section id="detailed-strikes" class="section">
+                <div class="section-header">
+                    <h2 class="section-title">📋 TABELA DETALHADA POR STRIKE (FIG 3)</h2>
+                    <div class="section-glow"></div>
+                </div>
+                <div class="info-box">
+                    <h3>📚 O que é a Tabela Detalhada?</h3>
+                    <p>Visão <b>completa por strike</b> combinando Call OI/Premium/Delta/Gamma + Put OI/Premium/Delta + Net (diferença). Strikes ATM destacados em <b>amarelo</b>, ITM/OTM diferenciados por cor. Linhas com <b>alto Net</b> (desequilíbrio) realçadas em vermelho — possíveis zonas de pressão vendedora/compradora. Mostra até 30 strikes mais líquidos (top por OI Total). Lógica em <code>src/calculator/bs_model.py</code> + <code>src/data_loader.py</code>.</p>
+                </div>
+
+                <div class="table-container" style="overflow-x: auto; max-height: 600px; overflow-y: auto;">
+                    <table id="detailedTable" class="data-table" style="width: 100%; border-collapse: collapse; color: #e0e0e0; font-size: 13px;">
+                        <thead style="position: sticky; top: 0; z-index: 10;">
+                            <tr style="background: rgba(76, 175, 80, 0.15); border-bottom: 2px solid #4caf50;">
+                                <th colspan="5" style="padding: 10px; text-align: center; color: #4caf50; border-right: 2px solid #555;">📈 CALLS</th>
+                                <th style="padding: 10px; text-align: center; background: rgba(255,255,255,0.05);">⚡ STRIKE</th>
+                                <th colspan="5" style="padding: 10px; text-align: center; color: #f44336; border-left: 2px solid #555;">📉 PUTS</th>
+                                <th colspan="2" style="padding: 10px; text-align: center; color: #ff9800;">⚖️ NET</th>
+                            </tr>
+                            <tr style="background: rgba(255,255,255,0.08); border-bottom: 1px solid #555;">
+                                <th style="padding: 8px; text-align: right;">OI</th>
+                                <th style="padding: 8px; text-align: right;">Premium</th>
+                                <th style="padding: 8px; text-align: right;">IV %</th>
+                                <th style="padding: 8px; text-align: right;">Delta</th>
+                                <th style="padding: 8px; text-align: right; border-right: 2px solid #555;">Gamma</th>
+                                <th style="padding: 8px; text-align: center; background: rgba(255,255,255,0.05);">Strike</th>
+                                <th style="padding: 8px; text-align: right; border-left: 2px solid #555;">OI</th>
+                                <th style="padding: 8px; text-align: right;">Premium</th>
+                                <th style="padding: 8px; text-align: right;">IV %</th>
+                                <th style="padding: 8px; text-align: right;">Delta</th>
+                                <th style="padding: 8px; text-align: right;">Gamma</th>
+                                <th style="padding: 8px; text-align: right;">Net OI</th>
+                                <th style="padding: 8px; text-align: right;">Sentiment</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detailedTableBody">
+                            <!-- Preenchido por createDetailedTable() -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
             <!-- Advanced Section (Key Levels) -->
             <section id="advanced" class="section">
                 <div class="section-header">
