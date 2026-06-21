@@ -225,7 +225,7 @@ for name, price in models.items():
 
 ### Q3 2026 (curto prazo)
 - [x] E74 Markovian Bergomi (resolve COS limitation)
-- [ ] E75 Monte Carlo rBergomi
+- [x] E75 Monte Carlo rBergomi (Honisch 2015) — circulant FFT method
 - [ ] E95 Code smell cleanup (except Exception)
 
 ### Q4 2026 (medio prazo)
