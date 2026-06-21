@@ -125,6 +125,7 @@ class StrangerThingsCharts {
             this.createDeltaAgregadoChart(data); // Added
             this.createSkewChart(data); // E45e: Skew IV dedicado
             this.createDiscoveryChart(data); // E45b: Strikes + Midwalls + Fibo
+            this.createRangeWallsChart(data); // E45c: Range + Walls (top N clusters)
 
             this.updateMetrics(data);
             this.updateKeyLevels(data);
@@ -2282,6 +2283,171 @@ strangerThingsCharts.prototype.createDiscoveryChart = function(data) {
                                 return `Fib @ ${ctx.dataset.fibStrike.toFixed(0)}`;
                             }
                             return `${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('pt-BR')}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'linear',
+                    title: { display: true, text: 'Strike', color: '#e0e0e0' },
+                    ticks: { color: '#e0e0e0', callback: (v) => v.toFixed(0) },
+                    grid: { color: 'rgba(255,255,255,0.05)' }
+                },
+                yOI: {
+                    title: { display: true, text: 'Open Interest', color: '#e0e0e0' },
+                    ticks: { color: '#e0e0e0', callback: (v) => v.toLocaleString('pt-BR') },
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+};
+
+// E45c: Range + Walls chart (top N clusters OI + range de precos)
+// Logica espelhada de src/discovery_levels.py:find_range_levels (E45d)
+strangerThingsCharts.prototype.createRangeWallsChart = function(data) {
+    const ctx = document.getElementById('rangeWallsChart');
+    if (!ctx) return;
+
+    const oiData = data.oi_data || {};
+    const strikes = oiData.strikes || data.strikes || [];
+    if (strikes.length === 0) {
+        console.warn('[E45c] Strikes data not available');
+        return;
+    }
+
+    const oiCall = oiData.call_oi || [];
+    const oiPut = oiData.put_oi || [];
+    if (oiCall.length !== strikes.length || oiPut.length !== strikes.length) {
+        console.warn('[E45c] OI arrays length mismatch');
+        return;
+    }
+
+    const oiTotal = strikes.map((_, i) => oiCall[i] + oiPut[i]);
+    const N_CLUSTERS = 5;
+
+    const sortedIdx = oiTotal
+        .map((v, i) => ({ v, i }))
+        .sort((a, b) => b.v - a.v)
+        .slice(0, N_CLUSTERS)
+        .map(x => x.i)
+        .sort((a, b) => a - b);
+
+    const topStrikes = sortedIdx.map(i => strikes[i]);
+    const topOI = sortedIdx.map(i => oiTotal[i]);
+    const topCallOI = sortedIdx.map(i => oiCall[i]);
+    const topPutOI = sortedIdx.map(i => oiPut[i]);
+
+    const totalOI = oiTotal.reduce((s, v) => s + v, 0);
+    const sortedByOI = oiTotal
+        .map((v, i) => ({ v, i }))
+        .sort((a, b) => b.v - a.v);
+
+    let cumOI = 0;
+    let rangeIndices = [];
+    for (const { v, i } of sortedByOI) {
+        cumOI += v;
+        rangeIndices.push(i);
+        if (cumOI >= 0.8 * totalOI) break;
+    }
+    rangeIndices.sort((a, b) => a - b);
+    const rangeLowStrike = strikes[rangeIndices[0]];
+    const rangeHighStrike = strikes[rangeIndices[rangeIndices.length - 1]];
+    const rangeWidth = rangeHighStrike - rangeLowStrike;
+
+    const datasets = [];
+
+    datasets.push({
+        label: 'OI Total (todos strikes)',
+        data: strikes.map((s, i) => ({ x: s, y: oiTotal[i] })),
+        backgroundColor: 'rgba(158, 158, 158, 0.25)',
+        borderColor: 'rgba(158, 158, 158, 0.4)',
+        borderWidth: 1,
+        type: 'bar',
+        yAxisID: 'yOI'
+    });
+
+    datasets.push({
+        label: `Top ${N_CLUSTERS} Walls (Call+Put)`,
+        data: topStrikes.map((s, i) => ({ x: s, y: topOI[i] })),
+        backgroundColor: topStrikes.map((s, i) => topCallOI[i] > topPutOI[i]
+            ? 'rgba(76, 175, 80, 0.85)'
+            : 'rgba(244, 67, 54, 0.85)'),
+        borderColor: topStrikes.map((s, i) => topCallOI[i] > topPutOI[i] ? '#4caf50' : '#f44336'),
+        borderWidth: 2,
+        type: 'bar',
+        yAxisID: 'yOI'
+    });
+
+    datasets.push({
+        label: `Range [${rangeLowStrike.toFixed(0)} - ${rangeHighStrike.toFixed(0)}] (80% OI)`,
+        data: [
+            { x: rangeLowStrike, y: Math.max(...oiTotal) * 1.15 },
+            { x: rangeHighStrike, y: Math.max(...oiTotal) * 1.15 },
+            { x: rangeHighStrike, y: 0 },
+            { x: rangeLowStrike, y: 0 }
+        ],
+        backgroundColor: 'rgba(33, 150, 243, 0.08)',
+        borderColor: 'rgba(33, 150, 243, 0.6)',
+        borderWidth: 2,
+        borderDash: [6, 4],
+        fill: true,
+        type: 'scatter',
+        showLine: true,
+        pointRadius: 0,
+        yAxisID: 'yOI',
+        rangeWidth: rangeWidth
+    });
+
+    const spot = data.spot_price || strikes[Math.floor(strikes.length / 2)];
+    datasets.push({
+        label: `Spot @ ${spot.toFixed(0)}`,
+        data: [
+            { x: spot, y: 0 },
+            { x: spot, y: Math.max(...oiTotal) * 1.15 }
+        ],
+        borderColor: 'rgba(255, 235, 59, 0.9)',
+        borderWidth: 2,
+        borderDash: [3, 3],
+        type: 'line',
+        pointRadius: 0,
+        fill: false,
+        yAxisID: 'yOI',
+        isSpot: true
+    });
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: { datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: `Edi - Range + Walls (Top ${N_CLUSTERS} Clusters OI)`,
+                    color: '#e0e0e0',
+                    font: { size: 14 }
+                },
+                legend: {
+                    display: true,
+                    labels: {
+                        color: '#e0e0e0',
+                        filter: (item) => !item.text.includes('todos strikes')
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+                            if (ctx.dataset.isSpot) {
+                                return `Spot: ${spot.toFixed(2)}`;
+                            }
+                            if (ctx.dataset.rangeWidth !== undefined) {
+                                return `Range width: ${ctx.dataset.rangeWidth.toFixed(0)} pts (80% OI)`;
+                            }
+                            return `${ctx.dataset.label}: Strike ${ctx.parsed.x.toFixed(0)} = ${ctx.parsed.y.toLocaleString('pt-BR')}`;
                         }
                     }
                 }

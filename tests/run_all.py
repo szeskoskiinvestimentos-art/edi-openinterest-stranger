@@ -1233,6 +1233,27 @@ def test_win_has_discovery_canvas(golden: dict) -> tuple[bool, str]:
     return True, "E45b: WIN discoveryChart canvas + createDiscoveryChart presentes"
 
 
+# --- E45c: Range + Walls chart (top N clusters OI) ---
+def test_wdo_has_range_walls_canvas(golden: dict) -> tuple[bool, str]:
+    """E45c: WDO tem canvas rangeWallsChart + createRangeWallsChart."""
+    src = (ROOT / "dashboard_unificado" / "WDO" / "index.html").read_text(encoding="utf-8")
+    if 'id="rangeWallsChart"' not in src:
+        return False, "E45c: rangeWallsChart canvas ausente em WDO/index.html"
+    if 'createRangeWallsChart' not in (ROOT / "dashboard_unificado" / "WDO" / "assets" / "js" / "charts.js").read_text(encoding="utf-8"):
+        return False, "E45c: createRangeWallsChart ausente em WDO/charts.js"
+    return True, "E45c: WDO rangeWallsChart canvas + createRangeWallsChart presentes"
+
+
+def test_win_has_range_walls_canvas(golden: dict) -> tuple[bool, str]:
+    """E45c: WIN tem canvas rangeWallsChart + createRangeWallsChart."""
+    src = (ROOT / "dashboard_unificado" / "WIN" / "index.html").read_text(encoding="utf-8")
+    if 'id="rangeWallsChart"' not in src:
+        return False, "E45c: rangeWallsChart canvas ausente em WIN/index.html"
+    if 'createRangeWallsChart' not in (ROOT / "dashboard_unificado" / "WIN" / "assets" / "js" / "charts.js").read_text(encoding="utf-8"):
+        return False, "E45c: createRangeWallsChart ausente em WIN/charts.js"
+    return True, "E45c: WIN rangeWallsChart canvas + createRangeWallsChart presentes"
+
+
 def test_wdo_has_ntsl_code_block(golden: dict) -> tuple[bool, str]:
     from tests.test_dashboards import test_wdo_has_ntsl_code_block
     return _wrap_test("dash_wdo_ntsl_block", test_wdo_has_ntsl_code_block)
@@ -1439,6 +1460,8 @@ TESTS = {
     "dash_e45e_win_skew": ("E45e WIN skewChart canvas", test_win_has_skew_canvas),
     "dash_e45b_wdo_discovery": ("E45b WDO discoveryChart canvas", test_wdo_has_discovery_canvas),
     "dash_e45b_win_discovery": ("E45b WIN discoveryChart canvas", test_win_has_discovery_canvas),
+    "dash_e45c_wdo_range_walls": ("E45c WDO rangeWallsChart canvas", test_wdo_has_range_walls_canvas),
+    "dash_e45c_win_range_walls": ("E45c WIN rangeWallsChart canvas", test_win_has_range_walls_canvas),
     "dash_win_assets": ("WIN assets externos existem", test_win_external_assets_exist),
     # --- VWAP E68 (16 testes) ---
     "vwap_basic": ("VWAP = Σ(P×V) / Σ(V)", test_vwap_basic),
