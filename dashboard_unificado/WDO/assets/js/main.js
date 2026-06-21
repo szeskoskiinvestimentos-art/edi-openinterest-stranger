@@ -556,7 +556,22 @@ Pressione ESC ou clique fora para fechar.`;
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.ediApp = new EDIApp();
-    
+
+    // E26: Inicializa Split-view WDO/WIN
+    if (window.EDI && window.EDI.splitView) {
+        // Para este dashboard, leftData = WDO (proprio) e rightData = WIN (do global)
+        // Se nao houver dados WIN separados, usa o mesmo marketData (modo espelho)
+        const wdoData = window.marketData || {};
+        const winData = window.marketDataWIN || window.marketData || {};
+        window.EDI.splitView.init({
+            containerId: 'edi-split-view-container',
+            leftData: wdoData,
+            rightData: winData,
+            leftLabel: 'WDO (S26 mini)',
+            rightLabel: 'WIN (S26 mini)'
+        });
+    }
+
     // Add welcome message
     setTimeout(() => {
         if (window.ediApp) {
