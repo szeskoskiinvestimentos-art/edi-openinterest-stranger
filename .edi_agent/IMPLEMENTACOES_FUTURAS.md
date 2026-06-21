@@ -1,25 +1,26 @@
 # IMPLEMENTACOES FUTURAS — EDI Market Guardian V0
 
-> **Versao**: 6.0
+> **Versao**: 7.0
 > **Data**: 2026-06-21
-> **Status**: **77 evolucoes concluidas (E1-E76, E80, E83)**
-> **Backlog novo**: E74, E75, E77, E78, E81, E82 + (heatmap, day-trade extras)
+> **Status**: **78 evolucoes concluidas (E1-E77, E80, E83)**
+> **Backlog novo**: E74, E75, E78, E81, E82 + (heatmap, day-trade extras)
 
 ---
 
 ## ESTADO ATUAL (atualizado 2026-06-20)
 
 ### Metricas atuais
-- **251/251 testes passando** (validado em `py -3.13 tests/run_all.py`)
-- **75 evolucoes implementadas** (E1-E76) — arsenal matematico de nivel institucional
-- **11 modelos matematicos** em `src/calculator/`:
+- **264/264 testes passando** (validado em `py -3.13 tests/run_all.py`)
+- **78 evolucoes implementadas** (E1-E77, E80, E83) — arsenal matematico de nivel institucional
+- **12 modelos matematicos** em `src/calculator/`:
   - Difusivos: BS, SABR, Volga, Veta
-  - Stoch vol: Heston, Dupire (local vol), SVI, **Bates (Heston+Merton)** [E76]
+  - Stoch vol: Heston, Dupire (local vol), SVI, **Bates (Heston+Merton)** [E76], **Rough Heston** [E77]
   - Jump-diffusion: Merton (1976), Kou (2002)
   - Rough vol: Rough Bergomi (Bayer-Friz-Gatheral 2016)
   - Operacional: VWAP, Position, Kelly
 - **5 dashboards** com tema Neon Terminal (HUB, WDO, WIN, MERCADO, CORR)
 - **Day-trade tools (E80)** — P&L ticker + alerts panel em WDO/WIN
+- **Greeks Heatmap (E83)** — heatmap CSS-based (5 greeks × 28 strikes) em WDO/WIN
 - **Pipeline Python unificado** (`scripts/orquestrador.py`)
 - **Snapshot pre-run** automatico via `Servico_Unificado_SAFE.bat`
 - **CI** com GitHub Actions + pre-commit hook
@@ -37,6 +38,7 @@
 - **E72 Kou double-exponential** ✅ — `src/calculator/kou.py` (15 testes)
 - **E73 Rough Bergomi** ✅ — `src/calculator/rough_bergomi.py` (13 testes) — **FRONTIER MODEL**
 - **E76 Bates (Heston+Merton)** ✅ — `src/calculator/bates.py` (13 testes) — combinado
+- **E77 Rough Heston** ✅ — `src/calculator/rough_heston.py` (12 testes) — rough vol + mean reversion
 
 ### Evolucoes recentes (Fase C: Day-Trade) — ✅ TODAS FEITAS
 - **E80 Day-Trade Tools** ✅ — `dashboard_unificado/shared/js/daytrade-tools.js` (289 linhas) + `css/daytrade-tools.css` (218 linhas)
@@ -78,6 +80,7 @@ src/calculator/            # 19 submodules
 ├── kou.py                 # Kou 2002 asym jumps (E72) - NEW
 ├── rough_bergomi.py       # rBergomi 2016 (E73) - NEW
 ├── bates.py               # Bates 1996 (E76) Heston+Merton - NEW
+├── rough_heston.py       # Rough Heston (E77) rough vol + mean reversion - NEW
 ├── vwap.py                # VWAP intraday (E68) - NEW
 ├── position.py            # Position P&L (E66) - NEW
 └── kelly.py               # Kelly Criterion (E67) - NEW
@@ -253,9 +256,10 @@ for name, price in models.items():
 | 29 | `017a1ea` | E73 Rough Bergomi |
 | 30 | `pending` | **E76 Bates (Heston+Merton)** + E80 Day-Trade Tools |
 | 31 | `pending` | **E83 Greeks Heatmap** (CSS-based, 5×28 matrix) |
-| 31+ | ... | Atualizacoes deste documento |
+| 32 | `pending` | **E77 Rough Heston** (rough vol + mean reversion) |
+| 32+ | ... | Atualizacoes deste documento |
 
-|Total: 32+ commits na sessão, +141 testes (102→251), 11 modelos matemáticos, 4 features UI (P&L ticker, alerts, heatmap, neon theme).|
+|Total: 33+ commits na sessão, +154 testes (102→264), 12 modelos matemáticos, 4 features UI (P&L ticker, alerts, heatmap, neon theme).|
 
 ---
 

@@ -1171,6 +1171,60 @@ def test_rbergomi_class_invalid_params_raise(golden: dict) -> tuple[bool, str]:
     return _wrap_test("rberg_class_invalid", test_rbergomi_class_invalid_params_raise)
 
 
+# --- test_rough_heston.py (12 testes E77) ---
+def test_rough_heston_call_atm_basic(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_heston import test_rough_heston_call_atm_basic
+    return _wrap_test("rh_call_atm", test_rough_heston_call_atm_basic)
+
+def test_rough_heston_call_itm_otm(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_heston import test_rough_heston_call_itm_otm
+    return _wrap_test("rh_itm_otm", test_rough_heston_call_itm_otm)
+
+def test_rough_heston_nu_zero_is_bs(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_heston import test_rough_heston_nu_zero_is_bs
+    return _wrap_test("rh_nu0_bs", test_rough_heston_nu_zero_is_bs)
+
+def test_rough_heston_kappa_zero_is_rbergomi(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_heston import test_rough_heston_kappa_zero_is_rbergomi
+    return _wrap_test("rh_kappa0_rberg", test_rough_heston_kappa_zero_is_rbergomi)
+
+def test_rough_heston_zero_T_returns_intrinsic(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_heston import test_rough_heston_zero_T_returns_intrinsic
+    return _wrap_test("rh_t0", test_rough_heston_zero_T_returns_intrinsic)
+
+def test_rough_heston_invalid_params_raises(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_heston import test_rough_heston_invalid_params_raises
+    return _wrap_test("rh_invalid", test_rough_heston_invalid_params_raises)
+
+def test_rough_heston_model_class_call(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_heston import test_rough_heston_model_class_call
+    return _wrap_test("rh_oo_func", test_rough_heston_model_class_call)
+
+def test_rough_heston_is_rough(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_heston import test_rough_heston_is_rough
+    return _wrap_test("rh_is_rough", test_rough_heston_is_rough)
+
+def test_rough_heston_is_classical_heston(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_heston import test_rough_heston_is_classical_heston
+    return _wrap_test("rh_is_classical", test_rough_heston_is_classical_heston)
+
+def test_rough_heston_is_rbergomi_limit(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_heston import test_rough_heston_is_rbergomi_limit
+    return _wrap_test("rh_is_rberg_limit", test_rough_heston_is_rbergomi_limit)
+
+def test_rough_heston_mean_reversion_effect(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_heston import test_rough_heston_mean_reversion_effect
+    return _wrap_test("rh_mean_rev", test_rough_heston_mean_reversion_effect)
+
+def test_rough_heston_put_call_parity(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_heston import test_rough_heston_put_call_parity
+    return _wrap_test("rh_parity", test_rough_heston_put_call_parity)
+
+def test_rough_heston_repr(golden: dict) -> tuple[bool, str]:
+    from tests.test_rough_heston import test_rough_heston_repr
+    return _wrap_test("rh_repr", test_rough_heston_repr)
+
+
 # --- test_bates.py (13 testes E76) ---
 def test_bates_call_atm_basic(golden: dict) -> tuple[bool, str]:
     from tests.test_bates import test_bates_call_atm_basic
@@ -1648,6 +1702,20 @@ TESTS = {
     "rberg_rough_check": ("rBerg is_rough e is_classical_bergomi", test_rbergomi_is_rough_property),
     "rberg_call_pos": ("rBerg call sempre >= 0", test_rbergomi_call_positive),
     "rberg_class_invalid": ("rBerg construtor valida 4 params", test_rbergomi_class_invalid_params_raise),
+    # --- Rough Heston E77 (12 testes) ---
+    "rh_call_atm": ("Rough Heston call ATM basico", test_rough_heston_call_atm_basic),
+    "rh_itm_otm": ("Rough Heston ITM > OTM", test_rough_heston_call_itm_otm),
+    "rh_nu0_bs": ("Rough Heston ν=0 degenera em BS", test_rough_heston_nu_zero_is_bs),
+    "rh_kappa0_rberg": ("Rough Heston κ=0 -> limite rBergomi", test_rough_heston_kappa_zero_is_rbergomi),
+    "rh_t0": ("Rough Heston T=0 -> intrinseco", test_rough_heston_zero_T_returns_intrinsic),
+    "rh_invalid": ("Rough Heston valida 6 parametros", test_rough_heston_invalid_params_raises),
+    "rh_oo_func": ("RoughHestonModel == funcao", test_rough_heston_model_class_call),
+    "rh_is_rough": ("Rough Heston is_rough (H<0.5)", test_rough_heston_is_rough),
+    "rh_is_classical": ("Rough Heston is_classical_heston (H=0.5)", test_rough_heston_is_classical_heston),
+    "rh_is_rberg_limit": ("Rough Heston is_rbergomi_limit (κ=0+H<0.5)", test_rough_heston_is_rbergomi_limit),
+    "rh_mean_rev": ("Rough Heston mean reversion v0->theta", test_rough_heston_mean_reversion_effect),
+    "rh_parity": ("Rough Heston paridade put-call", test_rough_heston_put_call_parity),
+    "rh_repr": ("RoughHestonModel repr tem 6 campos", test_rough_heston_repr),
     # --- Bates E76 (13 testes) ---
     "bates_atm": ("Bates call ATM basico", test_bates_call_atm_basic),
     "bates_itm_otm": ("Bates ITM > OTM", test_bates_call_itm_otm),
