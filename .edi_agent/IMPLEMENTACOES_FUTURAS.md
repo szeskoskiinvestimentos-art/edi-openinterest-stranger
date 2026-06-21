@@ -224,7 +224,7 @@ for name, price in models.items():
 ## ROADMAP
 
 ### Q3 2026 (curto prazo)
-- [ ] E74 Markovian Bergomi (resolve COS limitation)
+- [x] E74 Markovian Bergomi (resolve COS limitation)
 - [ ] E75 Monte Carlo rBergomi
 - [ ] E95 Code smell cleanup (except Exception)
 
