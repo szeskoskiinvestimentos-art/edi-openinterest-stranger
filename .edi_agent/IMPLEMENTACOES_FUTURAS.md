@@ -1,9 +1,9 @@
 # IMPLEMENTACOES FUTURAS — EDI Market Guardian V0
 
-> **Versao**: 5.0
+> **Versao**: 6.0
 > **Data**: 2026-06-21
-> **Status**: **75 evolucoes concluidas (E1-E76)**, E80 em progresso
-> **Backlog novo**: E74, E75 (Markovian/MC rBergomi), E80+ (day-trade features)
+> **Status**: **77 evolucoes concluidas (E1-E76, E80, E83)**
+> **Backlog novo**: E74, E75, E77, E78, E81, E82 + (heatmap, day-trade extras)
 
 ---
 
@@ -38,12 +38,22 @@
 - **E73 Rough Bergomi** ✅ — `src/calculator/rough_bergomi.py` (13 testes) — **FRONTIER MODEL**
 - **E76 Bates (Heston+Merton)** ✅ — `src/calculator/bates.py` (13 testes) — combinado
 
-### Evolucoes recentes (Fase C: Day-Trade) — 🚧 EM PROGRESSO
-- **E80 Day-Trade Tools** 🚧 — `dashboard_unificado/shared/js/daytrade-tools.js` (289 linhas) + `css/daytrade-tools.css` (218 linhas)
+### Evolucoes recentes (Fase C: Day-Trade) — ✅ TODAS FEITAS
+- **E80 Day-Trade Tools** ✅ — `dashboard_unificado/shared/js/daytrade-tools.js` (289 linhas) + `css/daytrade-tools.css` (218 linhas)
   - P&L Ticker: widget fixo canto inferior direito, gerencia posicoes (long/short) via localStorage, computa P&L em tempo real
   - Alerts Panel: monitor de thresholds (spot_above, spot_below) com persistencia
   - Auto-inject CSS, auto-init em DOMContentLoaded, failsafe (erros silenciosos)
   - Integrado em WDO/WIN dashboards (testado, sem regressoes)
+
+### Evolucoes recentes (Fase D: Visualizacao) — ✅ TODAS FEITAS
+- **E83 Greeks Heatmap** ✅ — `dashboard_unificado/shared/js/greeks-heatmap.js` (241 linhas) + `css/greeks-heatmap.css` (121 linhas)
+  - Heatmap CSS-based (sem Chart.js plugin), 5 greeks × 28 strikes
+  - 3 modos toggle: exposure (valores brutos) / cumulative (soma ate strike) / sign (verde/vermelho)
+  - Color mapping diverging (azul-vermelho) com normalizacao por linha
+  - Spot line highlight (coluna mais proxima do spot fica destacada)
+  - Hover scale + tooltip, sticky headers, mobile-friendly (overflow-x)
+  - Auto-inject CSS, auto-mount em container #greeks-heatmap-container (ou fallback pro main)
+  - Integrado em WDO/WIN dashboards
 
 ### Bugs corrigidos nesta fase
 - **Merton drift compensation** (commit `083b2198`): paridade put-call NÃO se aplica a modelos com saltos discretos; fix usa `r_compensated = r − λ·κ` no BS subjacente
@@ -74,9 +84,11 @@ src/calculator/            # 19 submodules
 dashboard_unificado/shared/
 ├── js/
 │   ├── chart_data_utils.js
-│   └── daytrade-tools.js  # E80: P&L ticker + alerts
+│   ├── daytrade-tools.js  # E80: P&L ticker + alerts
+│   └── greeks-heatmap.js  # E83: Greeks heatmap
 └── css/
-    └── daytrade-tools.css # E80: neon theme
+    ├── daytrade-tools.css # E80: neon theme
+    └── greeks-heatmap.css # E83: heatmap theme
 src/greeks.py              # Black-Scholes engine
 src/config.py              # Configuracoes
 src/tradingview_fetcher.py # Spot prices TradingView
@@ -240,9 +252,10 @@ for name, price in models.items():
 | 28 | `083b2198` | E72 Kou + Merton bugfix |
 | 29 | `017a1ea` | E73 Rough Bergomi |
 | 30 | `pending` | **E76 Bates (Heston+Merton)** + E80 Day-Trade Tools |
-| 30+ | ... | Atualizacoes deste documento |
+| 31 | `pending` | **E83 Greeks Heatmap** (CSS-based, 5×28 matrix) |
+| 31+ | ... | Atualizacoes deste documento |
 
-|Total: 31+ commits na sessão, +141 testes (102→251), 11 modelos matemáticos, 2 features UI (P&L ticker + alerts).|
+|Total: 32+ commits na sessão, +141 testes (102→251), 11 modelos matemáticos, 4 features UI (P&L ticker, alerts, heatmap, neon theme).|
 
 ---
 
