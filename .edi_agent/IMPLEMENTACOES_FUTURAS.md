@@ -227,7 +227,7 @@ for name, price in models.items():
 - [x] E74 Markovian Bergomi (resolve COS limitation)
 - [x] E75 Monte Carlo rBergomi (Honisch 2015) — circulant FFT method
 - [x] E26 Split-view WDO/WIN (3 modos: parallel/diff/overlay)
-- [ ] E95 Code smell cleanup (except Exception)
+- [x] E95 Code smell cleanup — safe_ops.py + tipagem de excecoes
 
 ### Q4 2026 (medio prazo)
 - [ ] E76 Bates (Heston+Merton combinados)

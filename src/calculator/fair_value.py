@@ -60,7 +60,7 @@ class FairValueMixin:
                 'spots': spots_sim,
                 'pnl': np.array(mm_pnl)
             }
-        except Exception as e:
+        except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:
             logger.error(f"Error calculating MM PnL: {e}")
             self.mm_pnl_simulation = None
 
@@ -79,7 +79,7 @@ class FairValueMixin:
             iv_arr = np.asarray(self.iv_strike_ref, dtype=float)
             if iv_arr.size == strikes_arr.size:
                 iv_sorted = iv_arr[order]
-        except Exception as e:
+        except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:
             logger.debug("[E95] calculate_fair_value_scenario failed: %s", e)
             iv_sorted = None
 

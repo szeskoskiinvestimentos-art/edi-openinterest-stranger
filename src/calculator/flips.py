@@ -117,7 +117,7 @@ class FlipsMixin:
                 return float(x1 if y2==y1 else x1 - y1*(x2 - x1)/(y2 - y1))
             else:
                 return float(ks[int(np.argmin(np.abs(gex_cum_hvl)))])
-        except Exception as e:
+        except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:
             logger.debug("[E95] operation failed: %s", e)
             return None
 
@@ -138,7 +138,7 @@ class FlipsMixin:
                 flips['Spline'] = float(roots_arr[np.argmin(np.abs(roots_arr - spot))])
             else:
                 flips['Spline'] = flips['Classic']
-        except Exception as e:
+        except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:
             logger.debug("[E95] calculate_gamma_flip_variations failed: %s", e)
             flips['Spline'] = flips['Classic']
 
@@ -168,7 +168,7 @@ class FlipsMixin:
             gex_smooth = gaussian_filter1d(self.gex_flip_base, sigma=sigma_gauss)
             gex_cum_gauss = np.cumsum(gex_smooth)
             flips['HVL Gaussian'] = self._find_zero_cross(strikes, gex_cum_gauss, spot)
-        except Exception as e:
+        except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:
             logger.debug("[E95] operation failed: %s", e)
             flips['HVL Gaussian'] = flips['Classic']
 
@@ -271,8 +271,7 @@ class FlipsMixin:
                     flips.append(x1)
                     continue
                 flips.append(float(x1 - y1 * (x2 - x1) / (y2 - y1)))
-
-        except Exception as e:
+        except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:
             logger.debug("[E95] operation failed: %s", e)
             flips = [None] * len(alphas)
 
@@ -290,7 +289,7 @@ class FlipsMixin:
                     v = v.strip().replace('%', '').replace('.', '').replace(',', '.')
                 x = float(v)
                 return x if np.isfinite(x) else None
-            except Exception as e:
+            except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:
                 logger.debug("[E95] _to_float failed: %s", e)
                 return None
 

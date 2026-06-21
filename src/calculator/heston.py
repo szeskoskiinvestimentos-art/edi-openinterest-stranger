@@ -360,7 +360,7 @@ class HestonModel:
                 try:
                     model_price = model.call_price(S0, K, T, r)
                     sq_err += (model_price - mkt_price) ** 2
-                except Exception as e:
+                except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:
                     logger.debug("[E95] _objective failed: %s", e)
                     return 1e10
             return sq_err

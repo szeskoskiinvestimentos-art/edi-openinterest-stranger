@@ -4,6 +4,8 @@ import os
 from typing import Any, Callable, Optional, TypeVar
 from dotenv import load_dotenv
 
+from src.safe_ops import safe_call
+
 logger = logging.getLogger(__name__)
 
 # Carrega variáveis do arquivo .env se existir (Fallback)
@@ -54,7 +56,8 @@ def get_val(manual_val: Any, env_key: str, default: T = None, cast: Optional[Cal
                     return type(default)(env_val)  # type: ignore
                 return env_val  # type: ignore
             return cast(env_val)
-        except:
+        except (ValueError, TypeError) as e:
+            logger.debug(f"get_val({env_key}) cast falhou: {e}")
             return default  # type: ignore
     if manual_val is not None and manual_val != "":
         return manual_val  # type: ignore
@@ -73,7 +76,8 @@ def _compute_display_scale() -> float:
     if direct_scale is not None and direct_scale != "":
         try:
             return float(direct_scale)
-        except:
+        except (ValueError, TypeError) as e:
+            logger.debug(f"DISPLAY_SCALE_FACTOR invalido: {e}")
             pass
     ewz = float(SCALING_EWZ_REF_CLOSE or 0.0)
     idx = float(SCALING_INDEX_REF_CLOSE or 0.0)

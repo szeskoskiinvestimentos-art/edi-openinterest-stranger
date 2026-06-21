@@ -98,7 +98,7 @@ def dupire_local_vol_from_surface(
         spline_dC_dK = RectBivariateSpline(T_grid, K_grid, dC_dK_grid, kx=1, ky=1, s=0)
         spline_d2C_dK2 = RectBivariateSpline(T_grid, K_grid, d2C_dK2_grid, kx=1, ky=1, s=0)
         spline_dC_dT = RectBivariateSpline(T_grid, K_grid, dC_dT_grid, kx=1, ky=1, s=0)
-    except Exception as e:
+    except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:
         logger.error("Falha no spline: %s", e)
         return np.nan
 
@@ -159,7 +159,7 @@ def dupire_local_vol_grid(
                 sigma_grid[i, j] = dupire_local_vol_from_surface(
                     k, t, K_grid, T_grid, C_grid, r, q,
                 )
-            except Exception as e:
+            except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:
                 logger.debug("[E95] dupire_local_vol_grid failed: %s", e)
                 sigma_grid[i, j] = np.nan
 

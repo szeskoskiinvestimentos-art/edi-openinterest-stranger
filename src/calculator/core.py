@@ -18,6 +18,7 @@ from typing import Any, Optional, TypedDict, cast
 from src.calculator.flips import FlipsMixin
 from src.calculator.greeks_exposure import GreeksExposureMixin
 from src.calculator.volatility import VolatilityMixin
+from src.safe_ops import safe_default
 from src.calculator.walls import WallsMixin
 from src.calculator.fair_value import FairValueMixin
 
@@ -154,7 +155,7 @@ class OptionsCalculator(FlipsMixin, GreeksExposureMixin, VolatilityMixin, WallsM
                 expiry_min = None
                 try:
                     expiry_min = pd.to_datetime(df_iv["Expiry"], errors="coerce").dropna().min()
-                except Exception as e:
+                except (ValueError, TypeError, KeyError) as e:
                     logger.debug("Falha ao parsear coluna Expiry (dataframe sem col Expiry ou formato invalido): %s", e)
                     expiry_min = None
                 if expiry_min is not None and pd.notnull(expiry_min):
@@ -283,15 +284,18 @@ class OptionsCalculator(FlipsMixin, GreeksExposureMixin, VolatilityMixin, WallsM
         # Auto-chamar calculate_greeks_exposure se ainda nao foi calculado
         # Isso garante que gex_cum_signed, gex_flip_base, etc. existam.
         if not hasattr(self, "gex_cum_signed") or self.gex_cum_signed is None:
-            try:
-                self.calculate_greeks_exposure()
-            except Exception as e:
-                logger.error(f"Erro ao calcular greeks_exposure automaticamente: {e}")
+            if not safe_default(
+                lambda: self.calculate_greeks_exposure() or True,
+                default=False,
+                logger=logger,
+                log_msg="calculate_greeks_exposure (auto-init)"
+            ):
                 return
 
+        # Substituido para usar tipos especificos em vez de Exception generica
         try:
             self.gamma_flip = self._find_zero_cross(self.strikes_ref, self.gex_cum_signed, self.spot)
-        except Exception as e:
+        except (ValueError, TypeError, IndexError, KeyError) as e:
             logger.error(f"Erro ao calcular Gamma Flip: {e}")
             self.gamma_flip = None
 
@@ -308,7 +312,7 @@ class OptionsCalculator(FlipsMixin, GreeksExposureMixin, VolatilityMixin, WallsM
                     self.zero_gamma_level = float(x1 - y1 * (x2 - x1) / (y2 - y1))
                 else:
                     self.zero_gamma_level = float(x1)
-        except Exception as e:
+        except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:
             logger.debug("Falha ao calcular zero_gamma_level via interpolacao, usando gamma_flip como fallback: %s", e)
             self.zero_gamma_level = self.gamma_flip
 
@@ -318,7 +322,7 @@ class OptionsCalculator(FlipsMixin, GreeksExposureMixin, VolatilityMixin, WallsM
             self.call_wall = self.strikes_ref[np.argmax(np.array(self.gex_call_tot))]
             self.put_wall = self.strikes_ref[np.argmax(np.array(self.gex_put_tot))]
             self.calculate_effective_walls()
-        except:
+        except (ValueError, TypeError, IndexError, AttributeError):
             self.call_wall = self.spot
             self.put_wall = self.spot
             self.effective_call_wall = self.spot
@@ -328,7 +332,7 @@ class OptionsCalculator(FlipsMixin, GreeksExposureMixin, VolatilityMixin, WallsM
             self.midwalls_strikes = (self.strikes_ref[:-1] + self.strikes_ref[1:]) / 2
             self.midwalls_call = (self.oi_call_ref[:-1] + self.oi_call_ref[1:]) / 2
             self.midwalls_put  = (self.oi_put_ref[:-1]  + self.oi_put_ref[1:]) / 2
-        except:
+        except (ValueError, TypeError, IndexError, AttributeError):
             self.midwalls_strikes = np.array([])
             self.midwalls_call = np.array([])
             self.midwalls_put = np.array([])
@@ -343,7 +347,7 @@ class OptionsCalculator(FlipsMixin, GreeksExposureMixin, VolatilityMixin, WallsM
                 for p in fib_percs:
                     self.fib_levels.append(lower + p*dist)
             self.fib_levels = np.array(self.fib_levels)
-        except:
+        except (ValueError, TypeError, IndexError, AttributeError):
             self.fib_levels = np.array([])
 
         self.r_gamma_exposure = self.gex_flip_base
@@ -354,30 +358,21 @@ class OptionsCalculator(FlipsMixin, GreeksExposureMixin, VolatilityMixin, WallsM
         self.flow_sentiment = {}
         self.gamma_flip_cone = {}
 
-        try:
-            self.calculate_gamma_flip_variations()
-        except Exception as e:
-            logger.error(f"Error calculating flip variations: {e}")
-
-        try:
-            self.calculate_delta_flip_profile()
-        except Exception as e:
-            logger.error(f"Error calculating delta flip profile: {e}")
-
-        try:
-            self.calculate_gamma_flip_cone()
-        except Exception as e:
-            logger.error(f"Error calculating gamma flip cone: {e}")
-
-        try:
-            self.calculate_flow_sentiment()
-        except Exception as e:
-            logger.error(f"Error calculating flow sentiment: {e}")
-
-        try:
-            self.calculate_expected_moves()
-        except Exception as e:
-            logger.error(f"Error calculating expected moves: {e}")
+        # Calculos secundarios: falhas isoladas nao impedem o resto
+        for method_name, error_msg in [
+            ("calculate_gamma_flip_variations", "flip variations"),
+            ("calculate_delta_flip_profile", "delta flip profile"),
+            ("calculate_gamma_flip_cone", "gamma flip cone"),
+            ("calculate_flow_sentiment", "flow sentiment"),
+            ("calculate_expected_moves", "expected moves"),
+        ]:
+            method = getattr(self, method_name, None)
+            if method is None:
+                continue
+            try:
+                method()
+            except (ValueError, TypeError, KeyError, IndexError, AttributeError) as e:
+                logger.error(f"Error calculating {error_msg}: {e}")
 
         try:
             self.calculate_mm_pnl_simulation()

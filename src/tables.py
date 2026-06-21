@@ -122,7 +122,7 @@ def create_model_comparison_table(calc):
     sf = getattr(settings, "DISPLAY_SCALE_FACTOR", 1.0)
     try:
         spot = float(getattr(calc, "spot", 0.0)) * float(sf)
-    except Exception as e:
+    except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:
         logger.debug("[E95] create_model_comparison_table failed: %s", e)
         spot = 0.0
 
@@ -134,7 +134,7 @@ def create_model_comparison_table(calc):
     def add_row(modelo, val):
         try:
             v = float(val) * float(sf)
-        except Exception as e:
+        except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:
             logger.debug("[E95] add_row failed: %s", e)
             return
         if not np.isfinite(v):
@@ -211,7 +211,7 @@ def create_fed_rates_table(options_df=None, spot=None, expiry=None):
             with open(p, "r", encoding="utf-8") as f:
                 data = json.load(f) or {}
             break
-        except Exception as e:
+        except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:
             logger.debug("[E95] create_fed_rates_table failed: %s", e)
             data = {}
 
@@ -342,7 +342,7 @@ def create_most_actives_table(options_df):
             return '-'
         try:
             return f"{format_number_br(float(iv_val), 1)}%"
-        except Exception as e:
+        except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:
             logger.debug("[E95] fmt_iv failed: %s", e)
             return '-'
     

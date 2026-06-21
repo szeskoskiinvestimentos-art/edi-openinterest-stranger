@@ -1,12 +1,14 @@
 import logging
 
+from src.safe_ops import safe_default
+
 logger = logging.getLogger(__name__)
 
 
 def format_number_br(value, decimals=2, prefix="", suffix=""):
     """
     Formata números no padrão brasileiro (1.234,56).
-    
+
     Args:
         value (float/int): Valor numérico
         decimals (int): Casas decimais
@@ -15,10 +17,14 @@ def format_number_br(value, decimals=2, prefix="", suffix=""):
     """
     if value is None:
         return "-"
-        
-    try:
-        val = float(value)
-    except:
+
+    val = safe_default(
+        lambda: float(value),
+        default=None,
+        logger=logger,
+        log_msg=f"format_number_br converteu {value!r} para float"
+    )
+    if val is None:
         return str(value)
         
     # Formata com vírgula como separador decimal e ponto como milhar
@@ -59,6 +65,6 @@ def parse_and_scale_walls(txt, scale):
                 except ValueError:
                     scaled_parts.append(p) # Mantém texto original se não for número
         return values, ' | '.join(scaled_parts)
-    except Exception as e:
+    except (ValueError, TypeError, IndexError, KeyError, AttributeError) as e:
         logger.warning("[E95] parse_and_scale_walls failed: %s", e)
         return [], txt
