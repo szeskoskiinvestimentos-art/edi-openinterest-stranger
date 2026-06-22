@@ -232,6 +232,20 @@ Owner pediu: "ajustar o sistema para que eu possa usar ele. Teste as coletas de 
 - **Yahoo fallback compensa** Barchart E97
 - Ver [[Problemas/Problema — FORCE.bat v4.0 validacao 2026-06-22]] para detalhes
 
+### Atualização 2026-06-22 20:00 (FORCE.bat v4.0 — 5 BUGS CRÍTICOS CORRIGIDOS)
+- **HEAD atual**: `0dd6b03f`
+- **5 commits aplicados** (e06c230e, 962d7413, a21cc389, 0dd6b03f, f8ea33dc):
+  1. `timeout` GNU → `ping -n` (cmd.exe nativo, 6 ocorrências)
+  2. `PROJECT_ROOT` via `%CD%` (sem trailing backslash) + disable exit_watcher em --force
+  3. `_run_node_sync` bytes + decode manual (errors='replace')
+  4. TODOS `text=True` → `text=False` no orquestrador (5 lugares)
+  5. `market_run_force.ps1` com System.Diagnostics.Process (exit code correto)
+- **FORCE agora chega até ETAPA 2/4** (Python pipeline / Barchart)
+- **Log force_*.log gerado** (4818 bytes, com todo o progresso)
+- **Service continua UP** após FORCE
+- **Erro remanescente**: UnicodeDecodeError no stderr do orquestrador (não-bloqueante)
+- Ver [[Problemas/Problema — FORCE.bat v4.0 validacao FINAL 2026-06-22]] para detalhes
+
 ### Pendências para próxima sessão
 - [ ] Owner validar FORCE.bat (resolveu "foi inesperado"?)
 - [ ] Decidir workaround Barchart E97 (A/B/C/D/E)

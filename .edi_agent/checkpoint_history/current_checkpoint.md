@@ -2,10 +2,10 @@
 
 ## Status: AGUARDANDO VALIDAÇÃO DO OWNER
 
-## Último Checkpoint: CP-052
-- **Data/Hora**: 2026-06-22 22:00 (re-registro)
-- **Título**: FORCE.bat v4.0 — VALIDADO end-to-end
-- **Status**: CONCLUÍDO (FORCE funciona, "travamento" é Barchart E97 compensado)
+## Último Checkpoint: CP-053
+- **Data/Hora**: 2026-06-22 20:00 (re-registro)
+- **Título**: FORCE.bat v4.0 — 5 bugs corrigidos, chega até ETAPA 2/4
+- **Status**: CONCLUÍDO (UnicodeDecodeError residual no stderr, não-bloqueante)
 
 ## Sessão 2026-06-22: Diagnóstico Coletas + Fix FORCE.bat
 
