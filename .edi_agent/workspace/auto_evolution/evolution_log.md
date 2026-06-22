@@ -164,3 +164,33 @@
 - **run_all.py atualizado**: 4 novos testes integrados
 - **Resultado**: 30/30 testes passando
 - **Status**: Implementado
+
+---
+
+## 2026-06-21 (Sessão Hermes + Owner paralelo)
+
+### E96: `safe_rmtree` / `safe_remove` com guard `.edi_agent/.protected` (ALTO)
+- **Autor**: Hermes (orquestrador) — 2026-06-21, ~20:30 BRT
+- **Contexto**: Investigação F3 sobre rotinas `.bat` + F4.1 implementar proteções em `src/safe_ops.py` (já existente em E95).
+- **Mudança**:
+  - **`src/safe_ops.py`** (+~110 L):
+    - Constante `SAFE_TO_PURGE_PREFIXES` (snapshots antigos podem ser purgados by design)
+    - Função `_is_protected_target(path)` — detecta path sob `.edi_agent/` (mas não sob `.edi_agent/snapshots/`)
+    - Função `safe_rmtree(path, logger)` — wrapper para `shutil.rmtree` com guard; **raise PermissionError** se alvo for protegido
+    - Função `safe_remove(path, logger)` — wrapper para `os.remove` com mesmo guard
+  - **`scripts/orquestrador.py`** (+9 L): 3 chamadas `shutil.rmtree` refatoradas para `_safe_rmtree` com fallback
+  - **`Cotacoes/tools/market/gerar_controle.py`** (+11 L): `_safe_rmtree` local delega para novo helper
+  - **`tests/test_safe_ops.py`** (NOVO, 138 L): 13 testes cobrindo proteção, purge allow, paths seguros, real delete, nonexistent, exception types
+- **Comportamento**:
+  - `safe_rmtree(".edi_agent/workspace/X.md")` → **PermissionError** ("BLOQUEADO")
+  - `safe_rmtree(".edi_agent/snapshots/snap-2025-X")` → **executa** (purga by design)
+  - `safe_rmtree("service_locks/options_run.lock")` → **executa** (não protegido)
+- **Testes**: 13/13 PASSED (manual runner); 278/278 PASSED no `run_all.py` (264 originais + 14 novos)
+- **Risco**: Baixo (mudanças cirúrgicas com fallback)
+- **Status**: Implementado
+
+### Notas da sessão (Hermes, 2026-06-21)
+
+- **Owner paralelo via Mimo/Opencode**: reescreveu `Servico_Unificado.bat` e `Servico_Unificado_FORCE.bat` para v2.0 com "E95b-prevention: 3 camadas de defesa contra sobrescrita do dashboard". Commit `437ae614`.
+- **F2/F3.1 arquivos NOVOS preservados**: `.edi_agent/.protected`, `auditoria_inicial_2026-06-21/*.md` (7), `dashboard_unificado/controle/index.html`, `dashboard_unificado/shared/styles.css`. Commitados via E95b-prevention.
+- **F2/F3.1 modifications dos docs perdidos**: E74/E75 entries em `evolution_log.md`, CP-043/CP-044 em `CHECKPOINT.md`, etc. foram revertidas antes de commit. Owner pode re-aplicar se necessário.
