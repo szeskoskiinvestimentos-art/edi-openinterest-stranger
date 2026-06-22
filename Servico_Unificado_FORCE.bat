@@ -120,7 +120,7 @@ echo ============================================================
 echo.
 
 set "DIRTY_COUNT=0"
-for /f %%i in ('git status --short 2^>nul ^| find /v /c ""') do set "DIRTY_COUNT=%%i"
+for /f %%i in ('powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\hooks\git_dirty_count.ps1"') do set "DIRTY_COUNT=%%i"
 
 echo  Working tree status:
 if %DIRTY_COUNT% gtr 0 (
