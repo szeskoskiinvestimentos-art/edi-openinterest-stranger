@@ -242,3 +242,20 @@
 - **Testes**: 278/278 passando
 - **Risco**: Baixo
 - **Status**: Implementado
+
+### E100: Auditoria de Dashboards - Decisões de Nav/Tema (2026-06-22)
+- **Escopo**: Auditoria completa de 7 dashboards (HUB, WDO, WIN, MERCADO, CORR, CONTROLE, CONTROLE_DADOS)
+- **Decisões registradas**:
+  1. **MERCADO nav** → Mantida nav própria (superior ao unified-nav.js: quickNav, quickSearch, nav-more, Dados button). Compatível via `<select id="assetSelect">`.
+  2. **CONTROLE_DADOS legado** → Tema Indigo mantido propositalmente (divergente do Neon Terminal). Página legada para compatibilidade.
+  3. **HUB particles.js** → Referência cross-directory para WDO/assets/js/particles.js (funcional, manter).
+- **Bugs corrigidos nesta auditoria** (E97):
+  - particles.js paths quebrados (CORR, MERCADO, CONTROLE_DADOS)
+  - CSS syntax error (CORR)
+  - 4 classes CSS indefinidas (WDO, WIN, shared)
+  - .data-table-container typo (WIN)
+  - Meta tags quebradas (CONTROLE)
+- **Status**: Implementado
+- **Testes**: 278/278 passando
+- **Risco**: Baixo
+- **Status**: Implementado
