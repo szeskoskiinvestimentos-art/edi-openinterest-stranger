@@ -131,7 +131,7 @@ echo ============================================================
 echo  SNAPSHOT PRE-RUN (recuperavel se algo der errado)
 echo ============================================================
 if exist "scripts\hooks\pre_run_snapshot.py" (
-  %PY_CMD% scripts\hooks\pre_run_snapshot.py --label pre-force
+  %PY_CMD% scripts\hooks\pre_run_snapshot.py create --label pre-force 2>&1
 ) else (
   echo  AVISO: pre_run_snapshot.py nao encontrado, pulando snapshot
 )
@@ -155,8 +155,31 @@ for /f "delims=" %%I in ('powershell -NoProfile -Command "Get-Date -Format 'yyyy
 if "%TS%"=="" set "TS=backup"
 set "LOGFILE=runtime\logs\force_%TS%.log"
 
-%PY_CMD% scripts\orquestrador.py --force --no-pause 2>&1 | tee "%LOGFILE%"
+REM ============================================================
+REM  CHECKPOINTS DO ORQUESTRADOR (4 BLOCOS)
+REM ============================================================
+echo.
+echo ============================================================
+echo  CHECKPOINTS DO FORCE - 4 BLOCOS A EXECUTAR
+echo ============================================================
+echo   BLOCO 1/4: Post /api/market/update (bypass cooldown)
+echo   BLOCO 2/4: Node side (Investing + InfoMoney + Sina) [~3 min]
+echo   BLOCO 3/4: Python pipeline (Barchart + TradingView) [~2-5 min]
+echo   BLOCO 4/4: Git full_sync (commit + PUSH origin) [~10 s]
+echo.
+echo  >>> BLOCO 1/4: Iniciando POST /api/market/update <<<
+echo.
+
+%PY_CMD% scripts\orquestrador.py --force --no-pause > "%LOGFILE%" 2>&1
 set "RC=%errorlevel%"
+
+REM Mostrar o log COM marcadores de bloco para facilitar leitura
+echo.
+echo ============================================================
+echo  LOG DO FORCE (com timestamps)
+echo ============================================================
+type "%LOGFILE%"
+echo ============================================================
 
 REM ============================================================
 REM 5. RESUMO FINAL

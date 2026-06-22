@@ -1000,7 +1000,7 @@ class Orquestrador:
     def _run_node_sync(self) -> threading.Thread | None:
         """Rota Node side (Investing + Sina + InfoMoney + Calendar) em paralelo.
 
-        Chama `npm run -s investing-sync-runner run-once` no Cotacoes/tools/market
+        Chama `npm run -s market:once` no Cotacoes/tools/market
         numa thread separada. Retorna o Thread para join() posterior.
 
         Modos disponiveis (env NODE_SYNC_MODE):
@@ -1010,13 +1010,21 @@ class Orquestrador:
         """
         import threading as _th
         mode = os.getenv("NODE_SYNC_MODE", "once").strip() or "once"
-        args = ["run", "-s", "investing-sync-runner", "run-once", mode]
+        # Mapear modo -> npm script
+        mode_to_script = {
+            "once": "market:once",
+            "portfolio": "market:portfolio",
+            "calendar": "market:calendar",
+            "di": "market:di",
+        }
+        npm_script = mode_to_script.get(mode, "market:once")
+        args = ["run", "-s", npm_script]
         if not (self.cfg.cotacoes_dir / "package.json").exists():
             logger.warning("[node-sync] package.json nao encontrado em %s. Pulando.", self.cfg.cotacoes_dir)
             return None
 
         def _worker() -> None:
-            logger.info("[node-sync] iniciando thread Node side (mode=%s)...", mode)
+            logger.info("[node-sync] iniciando thread Node side (script=%s, mode=%s)...", npm_script, mode)
             try:
                 proc = subprocess.Popen(
                     ["npm"] + args,
@@ -1055,10 +1063,21 @@ class Orquestrador:
         if resp and resp.get("ok"):
             logger.info("[market] update(force) solicitado.")
         else:
-            logger.info("[market] update(force) resposta ou erro.")
+            logger.info("[market] update(force) resposta ou erro. (Service pode estar DOWN — normal se rodou FORC此前 sem service UP)")
 
         logger.info("")
         logger.info("Status: %s/api/market/status", self.market._base_url)
+        logger.info("")
+
+        # ============================================================
+        # ETAPA 1/4: market:service (Node side — Investing + InfoMoney + Sina)
+        # ============================================================
+        logger.info("")
+        logger.info("=" * 70)
+        logger.info("  ETAPA 1/4 — Node side (Investing + InfoMoney + Sina + Calendar)")
+        logger.info("=" * 70)
+        logger.info("Esta etapa abre Chrome, loga em Investing/InfoMoney, faz download dos dados.")
+        logger.info("Tempo esperado: ~3 minutos (pode chegar a 5min se login necessário).")
         logger.info("")
 
         # ETAPA A: Iniciar Node side (Investing + Sina + InfoMoney + Calendar) em paralelo
@@ -1069,6 +1088,18 @@ class Orquestrador:
                 logger.info("[node-sync] thread Node side iniciada em background.")
         except Exception as e:
             logger.warning("[node-sync] falha ao iniciar: %s", e)
+
+        # ============================================================
+        # ETAPA 2/4: Python pipeline (Barchart + TradingView)
+        # ============================================================
+        logger.info("")
+        logger.info("=" * 70)
+        logger.info("  ETAPA 2/4 — Python pipeline (Barchart + TradingView)")
+        logger.info("=" * 70)
+        logger.info("Esta etapa roda Selenium/Chrome para coletar opcoes EWZ/USD/UUP do Barchart.")
+        logger.info("ATENCAO: Barchart pode TRAVAR (E97 — undetected_chromedriver Py3.12+).")
+        logger.info("Se travar, sera necessario Ctrl+C manual. O sistema continua funcionando sem Barchart.")
+        logger.info("")
 
         # ETAPA B: Rodar Python pipeline (Barchart+TradingView) com stage progress
         automacao = self.cfg.auto_b3_dir / "automacao_dados.py"
@@ -1087,11 +1118,35 @@ class Orquestrador:
             if node_thread.is_alive():
                 logger.warning("[node-sync] thread Node side ainda ativa apos 10min.")
 
+        # ============================================================
+        # ETAPA 3/4: Aguardar todas as coletas terminarem
+        # ============================================================
+        logger.info("")
+        logger.info("=" * 70)
+        logger.info("  ETAPA 3/4 — Aguardar coletas completarem")
+        logger.info("=" * 70)
+        logger.info("Verifica se market:service terminou o update triggered pelo BLOCO 1.")
         logger.info("")
         self.market.wait_update_complete(force_requested_at)
 
+        # ============================================================
+        # ETAPA 4/4: Git full_sync (commit + PUSH origin)
+        # ============================================================
+        logger.info("")
+        logger.info("=" * 70)
+        logger.info("  ETAPA 4/4 — Git full_sync (commit + PUSH para origin)")
+        logger.info("=" * 70)
+        logger.info("ATENCAO: Este bloco faz PUSH para GitHub. Se working tree tem arquivos")
+        logger.info("nao commitados (M, ??), eles serao incluídos no commit.")
+        logger.info("")
         git_ok = self.git.full_sync()
 
+        logger.info("")
+        logger.info("=" * 70)
+        logger.info("  FORCE CONCLUIDO")
+        logger.info("=" * 70)
+        logger.info("git_ok: %s", git_ok)
+        logger.info("Encerrando market:service (graceful)...")
         self.market.shutdown()
 
         return 0 if git_ok else 1
