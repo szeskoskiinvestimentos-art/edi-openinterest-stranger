@@ -826,11 +826,19 @@
     <script src="../shared/js/chart_data_utils.js"></script>
     <script src="../shared/unified-nav.js"></script>
     <script src="../shared/js/daytrade-tools.js"></script>
+    <script src="../shared/js/price-alerts.js"></script>
     <script src="../shared/js/greeks-heatmap.js"></script>
     <script src="../shared/js/split-view.js"></script>
 
     <!-- Gráficos e Lógica Principal -->
     <script src="assets/js/main.js"></script>
     <script src="assets/js/charts.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      if (window.EDI && window.EDI.priceAlerts) {
+        window.EDI.priceAlerts.init({ source: 'marketData' });
+      }
+    });
+    </script>
 </body>
 </html>
