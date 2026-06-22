@@ -26,21 +26,32 @@ echo ============================================================
 echo.
 
 REM Encontrar Python
-where python >nul 2>&1
-if errorlevel 1 (
-    echo [ERRO] Python nao encontrado no PATH.
-    exit /b 1
+set "PY_CMD="
+py -3 -c "import sys" >nul 2>&1
+if not errorlevel 1 set "PY_CMD=py -3.13"
+if "%PY_CMD%"=="" (
+  py -3 -c "import sys" >nul 2>&1
+  if not errorlevel 1 set "PY_CMD=py -3"
+)
+if "%PY_CMD%"=="" (
+  python -c "import sys" >nul 2>&1
+  if not errorlevel 1 set "PY_CMD=python"
+)
+
+if "%PY_CMD%"=="" (
+  echo [ERRO] Python nao encontrado no PATH.
+  exit /b 1
 )
 
 REM Coletar CSVs/JSONs sem subir servidor (regra do projeto: HTML estatico)
 set "MARKET_SCHEDULER_ENABLED=false"
 
 REM Criar snapshot
-python scripts\hooks\pre_run_snapshot.py --label pre-run
+%PY_CMD% scripts\hooks\pre_run_snapshot.py create --label pre-run-safe 2>&1
 if errorlevel 1 (
     echo.
     echo [AVISO] Falha ao criar snapshot. Continuando mesmo assim...
-    echo         Para pular o snapshot, use Servico_Unificado_FORCE.bat
+    echo         Para pular o snapshot, use Servico_Unificado.bat direto
     echo.
 )
 
