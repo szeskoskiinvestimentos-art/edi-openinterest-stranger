@@ -3,7 +3,7 @@
 ## Status: AGUARDANDO VALIDAÇÃO DO OWNER
 
 ## Último Checkpoint: CP-049
-- **Data/Hora**: 2026-06-22 12:00 (re-registro)
+- **Data/Hora**: 2026-06-22 12:04 (re-registro)
 - **Título**: Auto-start + WAIT_MARKET (Opção A do legado)
 - **Status**: CONCLUÍDO (aguardando validação Owner)
 
@@ -71,6 +71,12 @@ Travamento anterior: ontem (21/06 22:05) só abriu Barchart no EWZ, não rodou o
 - **HEAD atual**: `982449b8` (docs re-registro 11:50)
 - Service UP, última coleta `2026-06-22T14:48:01Z`
 - Estado ESTÁVEL — sem ação autônoma (Owner solicitou "pare")
+- Pendências inalteradas
+
+### Atualização 2026-06-22 12:04 (re-registro)
+- **HEAD atual**: `1164a31b` (docs re-registro 12:00)
+- Service UP, última coleta `2026-06-22T15:00:34Z` (auto-commit `de84daed`)
+- Estado ESTÁVEL — sem ação autônoma
 - Pendências inalteradas
 
 ### Arquivos em Análise

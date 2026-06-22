@@ -139,6 +139,14 @@ Owner pediu: "ajustar o sistema para que eu possa usar ele. Teste as coletas de 
 - **Estado**: ESTÁVEL — sem ação autônoma (Owner solicitou "pare" depois "atualize registros")
 - **Pendências**: inalteradas — aguarda validação FORCE.bat (CRLF) + decisão Barchart E97
 
+### Atualização 2026-06-22 12:04 (re-registro Owner pediu novamente)
+- **HEAD atual**: `1164a31b` (docs re-registro 12:00)
+- **Service**: UP, última coleta `2026-06-22T15:00:34Z` (auto-commit `de84daed` 15:00 UTC)
+- **Working tree**: 4 untracked (yahoo_*_options.json — outputs)
+- **Estado**: ESTÁVEL — sem ação autônoma
+- **Pendências**: inalteradas (FORCE.bat validar + Barchart E97)
+- **Próximo checkpoint**: apenas quando Owner enviar nova ação substantiva
+
 ### Pendências para próxima sessão
 - [ ] Owner validar FORCE.bat (resolveu "foi inesperado"?)
 - [ ] Decidir workaround Barchart E97 (A/B/C/D/E)
