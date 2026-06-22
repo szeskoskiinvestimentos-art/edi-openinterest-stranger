@@ -1,11 +1,14 @@
 @echo off
 REM ============================================================
-REM  EDI - Servico Unificado FORCE (v4.0 - 2026-06-22)
+REM  EDI - Servico Unificado FORCE (v5.0 - 2026-06-22)
 REM
-REM  Reescrito por Hermes para eliminar TODOS os powershell inline
-REM  que falhavam por expansao de variaveis ($r, $u, $p, etc) pelo cmd.
+REM  v5.0: -File SEM aspas duplas em todos powershell calls
+REM        (aspas causavam concatenacao de argumentos via cmd)
+REM        - PROJECT_ROOT via %CD% (sem trailing backslash)
+REM        - exit_watcher desabilitado em --force
+REM        - timeout -> ping (GNU timeout nao funciona em cmd)
 REM
-REM  Cada chamada powershell agora delega para scripts .ps1 em
+REM  Cada chamada powershell delega para scripts .ps1 em
 REM  scripts\hooks\ (market_health.ps1, market_health_wait.ps1, etc).
 REM
 REM  ATENCAO: Este .bat faz PUSH para GitHub (origin).
@@ -18,10 +21,9 @@ REM    3. Snapshot pre-run
 REM    4. HEALTH CHECK do market:service
 REM    5. Se DOWN: auto-start em background
 REM    6. WAIT_MARKET (ate 120s) com output '.' a cada 5s
-REM    7. Exit watcher (limpa se .bat morrer)
-REM    8. Executa orquestrador com --force (output em tempo real + log)
-REM    9. Shutdown graceful do market:service (se foi iniciado por este .bat)
-REM   10. Resumo final
+REM    7. Executa orquestrador com --force (output em tempo real + log)
+REM    8. Shutdown graceful do market:service (se foi iniciado por este .bat)
+REM    9. Resumo final
 REM
 REM  Pre-requisitos:
 REM    - Python 3.13 (py -3.13) ou Python generico
@@ -120,7 +122,7 @@ echo ============================================================
 echo.
 
 set "DIRTY_COUNT=0"
-for /f %%i in ('powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\hooks\git_dirty_count.ps1"') do set "DIRTY_COUNT=%%i"
+for /f %%i in ('powershell -NoProfile -ExecutionPolicy Bypass -File scripts\hooks\git_dirty_count.ps1') do set "DIRTY_COUNT=%%i"
 
 echo  Working tree status:
 if %DIRTY_COUNT% gtr 0 (
@@ -175,12 +177,12 @@ set "MARKET_STARTED_HERE=0"
 
 REM Detectar PID na porta usando .ps1 (sem powershell inline)
 set "MARKET_PID="
-for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\hooks\market_get_pid.ps1" -Port %MARKET_SERVICE_PORT%`) do set "MARKET_PID=%%i"
+for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\hooks\market_get_pid.ps1 -Port %MARKET_SERVICE_PORT%`) do set "MARKET_PID=%%i"
 if not "%MARKET_PID%"=="" set "MARKET_ALREADY_RUNNING=1"
 
 REM Se porta ocupada, verificar health
 if "%MARKET_ALREADY_RUNNING%"=="1" (
-  powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\hooks\market_health.ps1" -Url "http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/health" >nul 2>&1
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\hooks\market_health.ps1 -Url "http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/health" >nul 2>&1
   if errorlevel 1 (
     if not "%MARKET_PID%"=="" (
       echo  AVISO: Porta %MARKET_SERVICE_PORT% ocupada, mas healthcheck falhou. Encerrando PID=%MARKET_PID%...
@@ -195,7 +197,7 @@ REM Se ainda nao UP, iniciar em background
 if "%MARKET_ALREADY_RUNNING%"=="0" (
   echo  Iniciando market:service em background...
   set "MARKET_STARTED_HERE=1"
-  start "market-service" /b powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\hooks\market_start.ps1" ^
+  start "market-service" /b powershell -NoProfile -ExecutionPolicy Bypass -File scripts\hooks\market_start.ps1 ^
     -CotacoesDir "%COTACOES_DIR%" ^
     -ServiceHost "%MARKET_SERVICE_HOST%" ^
     -ServicePort "%MARKET_SERVICE_PORT%" ^
@@ -227,7 +229,7 @@ echo.
 echo  Aguardando market:service em http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT% ...
 echo  (output '.' a cada 5s, ate 120s)
 echo.
-powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\hooks\market_health_wait.ps1" ^
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\hooks\market_health_wait.ps1 ^
   -Url "http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/health" ^
   -TimeoutSec 120 ^
   -PollIntervalSec 1
@@ -241,18 +243,7 @@ if errorlevel 1 (
 echo.
 
 REM ============================================================
-REM 6. EXIT WATCHER (cleanup se .bat morrer)
-REM ============================================================
-
-if "%EDI_EXIT_WATCHER_STARTED%"=="1" goto SKIP_WATCHER
-set "EDI_EXIT_WATCHER_STARTED=1"
-start "exit-watcher" /b powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "scripts\hooks\market_exit_watcher.ps1" ^
-  -ServiceHost "%MARKET_SERVICE_HOST%" ^
-  -ServicePort %MARKET_SERVICE_PORT%
-:SKIP_WATCHER
-
-REM ============================================================
-REM 7. EXECUTAR ORQUESTRADOR --force
+REM 6. EXECUTAR ORQUESTRADOR --force
 REM ============================================================
 
 echo.
@@ -270,19 +261,19 @@ if "%TS%"=="" set "TS=backup"
 set "LOGFILE=runtime\logs\force_%TS%.log"
 
 echo.
-echo  Executando orquestrador — acompanhe o progresso abaixo:
+echo  Executando orquestrador - acompanhe o progresso abaixo:
 echo  (Log completo salvo em: %LOGFILE%)
 echo.
 
 set "RC=1"
-powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\hooks\market_run_force.ps1" ^
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\hooks\market_run_force.ps1 ^
   -ProjectRoot "%PROJECT_ROOT%" ^
   -LogFile "%LOGFILE%" ^
   -PyCmd "%PY_CMD%"
-set "RC=%errorlevel%
+set "RC=%errorlevel%"
 
 REM ============================================================
-REM 8. RESUMO FINAL
+REM 7. RESUMO FINAL
 REM ============================================================
 
 echo.
@@ -318,10 +309,10 @@ REM ============================================================
 
 :SHUTDOWN_MARKET_FORCE
 setlocal
-powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\hooks\market_shutdown.ps1" ^
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\hooks\market_shutdown.ps1 ^
   -Url "http://%MARKET_SERVICE_HOST%:%MARKET_SERVICE_PORT%/api/market/shutdown" ^
   -WaitSec 12
 set "KPID="
-for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\hooks\market_get_pid.ps1" -Port %MARKET_SERVICE_PORT%`) do set "KPID=%%i"
+for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\hooks\market_get_pid.ps1 -Port %MARKET_SERVICE_PORT%`) do set "KPID=%%i"
 if not "%KPID%"=="" taskkill /PID %KPID% /T /F >nul 2>&1
 endlocal & exit /b 0
