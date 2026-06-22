@@ -26,7 +26,7 @@ import sys
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, date
+from datetime import datetime, date, time as dt_time
 from pathlib import Path
 from typing import Any
 
@@ -637,7 +637,11 @@ class OptionsPipeline:
         for t in times:
             try:
                 parts = t.split(":")
-                slot_time = today.replace(hour=int(parts[0]), minute=int(parts[1]), second=0, microsecond=0)
+                # today e date (sem hora), entao construir datetime via combine
+                slot_time = datetime.combine(
+                    today,
+                    dt_time(hour=int(parts[0]), minute=int(parts[1]), second=0, microsecond=0),
+                )
                 if slot_time <= now:
                     due_slots.append(slot_time)
             except (ValueError, IndexError):
