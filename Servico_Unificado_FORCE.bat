@@ -63,7 +63,7 @@ if "%PY_CMD%"=="" (
   exit /b 1
 )
 
-if not exist "scripts\orquestrador.py" (
+if not exist "scripts/orquestrador.py" (
   echo.
   echo ============================================================
   echo  ERRO CRITICO: orquestrador.py nao encontrado
@@ -130,8 +130,8 @@ echo.
 echo ============================================================
 echo  SNAPSHOT PRE-RUN (recuperavel se algo der errado)
 echo ============================================================
-if exist "scripts\hooks\pre_run_snapshot.py" (
-  %PY_CMD% scripts\hooks\pre_run_snapshot.py create --label pre-force 2>&1
+if exist "scripts/hooks/pre_run_snapshot.py" (
+  %PY_CMD% "scripts/hooks/pre_run_snapshot.py" create --label pre-force 2>&1
 ) else (
   echo  AVISO: pre_run_snapshot.py nao encontrado, pulando snapshot
 )
@@ -170,7 +170,7 @@ echo.
 echo  >>> BLOCO 1/4: Iniciando POST /api/market/update <<<
 echo.
 
-%PY_CMD% scripts\orquestrador.py --force --no-pause > "%LOGFILE%" 2>&1
+%PY_CMD% "scripts/orquestrador.py" --force --no-pause > "%LOGFILE%" 2>&1
 set "RC=%errorlevel%"
 
 REM Mostrar o log COM marcadores de bloco para facilitar leitura

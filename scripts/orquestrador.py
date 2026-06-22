@@ -343,14 +343,14 @@ class MarketService:
         npm_bin = self.cfg.cotacoes_dir / "node_modules" / ".bin" / "tsx.cmd"
         if not npm_bin.exists():
             subprocess.run(
-                ["npm", "ci", "--silent"],
+                [self._resolve_npm_exe(), "ci", "--silent"],
                 cwd=str(self.cfg.cotacoes_dir),
                 capture_output=True, timeout=300,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
         try:
             self._process = subprocess.Popen(
-                ["npm", "run", "-s", "market:service"],
+                [self._resolve_npm_exe(), "run", "-s", "market:service"],
                 cwd=str(self.cfg.cotacoes_dir),
                 env=env,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0),
@@ -360,6 +360,20 @@ class MarketService:
         except Exception as e:
             logger.error("Falha ao iniciar market:service: %s", e)
         time.sleep(2)
+
+    def _resolve_npm_exe(self) -> str:
+        """Resolve caminho absoluto do npm.cmd (necessario em Windows)."""
+        import shutil
+        candidates = [
+            r"C:\Program Files\nodejs\npm.cmd",
+            r"C:\Program Files (x86)\nodejs\npm.cmd",
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                return c
+        # Fallback: shutil.which (consulta PATH)
+        w = shutil.which("npm") or shutil.which("npm.cmd") or "npm"
+        return w
 
     def _check_modules_active(self) -> None:
         data = self.status()
