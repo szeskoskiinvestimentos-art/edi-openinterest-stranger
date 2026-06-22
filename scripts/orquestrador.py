@@ -993,6 +993,49 @@ class Orquestrador:
             return 1
         return 0
 
+    def _run_node_sync(self) -> threading.Thread | None:
+        """Rota Node side (Investing + Sina + InfoMoney + Calendar) em paralelo.
+
+        Chama `npm run -s investing-sync-runner run-once` no Cotacoes/tools/market
+        numa thread separada. Retorna o Thread para join() posterior.
+
+        Modos disponiveis (env NODE_SYNC_MODE):
+          - "once"  (padrao): 1 coleta completa + sai
+          - "portfolio": so portfolio Investing
+          - "calendar": so calendario economico
+        """
+        import threading as _th
+        mode = os.getenv("NODE_SYNC_MODE", "once").strip() or "once"
+        args = ["run", "-s", "investing-sync-runner", "run-once", mode]
+        if not (self.cfg.cotacoes_dir / "package.json").exists():
+            logger.warning("[node-sync] package.json nao encontrado em %s. Pulando.", self.cfg.cotacoes_dir)
+            return None
+
+        def _worker() -> None:
+            logger.info("[node-sync] iniciando thread Node side (mode=%s)...", mode)
+            try:
+                proc = subprocess.Popen(
+                    ["npm"] + args,
+                    cwd=str(self.cfg.cotacoes_dir),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+                if proc.stdout is not None:
+                    for line in proc.stdout:
+                        line = line.rstrip()
+                        if line:
+                            logger.info("[node-sync] %s", line)
+                proc.wait(timeout=900)
+                logger.info("[node-sync] concluido rc=%d", proc.returncode)
+            except Exception as e:
+                logger.warning("[node-sync] erro: %s", e)
+
+        t = _th.Thread(target=_worker, name="node-sync", daemon=True)
+        t.start()
+        return t
+
     def _run_force(self) -> int:
         logger.info("")
         logger.info("=====================================")
@@ -1014,6 +1057,16 @@ class Orquestrador:
         logger.info("Status: %s/api/market/status", self.market._base_url)
         logger.info("")
 
+        # ETAPA A: Iniciar Node side (Investing + Sina + InfoMoney + Calendar) em paralelo
+        node_thread = None
+        try:
+            node_thread = self._run_node_sync()
+            if node_thread:
+                logger.info("[node-sync] thread Node side iniciada em background.")
+        except Exception as e:
+            logger.warning("[node-sync] falha ao iniciar: %s", e)
+
+        # ETAPA B: Rodar Python pipeline (Barchart+TradingView) com stage progress
         automacao = self.cfg.auto_b3_dir / "automacao_dados.py"
         if automacao.exists():
             logger.info("")
@@ -1022,6 +1075,13 @@ class Orquestrador:
         else:
             logger.info("")
             logger.info("AVISO: automacao_dados.py nao encontrado. Pulando Opcoes.")
+
+        # ETAPA C: Aguardar Node side terminar
+        if node_thread is not None:
+            logger.info("[node-sync] aguardando thread Node side terminar...")
+            node_thread.join(timeout=600)
+            if node_thread.is_alive():
+                logger.warning("[node-sync] thread Node side ainda ativa apos 10min.")
 
         logger.info("")
         self.market.wait_update_complete(force_requested_at)
