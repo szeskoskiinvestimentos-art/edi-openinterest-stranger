@@ -1058,12 +1058,15 @@ class Orquestrador:
                     cwd=str(self.cfg.cotacoes_dir),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
-                    text=True,
+                    text=False,  # Captura bytes; decodifica com errors=replace
                     creationflags=sfx,
                 )
                 if proc.stdout is not None:
-                    for line in proc.stdout:
-                        line = line.rstrip()
+                    for raw_line in proc.stdout:
+                        try:
+                            line = raw_line.decode('utf-8', errors='replace').rstrip()
+                        except Exception:
+                            line = raw_line.decode('latin-1', errors='replace').rstrip()
                         if line:
                             logger.info("[node-sync] %s", line)
                 proc.wait(timeout=900)
