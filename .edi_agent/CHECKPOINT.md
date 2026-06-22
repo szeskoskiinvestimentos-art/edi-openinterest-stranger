@@ -201,6 +201,25 @@ Owner pediu: "ajustar o sistema para que eu possa usar ele. Teste as coletas de 
 - **Service UP** porta 3433
 - **Status**: E97 resolvido via Opção E (Yahoo primário, Barchart fallback)
 
+### Atualização 2026-06-22 21:50 (Testes completos 8/10 OK)
+- **HEAD atual**: `c04f9678` (data collect 21:38 UTC)
+- **Testes manuais validados**:
+  1. ✅ Service UP (porta 3433, cron 15min, exit 0)
+  2. ✅ `market:once` (245 Yahoo + Sina Dalian + DI=45 + CAL=36, 3min13s)
+  3. ✅ `market:addons` (6 addons + 2 PDFs)
+  4. ✅ `automacao_dados.py` (Yahoo funcionando, BRL=X=5.1417)
+  5. ✅ `update_spot_prices` (WDO 5153.0, WIN 173490.0, EWZ 34.27)
+  6. ✅ `gerar_controle.py` (66 arquivos, swapped, 13/13 validate)
+  7. ✅ Dashboards WDO/WIN (spot atualizado, yahoo_options completo)
+  8. ✅ Yahoo Options coverage: WDO EWZ 634 strikes 21 expiries, WIN EWZ 508 calls + 383 puts
+  9. ⏹️ FORCE.bat v4.0 end-to-end (CANCELADO, FORCE não chegou no orquestrador)
+- **Yahoo Options estrutura**: arrays paralelos (call_oi[], put_oi[], call_iv[]) - NÃO `calls[]`/`puts[]`
+- **Bugs encontrados**:
+  - Calendar `enabled=False` (deveria ser `True`?)
+  - Barchart Selenium ainda trava (mas Yahoo fallback compensa)
+  - FORCE.bat end-to-end pendente
+- **Próximo**: Owner validar FORCE.bat, ativar calendar (se for bug)
+
 ### Pendências para próxima sessão
 - [ ] Owner validar FORCE.bat (resolveu "foi inesperado"?)
 - [ ] Decidir workaround Barchart E97 (A/B/C/D/E)
