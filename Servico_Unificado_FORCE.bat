@@ -260,20 +260,23 @@ echo ============================================================
 echo  EXECUTANDO ORQUESTRADOR --force
 echo  ATENCAO: vai fazer PUSH para origin
 echo ============================================================
-echo.
+set "PROJECT_ROOT=%CD%"
+REM Remover backslash final se houver (CD pode incluir)
+if "%PROJECT_ROOT:~-1%"=="\" set "PROJECT_ROOT=%PROJECT_ROOT:~0,-1%"
 
+REM Executar com log em arquivo + output EM TEMPO REAL
 for /f "delims=" %%I in ('powershell -NoProfile -Command "Get-Date -Format 'yyyyMMdd_HHmmss'" 2^>nul') do set "TS=%%I"
 if "%TS%"=="" set "TS=backup"
 set "LOGFILE=runtime\logs\force_%TS%.log"
 
+echo.
 echo  Executando orquestrador — acompanhe o progresso abaixo:
 echo  (Log completo salvo em: %LOGFILE%)
 echo.
 
-REM Executar via .ps1 (com tee e exit code corretos)
 set "RC=1"
 powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\hooks\market_run_force.ps1" ^
-  -ProjectRoot "%~dp0" ^
+  -ProjectRoot "%PROJECT_ROOT%" ^
   -LogFile "%LOGFILE%" ^
   -PyCmd "%PY_CMD%"
 set "RC=%errorlevel%

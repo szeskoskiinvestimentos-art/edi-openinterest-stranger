@@ -955,7 +955,9 @@ class Orquestrador:
             else:
                 logger.info("Market service online.")
 
-        self._start_exit_watcher()
+        # Exit watcher: NAO inicia em modo force (FORCE.BAT gerencia lifecycle)
+        if not self.args.force:
+            self._start_exit_watcher()
 
         if self.args.force:
             return self._run_force()
