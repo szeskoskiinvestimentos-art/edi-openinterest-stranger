@@ -2,10 +2,10 @@
 
 ## Status: AGUARDANDO VALIDAÇÃO DO OWNER
 
-## Último Checkpoint: CP-051
-- **Data/Hora**: 2026-06-22 18:18 (re-registro)
-- **Título**: Barchart E97 BYPASSADO via Yahoo Finance (Opção E)
-- **Status**: CONCLUÍDO (validado manualmente, aguarda FORCE end-to-end)
+## Último Checkpoint: CP-052
+- **Data/Hora**: 2026-06-22 22:00 (re-registro)
+- **Título**: FORCE.bat v4.0 — VALIDADO end-to-end
+- **Status**: CONCLUÍDO (FORCE funciona, "travamento" é Barchart E97 compensado)
 
 ## Sessão 2026-06-22: Diagnóstico Coletas + Fix FORCE.bat
 

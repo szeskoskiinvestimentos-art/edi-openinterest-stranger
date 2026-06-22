@@ -220,6 +220,18 @@ Owner pediu: "ajustar o sistema para que eu possa usar ele. Teste as coletas de 
   - FORCE.bat end-to-end pendente
 - **Próximo**: Owner validar FORCE.bat, ativar calendar (se for bug)
 
+### Atualização 2026-06-22 22:00 (FORCE.bat v4.0 — VALIDADO)
+- **HEAD atual**: `7e532968` (fix git_dirty_count.ps1)
+- **FORCE.bat FUNCIONA end-to-end**: Service sobe, orquestrador roda, coleta completa 22:19:38
+- **Bug 'find: Permission denied'** (12:50) era git-bash/msys substituindo cmd `find` por Unix find
+- **Fix**: scripts/hooks/git_dirty_count.ps1 standalone (sem interpolação $)
+- **Observado durante FORCE**:
+  - 4 instancias do orquestrador (race condition?)
+  - Service Node (PID 15412) fez coleta 22:19:38 com exit 0
+  - "Travamento" = orquestrador em Barchart (E97), não FORCE.bat
+- **Yahoo fallback compensa** Barchart E97
+- Ver [[Problemas/Problema — FORCE.bat v4.0 validacao 2026-06-22]] para detalhes
+
 ### Pendências para próxima sessão
 - [ ] Owner validar FORCE.bat (resolveu "foi inesperado"?)
 - [ ] Decidir workaround Barchart E97 (A/B/C/D/E)
