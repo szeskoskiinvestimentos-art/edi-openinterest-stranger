@@ -126,6 +126,7 @@ CONTROLE : OK
 | 4J | ✅ | **Re-registro 11:50**: HEAD `daab2897` (auto-commit market:service 14:48:01), service continua UP |
 | 4K | ✅ | **Re-registro 12:00**: HEAD `982449b8` (estado estável, aguardando Owner validar FORCE.bat) |
 | 4L | ✅ | **Re-registro 12:04**: HEAD `1164a31b` (auto-commit `de84daed` 15:00:34, estado estável) |
+| 4M | ⚠️ | **Re-registro 12:10**: service **DOWN** (porta 3433 livre após auto-commit 15:00:34), restart manual necessário |
 
 ## 5. Recomendações (NÃO aplicadas)
 

@@ -147,6 +147,16 @@ Owner pediu: "ajustar o sistema para que eu possa usar ele. Teste as coletas de 
 - **Pendências**: inalteradas (FORCE.bat validar + Barchart E97)
 - **Próximo checkpoint**: apenas quando Owner enviar nova ação substantiva
 
+### Atualização 2026-06-22 12:10 (re-registro Owner pediu novamente)
+- **HEAD atual**: `5edf2288` (docs re-registro 12:04)
+- **Service**: DOWN! porta 3433 livre, sem resposta em `/api/market/health`
+- **Causa provável**: cron tentou reiniciar após auto-commit `de84daed` 15:00:34, mas serviço anterior não liberou limpo
+- **24 node.exe** rodando (provavelmente outros projetos, não o nosso)
+- **Working tree**: 4 untracked (yahoo_*_options.json — outputs)
+- **Estado**: SERVICE DOWN — sem ação autônoma (Owner ainda não pediu restart)
+- **Pendências**: inalteradas + **restart manual do service** agora necessário
+- **Próximo checkpoint**: Owner pedir restart ou nova ação
+
 ### Pendências para próxima sessão
 - [ ] Owner validar FORCE.bat (resolveu "foi inesperado"?)
 - [ ] Decidir workaround Barchart E97 (A/B/C/D/E)

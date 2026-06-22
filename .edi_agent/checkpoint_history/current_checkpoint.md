@@ -3,7 +3,7 @@
 ## Status: AGUARDANDO VALIDAÇÃO DO OWNER
 
 ## Último Checkpoint: CP-049
-- **Data/Hora**: 2026-06-22 12:04 (re-registro)
+- **Data/Hora**: 2026-06-22 12:10 (re-registro)
 - **Título**: Auto-start + WAIT_MARKET (Opção A do legado)
 - **Status**: CONCLUÍDO (aguardando validação Owner)
 
@@ -78,6 +78,13 @@ Travamento anterior: ontem (21/06 22:05) só abriu Barchart no EWZ, não rodou o
 - Service UP, última coleta `2026-06-22T15:00:34Z` (auto-commit `de84daed`)
 - Estado ESTÁVEL — sem ação autônoma
 - Pendências inalteradas
+
+### Atualização 2026-06-22 12:10 (re-registro)
+- **HEAD atual**: `5edf2288` (docs re-registro 12:04)
+- **Service**: DOWN! porta 3433 livre
+- 24 node.exe rodando (outros projetos)
+- Sem ação autônoma
+- **Restart manual necessário** quando Owner pedir
 
 ### Arquivos em Análise
 - `Servico_Unificado_FORCE.bat` (CRLF forçado em `7f005f01`)
