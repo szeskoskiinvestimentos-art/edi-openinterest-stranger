@@ -3,7 +3,7 @@
 ## Status: AGUARDANDO VALIDAÇÃO DO OWNER
 
 ## Último Checkpoint: CP-049
-- **Data/Hora**: 2026-06-22 11:50 (re-registro)
+- **Data/Hora**: 2026-06-22 12:00 (re-registro)
 - **Título**: Auto-start + WAIT_MARKET (Opção A do legado)
 - **Status**: CONCLUÍDO (aguardando validação Owner)
 
@@ -66,6 +66,12 @@ Travamento anterior: ontem (21/06 22:05) só abriu Barchart no EWZ, não rodou o
 - Próxima coleta scheduled: 14:45 UTC (cron 15min)
 - Working tree: 4 untracked (yahoo_*_options.json — outputs)
 - Pendências inalteradas: aguardando FORCE.bat validar + decisão Barchart E97
+
+### Atualização 2026-06-22 12:00 (re-registro)
+- **HEAD atual**: `982449b8` (docs re-registro 11:50)
+- Service UP, última coleta `2026-06-22T14:48:01Z`
+- Estado ESTÁVEL — sem ação autônoma (Owner solicitou "pare")
+- Pendências inalteradas
 
 ### Arquivos em Análise
 - `Servico_Unificado_FORCE.bat` (CRLF forçado em `7f005f01`)

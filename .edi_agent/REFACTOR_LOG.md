@@ -124,6 +124,7 @@ CONTROLE : OK
 | 4H | ⏳ | CI/Pre-commit (próximo) |
 | 4I | ✅ | **Sessão 2026-06-22**: 8 commits, 5 bugs corrigidos (CP-043 a CP-049) |
 | 4J | ✅ | **Re-registro 11:50**: HEAD `daab2897` (auto-commit market:service 14:48:01), service continua UP |
+| 4K | ✅ | **Re-registro 12:00**: HEAD `982449b8` (estado estável, aguardando Owner validar FORCE.bat) |
 
 ## 5. Recomendações (NÃO aplicadas)
 

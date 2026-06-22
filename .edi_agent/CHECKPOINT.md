@@ -132,6 +132,13 @@ Owner pediu: "ajustar o sistema para que eu possa usar ele. Teste as coletas de 
 - **Decisão Owner pendente**: Barchart E97 workaround (A/B/C/D/E)
 - **Working tree**: 4 untracked (yahoo_*_options.json — outputs regenerados, NAO comitados)
 
+### Atualização 2026-06-22 12:00 (re-registro Owner pediu novamente)
+- **HEAD atual**: `982449b8` (docs re-registro 11:50)
+- **Service**: UP, última coleta `2026-06-22T14:48:01Z` (auto-commit `daab2897`)
+- **Working tree**: 4 untracked (yahoo_*_options.json — outputs regenerados)
+- **Estado**: ESTÁVEL — sem ação autônoma (Owner solicitou "pare" depois "atualize registros")
+- **Pendências**: inalteradas — aguarda validação FORCE.bat (CRLF) + decisão Barchart E97
+
 ### Pendências para próxima sessão
 - [ ] Owner validar FORCE.bat (resolveu "foi inesperado"?)
 - [ ] Decidir workaround Barchart E97 (A/B/C/D/E)
