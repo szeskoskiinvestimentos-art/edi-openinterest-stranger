@@ -686,11 +686,26 @@ def _summarize_yahoo_options_coverage(staging_dir: str) -> List[Dict]:
 
 def main() -> int:
   workspace_root = _join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
+  # Ordem de preferencia de fonte:
+  #   1. Auto_B3_System/dashboard_unificado  (legacy publish source, se voltar a ser populado)
+  #   2. B3_System/dashboard_unificado       (outro nome legacy)
+  #   3. dashboard_unificado                 (canonica commitada no git - fonte real desde 2026-06-22)
+  # Criterio de selecao: candidato deve ter WDO/index.html (estrutura completa).
+  # Sem isso, e um diretorio orfao (so tem assets/) e deve ser pulado.
+  def _is_complete_source(p: str) -> bool:
+    if not os.path.isdir(p):
+      return False
+    if not os.path.isdir(os.path.join(p, "WDO")):
+      return False
+    if not os.path.isfile(os.path.join(p, "WDO", "index.html")):
+      return False
+    return True
   src_candidates = [
     _join(workspace_root, "Auto_B3_System", "dashboard_unificado"),
     _join(workspace_root, "B3_System", "dashboard_unificado"),
+    _join(workspace_root, "dashboard_unificado"),
   ]
-  src = next((p for p in src_candidates if os.path.isdir(p)), src_candidates[0])
+  src = next((p for p in src_candidates if _is_complete_source(p)), src_candidates[2])
   dst = _join(workspace_root, "dashboard_unificado")
   staging = _join(workspace_root, "dashboard_unificado._staging")
   prev_hint = _join(workspace_root, "dashboard_unificado._previous")
