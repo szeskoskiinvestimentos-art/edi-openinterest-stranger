@@ -753,6 +753,24 @@ def fetch_tradingview_data(driver, symbol):
         print(f"Erro no TradingView {symbol}: {e}")
         return 0.0
 
+def fetch_yahoo_spot(ticker: str) -> float:
+    """Busca spot price via Yahoo Finance API (v8). Retorna 0.0 se falhar."""
+    try:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            return 0.0
+        data = resp.json()
+        meta = data.get("chart", {}).get("result", [{}])[0].get("meta", {})
+        price = meta.get("regularMarketPrice", 0.0)
+        if price and price > 0:
+            print(f"EWZ Spot (Yahoo Finance): {price}")
+            return float(price)
+    except Exception as e:
+        print(f"Yahoo Finance spot failed for {ticker}: {e}")
+    return 0.0
+
 def fetch_fed_rate_monitor_investing():
     url = "https://m.br.investing.com/central-banks/fed-rate-monitor"
     headers = {
@@ -1678,32 +1696,35 @@ def main():
         ewz = get_ewz_contract()
 
         try:
-            ok = safe_driver_get(
-                driver,
-                f"https://www.barchart.com/etfs-funds/quotes/{ewz['symbol']}/overview",
-                timeout=20,
-                label=f"ewz_overview({ewz['symbol']})",
-            )
-            if ok:
-                time.sleep(2)
-                quote_ewz = fetch_quote_data(driver, ewz["symbol"])
-                spot_val = 0.0
-                if quote_ewz:
-                    spot_val = quote_ewz["last"]
-                    print(f"EWZ Spot (Barchart): {spot_val}")
+            # Yahoo Finance como fonte primária (mais confiável para ETF spot)
+            spot_val = fetch_yahoo_spot("EWZ")
+            if spot_val > 0:
+                env_data["WIN_SPOT"] = spot_val
+                env_data["WIN_SCALING_EWZ_REF_CLOSE"] = spot_val
+                step_ok("ewz_spot_yahoo", f"{spot_val}")
+            else:
+                # Fallback: Barchart overview
+                ok = safe_driver_get(
+                    driver,
+                    f"https://www.barchart.com/etfs-funds/quotes/{ewz['symbol']}/overview",
+                    timeout=20,
+                    label=f"ewz_overview({ewz['symbol']})",
+                )
+                if ok:
+                    time.sleep(2)
+                    quote_ewz = fetch_quote_data(driver, ewz["symbol"])
+                    if quote_ewz:
+                        spot_val = quote_ewz["last"]
+                        print(f"EWZ Spot (Barchart fallback): {spot_val}")
+                    else:
+                        spot_val = fetch_tradingview_data(driver, "EWZ") or 0.0
+                        print(f"EWZ Spot (TradingView fallback): {spot_val}")
                 else:
                     spot_val = fetch_tradingview_data(driver, "EWZ") or 0.0
                     print(f"EWZ Spot (TradingView fallback): {spot_val}")
                 env_data["WIN_SPOT"] = spot_val
                 env_data["WIN_SCALING_EWZ_REF_CLOSE"] = spot_val
                 step_ok("ewz_spot", f"{spot_val}")
-            else:
-                # Fallback total: TradingView
-                spot_val = fetch_tradingview_data(driver, "EWZ") or 0.0
-                env_data["WIN_SPOT"] = spot_val
-                env_data["WIN_SCALING_EWZ_REF_CLOSE"] = spot_val
-                step_fail("ewz_spot_barchart", "paywall/timeout → fallback TV")
-                step_ok("ewz_spot_tv_fallback", f"{spot_val}")
         except Exception as e:
             step_fail("ewz_spot", str(e)[:60])
             driver = restart_driver_if_needed(driver)

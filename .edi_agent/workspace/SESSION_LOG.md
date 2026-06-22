@@ -278,3 +278,30 @@ Implementadas 6 evolucoes do Q1 conforme planejado em IMPLEMENTACOES_FUTURAS.md.
 ### Pendencias para proxima sessao
 - Escolher entre Q2 (E21 SABR, E23 Stress, E26 MERCADO tests, E35 API REST, E36 E2E, E38 JSON log, E45 v3->v1) e Backlog
 - IMPLEMENTACOES_FUTURAS.md ja tem roadmap completo
+
+---
+
+## 2026-06-22 12:30 - Correção Bat Files v3.0
+
+### Resumo
+Reescrita completa dos 3 bat files (v2.0 → v3.0) com lógica robusta do backup original, adaptada para o sistema atual.
+
+### Mudanças aplicadas
+- **Servico_Unificado.bat**: Health check robusto, env vars completas, args parsing com loop, exit watcher
+- **Servico_Unificado_FORCE.bat**: Mesmas melhorias + confirmação interativa preservada
+- **Servico_Unificado_SAFE.bat**: Python detection consistente
+
+### Verificação
+- Dry run OK (porta 3433, Python 3.13)
+- CRLF convertido (LF → CRLF)
+- 322/325 testes passam (3 failures pre-existing)
+- orquestrador.py compatível com env vars
+
+### Commits pendentes
+- Alterações ainda no working tree
+- Untracked: yahoo_*_options.json (4 files)
+
+### Próximos passos
+- Testar execução real: `Servico_Unificado.bat --once --no-pause`
+- Verificar dados coletados
+- Validar dashboards recebem dados atualizados

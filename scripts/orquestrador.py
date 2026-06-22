@@ -43,6 +43,8 @@ logger = logging.getLogger("orquestrador")
 
 
 def _setup_logging() -> None:
+    # line_buffering=True garante output em tempo real mesmo com pipe/redirecionamento
+    sys.stdout.reconfigure(line_buffering=True)  # Python 3.7+
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(logging.DEBUG)
     fmt = logging.Formatter("[%(asctime)s] %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
@@ -1039,14 +1041,23 @@ class Orquestrador:
 
         def _worker() -> None:
             logger.info("[node-sync] iniciando thread Node side (script=%s, mode=%s)...", npm_script, mode)
+            npm_exe = self.market._resolve_npm_exe()
             try:
+                # Windows: .cmd files nao funcionam com CREATE_NO_WINDOW.
+                # Usar shell=True ou cmd.exe /c para garantir execucao.
+                if sys.platform == "win32":
+                    cmd = ["cmd.exe", "/c", npm_exe] + args
+                    sfx = subprocess.CREATE_NO_WINDOW
+                else:
+                    cmd = [npm_exe] + args
+                    sfx = 0
                 proc = subprocess.Popen(
-                    ["npm"] + args,
+                    cmd,
                     cwd=str(self.cfg.cotacoes_dir),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
-                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                    creationflags=sfx,
                 )
                 if proc.stdout is not None:
                     for line in proc.stdout:
@@ -1072,12 +1083,13 @@ class Orquestrador:
         logger.info("")
 
         logger.info("Forcando update (bypass cooldown)...")
-        force_requested_at = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+        from datetime import timezone
+        force_requested_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         resp = self.market._http_post("/api/market/update", {"reason": "force"}, timeout=8)
         if resp and resp.get("ok"):
             logger.info("[market] update(force) solicitado.")
         else:
-            logger.info("[market] update(force) resposta ou erro. (Service pode estar DOWN — normal se rodou FORC此前 sem service UP)")
+            logger.info("[market] update(force) resposta ou erro. (Service pode estar DOWN - normal se rodou FORCA sem service UP)")
 
         logger.info("")
         logger.info("Status: %s/api/market/status", self.market._base_url)
