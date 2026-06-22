@@ -216,7 +216,7 @@ if "%MARKET_ALREADY_RUNNING%"=="1" (
     if not "%MARKET_PID%"=="" (
       echo  AVISO: Porta %MARKET_SERVICE_PORT% ocupada, mas healthcheck falhou. Encerrando PID=%MARKET_PID%...
       taskkill /PID %MARKET_PID% /T /F >nul 2>&1
-      timeout /t 1 >nul
+      ping -n 2 127.0.0.1 >nul
     )
     set "MARKET_ALREADY_RUNNING=0"
   )
@@ -241,7 +241,7 @@ if "%MARKET_ALREADY_RUNNING%"=="1" (
     echo  AVISO: market:service com modulos desativados. Reiniciando...
     call :SHUTDOWN_MARKET
     set "MARKET_ALREADY_RUNNING=0"
-    timeout /t 1 >nul
+    ping -n 2 127.0.0.1 >nul
   )
 )
 
@@ -249,7 +249,7 @@ if "%MARKET_ALREADY_RUNNING%"=="0" (
   echo  Iniciando market:service em background...
   set "MARKET_STARTED_HERE=1"
   start "" /b powershell -NoProfile -Command "$env:DOTENV_OVERRIDE='%DOTENV_OVERRIDE%'; $env:MARKET_GIT_SYNC_ENABLED='%MARKET_GIT_SYNC_ENABLED%'; $env:MARKET_GIT_SYNC_PUSH='%MARKET_GIT_SYNC_PUSH%'; $env:MARKET_SERVICE_HOST='%MARKET_SERVICE_HOST%'; $env:MARKET_SERVICE_PORT='%MARKET_SERVICE_PORT%'; $env:MARKET_INTERVAL_MINUTES='%MARKET_INTERVAL_MINUTES%'; $env:INVESTING_PORTFOLIO_INTERVAL_MINUTES='%INVESTING_PORTFOLIO_INTERVAL_MINUTES%'; $env:MARKET_UPDATE_MODE='%MARKET_UPDATE_MODE%'; $env:MARKET_SCHEDULE_MODE='%MARKET_SCHEDULE_MODE%'; $env:MARKET_SCHEDULER_ENABLED='%MARKET_SCHEDULER_ENABLED%'; $env:MARKET_RETENTION_DAYS='%MARKET_RETENTION_DAYS%'; $env:MARKET_YAHOO_ENABLED='%MARKET_YAHOO_ENABLED%'; $env:MARKET_YAHOO_MAX_SYMBOLS='%MARKET_YAHOO_MAX_SYMBOLS%'; $env:MARKET_YAHOO_TIMEOUT_MS='%MARKET_YAHOO_TIMEOUT_MS%'; $env:INVESTING_PORTFOLIO_ENABLED='%INVESTING_PORTFOLIO_ENABLED%'; $env:INVESTING_CALENDAR_ENABLED='%INVESTING_CALENDAR_ENABLED%'; $env:INFOMONEY_DI_ENABLED='%INFOMONEY_DI_ENABLED%'; $env:OPTIONS_UNIFIED_DASHBOARD_DIR='%OPTIONS_UNIFIED_DASHBOARD_DIR%'; Set-Location '%COTACOES_DIR%'; if (-not (Test-Path -LiteralPath 'node_modules\.bin\tsx.cmd')) { npm ci --silent }; npm run -s market:service"
-  timeout /t 3 >nul
+  ping -n 4 127.0.0.1 >nul
 )
 
 REM Aguardar market:service ficar UP

@@ -144,7 +144,7 @@ if /i not "%CONFIRM%"=="sim" if /i not "%CONFIRM%"=="s" (
 
 echo.
 echo  Confirmado. Iniciando FORCE em 3 segundos...
-timeout /t 3 /nobreak >nul
+ping -n 4 127.0.0.1 >nul
 
 REM ============================================================
 REM 3. SNAPSHOT PRE-RUN
@@ -185,7 +185,7 @@ if "%MARKET_ALREADY_RUNNING%"=="1" (
     if not "%MARKET_PID%"=="" (
       echo  AVISO: Porta %MARKET_SERVICE_PORT% ocupada, mas healthcheck falhou. Encerrando PID=%MARKET_PID%...
       taskkill /PID %MARKET_PID% /T /F >nul 2>&1
-      timeout /t 1 >nul
+      ping -n 2 127.0.0.1 >nul
     )
     set "MARKET_ALREADY_RUNNING=0"
   )
@@ -216,7 +216,7 @@ if "%MARKET_ALREADY_RUNNING%"=="0" (
     -GitSyncPush "%MARKET_GIT_SYNC_PUSH%" ^
     -GitSyncBranch "%MARKET_GIT_SYNC_BRANCH%" ^
     -DotenvOverride "%DOTENV_OVERRIDE%"
-  timeout /t 3 >nul
+  ping -n 4 127.0.0.1 >nul
 )
 
 REM ============================================================
