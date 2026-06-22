@@ -123,6 +123,7 @@ CONTROLE : OK
 | 4G | ✅ | MATH_REVIEW.md atualizado com E7/E8/E10 + 2 testes regressão |
 | 4H | ⏳ | CI/Pre-commit (próximo) |
 | 4I | ✅ | **Sessão 2026-06-22**: 8 commits, 5 bugs corrigidos (CP-043 a CP-049) |
+| 4J | ✅ | **Re-registro 11:50**: HEAD `daab2897` (auto-commit market:service 14:48:01), service continua UP |
 
 ## 5. Recomendações (NÃO aplicadas)
 

@@ -125,6 +125,13 @@ Owner pediu: "ajustar o sistema para que eu possa usar ele. Teste as coletas de 
 - **Próxima coleta scheduled**: 14:30 UTC
 - **Próximo passo**: Owner validar FORCE.bat com CRLF aplicado
 
+### Atualização 2026-06-22 11:50 (re-registro)
+- **HEAD atual**: `daab2897` (auto-commit do market:service às 14:48:01 UTC)
+- **Service continua UP**, agendando coletas a cada 15min via cron
+- **Pendências inalteradas**: aguardar validação Owner do FORCE.bat (CRLF)
+- **Decisão Owner pendente**: Barchart E97 workaround (A/B/C/D/E)
+- **Working tree**: 4 untracked (yahoo_*_options.json — outputs regenerados, NAO comitados)
+
 ### Pendências para próxima sessão
 - [ ] Owner validar FORCE.bat (resolveu "foi inesperado"?)
 - [ ] Decidir workaround Barchart E97 (A/B/C/D/E)

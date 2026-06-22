@@ -3,7 +3,7 @@
 ## Status: AGUARDANDO VALIDAÇÃO DO OWNER
 
 ## Último Checkpoint: CP-049
-- **Data/Hora**: 2026-06-22 11:15
+- **Data/Hora**: 2026-06-22 11:50 (re-registro)
 - **Título**: Auto-start + WAIT_MARKET (Opção A do legado)
 - **Status**: CONCLUÍDO (aguardando validação Owner)
 
@@ -32,7 +32,7 @@ Travamento anterior: ontem (21/06 22:05) só abriu Barchart no EWZ, não rodou o
 - CP-043 (28fbca79): date.replace() → datetime.combine()
 - CP-044 (e651aa69): node-sync npm script
 - CP-045 (e651aa69): gerar_controle.py source orfao
-- CP-046: Barchart E97 (NÃO CORRIGIDO - latente)
+- CP-046: Barchart E97 (NAO CORRIGIDO - latente)
 - CP-048 (7f005f01): CRLF forçado em .bat
 
 #### T3: Auto-start + WAIT_MARKET ✅
@@ -60,6 +60,13 @@ Travamento anterior: ontem (21/06 22:05) só abriu Barchart no EWZ, não rodou o
 - 4 untracked: dashboard_unificado/{WDO,WIN}/assets/data/yahoo_*_options.json
 - Considerar adicionar ao .gitignore (outputs regeneraveis)
 
+### Atualização 2026-06-22 11:50
+- **HEAD atual**: `daab2897` (auto-commit do market:service às 14:48:01 UTC)
+- Service continua UP na porta 3433
+- Próxima coleta scheduled: 14:45 UTC (cron 15min)
+- Working tree: 4 untracked (yahoo_*_options.json — outputs)
+- Pendências inalteradas: aguardando FORCE.bat validar + decisão Barchart E97
+
 ### Arquivos em Análise
 - `Servico_Unificado_FORCE.bat` (CRLF forçado em `7f005f01`)
 - `scripts/orquestrador.py` (múltiplos fixes)
@@ -67,7 +74,7 @@ Travamento anterior: ontem (21/06 22:05) só abriu Barchart no EWZ, não rodou o
 - `scripts/hooks/market_health.ps1` (NOVO)
 - `.gitattributes` (NOVO)
 
-### Commits da Sessão (8 total)
+### Commits da Sessão (12 total)
 1. `28fbca79` - fix should_run date.replace
 2. `e651aa69` - fix node-sync + checkpoints
 3. `eeed501f` - paths forward-slash + npm.exe
@@ -75,11 +82,15 @@ Travamento anterior: ontem (21/06 22:05) só abriu Barchart no EWZ, não rodou o
 5. `73628fd8` - market_health.ps1 standalone
 6. `a8ac7a71` - remover aspas do -File
 7. `1d41a2c6` - CRLF + .gitattributes (REVERTIDO)
-8. `7f005f01` - CRLF forçado (FIX FINAL)
+8. `7f005f01` - CRLF forçado (FIX REAL)
+9. `903f7fc1` - revert do 1d41a2c6
+10. `3c61143` - recriar .gitattributes
+11. `0b40d86b` - atualizar CHECKPOINT, REFACTOR_LOG
+12. `daab2897` - auto-commit market:service 14:48:01
 
 ### Notas
 - Sistema de modos automaticos funcionando (cron 15min)
-- Service Node UP na porta 3433 (NÃO 3033)
+- Service Node UP na porta 3433 (NAO 3033)
 - Backup do projeto legado em C:\Projetos_Hermes\Edi_Market_Guardian_V0\Backup\Edi_Sistema_Unificado_X
 - Critérios Edi_Revisao.txt §1 aplicados: Organização, sem duplicação, modularização
 - Próximo passo: Owner valida FORCE.bat com CRLF
