@@ -271,10 +271,10 @@ class MarketService:
                      f"$p=(Get-NetTCPConnection -State Listen -LocalPort {self.cfg.market_port} "
                      "-ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess; "
                      "if($p){$p}"],
-                    capture_output=True, text=True, timeout=5,
+                    capture_output=True, text=False, timeout=5,
                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
-                output = result.stdout.strip()
+                output = (result.stdout or b"").decode('utf-8', errors='replace').strip()
                 if output:
                     return int(output)
             except Exception:
@@ -612,10 +612,11 @@ class OptionsPipeline:
                 if sys.platform == "win32":
                     result = subprocess.run(
                         ["tasklist", "/FI", f"PID eq {pid}"],
-                        capture_output=True, text=True, timeout=5,
+                        capture_output=True, text=False, timeout=5,
                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                     )
-                    if str(pid) not in result.stdout:
+                    stdout_str = (result.stdout or b"").decode('utf-8', errors='replace')
+                    if str(pid) not in stdout_str:
                         return True
                 else:
                     os.kill(pid, 0)
@@ -796,13 +797,13 @@ class GitManager:
     def _run_git(self, *args: str, check: bool = False, timeout: int = 30) -> subprocess.CompletedProcess:
         return subprocess.run(
             ["git"] + list(args),
-            capture_output=True, text=True, timeout=timeout,
+            capture_output=True, text=False, timeout=timeout,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
 
     def get_current_branch(self) -> str:
         result = self._run_git("rev-parse", "--abbrev-ref", "HEAD")
-        return result.stdout.strip()
+        return (result.stdout or b"").decode('utf-8', errors='replace').strip()
 
     def fetch(self) -> None:
         target = self.cfg.edi_artifacts_branch or self.cfg.market_git_sync_branch
@@ -811,7 +812,7 @@ class GitManager:
     def is_behind(self) -> int:
         target = self.cfg.edi_artifacts_branch or self.cfg.market_git_sync_branch
         result = self._run_git("rev-list", "--left-right", "--count", f"HEAD...origin/{target}")
-        parts = result.stdout.strip().split()
+        parts = (result.stdout or b"").decode('utf-8', errors='replace').strip().split()
         if len(parts) == 2:
             return int(parts[1])
         return 0
@@ -821,7 +822,7 @@ class GitManager:
             return True
         result = subprocess.run(
             ["npm", "-C", str(self.cfg.cotacoes_dir), "run", "-s", "market:validate:strict"],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=False, timeout=120,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         return result.returncode == 0
@@ -853,7 +854,7 @@ class GitManager:
             env["GCM_INTERACTIVE"] = "Never"
             result = subprocess.run(
                 ["git", "push", "origin", target],
-                capture_output=True, text=True, timeout=180,
+                capture_output=True, text=False, timeout=180,
                 env=env,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
@@ -1217,11 +1218,11 @@ class Orquestrador:
                 if sys.platform == "win32":
                     result = subprocess.run(
                         ["tasklist", "/FI", f"PID eq {parent_pid}"],
-                        capture_output=True, text=True, timeout=5,
+                        capture_output=True, text=False, timeout=5,
                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                     )
-                    # result.stdout pode ser None se processo ja morreu
-                    stdout_str = result.stdout or ""
+                    # result.stdout pode ser None ou bytes (text=False)
+                    stdout_str = (result.stdout or b"").decode('utf-8', errors='replace')
                     if str(parent_pid) not in stdout_str:
                         logger.info("Processo pai (PID=%d) encerrado. Fazendo shutdown...", parent_pid)
                         self.market.shutdown()
