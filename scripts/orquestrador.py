@@ -1215,7 +1215,9 @@ class Orquestrador:
                         capture_output=True, text=True, timeout=5,
                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                     )
-                    if str(parent_pid) not in result.stdout:
+                    # result.stdout pode ser None se processo ja morreu
+                    stdout_str = result.stdout or ""
+                    if str(parent_pid) not in stdout_str:
                         logger.info("Processo pai (PID=%d) encerrado. Fazendo shutdown...", parent_pid)
                         self.market.shutdown()
                         return
