@@ -177,7 +177,7 @@ set "MARKET_PORT=3433"
 set "MARKET_HEALTH_URL=http://%MARKET_HOST%:%MARKET_PORT%/api/market/health"
 
 echo  [WAIT_MARKET] Verificando se market:service esta UP em %MARKET_HEALTH_URL%...
-powershell -NoProfile -Command "try { $r=Invoke-RestMethod -Method Get -Uri '%MARKET_HEALTH_URL%' -TimeoutSec 2; if($r -and $r.ok -eq $true){ exit 0 } exit 1 } catch { exit 1 }" >nul 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts/hooks/market_health.ps1" >nul 2>&1
 if errorlevel 1 (
   echo  [WAIT_MARKET] Service DOWN. Subindo em background...
   pushd "%~dp0Cotacoes"
@@ -191,13 +191,13 @@ if errorlevel 1 (
   set "WAITED=0"
   :WAIT_LOOP
   if %WAITED% geq 60 goto WAIT_DONE
-  powershell -NoProfile -Command "try { $r=Invoke-RestMethod -Method Get -Uri '%MARKET_HEALTH_URL%' -TimeoutSec 2; if($r -and $r.ok -eq $true){ exit 0 } exit 1 } catch { exit 1 }" >nul 2>&1
+  powershell -NoProfile -ExecutionPolicy Bypass -File "scripts/hooks/market_health.ps1" >nul 2>&1
   if not errorlevel 1 goto WAIT_DONE
   timeout /t 2 /nobreak >nul
   set /a "WAITED+=2"
   goto WAIT_LOOP
   :WAIT_DONE
-  powershell -NoProfile -Command "try { $r=Invoke-RestMethod -Method Get -Uri '%MARKET_HEALTH_URL%' -TimeoutSec 2; if($r -and $r.ok -eq $true){ exit 0 } exit 1 } catch { exit 1 }" >nul 2>&1
+  powershell -NoProfile -ExecutionPolicy Bypass -File "scripts/hooks/market_health.ps1" >nul 2>&1
   if errorlevel 1 (
     echo  [WAIT_MARKET] AVISO: Service nao respondeu em 60s. Continuando mesmo assim.
     echo  [WAIT_MARKET] O BLOCO 1 (POST /api/market/update) provavelmente falhara.
