@@ -1,7 +1,7 @@
 # Auto-Registro - Estado Atual do Projeto
 
-> **Última atualização**: 2026-06-22 11:15 (Sessão Diagnóstico Coletas)
-> **Próxima revisão**: após FORCE.bat validar (aguardando Owner)
+> **Última atualização**: 2026-06-22 12:30 (Sessão Correção Bat Files v3.0)
+> **Próxima revisão**: Testar execução real com `--once --no-pause`
 
 ---
 
@@ -11,11 +11,11 @@
 ```
 Edi_Market_Guardian_V0/
 ├── src/                       # calculator (E22-E78), greeks, config
-├── tests/                     # 30+ testes
+├── tests/                     # 322/325 testes (99.1%)
 ├── scripts/                   # orquestrador.py + hooks (CRLF-safe)
 │   └── hooks/
 │       ├── pre_run_snapshot.py
-│       └── market_health.ps1  # NOVO (2026-06-22) - health check robusto
+│       └── market_health.ps1  # health check robusto (porta 3433)
 ├── dashboard_unificado/       # 6 dashboards (WDO+WIN+CONTROLE+CORR+HUB+MERCADOS)
 ├── Cotacoes/                  # Serviço Node.js (porta 3433)
 │   ├── tools/market/
@@ -24,10 +24,10 @@ Edi_Market_Guardian_V0/
 │   │   └── update-service/
 ├── Auto_B3_System/            # Barchart + TradingView (E97 quebrado)
 ├── .edi_agent/                # Auto-aprendizado
-└── [arquivos raiz]            # .bat wrappers (CRLF forçado)
+└── [arquivos raiz]            # .bat wrappers v3.0 (CRLF forçado)
 ```
 
-### Métricas (2026-06-22)
+### Métricas (2026-06-22 12:30)
 | Métrica | Valor |
 |---------|-------|
 | Evoluções implementadas | 30+ (até E97) |
@@ -35,6 +35,7 @@ Edi_Market_Guardian_V0/
 | Commits hoje | 8 (28fbca79, e651aa69, eeed501f, 667ec25b, 73628fd8, a8ac7a71, 1d41a2c6, 7f005f01) |
 | Bugs críticos corrigidos hoje | 5 (date.replace, node-sync, npm.exe, powershell, CRLF) |
 | Bugs latentes | E97 (undetected_chromedriver Py3.12+), Barchart E97 |
+| Bat files reescritos | 3 (v2.0 → v3.0, 2026-06-22) |
 
 ---
 
@@ -166,6 +167,16 @@ Owner pediu: "ajustar o sistema para que eu possa usar ele. Teste as coletas de 
 - **Pendências**: restart manual do service, FORCE.bat validar, Barchart E97
 - **Próximo checkpoint**: Owner enviar nova ação substantiva
 
+### Atualização 2026-06-22 12:24 (re-registro Owner pediu Force, Mimo trabalha em paralelo)
+- **HEAD atual**: Mimo reescreveu `Servico_Unificado_FORCE.bat` (v3.0, 344 linhas, logica do legado)
+- **Service**: SUBIU! log "Market updater em http://127.0.0.1:3433" (start do `market:service` OK)
+- **MAS travou em**: `:WAIT_MARKET` (powershell inline com `$r`/`$u` expandidos pelo cmd)
+- **Mensagem "provavelmente"**: echo de erro (linha 233) porque WAIT_MARKET retornou 1
+- **Working tree**: 11 modified (Mimo editando: Auto_B3_System/automacao_dados.py, orquestrador.py, .edi_agent/*)
+- **DECISÃO**: PAREI edições em código para não conflitar com Mimo
+- **Status**: Hermes só atualiza `.edi_agent` e Obsidian, sem mexer em código
+- **Próximo passo**: Mimo continua + Owner valida FORCE novo
+
 ### Pendências para próxima sessão
 - [ ] Owner validar FORCE.bat (resolveu "foi inesperado"?)
 - [ ] Decidir workaround Barchart E97 (A/B/C/D/E)
@@ -173,6 +184,48 @@ Owner pediu: "ajustar o sistema para que eu possa usar ele. Teste as coletas de 
 - [ ] Validar end-to-end do FORCE completo (após CRLF)
 - [ ] Considerar adicionar `yahoo_*_options.{js,json}` ao .gitignore (são outputs)
 - [ ] Avaliar se FORCE deve matar o service no final (atualmente sim via `self.market.shutdown()`)
+
+---
+
+## Fase 8: Correção Bat Files v3.0 (2026-06-22 12:30)
+
+### Contexto
+Owner pediu: "continue" e "lembre-se de registrar tudo tambem o que você está fazendo, pode testar e ajustar"
+
+### Implementação
+
+#### Servico_Unificado.bat (v2.0 → v3.0)
+- **Porta**: 3433 (consistente com orquestrador.py, user-requested)
+- **Health check robusto**: Detecção PID via PowerShell + verificação módulos desativados
+- **Env vars completas**: INVESTING_PORTFOLIO_ENABLED, INVESTING_CALENDAR_ENABLED, INFOMONEY_DI_ENABLED, etc.
+- **Args parsing**: Loop `:PARSE_ARGS` com shift (aceita N argumentos, não apenas 3)
+- **Exit watcher**: Monitora PID pai, desliga market:service se .bat morrer
+- **MARKET_SCHEDULER_ENABLED=false**: COLLECT-ONLY mode (regra do projeto: HTML estatico)
+
+#### Servico_Unificado_FORCE.bat (v2.0 → v3.0)
+- Mesmas melhorias do bat padrão
+- Confirmação interativa preservada
+- Lifecycle completo: start → health check → force update → git sync → shutdown
+
+#### Servico_Unificado_SAFE.bat
+- Python detection consistente (py -3.13 primeiro)
+- Snapshot wrapper preservado
+
+### Verificação
+- **Dry run**: `--git-dry-run --no-pause` executou sem erros
+- **CRLF**: Todos os 3 bat files convertidos (LF → CRLF)
+- **Tests**: 322/325 pass (99.1%), 3 failures pre-existing em test_tradingview_fetcher.py
+- **orquestrador.py**: Import OK, env vars compatíveis (lines 146-159, 290-319)
+
+### Commits pendentes
+- Alterações ainda no working tree (não commitadas)
+- Untracked: yahoo_*_options.json (4 files, outputs regenerados)
+
+### Próximos passos
+- [ ] Testar execução real: `Servico_Unificado.bat --once --no-pause`
+- [ ] Verificar dados coletados (Investing, InfoMoney, Barchart)
+- [ ] Validar dashboards recebem dados atualizados
+- [ ] Commit das alterações nos bat files
 
 ---
 
