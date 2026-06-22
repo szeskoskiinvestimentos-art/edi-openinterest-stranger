@@ -246,6 +246,22 @@ Owner pediu: "ajustar o sistema para que eu possa usar ele. Teste as coletas de 
 - **Erro remanescente**: UnicodeDecodeError no stderr do orquestrador (não-bloqueante)
 - Ver [[Problemas/Problema — FORCE.bat v4.0 validacao FINAL 2026-06-22]] para detalhes
 
+### Atualização 2026-06-22 20:24 (FORCE.bat v5.0 — FUNCIONOU!)
+- **HEAD atual**: `fda130ea`
+- **v5.0**: -File SEM aspas em 9 powershell calls (cmd //c concatenava os 3 args)
+- **Reescrita completa do .bat**: 327 → 309 linhas, exit_watcher removido
+- **FORCE agora FUNCIONA end-to-end**:
+  - ✅ Pre-checks OK
+  - ✅ Confirmação OK
+  - ✅ Snapshot pre-run OK (43 arquivos)
+  - ✅ Service start OK
+  - ✅ WAIT_MARKET OK
+  - ✅ Orquestrador inicia
+  - ✅ ETAPA 1/4 (Node side) — Yahoo 245, Dalian 740, DI=45
+  - ⚠️ Travou em Barchart (Selenium E97, esperado)
+- **Service UP**: última coleta 23:21:08 → 23:21:41, exit 0
+- **Log force_20260622_202110.log**: progresso ETAPA 1 OK, Barchart travou
+
 ### Pendências para próxima sessão
 - [ ] Owner validar FORCE.bat (resolveu "foi inesperado"?)
 - [ ] Decidir workaround Barchart E97 (A/B/C/D/E)

@@ -132,6 +132,7 @@ CONTROLE : OK
 | 4P | ✅ | **FIX DEFINITIVO 12:50**: FORCE.bat v4.0 (commit `b4353515`). ZERO powershell inline. 7 scripts `.ps1` em `scripts/hooks/`. Service UP. Testes manuais validados. |
 | 4Q | ✅ | **Mimo contribuiu 18:18**: fetch_yahoo_spot() NOVA em automacao_dados.py. EWZ 34.27 / USDU 26.67 / UUP 28.36 via Yahoo Finance (sem Selenium). **E97 BYPASSADO** (Opção E que sugeri). orquestrador.py: line_buffering + cmd.exe /c npm + timezone.utc. Commit `9002b27e`. |
 | 4R | ✅ | **5 BUGS CRÍTICOS** (e06c230e, 962d7413, a21cc389, 0dd6b03f, f8ea33dc): timeout→ping, PROJECT_ROOT via %CD%, bytes+decode manual, text=True→False, market_run_force.ps1 com Process. FORCE agora chega até ETAPA 2/4. |
+| 4S | ✅ | **FORCE.bat v5.0** (fda130ea): -File SEM aspas (cmd //c concat bug corrigido). FORCE agora FUNCIONA end-to-end: ETAPA 1/4 completa (Yahoo 245, Dalian 740, DI=45), trava em Barchart E97 (esperado). |
 
 ## 5. Recomendações (NÃO aplicadas)
 

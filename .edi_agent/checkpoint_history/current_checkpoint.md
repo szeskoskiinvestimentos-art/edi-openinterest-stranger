@@ -2,10 +2,10 @@
 
 ## Status: AGUARDANDO VALIDAÇÃO DO OWNER
 
-## Último Checkpoint: CP-053
-- **Data/Hora**: 2026-06-22 20:00 (re-registro)
-- **Título**: FORCE.bat v4.0 — 5 bugs corrigidos, chega até ETAPA 2/4
-- **Status**: CONCLUÍDO (UnicodeDecodeError residual no stderr, não-bloqueante)
+## Último Checkpoint: CP-054
+- **Data/Hora**: 2026-06-22 20:24 (re-registro)
+- **Título**: FORCE.bat v5.0 — FUNCIONA end-to-end
+- **Status**: CONCLUÍDO (Barchart E97 travando esperado, mas Yahoo/Node/DI completos)
 
 ## Sessão 2026-06-22: Diagnóstico Coletas + Fix FORCE.bat
 
