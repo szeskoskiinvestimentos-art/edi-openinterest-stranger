@@ -2,10 +2,10 @@
 
 ## Status: AGUARDANDO VALIDAÇÃO DO OWNER
 
-## Último Checkpoint: CP-049
-- **Data/Hora**: 2026-06-22 12:24 (re-registro)
-- **Título**: Auto-start + WAIT_MARKET (Opção A do legado)
-- **Status**: CONCLUÍDO (Mimo reescreveu FORCE.bat v3.0, Owner validando)
+## Último Checkpoint: CP-050
+- **Data/Hora**: 2026-06-22 12:50 (re-registro)
+- **Título**: FORCE.bat v4.0 — ZERO powershell inline
+- **Status**: CONCLUÍDO (aguardando validação Owner)
 
 ## Sessão 2026-06-22: Diagnóstico Coletas + Fix FORCE.bat
 
@@ -98,6 +98,12 @@ Travamento anterior: ontem (21/06 22:05) só abriu Barchart no EWZ, não rodou o
 - Owner rodou FORCE: service SUBIU mas travou em `:WAIT_MARKET` (powershell inline bug)
 - **DECISÃO**: Hermes parou edições em código para não conflitar com Mimo
 - Só atualiza `.edi_agent` e Obsidian a partir de agora
+
+### Atualização 2026-06-22 12:50 (FIX DEFINITIVO)
+- **FORCE.bat v4.0 reescrito** (commit b4353515)
+- 7 scripts `.ps1` separados em `scripts/hooks/`
+- Service UP (porta 3433), testes manuais OK
+- Aguardando Owner validar FORCE end-to-end
 
 ### Arquivos em Análise
 - `Servico_Unificado_FORCE.bat` (CRLF forçado em `7f005f01`)

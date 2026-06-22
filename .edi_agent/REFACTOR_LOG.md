@@ -129,6 +129,7 @@ CONTROLE : OK
 | 4M | ⚠️ | **Re-registro 12:10**: service **DOWN** (porta 3433 livre após auto-commit 15:00:34), restart manual necessário |
 | 4N | ⚠️ | **Re-registro 12:19**: service continua DOWN, working tree cresceu (8 modified + 4 untracked), Owner pediu "pare" 2x |
 | 4O | 🛑 | **Re-registro 12:24**: Mimo reescreveu FORCE.bat v3.0 (344 linhas, lógica legado). Service SUBIU mas travou em `:WAIT_MARKET`. **Hermes parou edições em código** para não conflitar. Só atualiza `.edi_agent` e Obsidian. |
+| 4P | ✅ | **FIX DEFINITIVO 12:50**: FORCE.bat v4.0 (commit `b4353515`). ZERO powershell inline. 7 scripts `.ps1` em `scripts/hooks/`. Service UP. Testes manuais validados. |
 
 ## 5. Recomendações (NÃO aplicadas)
 

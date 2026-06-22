@@ -177,6 +177,15 @@ Owner pediu: "ajustar o sistema para que eu possa usar ele. Teste as coletas de 
 - **Status**: Hermes só atualiza `.edi_agent` e Obsidian, sem mexer em código
 - **Próximo passo**: Mimo continua + Owner valida FORCE novo
 
+### Atualização 2026-06-22 12:50 (FORCE.bat v4.0 — FIX DEFINITIVO)
+- **HEAD atual**: `b4353515` (refactor FORCE.bat v4.0)
+- **Mimo inativo**, Owner autorizou Hermes a mexer
+- **FORCE.bat reescrito**: ZERO powershell inline, 7 scripts .ps1 separados
+- **Scripts novos**: market_health, market_health_wait, market_status_check, market_start, market_shutdown, market_get_pid, market_exit_watcher, market_run_force
+- **Service**: UP na porta 3433 (cron 15min, ultima coleta 20:48:35 UTC)
+- **Testes manuais**: market_health.ps1 retorna 0 UP, market_get_pid.ps1 retorna PID correto
+- **Status**: aguardando Owner validar FORCE end-to-end
+
 ### Pendências para próxima sessão
 - [ ] Owner validar FORCE.bat (resolveu "foi inesperado"?)
 - [ ] Decidir workaround Barchart E97 (A/B/C/D/E)
