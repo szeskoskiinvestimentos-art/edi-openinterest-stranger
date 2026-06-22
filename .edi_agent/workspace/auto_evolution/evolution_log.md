@@ -194,3 +194,51 @@
 - **Owner paralelo via Mimo/Opencode**: reescreveu `Servico_Unificado.bat` e `Servico_Unificado_FORCE.bat` para v2.0 com "E95b-prevention: 3 camadas de defesa contra sobrescrita do dashboard". Commit `437ae614`.
 - **F2/F3.1 arquivos NOVOS preservados**: `.edi_agent/.protected`, `auditoria_inicial_2026-06-21/*.md` (7), `dashboard_unificado/controle/index.html`, `dashboard_unificado/shared/styles.css`. Commitados via E95b-prevention.
 - **F2/F3.1 modifications dos docs perdidos**: E74/E75 entries em `evolution_log.md`, CP-043/CP-044 em `CHECKPOINT.md`, etc. foram revertidas antes de commit. Owner pode re-aplicar se necessário.
+
+### E96: Bat Files v3.0 - Correção Coleta de Dados (2026-06-22)
+- **Arquivos**: Servico_Unificado.bat, Servico_Unificado_FORCE.bat, Servico_Unificado_SAFE.bat
+- **Mudança**: Reescrita completa dos 3 bat files (v2.0 → v3.0)
+- **Motivo**: Backup bat files (328/241 linhas) tinham lógica robusta que foi perdida na simplificação para v2.0
+- **Mudanças aplicadas**:
+  1. Porta 3433 (user-requested para compatibilidade)
+  2. Health check robusto (detecção PID + verificação módulos)
+  3. Env vars completas (INVESTING, DI, Calendar, Yahoo)
+  4. Args parsing com loop (aceita N argumentos)
+  5. Exit watcher (cleanup se .bat morrer)
+  6. MARKET_SCHEDULER_ENABLED=false (COLLECT-ONLY mode)
+- **Verificação**: Dry run OK, CRLF convertido, 322/325 testes passam, orquestrador.py compatível
+- **Risco**: Baixo (mudanças nos wrappers, lógica delegada ao orquestrador.py existente)
+- **Status**: Implementado (commit pendente)
+
+### E97: Dashboard Bug Fixes - Tema e Estrutura (2026-06-22)
+- **Arquivos**: 9 arquivos (HTML + CSS)
+- **Mudança**: Correção de bugs de tema, path de scripts e CSS
+- **Bugs corrigidos**:
+  1. **particles.js path quebrado** em 3 dashboards:
+     - `correlation/index.html:80` → `../shared/js/` corrigido para `../WDO/assets/js/`
+     - `controle_de_dados.html:131` → `dashboard_unificado/shared/js/` corrigido para `dashboard_unificado/WDO/assets/js/`
+     - `MERCADO/index.html:999` → `<script>` para particles.js adicionado (div existia mas script faltava)
+  2. **CSS syntax quebrado** em `correlation/assets/css/style.css:13` → `}` órfão + propriedades soltas removidos
+  3. **CSS variable indefinida** → `var(--muted)` substituído por `var(--text-muted)` em correlation/style.css
+  4. **4 classes CSS indefinidas** adicionadas a WDO, WIN e shared/styles.css:
+     - `.info-box` (caixas educacionais, neon cyan border)
+     - `.copy-btn` (botões de copiar/baixar, neon style)
+     - `.loading-text` (placeholder de carregamento, pulse animation)
+     - `.section-description` (descrições de seção, border-left cyan)
+  5. **Typo CSS class** em `WIN/index.html:687` → `.data-table-container` corrigido para `.table-container`
+  6. **Meta tags quebradas** em `controle/index.html:7-8` → adicionado `content=` attribute
+- **Testes**: 278/278 passando
+- **Risco**: Baixo (CSS aditivo, paths corrigidos)
+- **Status**: Implementado
+
+### E98: Data Pipeline - Refresh WDO/WIN + Test Runner Fix (2026-06-22)
+- **Arquivos**: tests/run_all.py, dashboard_unificado/WDO/assets/data/*, dashboard_unificado/WIN/assets/data/*
+- **Mudança**: Atualização de dados e correção de bug no runner de testes
+- **Mudanças aplicadas**:
+  1. **Test runner Unicode fix** → `tests/run_all.py:1850` `.encode("ascii", "replace")` para imprimir nomes com caracteres especiais (Σ)
+  2. **WDO/WIN data refresh** → Dados copiados de Auto_B3_System (fresh 22/06 10:10) para dashboard_unificado (estavam de 19/06)
+  3. **Yahoo options commit** → 4 arquivos yahoo_ewz/usdu/uup_options.json commitados (eram untracked)
+  4. **gerar_controle.py validado** → 65 arquivos copiados, market_validate:strict OK (13/13 JSONs)
+- **Testes**: 278/278 passando
+- **Risco**: Baixo
+- **Status**: Implementado
