@@ -2,10 +2,10 @@
 
 ## Status: AGUARDANDO VALIDAÇÃO DO OWNER
 
-## Último Checkpoint: CP-050
-- **Data/Hora**: 2026-06-22 12:50 (re-registro)
-- **Título**: FORCE.bat v4.0 — ZERO powershell inline
-- **Status**: CONCLUÍDO (aguardando validação Owner)
+## Último Checkpoint: CP-051
+- **Data/Hora**: 2026-06-22 18:18 (re-registro)
+- **Título**: Barchart E97 BYPASSADO via Yahoo Finance (Opção E)
+- **Status**: CONCLUÍDO (validado manualmente, aguarda FORCE end-to-end)
 
 ## Sessão 2026-06-22: Diagnóstico Coletas + Fix FORCE.bat
 
@@ -104,6 +104,13 @@ Travamento anterior: ontem (21/06 22:05) só abriu Barchart no EWZ, não rodou o
 - 7 scripts `.ps1` separados em `scripts/hooks/`
 - Service UP (porta 3433), testes manuais OK
 - Aguardando Owner validar FORCE end-to-end
+
+### Atualização 2026-06-22 18:18 (Mimo contribuiu com fix E97)
+- **fetch_yahoo_spot() NOVA** em automacao_dados.py
+- EWZ 34.27 / USDU 26.67 / UUP 28.36 via Yahoo Finance (sem Selenium)
+- **E97 BYPASSADO** (Opção E que sugeri)
+- orquestrador.py: line_buffering + cmd.exe /c npm + timezone.utc
+- Service UP, testes manuais validados
 
 ### Arquivos em Análise
 - `Servico_Unificado_FORCE.bat` (CRLF forçado em `7f005f01`)

@@ -186,6 +186,21 @@ Owner pediu: "ajustar o sistema para que eu possa usar ele. Teste as coletas de 
 - **Testes manuais**: market_health.ps1 retorna 0 UP, market_get_pid.ps1 retorna PID correto
 - **Status**: aguardando Owner validar FORCE end-to-end
 
+### Atualização 2026-06-22 18:18 (Mimo contribuiu com fix E97 - Opção E)
+- **HEAD atual**: `9002b27e` (feat workarounds E97)
+- **Mimo modificou working tree** (commit `9002b27e` consolida):
+  - `scripts/orquestrador.py` (16+/4-): line_buffering, cmd.exe /c npm, timezone.utc
+  - `Auto_B3_System/automacao_dados.py` (41+/20-): **fetch_yahoo_spot() NOVA**
+  - `.edi_agent/workspace/SESSION_LOG.md`: documentou trabalho
+- **E97 BYPASSADO**: `fetch_yahoo_spot('EWZ')` retorna 34.27 via Yahoo Finance API (sem Selenium!)
+- **Testes manuais validados**:
+  - EWZ: 34.27 ✅
+  - USDU: 26.67 ✅
+  - UUP: 28.36 ✅
+  - EW1!: 0.0 (símbolo errado, é WDO)
+- **Service UP** porta 3433
+- **Status**: E97 resolvido via Opção E (Yahoo primário, Barchart fallback)
+
 ### Pendências para próxima sessão
 - [ ] Owner validar FORCE.bat (resolveu "foi inesperado"?)
 - [ ] Decidir workaround Barchart E97 (A/B/C/D/E)

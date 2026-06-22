@@ -130,6 +130,7 @@ CONTROLE : OK
 | 4N | ⚠️ | **Re-registro 12:19**: service continua DOWN, working tree cresceu (8 modified + 4 untracked), Owner pediu "pare" 2x |
 | 4O | 🛑 | **Re-registro 12:24**: Mimo reescreveu FORCE.bat v3.0 (344 linhas, lógica legado). Service SUBIU mas travou em `:WAIT_MARKET`. **Hermes parou edições em código** para não conflitar. Só atualiza `.edi_agent` e Obsidian. |
 | 4P | ✅ | **FIX DEFINITIVO 12:50**: FORCE.bat v4.0 (commit `b4353515`). ZERO powershell inline. 7 scripts `.ps1` em `scripts/hooks/`. Service UP. Testes manuais validados. |
+| 4Q | ✅ | **Mimo contribuiu 18:18**: fetch_yahoo_spot() NOVA em automacao_dados.py. EWZ 34.27 / USDU 26.67 / UUP 28.36 via Yahoo Finance (sem Selenium). **E97 BYPASSADO** (Opção E que sugeri). orquestrador.py: line_buffering + cmd.exe /c npm + timezone.utc. Commit `9002b27e`. |
 
 ## 5. Recomendações (NÃO aplicadas)
 
