@@ -243,6 +243,19 @@
 - **Risco**: Baixo
 - **Status**: Implementado
 
+### E101: Price Alerts - Support/Resistance Level Detection (2026-06-22)
+- **Arquivo**: dashboard_unificado/shared/js/price-alerts.js (novo)
+- **Mudança**: Módulo compartilhado de alertas de preço baseados em níveis
+- **Funcionalidades**:
+  - Auto-detecta níveis: max_pain, gamma_flip, effective_walls, support/resistance
+  - Compara spot_price com níveis usando threshold configurável
+  - Banner visual neon red + beep (Web Audio API 800Hz)
+  - Deduplicação (5 min por nível via localStorage)
+  - Integração: WDO, WIN, MERCADO
+- **Testes**: 278/278 passando (incluindo 6 novos testes)
+- **Risco**: Baixo (módulo novo, não modifica código existente)
+- **Status**: Implementado
+
 ### E100: Auditoria de Dashboards - Decisões de Nav/Tema (2026-06-22)
 - **Escopo**: Auditoria completa de 7 dashboards (HUB, WDO, WIN, MERCADO, CORR, CONTROLE, CONTROLE_DADOS)
 - **Decisões registradas**:
