@@ -1,4 +1,4 @@
-// NTSL Indicator - Edi OpenInterest Levels - 22/06/2026 10:10
+// NTSL Indicator - Edi OpenInterest Levels - 22/06/2026 16:40
 // Gerado Automaticamente
 
 const
@@ -29,30 +29,30 @@ input
   ExibirOpcoesEdi(false);
   ExibirUsdBeta(false);
   JanelaUsdBeta(0);
-  ModeloFlip(5);
+  ModeloFlip(4);
   spot(0);
-  // 1 = Classic (5212.32)
-  // 2 = Spline (5212.53)
-  // 3 = HVL (5201.39)
-  // 4 = HVL Log (5152.07)
-  // 5 = Sigma Kernel (5152.15)
-  // 6 = PVOP (5212.32)
-  // 7 = HVL Gaussian (5203.10)
+  // 1 = Classic (5214.59)
+  // 2 = Spline (5214.39)
+  // 3 = HVL (5203.70)
+  // 4 = HVL Log (5153.89)
+  // 5 = Sigma Kernel (5153.99)
+  // 6 = PVOP (5214.59)
+  // 7 = HVL Gaussian (5208.81)
 
 var
   GammaVal: Float;
 
 begin
   // Inicializa GammaVal com o primeiro disponivel por seguranca
-  GammaVal := 5212.32;
+  GammaVal := 5214.59;
 
-  if (ModeloFlip = 1) then GammaVal := 5212.32;
-  if (ModeloFlip = 2) then GammaVal := 5212.53;
-  if (ModeloFlip = 3) then GammaVal := 5201.39;
-  if (ModeloFlip = 4) then GammaVal := 5152.07;
-  if (ModeloFlip = 5) then GammaVal := 5152.15;
-  if (ModeloFlip = 6) then GammaVal := 5212.32;
-  if (ModeloFlip = 7) then GammaVal := 5203.10;
+  if (ModeloFlip = 1) then GammaVal := 5214.59;
+  if (ModeloFlip = 2) then GammaVal := 5214.39;
+  if (ModeloFlip = 3) then GammaVal := 5203.70;
+  if (ModeloFlip = 4) then GammaVal := 5153.89;
+  if (ModeloFlip = 5) then GammaVal := 5153.99;
+  if (ModeloFlip = 6) then GammaVal := 5214.59;
+  if (ModeloFlip = 7) then GammaVal := 5208.81;
 
   // --- Linhas Principais (Com Intercalação de Texto) ---
   if (ExibirWalls) then
@@ -72,17 +72,17 @@ begin
   if (ExibirWalls) then
     HorizontalLineCustom(5100.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirExpMoves) then
-    HorizontalLineCustom(5122.56, clExpMove, 1, psDot, "Edi_ExpMove", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    HorizontalLineCustom(5112.14, clExpMove, 1, psDot, "Edi_ExpMove", TamanhoFonte, tpTopRight, CurrentDate, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(5150.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+  if (ExibirExpMoves) then
+    HorizontalLineCustom(5194.86, clExpMove, 1, psDot, "Edi_ExpMove", TamanhoFonte, tpTopRight, CurrentDate, 0);
   if (ExibirWalls) then
-    HorizontalLineCustom(5200.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
+    HorizontalLineCustom(5200.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpBottomRight, 0, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(5200.00, clPutWall, 1, psDash, "PutWall", TamanhoFonte, tpTopRight, 0, 0);
   if (ExibirMaxPain) then
     HorizontalLineCustom(5200.00, clMaxPain, 2, psSolid, "Edi_MaxPain", TamanhoFonte, tpBottomRight, CurrentDate, 0);
-  if (ExibirExpMoves) then
-    HorizontalLineCustom(5205.44, clExpMove, 1, psDot, "Edi_ExpMove", TamanhoFonte, tpTopRight, CurrentDate, 0);
   if (ExibirWalls) then
     HorizontalLineCustom(5250.00, clCallWall, 1, psDash, "CallWall", TamanhoFonte, tpTopLeft, 0, 0);
   if (ExibirRange) then
@@ -126,8 +126,8 @@ begin
   if (ExibirFlips) then begin
     if (GammaVal > 0) then
       HorizontalLineCustom(GammaVal, clGammaFlip, 2, psDash, "Edi_GammaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
-    if (5113.81 > 0) then
-      HorizontalLineCustom(5113.81, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
+    if (5113.60 > 0) then
+      HorizontalLineCustom(5113.60, clDeltaFlip, 2, psDash, "Edi_DeltaFlip", TamanhoFonte, tpTopRight, CurrentDate, 0);
   end;
 
   // Edi_Wall (Midpoints) - Grid Completo
@@ -347,40 +347,40 @@ begin
     begin
       HorizontalLineCustom(5127.50, clEffectiveWall, 2, psSolid, "UsdBeta_30_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
       HorizontalLineCustom(5128.32, clFib, 2, psDashDot, "UsdBeta_30_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-      HorizontalLineCustom(5162.61, clMaxPain, 1, psDot, "UsdBeta_30_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5152.11, clMaxPain, 1, psDot, "UsdBeta_30_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
       HorizontalLineCustom(5127.50, clEffectiveWall, 2, psSolid, "UsdBeta_60_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
       HorizontalLineCustom(5128.32, clFib, 2, psDashDot, "UsdBeta_60_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-      HorizontalLineCustom(5161.94, clMaxPain, 1, psDot, "UsdBeta_60_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5151.45, clMaxPain, 1, psDot, "UsdBeta_60_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
       HorizontalLineCustom(5127.50, clEffectiveWall, 2, psSolid, "UsdBeta_90_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
       HorizontalLineCustom(5128.32, clFib, 2, psDashDot, "UsdBeta_90_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-      HorizontalLineCustom(5161.61, clMaxPain, 1, psDot, "UsdBeta_90_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5151.12, clMaxPain, 1, psDot, "UsdBeta_90_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
       HorizontalLineCustom(5127.50, clEffectiveWall, 2, psSolid, "UsdBeta_252_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
       HorizontalLineCustom(5128.32, clFib, 2, psDashDot, "UsdBeta_252_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-      HorizontalLineCustom(5162.48, clMaxPain, 1, psDot, "UsdBeta_252_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5151.98, clMaxPain, 1, psDot, "UsdBeta_252_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
     end;
     if (JanelaUsdBeta = 30) then
     begin
       HorizontalLineCustom(5127.50, clEffectiveWall, 2, psSolid, "UsdBeta_30_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
       HorizontalLineCustom(5128.32, clFib, 2, psDashDot, "UsdBeta_30_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-      HorizontalLineCustom(5162.61, clMaxPain, 1, psDot, "UsdBeta_30_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5152.11, clMaxPain, 1, psDot, "UsdBeta_30_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
     end;
     if (JanelaUsdBeta = 60) then
     begin
       HorizontalLineCustom(5127.50, clEffectiveWall, 2, psSolid, "UsdBeta_60_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
       HorizontalLineCustom(5128.32, clFib, 2, psDashDot, "UsdBeta_60_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-      HorizontalLineCustom(5161.94, clMaxPain, 1, psDot, "UsdBeta_60_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5151.45, clMaxPain, 1, psDot, "UsdBeta_60_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
     end;
     if (JanelaUsdBeta = 90) then
     begin
       HorizontalLineCustom(5127.50, clEffectiveWall, 2, psSolid, "UsdBeta_90_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
       HorizontalLineCustom(5128.32, clFib, 2, psDashDot, "UsdBeta_90_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-      HorizontalLineCustom(5161.61, clMaxPain, 1, psDot, "UsdBeta_90_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5151.12, clMaxPain, 1, psDot, "UsdBeta_90_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
     end;
     if (JanelaUsdBeta = 252) then
     begin
       HorizontalLineCustom(5127.50, clEffectiveWall, 2, psSolid, "UsdBeta_252_A_MediaRange", TamanhoFonte, tpTopRight, 0, 0);
       HorizontalLineCustom(5128.32, clFib, 2, psDashDot, "UsdBeta_252_A_MediaOI", TamanhoFonte, tpTopRight, 0, 0);
-      HorizontalLineCustom(5162.48, clMaxPain, 1, psDot, "UsdBeta_252_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
+      HorizontalLineCustom(5151.98, clMaxPain, 1, psDot, "UsdBeta_252_ProxyFx", TamanhoFonte, tpTopRight, 0, 0);
     end;
   end;
 end;
