@@ -127,6 +127,7 @@ CONTROLE : OK
 | 4K | ✅ | **Re-registro 12:00**: HEAD `982449b8` (estado estável, aguardando Owner validar FORCE.bat) |
 | 4L | ✅ | **Re-registro 12:04**: HEAD `1164a31b` (auto-commit `de84daed` 15:00:34, estado estável) |
 | 4M | ⚠️ | **Re-registro 12:10**: service **DOWN** (porta 3433 livre após auto-commit 15:00:34), restart manual necessário |
+| 4N | ⚠️ | **Re-registro 12:19**: service continua DOWN, working tree cresceu (8 modified + 4 untracked), Owner pediu "pare" 2x |
 
 ## 5. Recomendações (NÃO aplicadas)
 

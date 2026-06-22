@@ -157,6 +157,15 @@ Owner pediu: "ajustar o sistema para que eu possa usar ele. Teste as coletas de 
 - **Pendências**: inalteradas + **restart manual do service** agora necessário
 - **Próximo checkpoint**: Owner pedir restart ou nova ação
 
+### Atualização 2026-06-22 12:19 (re-registro Owner pediu novamente)
+- **HEAD atual**: `2e88a99f` (docs re-registro 12:10)
+- **Service**: continua DOWN! porta 3433 livre
+- **Working tree**: 8 modified (Cotacoes MERCADO + controle_de_dados.html) + 4 untracked (yahoo_*_options.json)
+- **Causa provavel dos modified**: mercado:service tenta rodar, falha silenciosa, escreve em working tree sem commit
+- **Estado**: SERVICE DOWN, Owner pediu "pare" 2x
+- **Pendências**: restart manual do service, FORCE.bat validar, Barchart E97
+- **Próximo checkpoint**: Owner enviar nova ação substantiva
+
 ### Pendências para próxima sessão
 - [ ] Owner validar FORCE.bat (resolveu "foi inesperado"?)
 - [ ] Decidir workaround Barchart E97 (A/B/C/D/E)
