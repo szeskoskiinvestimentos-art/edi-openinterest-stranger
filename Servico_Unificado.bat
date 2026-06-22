@@ -115,7 +115,7 @@ echo ============================================================
 echo  SNAPSHOT PRE-RUN
 echo ============================================================
 if exist "scripts\hooks\pre_run_snapshot.py" (
-  %PY_CMD% scripts\hooks\pre_run_snapshot.py create --label pre-run 2>&1
+  %PY_CMD% scripts\hooks\pre_run_snapshot.py --label pre-run 2>&1 | findstr /C:"[SNAPSHOT]" /C:"[PURGE]"
   if errorlevel 1 (
     echo  AVISO: snapshot retornou aviso, mas continuando...
   )
@@ -145,8 +145,7 @@ for /f "delims=" %%I in ('powershell -NoProfile -Command "Get-Date -Format 'yyyy
 if "%TS%"=="" set "TS=backup"
 set "LOGFILE=runtime\logs\servico_%TS%.log"
 
-%PY_CMD% scripts\orquestrador.py%ARGS% > "%LOGFILE%" 2>&1
-type "%LOGFILE%"
+%PY_CMD% scripts\orquestrador.py%ARGS% 2>&1 | tee "%LOGFILE%"
 set "RC=%errorlevel%"
 
 REM ============================================================
