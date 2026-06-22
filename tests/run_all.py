@@ -1847,7 +1847,8 @@ def run_all(quick: bool = False, only: list[str] | None = None) -> dict:
             "elapsed_ms": round(elapsed, 1),
         })
         status = "OK " if ok else "FAIL"
-        print(f"  [{status}] {name:40s} ({elapsed:6.1f}ms)")
+        safe_name = name.encode("ascii", "replace").decode("ascii")
+        print(f"  [{status}] {safe_name:40s} ({elapsed:6.1f}ms)")
         if not ok:
             for line in msg.splitlines():
                 print(f"          {line}")
@@ -1867,7 +1868,8 @@ def run_all(quick: bool = False, only: list[str] | None = None) -> dict:
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     RESULTS_PATH.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    print(f"\n=== Total: {len(results)}, Passou: {passed}, Falhou: {failed} ===")
+    total = len(results)
+    print(f"\n=== Total: {total}, Passou: {passed}, Falhou: {failed} ===")
     return report
 
 
