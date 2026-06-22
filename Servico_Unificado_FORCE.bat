@@ -156,7 +156,7 @@ if "%TS%"=="" set "TS=backup"
 set "LOGFILE=runtime\logs\force_%TS%.log"
 
 REM ============================================================
-REM  CHECKPOINTS DO ORQUESTRADOR (4 BLOCOS)
+REM  CHECKPOINTS DO FORCE - 4 BLOCOS A EXECUTAR
 REM ============================================================
 echo.
 echo ============================================================
@@ -167,6 +167,48 @@ echo   BLOCO 2/4: Node side (Investing + InfoMoney + Sina) [~3 min]
 echo   BLOCO 3/4: Python pipeline (Barchart + TradingView) [~2-5 min]
 echo   BLOCO 4/4: Git full_sync (commit + PUSH origin) [~10 s]
 echo.
+
+REM ============================================================
+REM  AUTO-START DO market:service (se DOWN) - porta 3433
+REM  Padrao do legado: WAIT_MARKET ate 120s
+REM ============================================================
+set "MARKET_HOST=127.0.0.1"
+set "MARKET_PORT=3433"
+set "MARKET_HEALTH_URL=http://%MARKET_HOST%:%MARKET_PORT%/api/market/health"
+
+echo  [WAIT_MARKET] Verificando se market:service esta UP em %MARKET_HEALTH_URL%...
+powershell -NoProfile -Command "try { $r=Invoke-RestMethod -Method Get -Uri '%MARKET_HEALTH_URL%' -TimeoutSec 2; if($r -and $r.ok -eq $true){ exit 0 } exit 1 } catch { exit 1 }" >nul 2>&1
+if errorlevel 1 (
+  echo  [WAIT_MARKET] Service DOWN. Subindo em background...
+  pushd "%~dp0Cotacoes"
+  if not exist "node_modules\.bin\tsx.cmd" (
+    echo  [WAIT_MARKET] Instalando deps (npm ci)...
+    call "npm.cmd" ci --silent
+  )
+  start "market-service" /b cmd /c "set MARKET_SCHEDULER_ENABLED=true& npm run -s market:service"
+  popd
+  echo  [WAIT_MARKET] Aguardando service ficar UP (ate 60s)...
+  set "WAITED=0"
+  :WAIT_LOOP
+  if %WAITED% geq 60 goto WAIT_DONE
+  powershell -NoProfile -Command "try { $r=Invoke-RestMethod -Method Get -Uri '%MARKET_HEALTH_URL%' -TimeoutSec 2; if($r -and $r.ok -eq $true){ exit 0 } exit 1 } catch { exit 1 }" >nul 2>&1
+  if not errorlevel 1 goto WAIT_DONE
+  timeout /t 2 /nobreak >nul
+  set /a "WAITED+=2"
+  goto WAIT_LOOP
+  :WAIT_DONE
+  powershell -NoProfile -Command "try { $r=Invoke-RestMethod -Method Get -Uri '%MARKET_HEALTH_URL%' -TimeoutSec 2; if($r -and $r.ok -eq $true){ exit 0 } exit 1 } catch { exit 1 }" >nul 2>&1
+  if errorlevel 1 (
+    echo  [WAIT_MARKET] AVISO: Service nao respondeu em 60s. Continuando mesmo assim.
+    echo  [WAIT_MARKET] O BLOCO 1 (POST /api/market/update) provavelmente falhara.
+  ) else (
+    echo  [WAIT_MARKET] Service UP. Continuando.
+  )
+) else (
+  echo  [WAIT_MARKET] Service ja esta UP. Continuando.
+)
+echo.
+
 echo  >>> BLOCO 1/4: Iniciando POST /api/market/update <<<
 echo.
 
