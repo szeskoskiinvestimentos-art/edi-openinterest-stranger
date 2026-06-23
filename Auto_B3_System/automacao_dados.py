@@ -1110,31 +1110,210 @@ def fetch_options_api(driver, symbol, expiration_date=None, asset_type='etfs-fun
             
     return df[final_cols].copy()
 
+def _html_records_to_df(records, expiration_date, symbol):
+    """Normaliza lista de dicts retornada por parse_html_table para DataFrame
+    com o MESMO schema de fetch_options_api (Strike, Last, Open Int, Vol, Type, Expiration, IV, symbol).
+    O parse_html_table usa chaves: strikePrice, lastPrice, volatility, openInterest, volume, bid, ask,
+    delta, gamma, theta, vega, symbolType.
+    """
+    if not records:
+        return None
+    try:
+        df = pd.DataFrame(records)
+    except Exception as e:
+        print(f"  [html] falha ao converter records para DF: {e}")
+        return None
+
+    if df.empty:
+        return None
+
+    # Strike — limpar virgulas e possivel sufixo C/P que o stacked view as vezes coloca
+    def _clean_strike(v):
+        if v is None:
+            return None
+        s = str(v).replace(',', '').strip()
+        # Remove trailing C/P ex: "5400C" -> "5400"
+        s = re.sub(r'[CPcp]\s*$', '', s).strip()
+        try:
+            return float(s)
+        except Exception:
+            return None
+
+    df['Strike'] = df['strikePrice'].apply(_clean_strike) if 'strikePrice' in df.columns else None
+
+    def _clean_num(v):
+        if v is None:
+            return 0.0
+        s = str(v).replace(',', '').replace('%', '').strip()
+        if s in ('', '-', 'N/A', 'n/a'):
+            return 0.0
+        try:
+            return float(s)
+        except Exception:
+            return 0.0
+
+    df['Last'] = df['lastPrice'].apply(_clean_num) if 'lastPrice' in df.columns else 0.0
+    df['Open Int'] = df['openInterest'].apply(_clean_num) if 'openInterest' in df.columns else 0.0
+    df['Vol'] = df['volume'].apply(_clean_num) if 'volume' in df.columns else 0.0
+    df['IV'] = df['volatility'].apply(_clean_num) if 'volatility' in df.columns else 0.0
+
+    # Type — symbolType se disponivel; senao inferir do 'C'/'P' suffix no strike original
+    def _infer_type(row):
+        t = row.get('symbolType') or row.get('type')
+        if t and str(t).strip():
+            ts = str(t).strip().lower()
+            if ts in ('call', 'c'):
+                return 'Call'
+            if ts in ('put', 'p'):
+                return 'Put'
+            return str(t).strip()
+        # Fallback: detectar no strike original (ex: "5400C")
+        sp = row.get('strikePrice')
+        if sp is not None:
+            s = str(sp).strip()
+            if re.search(r'C\s*$', s):
+                return 'Call'
+            if re.search(r'P\s*$', s):
+                return 'Put'
+        return ''
+
+    df['Type'] = df.apply(_infer_type, axis=1)
+
+    # Expiration — se o HTML trouxer, usar; senao o parametro
+    if hasattr(expiration_date, 'strftime'):
+        exp_str = expiration_date.strftime('%Y-%m-%d')
+    else:
+        exp_str = str(expiration_date) if expiration_date else ''
+
+    if 'expirationDate' in df.columns:
+        df['Expiration'] = df['expirationDate'].fillna('').astype(str)
+        # Onde vier vazio, preenche com o target
+        if exp_str:
+            mask = df['Expiration'].isna() | (df['Expiration'].str.strip() == '')
+            df.loc[mask, 'Expiration'] = exp_str
+    else:
+        df['Expiration'] = exp_str
+
+    df['symbol'] = symbol
+
+    final_cols = ['Strike', 'Last', 'Open Int', 'Vol', 'Type', 'Expiration', 'IV', 'symbol']
+    for col in final_cols:
+        if col not in df.columns:
+            df[col] = None
+
+    return df[final_cols].copy()
+
+
+def _build_options_url(symbol, asset_type='futures'):
+    """Constroi URL do Barchart para HTML scraping de options chain."""
+    if asset_type == 'futures':
+        # Futures: /futures/quotes/{symbol}/options
+        return f"https://www.barchart.com/futures/quotes/{symbol}/options?view=stacked&moneyness=allRows"
+    # ETF/stocks: /etfs-funds/quotes/{symbol}/options ou /stocks/quotes/{symbol}/options
+    return f"https://www.barchart.com/etfs-funds/quotes/{symbol}/options?view=stacked&moneyness=allRows"
+
+
+def _scroll_full_page(driver, max_passes=8, pause=1.0):
+    """Forca lazy-load rolando ate o fim da pagina."""
+    last_height = 0
+    for i in range(max_passes):
+        try:
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        except Exception:
+            break
+        time.sleep(pause)
+        try:
+            new_height = driver.execute_script("return document.body.scrollHeight;")
+            if new_height == last_height:
+                break
+            last_height = new_height
+        except Exception:
+            break
+
+
+def fetch_options_html(driver, symbol, expiration_date=None, asset_type='futures', custom_url=None):
+    """Fallback via HTML scraping quando API nao retorna todos os strikes (GAP #1 WDO).
+
+    URL: https://www.barchart.com/futures/quotes/{symbol}/options?view=stacked&moneyness=allRows
+    Reusa parse_html_table (L430) para parsear a tabela HTML.
+    Retorna DataFrame com MESMO schema de fetch_options_api (Strike, Last, Open Int, Vol, Type, Expiration, IV, symbol).
+    """
+    url = custom_url or _build_options_url(symbol, asset_type)
+    print(f"  [html] GET {url}")
+
+    if not safe_driver_get(driver, url, timeout=30, label=f"options_html({symbol})"):
+        print(f"  [html] safe_driver_get falhou para {symbol}")
+        return None
+
+    try:
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.webdriver.common.by import By
+        WebDriverWait(driver, 25).until(
+            EC.presence_of_element_located((By.XPATH, "//th[contains(translate(text(), 'STRIKE', 'strike'), 'strike')]"))
+        )
+        print(f"  [html] header 'Strike' renderizou para {symbol}")
+    except Exception as e:
+        print(f"  [html] header nao apareceu em 25s para {symbol}: {e} — tentando mesmo assim")
+
+    _scroll_full_page(driver, max_passes=8, pause=1.0)
+
+    records = parse_html_table(driver.page_source)
+    if not records:
+        print(f"  [html] parse_html_table retornou vazio para {symbol}")
+        return None
+
+    print(f"  [html] parse_html_table extraiu {len(records)} linhas para {symbol}")
+    return _html_records_to_df(records, expiration_date, symbol)
+
+
 def fetch_options_data(driver, symbol, expiration, asset_type, custom_url=None):
-    """Wrapper para manter compatibilidade, agora usando API."""
-    # Adaptação temporária para retornar formato esperado pelo process_and_save_csv
-    df = fetch_options_api(driver, symbol, expiration, asset_type)
-    if df is not None and not df.empty:
-        # Converte de volta para lista de dicts com chaves esperadas pelo process_and_save_csv
-        # O process_and_save_csv espera: strikePrice, lastPrice, volatility, delta, etc.
-        # O fetch_options_api já normalizou para: Strike, Last, IV, etc.
-        # Vamos reverter ou adaptar para o que o parser original esperava, ou retornar o DF e torcer para o código downstream ter mudado (mas não mudou neste arquivo).
-        # Melhor estratégia: retornar dict 'data' com chaves mapeadas para o que o processador atual espera.
-        records = []
-        for _, row in df.iterrows():
-            records.append({
-                'strikePrice': row['Strike'],
-                'lastPrice': row['Last'],
-                'volatility': row['IV'],
-                'openInterest': row['Open Int'],
-                'volume': row['Vol'],
-                'symbolType': row['Type'],
-                'expirationDate': row['Expiration'],
-                # Campos que a API talvez não trouxe ou não normalizamos, mas o parser antigo usava:
-                'bid': 0, 'ask': 0, 'delta': 0, 'gamma': 0, 'vega': 0, 'theta': 0
-            })
-        return {"data": records, "meta": {}}
-    return None
+    """Wrapper que tenta API primeiro e cai no HTML scraping quando a API
+    Barchart devolve strikes incompletos (caso WDO/DXY — GAP #1 auditoria 2026-06-22).
+
+    Comportamento:
+      - asset_type == 'futures' (WDO): API retorna 1-4 strikes ATM; cai no HTML.
+      - asset_type == 'etf' (EWZ): API ja funciona (24 expiries ~70 strikes); mantem API.
+      - threshold de fallback: se DataFrame da API tiver <20 strikes OU estiver vazio,
+        tenta HTML.
+    Retorna dict {'data': records, 'meta': {...}} no formato esperado por
+    process_and_save_csv (compatibilidade total com chamadores existentes).
+    """
+    threshold = 20  # API de futuros Barchart raramente passa de 4 strikes para WDO
+
+    # 1) Tenta API primeiro
+    df = None
+    try:
+        df = fetch_options_api(driver, symbol, expiration, asset_type)
+    except Exception as e:
+        print(f"  [wrapper] fetch_options_api excecao para {symbol}: {e}")
+
+    api_rows = len(df) if df is not None else 0
+    use_html = df is None or df.empty or api_rows < threshold
+
+    source = "api"
+    if use_html and asset_type == 'futures':
+        print(f"  [wrapper] API devolveu {api_rows} strikes (<{threshold}) para {symbol} — fallback HTML")
+        df = fetch_options_html(driver, symbol, expiration, asset_type, custom_url=custom_url)
+        source = "html"
+
+    if df is None or df.empty:
+        return None
+
+    # Converte DF -> lista de dicts com chaves que process_and_save_csv espera
+    records = []
+    for _, row in df.iterrows():
+        records.append({
+            'strikePrice': row['Strike'],
+            'lastPrice': row['Last'],
+            'volatility': row['IV'],
+            'openInterest': row['Open Int'],
+            'volume': row['Vol'],
+            'symbolType': row['Type'],
+            'expirationDate': row['Expiration'],
+            'bid': 0, 'ask': 0, 'delta': 0, 'gamma': 0, 'vega': 0, 'theta': 0
+        })
+    return {"data": records, "meta": {"source": source, "rows": len(records)}}
 
 def fetch_quote_data(driver, symbol):
     """Busca dados de cotação (Last Price) via Scraping."""
