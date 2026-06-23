@@ -2,10 +2,10 @@
 
 ## Status: AGUARDANDO VALIDAÇÃO DO OWNER
 
-## Último Checkpoint: CP-054
-- **Data/Hora**: 2026-06-22 20:24 (re-registro)
-- **Título**: FORCE.bat v5.0 — FUNCIONA end-to-end
-- **Status**: CONCLUÍDO (Barchart E97 travando esperado, mas Yahoo/Node/DI completos)
+## Último Checkpoint: CP-055
+- **Data/Hora**: 2026-06-22 22:30 (re-registro)
+- **Título**: Barchart HTML fallback IMPLEMENTADO + 3 auditorias completas
+- **Status**: CONCLUÍDO (testado em sandbox, pendente validação live)
 
 ## Sessão 2026-06-22: Diagnóstico Coletas + Fix FORCE.bat
 
