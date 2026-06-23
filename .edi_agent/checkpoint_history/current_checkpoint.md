@@ -2,10 +2,10 @@
 
 ## Status: AGUARDANDO VALIDAÇÃO DO OWNER
 
-## Último Checkpoint: CP-055
-- **Data/Hora**: 2026-06-22 22:30 (re-registro)
-- **Título**: Barchart HTML fallback IMPLEMENTADO + 3 auditorias completas
-- **Status**: CONCLUÍDO (testado em sandbox, pendente validação live)
+## Último Checkpoint: CP-056
+- **Data/Hora**: 2026-06-22 23:50 (re-registro)
+- **Título**: 4 subagentes em paralelo + 2 fixes críticos (MERCADO CSS path, controle_de_dados.html Neon)
+- **Status**: CONCLUÍDO (testado + commitado)
 
 ## Sessão 2026-06-22: Diagnóstico Coletas + Fix FORCE.bat
 
